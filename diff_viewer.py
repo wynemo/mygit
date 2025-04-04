@@ -50,18 +50,22 @@ class DiffTextEdit(QPlainTextEdit):
         """垂直滚动条值改变时的处理"""
         if not self.is_scrolling:
             self.is_scrolling = True
-            # 计算滚动百分比
-            maximum = self.verticalScrollBar().maximum()
-            if maximum == 0:
-                percentage = 0
-            else:
-                percentage = value / maximum
-                
-            # 同步其他编辑器的滚动
-            for edit in self.sync_scrolls:
-                other_maximum = edit.verticalScrollBar().maximum()
-                edit.verticalScrollBar().setValue(int(percentage * other_maximum))
-            self.is_scrolling = False
+            try:
+                # 计算滚动百分比
+                maximum = self.verticalScrollBar().maximum()
+                if maximum > 0:
+                    percentage = value / maximum
+                    # 同步其他编辑器的滚动
+                    for edit in self.sync_scrolls:
+                        other_maximum = edit.verticalScrollBar().maximum()
+                        target_value = int(percentage * other_maximum)
+                        # 确保值在有效范围内
+                        target_value = max(0, min(target_value, other_maximum))
+                        edit.verticalScrollBar().setValue(target_value)
+            except Exception as e:
+                print(f"滚动同步出错: {e}")
+            finally:
+                self.is_scrolling = False
             
     def on_horizontal_scroll_changed(self, value):
         """水平滚动条值改变时的处理"""
@@ -97,10 +101,20 @@ class DiffTextEdit(QPlainTextEdit):
         super().wheelEvent(event)
         if not self.is_scrolling:
             self.is_scrolling = True
-            # 同步其他编辑器的滚动
-            for edit in self.sync_scrolls:
-                edit.verticalScrollBar().setValue(self.verticalScrollBar().value())
-            self.is_scrolling = False 
+            # 计算当前滚动百分比
+            current_value = self.verticalScrollBar().value()
+            maximum = self.verticalScrollBar().maximum()
+            if maximum > 0:
+                percentage = current_value / maximum
+                # 同步其他编辑器的滚动
+                for edit in self.sync_scrolls:
+                    other_maximum = edit.verticalScrollBar().maximum()
+                    # 根据百分比计算对应的滚动值
+                    target_value = int(percentage * other_maximum)
+                    # 确保值在有效范围内
+                    target_value = max(0, min(target_value, other_maximum))
+                    edit.verticalScrollBar().setValue(target_value)
+            self.is_scrolling = False
 
     def line_number_area_width(self):
         """计算行号区域的宽度"""
