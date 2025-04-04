@@ -1,12 +1,14 @@
 import sys
+import os
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QFileDialog, QVBoxLayout, 
                            QWidget, QPushButton, QListWidget, QHBoxLayout, 
                            QLabel, QComboBox, QSplitter, QTreeWidget, QTreeWidgetItem,
-                           QTextEdit)
+                           QTextEdit, QMenu, QToolButton)
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QAction
 from git_manager import GitManager
 from syntax_highlighter import CodeHighlighter, format_diff_content
+from settings import Settings
 
 class DiffTextEdit(QTextEdit):
     def __init__(self, parent=None):
@@ -21,6 +23,7 @@ class GitManagerWindow(QMainWindow):
         self.setGeometry(100, 100, 1200, 800)
         self.git_manager = None
         self.current_commit = None
+        self.settings = Settings()
         
         # 创建主窗口部件
         main_widget = QWidget()
@@ -34,10 +37,26 @@ class GitManagerWindow(QMainWindow):
         top_layout = QHBoxLayout()
         main_layout.addLayout(top_layout)
         
+        # 创建打开文件夹按钮和最近文件夹按钮的容器
+        folder_layout = QHBoxLayout()
+        
         # 创建打开文件夹按钮
         self.open_button = QPushButton("打开文件夹")
-        self.open_button.clicked.connect(self.open_folder)
-        top_layout.addWidget(self.open_button)
+        self.open_button.clicked.connect(self.open_folder_dialog)
+        folder_layout.addWidget(self.open_button)
+        
+        # 创建最近文件夹按钮
+        self.recent_button = QToolButton()
+        self.recent_button.setText("最近")
+        self.recent_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        
+        # 创建最近文件夹菜单
+        self.recent_menu = QMenu(self)
+        self.recent_button.setMenu(self.recent_menu)
+        self.update_recent_menu()
+        
+        folder_layout.addWidget(self.recent_button)
+        top_layout.addLayout(folder_layout)
         
         # 创建分支选择下拉框
         self.branch_label = QLabel("当前分支:")
@@ -127,17 +146,56 @@ class GitManagerWindow(QMainWindow):
         # 设置垂直分割器的初始大小
         vertical_splitter.setSizes([400, 400])
         
-    def open_folder(self):
+        # 在初始化完成后，尝试打开上次的文件夹
+        last_folder = self.settings.get_last_folder()
+        if last_folder and os.path.exists(last_folder):
+            self.open_folder(last_folder)
+        
+    def update_recent_menu(self):
+        """更新最近文件夹菜单"""
+        self.recent_menu.clear()
+        recent_folders = self.settings.get_recent_folders()
+        
+        for folder in recent_folders:
+            if os.path.exists(folder):  # 只显示仍然存在的文件夹
+                action = QAction(folder, self)
+                action.triggered.connect(lambda checked, f=folder: self.open_folder(f))
+                self.recent_menu.addAction(action)
+                
+        if recent_folders:
+            self.recent_menu.addSeparator()
+            clear_action = QAction("清除最近记录", self)
+            clear_action.triggered.connect(self.clear_recent_folders)
+            self.recent_menu.addAction(clear_action)
+            
+    def clear_recent_folders(self):
+        """清除最近文件夹记录"""
+        self.settings.settings['recent_folders'] = []
+        self.settings.settings['last_folder'] = None
+        self.settings.save_settings()
+        self.update_recent_menu()
+        
+    def open_folder_dialog(self):
+        """打开文件夹选择对话框"""
         folder_path = QFileDialog.getExistingDirectory(self, "选择Git仓库")
         if folder_path:
-            self.git_manager = GitManager(folder_path)
-            if self.git_manager.initialize():
-                self.update_branches()
-                self.update_commit_history()
-            else:
-                self.history_list.clear()
-                self.history_list.addItem("所选文件夹不是有效的Git仓库")
-                
+            self.open_folder(folder_path)
+            
+    def open_folder(self, folder_path):
+        """打开指定的文件夹"""
+        self.git_manager = GitManager(folder_path)
+        if self.git_manager.initialize():
+            # 添加到最近文件夹列表
+            self.settings.add_recent_folder(folder_path)
+            self.update_recent_menu()
+            
+            # 更新UI
+            self.update_branches()
+            self.update_commit_history()
+        else:
+            self.history_list.clear()
+            self.history_list.addItem("所选文件夹不是有效的Git仓库")
+            
     def update_branches(self):
         """更新分支列表"""
         self.branch_combo.clear()
