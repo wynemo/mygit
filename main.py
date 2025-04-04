@@ -5,16 +5,16 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QFileDialog, QVBoxLayout
                            QLabel, QComboBox, QSplitter, QTreeWidget, QTreeWidgetItem,
                            QTextEdit, QMenu, QToolButton, QScrollBar)
 from PyQt6.QtCore import Qt, QPoint
-from PyQt6.QtGui import QFont, QAction, QTextCursor
+from PyQt6.QtGui import QFont, QAction, QTextCursor, QColor
 from git_manager import GitManager
-from syntax_highlighter import CodeHighlighter, format_diff_content
+from syntax_highlighter import CodeHighlighter, DiffCodeHighlighter, format_diff_content
 from settings import Settings
 
 class DiffTextEdit(QTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFont(QFont('Courier New', 10))
-        self.highlighter = CodeHighlighter(self.document())
+        self.highlighter = DiffCodeHighlighter(self.document())
         self.sync_scrolls = []  # 同步滚动的其他编辑器列表
         self.is_scrolling = False  # 防止递归滚动
         
@@ -66,6 +66,18 @@ class DiffTextEdit(QTextEdit):
                 edit.horizontalScrollBar().setValue(int(percentage * other_maximum))
             self.is_scrolling = False
             
+    def set_diff_info(self, line_info):
+        """Passes diff info to the highlighter."""
+        if isinstance(self.highlighter, DiffCodeHighlighter):
+            self.highlighter.set_diff_info(line_info)
+        else:
+             # Fallback or error handling if highlighter is not the expected type
+             print("Warning: Highlighter is not DiffCodeHighlighter, cannot set diff info.")
+
+    def rehighlight(self):
+        """Triggers rehighlighting."""
+        self.highlighter.rehighlight()
+        
     def wheelEvent(self, event):
         """处理鼠标滚轮事件"""
         super().wheelEvent(event)
@@ -388,71 +400,116 @@ class GitManagerWindow(QMainWindow):
         self.right_diff.add_sync_scroll(self.middle_diff)
         
     def on_file_clicked(self, item):
-        """当点击文件项时显示文件差异"""
-        if not self.current_commit or not item:
-            return
-            
-        # 如果点击的是目录（有子项），不显示差异
-        if item.childCount() > 0:
+        """当点击文件项时显示文件差异 (Revised Implementation)"""
+        if not self.current_commit or not item or item.childCount() > 0:
             return
             
         try:
             file_path = self.get_full_path(item)
-            parent = self.current_commit.parents[0] if self.current_commit.parents else None
+            parents = self.current_commit.parents
+            is_merge = len(parents) > 1
             
-            # 检查是否是合并提交
-            is_merge = len(self.current_commit.parents) > 1
+            # Default contents
+            old_content = ""
+            new_content = ""
+            parent1_content = "" # For merge base (optional, could use parent[0])
+            parent2_content = "" # For merge source
             
-            # 在设置新内容前先清空并重置滚动条
+            # --- Fetch Content ---
+            try:
+                new_content = self.current_commit.tree[file_path].data_stream.read().decode('utf-8', errors='replace')
+            except KeyError:
+                 # File might have been deleted in this commit, check diff status
+                 print(f"File {file_path} not found in current commit tree.")
+                 # If deleted, new_content remains ""
+            except Exception as e:
+                 print(f"Error reading current content for {file_path}: {e}")
+                 self.left_diff.setPlainText(f"Error reading current content:\n{e}")
+                 self.middle_diff.clear()
+                 self.right_diff.clear()
+                 return
+
+            if is_merge:
+                try:
+                    parent1_content = parents[0].tree[file_path].data_stream.read().decode('utf-8', errors='replace')
+                except KeyError: pass # File might not exist in parent 1
+                except Exception as e: print(f"Error reading parent1 content: {e}")
+                try:
+                    parent2_content = parents[1].tree[file_path].data_stream.read().decode('utf-8', errors='replace')
+                except KeyError: pass # File might not exist in parent 2
+                except Exception as e: print(f"Error reading parent2 content: {e}")
+                # For 3-way diff, 'old_content' often refers to the common ancestor (base)
+                # Finding the merge base can be complex, let's stick to comparing parents to current for now
+                old_content = parent1_content # Left view compares parent1 vs current
+                # Middle view shows current
+                # Right view compares parent2 vs current
+                
+            elif parents: # Single parent commit
+                try:
+                    old_content = parents[0].tree[file_path].data_stream.read().decode('utf-8', errors='replace')
+                except KeyError: 
+                     # File added in this commit, old_content remains ""
+                     pass 
+                except Exception as e:
+                    print(f"Error reading parent content for {file_path}: {e}")
+                    old_content = f"(Error reading parent content: {e})"
+            else: # Initial commit
+                 old_content = "" # No parent, so old content is empty
+
+            # --- Clear and Reset Scroll ---
             self.left_diff.clear()
             self.middle_diff.clear()
             self.right_diff.clear()
             self.left_diff.verticalScrollBar().setValue(0)
             self.middle_diff.verticalScrollBar().setValue(0)
             self.right_diff.verticalScrollBar().setValue(0)
-            
+
+            # --- Process Diff and Apply ---
             if is_merge:
-                # 显示三方对比
                 self.middle_diff.show()
-                # 获取两个父提交的文件内容
-                parent1_content = parent.tree[file_path].data_stream.read().decode('utf-8')
-                parent2_content = self.current_commit.parents[1].tree[file_path].data_stream.read().decode('utf-8')
-                current_content = self.current_commit.tree[file_path].data_stream.read().decode('utf-8')
                 
-                # 生成差异HTML
-                # 左边显示当前分支的父提交
-                self.left_diff.setHtml(format_diff_content(parent1_content, current_content)[0])
-                # 中间显示合并后的结果
-                self.middle_diff.setHtml(format_diff_content("", current_content)[1])
-                # 右边显示要合并的分支的父提交
-                self.right_diff.setHtml(format_diff_content(parent2_content, current_content)[0])
-            else:
-                # 隐藏中间文本框
+                # Compare Parent1 vs Current (for left view)
+                old_line_info1, _ = format_diff_content(parent1_content, new_content)
+                # Compare Parent2 vs Current (for right view - need info for parent2 side)
+                old_line_info2, new_line_info2_vs_p2 = format_diff_content(parent2_content, new_content) # We need diff relative to P2 for right view highlighting
+
+                # Left view: Parent 1 content, highlighted based on diff with Current
+                self.left_diff.setPlainText(parent1_content) 
+                self.left_diff.set_diff_info(old_line_info1) # Highlight based on changes FROM parent1
+                self.left_diff.rehighlight()
+
+                # Middle view: Current content (no diff highlighting needed relative to itself)
+                self.middle_diff.setPlainText(new_content)
+                self.middle_diff.set_diff_info([]) # No diff markers
+                self.middle_diff.rehighlight()
+
+                # Right view: Parent 2 content, highlighted based on diff with Current
+                self.right_diff.setPlainText(parent2_content) 
+                self.right_diff.set_diff_info(old_line_info2) # Highlight based on changes FROM parent2
+                self.right_diff.rehighlight()
+
+            else: # Normal diff (or initial commit)
                 self.middle_diff.hide()
-                if parent:
-                    try:
-                        # 获取旧版本内容
-                        old_content = parent.tree[file_path].data_stream.read().decode('utf-8')
-                        new_content = self.current_commit.tree[file_path].data_stream.read().decode('utf-8')
-                        
-                        # 生成差异HTML
-                        old_html, new_html = format_diff_content(old_content, new_content)
-                        
-                        self.left_diff.setHtml(old_html)
-                        self.right_diff.setHtml(new_html)
-                    except KeyError:
-                        # 文件在旧版本中不存在
-                        self.left_diff.setPlainText("(文件不存在)")
-                        new_content = self.current_commit.tree[file_path].data_stream.read().decode('utf-8')
-                        self.right_diff.setHtml(format_diff_content("", new_content)[1])
-                else:
-                    # 第一个提交
-                    self.left_diff.setPlainText("(新文件)")
-                    new_content = self.current_commit.tree[file_path].data_stream.read().decode('utf-8')
-                    self.right_diff.setHtml(format_diff_content("", new_content)[1])
-                    
+                
+                # Get structured diff info
+                old_line_info, new_line_info = format_diff_content(old_content, new_content)
+                
+                # Left view: Old content, highlighted if removed/changed
+                self.left_diff.setPlainText(old_content if old_content else "(New File)")
+                self.left_diff.set_diff_info(old_line_info)
+                self.left_diff.rehighlight()
+
+                # Right view: New content, highlighted if added/changed
+                self.right_diff.setPlainText(new_content if new_content else "(File Deleted)")
+                self.right_diff.set_diff_info(new_line_info)
+                self.right_diff.rehighlight()
+                
         except Exception as e:
-            self.left_diff.setPlainText(f"获取文件差异失败: {str(e)}")
+            # General error handling
+            print(f"Error displaying file diff for {item.text(0)}: {e}")
+            import traceback
+            traceback.print_exc() # Print detailed traceback
+            self.left_diff.setPlainText(f"获取文件差异失败:\n{traceback.format_exc()}")
             self.middle_diff.clear()
             self.right_diff.clear()
 
