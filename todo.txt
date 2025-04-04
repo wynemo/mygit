@@ -1,1 +1,1 @@
-1. merge view还是有问题，比较高亮
+1. merge view还是有问题，比较高亮 让ai打印出git diff的信息，和界面比较
