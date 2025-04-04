@@ -25,14 +25,22 @@ class GitManager:
         if not self.repo:
             return []
             
-        commits = []
-        for commit in self.repo.iter_commits(branch, max_count=limit):
-            # 只取第一行提交信息
-            message = commit.message.strip().split('\n')[0]
-            commits.append({
-                'hash': commit.hexsha,
-                'message': message,
-                'author': commit.author.name,
-                'date': commit.committed_datetime.strftime('%Y-%m-%d %H:%M:%S')
-            })
-        return commits 
+        try:
+            # 如果分支名为空,使用当前分支
+            if not branch:
+                branch = self.repo.active_branch.name
+                
+            commits = []
+            for commit in self.repo.iter_commits(branch, max_count=limit):
+                # 只取第一行提交信息
+                message = commit.message.strip().split('\n')[0]
+                commits.append({
+                    'hash': commit.hexsha,
+                    'message': message,
+                    'author': commit.author.name,
+                    'date': commit.committed_datetime.strftime('%Y-%m-%d %H:%M:%S')
+                })
+            return commits
+        except Exception as e:
+            print(f"获取提交历史失败: {str(e)}")
+            return [] 
