@@ -420,13 +420,12 @@ class GitManagerWindow(QMainWindow):
                 current_content = self.current_commit.tree[file_path].data_stream.read().decode('utf-8')
                 
                 # 生成差异HTML
-                old_html, _ = format_diff_content(parent1_content, current_content)
-                middle_html, _ = format_diff_content(parent2_content, current_content)
-                _, new_html = format_diff_content(parent1_content, current_content)
-                
-                self.left_diff.setHtml(old_html)
-                self.middle_diff.setHtml(middle_html)
-                self.right_diff.setHtml(new_html)
+                # 左边显示当前分支的父提交
+                self.left_diff.setHtml(format_diff_content(parent1_content, current_content)[0])
+                # 中间显示合并后的结果
+                self.middle_diff.setHtml(format_diff_content("", current_content)[1])
+                # 右边显示要合并的分支的父提交
+                self.right_diff.setHtml(format_diff_content(parent2_content, current_content)[0])
             else:
                 # 隐藏中间文本框
                 self.middle_diff.hide()
