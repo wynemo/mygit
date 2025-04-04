@@ -3,9 +3,9 @@ import os
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QFileDialog, QVBoxLayout, 
                            QWidget, QPushButton, QListWidget, QHBoxLayout, 
                            QLabel, QComboBox, QSplitter, QTreeWidget, QTreeWidgetItem,
-                           QTextEdit, QMenu, QToolButton)
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QAction
+                           QTextEdit, QMenu, QToolButton, QScrollBar)
+from PyQt6.QtCore import Qt, QPoint
+from PyQt6.QtGui import QFont, QAction, QTextCursor
 from git_manager import GitManager
 from syntax_highlighter import CodeHighlighter, format_diff_content
 from settings import Settings
@@ -15,6 +15,66 @@ class DiffTextEdit(QTextEdit):
         super().__init__(parent)
         self.setFont(QFont('Courier New', 10))
         self.highlighter = CodeHighlighter(self.document())
+        self.sync_scrolls = []  # 同步滚动的其他编辑器列表
+        self.is_scrolling = False  # 防止递归滚动
+        
+        # 监听滚动条变化
+        self.verticalScrollBar().valueChanged.connect(self.on_scroll_changed)
+        self.horizontalScrollBar().valueChanged.connect(self.on_horizontal_scroll_changed)
+        
+    def add_sync_scroll(self, other_edit):
+        """添加需要同步滚动的编辑器"""
+        if other_edit not in self.sync_scrolls:
+            self.sync_scrolls.append(other_edit)
+            
+    def remove_sync_scroll(self, other_edit):
+        """移除同步滚动的编辑器"""
+        if other_edit in self.sync_scrolls:
+            self.sync_scrolls.remove(other_edit)
+            
+    def on_scroll_changed(self, value):
+        """垂直滚动条值改变时的处理"""
+        if not self.is_scrolling:
+            self.is_scrolling = True
+            # 计算滚动百分比
+            maximum = self.verticalScrollBar().maximum()
+            if maximum == 0:
+                percentage = 0
+            else:
+                percentage = value / maximum
+                
+            # 同步其他编辑器的滚动
+            for edit in self.sync_scrolls:
+                other_maximum = edit.verticalScrollBar().maximum()
+                edit.verticalScrollBar().setValue(int(percentage * other_maximum))
+            self.is_scrolling = False
+            
+    def on_horizontal_scroll_changed(self, value):
+        """水平滚动条值改变时的处理"""
+        if not self.is_scrolling:
+            self.is_scrolling = True
+            # 计算滚动百分比
+            maximum = self.horizontalScrollBar().maximum()
+            if maximum == 0:
+                percentage = 0
+            else:
+                percentage = value / maximum
+                
+            # 同步其他编辑器的滚动
+            for edit in self.sync_scrolls:
+                other_maximum = edit.horizontalScrollBar().maximum()
+                edit.horizontalScrollBar().setValue(int(percentage * other_maximum))
+            self.is_scrolling = False
+            
+    def wheelEvent(self, event):
+        """处理鼠标滚轮事件"""
+        super().wheelEvent(event)
+        if not self.is_scrolling:
+            self.is_scrolling = True
+            # 同步其他编辑器的滚动
+            for edit in self.sync_scrolls:
+                edit.verticalScrollBar().setValue(self.verticalScrollBar().value())
+            self.is_scrolling = False
 
 class GitManagerWindow(QMainWindow):
     def __init__(self):
@@ -139,6 +199,9 @@ class GitManagerWindow(QMainWindow):
         self.right_diff = DiffTextEdit()
         self.right_diff.setReadOnly(True)
         diff_splitter.addWidget(self.right_diff)
+        
+        # 设置文本框之间的滚动同步
+        self.setup_diff_sync()
         
         # 添加下半部分到垂直分割器
         vertical_splitter.addWidget(diff_widget)
@@ -312,6 +375,18 @@ class GitManagerWindow(QMainWindow):
             item = item.parent()
         return '/'.join(path_parts)
             
+    def setup_diff_sync(self):
+        """设置差异文本框之间的滚动同步"""
+        # 左右文本框互相同步
+        self.left_diff.add_sync_scroll(self.right_diff)
+        self.right_diff.add_sync_scroll(self.left_diff)
+        
+        # 中间文本框与左右都同步
+        self.middle_diff.add_sync_scroll(self.left_diff)
+        self.middle_diff.add_sync_scroll(self.right_diff)
+        self.left_diff.add_sync_scroll(self.middle_diff)
+        self.right_diff.add_sync_scroll(self.middle_diff)
+        
     def on_file_clicked(self, item):
         """当点击文件项时显示文件差异"""
         if not self.current_commit or not item:
@@ -327,6 +402,14 @@ class GitManagerWindow(QMainWindow):
             
             # 检查是否是合并提交
             is_merge = len(self.current_commit.parents) > 1
+            
+            # 在设置新内容前先清空并重置滚动条
+            self.left_diff.clear()
+            self.middle_diff.clear()
+            self.right_diff.clear()
+            self.left_diff.verticalScrollBar().setValue(0)
+            self.middle_diff.verticalScrollBar().setValue(0)
+            self.right_diff.verticalScrollBar().setValue(0)
             
             if is_merge:
                 # 显示三方对比
