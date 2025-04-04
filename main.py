@@ -4,7 +4,15 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QFileDialog, QVBoxLayout
                            QLabel, QComboBox, QSplitter, QTreeWidget, QTreeWidgetItem,
                            QTextEdit)
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont
 from git_manager import GitManager
+from syntax_highlighter import CodeHighlighter, format_diff_content
+
+class DiffTextEdit(QTextEdit):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFont(QFont('Courier New', 10))
+        self.highlighter = CodeHighlighter(self.document())
 
 class GitManagerWindow(QMainWindow):
     def __init__(self):
@@ -98,18 +106,18 @@ class GitManagerWindow(QMainWindow):
         diff_layout.addWidget(diff_splitter)
         
         # 左侧差异文本框
-        self.left_diff = QTextEdit()
+        self.left_diff = DiffTextEdit()
         self.left_diff.setReadOnly(True)
         diff_splitter.addWidget(self.left_diff)
         
         # 中间差异文本框（用于merge情况）
-        self.middle_diff = QTextEdit()
+        self.middle_diff = DiffTextEdit()
         self.middle_diff.setReadOnly(True)
         self.middle_diff.hide()  # 默认隐藏
         diff_splitter.addWidget(self.middle_diff)
         
         # 右侧差异文本框
-        self.right_diff = QTextEdit()
+        self.right_diff = DiffTextEdit()
         self.right_diff.setReadOnly(True)
         diff_splitter.addWidget(self.right_diff)
         
@@ -270,9 +278,14 @@ class GitManagerWindow(QMainWindow):
                 parent2_content = self.current_commit.parents[1].tree[file_path].data_stream.read().decode('utf-8')
                 current_content = self.current_commit.tree[file_path].data_stream.read().decode('utf-8')
                 
-                self.left_diff.setText(parent1_content)
-                self.middle_diff.setText(parent2_content)
-                self.right_diff.setText(current_content)
+                # 生成差异HTML
+                old_html, _ = format_diff_content(parent1_content, current_content)
+                middle_html, _ = format_diff_content(parent2_content, current_content)
+                _, new_html = format_diff_content(parent1_content, current_content)
+                
+                self.left_diff.setHtml(old_html)
+                self.middle_diff.setHtml(middle_html)
+                self.right_diff.setHtml(new_html)
             else:
                 # 隐藏中间文本框
                 self.middle_diff.hide()
@@ -280,22 +293,26 @@ class GitManagerWindow(QMainWindow):
                     try:
                         # 获取旧版本内容
                         old_content = parent.tree[file_path].data_stream.read().decode('utf-8')
-                        self.left_diff.setText(old_content)
+                        new_content = self.current_commit.tree[file_path].data_stream.read().decode('utf-8')
+                        
+                        # 生成差异HTML
+                        old_html, new_html = format_diff_content(old_content, new_content)
+                        
+                        self.left_diff.setHtml(old_html)
+                        self.right_diff.setHtml(new_html)
                     except KeyError:
                         # 文件在旧版本中不存在
-                        self.left_diff.setText("(文件不存在)")
-                        
-                    # 获取新版本内容
-                    new_content = self.current_commit.tree[file_path].data_stream.read().decode('utf-8')
-                    self.right_diff.setText(new_content)
+                        self.left_diff.setPlainText("(文件不存在)")
+                        new_content = self.current_commit.tree[file_path].data_stream.read().decode('utf-8')
+                        self.right_diff.setHtml(format_diff_content("", new_content)[1])
                 else:
                     # 第一个提交
-                    self.left_diff.setText("(新文件)")
+                    self.left_diff.setPlainText("(新文件)")
                     new_content = self.current_commit.tree[file_path].data_stream.read().decode('utf-8')
-                    self.right_diff.setText(new_content)
+                    self.right_diff.setHtml(format_diff_content("", new_content)[1])
                     
         except Exception as e:
-            self.left_diff.setText(f"获取文件差异失败: {str(e)}")
+            self.left_diff.setPlainText(f"获取文件差异失败: {str(e)}")
             self.middle_diff.clear()
             self.right_diff.clear()
 
