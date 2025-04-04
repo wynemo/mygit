@@ -1,7 +1,7 @@
 import sys
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QFileDialog, QVBoxLayout, 
                            QWidget, QPushButton, QListWidget, QHBoxLayout, 
-                           QLabel, QComboBox, QSplitter, QTextEdit)
+                           QLabel, QComboBox, QSplitter, QTreeWidget, QTreeWidgetItem)
 from PyQt6.QtCore import Qt
 from git_manager import GitManager
 
@@ -58,9 +58,12 @@ class GitManagerWindow(QMainWindow):
         
         self.changes_label = QLabel("文件变化:")
         right_layout.addWidget(self.changes_label)
-        self.changes_text = QTextEdit()
-        self.changes_text.setReadOnly(True)
-        right_layout.addWidget(self.changes_text)
+        
+        # 使用QTreeWidget替代QTextEdit
+        self.changes_tree = QTreeWidget()
+        self.changes_tree.setHeaderLabels(["文件", "状态"])
+        self.changes_tree.setColumnCount(2)
+        right_layout.addWidget(self.changes_tree)
         
         # 添加左右部件到分割器
         splitter.addWidget(left_widget)
@@ -105,6 +108,43 @@ class GitManagerWindow(QMainWindow):
         if self.git_manager:
             self.update_commit_history()
             
+    def add_file_to_tree(self, path_parts, status, parent=None):
+        """递归添加文件到树形结构"""
+        if not path_parts:
+            return
+            
+        # 检查当前层级是否已存在
+        current_part = path_parts[0]
+        found_item = None
+        
+        if parent is None:
+            root = self.changes_tree.invisibleRootItem()
+            for i in range(root.childCount()):
+                if root.child(i).text(0) == current_part:
+                    found_item = root.child(i)
+                    break
+        else:
+            for i in range(parent.childCount()):
+                if parent.child(i).text(0) == current_part:
+                    found_item = parent.child(i)
+                    break
+                    
+        if found_item is None:
+            # 创建新项
+            if parent is None:
+                found_item = QTreeWidgetItem(self.changes_tree)
+            else:
+                found_item = QTreeWidgetItem(parent)
+            found_item.setText(0, current_part)
+            
+            # 只在叶子节点显示状态
+            if len(path_parts) == 1:
+                found_item.setText(1, status)
+                
+        # 递归处理剩余路径
+        if len(path_parts) > 1:
+            self.add_file_to_tree(path_parts[1:], status, found_item)
+            
     def on_commit_clicked(self, item):
         """当点击提交历史项时显示文件变化"""
         if not self.git_manager or not self.git_manager.repo:
@@ -119,25 +159,32 @@ class GitManagerWindow(QMainWindow):
             parent = commit.parents[0] if commit.parents else None
             
             # 清空之前的显示
-            self.changes_text.clear()
+            self.changes_tree.clear()
             
             if parent:
                 # 获取与父提交的差异
                 diff = parent.diff(commit)
                 for change in diff:
-                    self.changes_text.append(f"文件: {change.a_path}")
-                    self.changes_text.append(f"状态: {change.change_type}")
-                    self.changes_text.append("")
+                    path_parts = change.a_path.split('/')
+                    self.add_file_to_tree(path_parts, change.change_type)
             else:
                 # 如果是第一个提交,显示所有文件
                 for item in commit.tree.traverse():
                     if item.type == 'blob':  # 只显示文件,不显示目录
-                        self.changes_text.append(f"文件: {item.path}")
-                        self.changes_text.append("状态: 新增")
-                        self.changes_text.append("")
+                        path_parts = item.path.split('/')
+                        self.add_file_to_tree(path_parts, "新增")
+                        
+            # 展开所有项
+            self.changes_tree.expandAll()
+            
+            # 调整列宽以适应内容
+            self.changes_tree.resizeColumnToContents(0)
+            self.changes_tree.resizeColumnToContents(1)
                         
         except Exception as e:
-            self.changes_text.setText(f"获取文件变化失败: {str(e)}")
+            self.changes_tree.clear()
+            error_item = QTreeWidgetItem(self.changes_tree)
+            error_item.setText(0, f"获取文件变化失败: {str(e)}")
 
 def main():
     app = QApplication(sys.argv)
