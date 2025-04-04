@@ -98,23 +98,8 @@ class DiffTextEdit(QPlainTextEdit):
         
     def wheelEvent(self, event):
         """处理鼠标滚轮事件"""
+        # 只调用父类方法处理滚动，同步交给 on_scroll_changed 处理
         super().wheelEvent(event)
-        if not self.is_scrolling:
-            self.is_scrolling = True
-            # 计算当前滚动百分比
-            current_value = self.verticalScrollBar().value()
-            maximum = self.verticalScrollBar().maximum()
-            if maximum > 0:
-                percentage = current_value / maximum
-                # 同步其他编辑器的滚动
-                for edit in self.sync_scrolls:
-                    other_maximum = edit.verticalScrollBar().maximum()
-                    # 根据百分比计算对应的滚动值
-                    target_value = int(percentage * other_maximum)
-                    # 确保值在有效范围内
-                    target_value = max(0, min(target_value, other_maximum))
-                    edit.verticalScrollBar().setValue(target_value)
-            self.is_scrolling = False
 
     def line_number_area_width(self):
         """计算行号区域的宽度"""
