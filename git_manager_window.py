@@ -391,10 +391,30 @@ class GitManagerWindow(QMainWindow):
                 self.middle_diff.show()
 
                 # --- 计算高亮所需差异 ---
-                # 1. 比较 Parent 1 vs New Content, 获取 P1 中被删除/修改的行信息
-                old_line_info1, _ = format_diff_content(parent1_content, new_content)
-                # 2. 比较 Parent 2 vs New Content, 获取 P2 删除/修改的行 (old) 和 New 新增/修改的行 (new)
+                # 1. 比较 Parent 1 vs New Content, 获取 P1 删除/修改的行 (old1) 和 New 新增/修改的行 (new1)
+                old_line_info1, new_line_info1 = format_diff_content(parent1_content, new_content)
+                # 2. 比较 Parent 2 vs New Content, 获取 P2 删除/修改的行 (old2) 和 New 新增/修改的行 (new2)
                 old_line_info2, new_line_info2 = format_diff_content(parent2_content, new_content)
+
+                # --- 计算中间视图的综合高亮信息 --- 
+                middle_highlight_info = []
+                dict_new_info1 = dict(new_line_info1) # 转为字典以提高查找效率
+                dict_new_info2 = dict(new_line_info2)
+                num_lines_new = len(new_content.splitlines())
+
+                for ln in range(1, num_lines_new + 1):
+                    status1 = dict_new_info1.get(ln, 'normal')
+                    status2 = dict_new_info2.get(ln, 'normal')
+                    final_status = 'normal'
+
+                    # 如果相对于 P1 或 P2 是 'add'，则最终标记为 'add'
+                    if status1 == 'add' or status2 == 'add':
+                        final_status = 'add'
+                    # TODO: 可以扩展处理 'modify' 等类型, 需要 format_diff_content 支持
+
+                    if final_status != 'normal':
+                        middle_highlight_info.append((ln, final_status))
+                # --- 综合高亮计算结束 ---
 
                 # --- 设置视图内容和高亮 ---
                 # 左侧视图: 显示 Parent 1 内容, 高亮相对于 New 被删除/修改的行
@@ -402,9 +422,9 @@ class GitManagerWindow(QMainWindow):
                 self.left_diff.set_diff_info(old_line_info1) # 应用 old_line_info1
                 self.left_diff.rehighlight()
 
-                # 中间视图: 显示 New Content 内容, 高亮相对于 Parent 2 新增/修改的行
+                # 中间视图: 显示 New Content 内容, 高亮相对于 P1 或 P2 新增/修改的行
                 self.middle_diff.setPlainText(new_content)
-                self.middle_diff.set_diff_info(new_line_info2) # 应用 new_line_info2
+                self.middle_diff.set_diff_info(middle_highlight_info) # 应用综合高亮信息
                 self.middle_diff.rehighlight()
 
                 # 右侧视图: 显示 Parent 2 内容, 高亮相对于 New 被删除/修改的行
