@@ -386,27 +386,44 @@ class GitManagerWindow(QMainWindow):
             self.middle_diff.verticalScrollBar().setValue(0)
             self.right_diff.verticalScrollBar().setValue(0)
 
-            # --- 处理并显示内容 (移除差异计算和高亮) ---
+            # --- 处理并显示内容 ---
             if is_merge:
                 self.middle_diff.show()
 
-                # 为了打印 P2 vs New 的 diff，临时调用 format_diff_content
-                print("\n--- 即将比较: 右边 (Parent 2) vs 中间 (New) ---")
-                # 调用但不使用结果 (除了触发 syntax_highlighter.py 中的打印)
-                format_diff_content(parent2_content, new_content)
-                print("--- 比较结束 ---\n")
+                # --- 计算中间和右侧高亮所需差异 ---
+                # 比较 Parent 2 vs New Content, 获取 P2 删除/修改的行 (old) 和 New 新增/修改的行 (new)
+                old_line_info2, new_line_info2 = format_diff_content(parent2_content, new_content)
 
-                # 保持原有的文本设置逻辑 (无高亮)
+                # --- 设置视图内容和高亮 ---
+                # 左侧视图: 只显示 Parent 1 内容, 无高亮
                 self.left_diff.setPlainText(parent1_content)
-                self.middle_diff.setPlainText(new_content)
-                self.right_diff.setPlainText(parent2_content)
+                self.left_diff.set_diff_info([])
+                self.left_diff.rehighlight()
 
-            else: # 普通差异 (或初始提交)
+                # 中间视图: 显示 New Content 内容, 高亮相对于 Parent 2 新增/修改的行
+                self.middle_diff.setPlainText(new_content)
+                self.middle_diff.set_diff_info(new_line_info2) # 应用 new_line_info2
+                self.middle_diff.rehighlight()
+
+                # 右侧视图: 显示 Parent 2 内容, 高亮相对于 New 被删除/修改的行
+                self.right_diff.setPlainText(parent2_content)
+                self.right_diff.set_diff_info(old_line_info2) # 应用 old_line_info2
+                self.right_diff.rehighlight()
+
+            else: # 普通差异 (或初始提交) - 保持原有逻辑
                 self.middle_diff.hide()
 
-                # 只设置文本内容
+                # 计算差异
+                old_line_info, new_line_info = format_diff_content(old_content, new_content)
+
+                # 设置文本和高亮
                 self.left_diff.setPlainText(old_content if old_content else "(新文件)")
+                self.left_diff.set_diff_info(old_line_info)
+                self.left_diff.rehighlight()
+
                 self.right_diff.setPlainText(new_content if new_content else "(文件已删除)")
+                self.right_diff.set_diff_info(new_line_info)
+                self.right_diff.rehighlight()
 
         except Exception as e:
             # 通用错误处理
