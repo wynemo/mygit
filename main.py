@@ -1,7 +1,8 @@
 import sys
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QFileDialog, QVBoxLayout, 
                            QWidget, QPushButton, QListWidget, QHBoxLayout, 
-                           QLabel, QComboBox, QSplitter, QTreeWidget, QTreeWidgetItem)
+                           QLabel, QComboBox, QSplitter, QTreeWidget, QTreeWidgetItem,
+                           QTextEdit)
 from PyQt6.QtCore import Qt
 from git_manager import GitManager
 
@@ -11,6 +12,7 @@ class GitManagerWindow(QMainWindow):
         self.setWindowTitle("Git Manager")
         self.setGeometry(100, 100, 1200, 800)
         self.git_manager = None
+        self.current_commit = None
         
         # 创建主窗口部件
         main_widget = QWidget()
@@ -36,9 +38,18 @@ class GitManagerWindow(QMainWindow):
         top_layout.addWidget(self.branch_label)
         top_layout.addWidget(self.branch_combo)
         
-        # 创建分割器
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        main_layout.addWidget(splitter)
+        # 创建垂直分割器
+        vertical_splitter = QSplitter(Qt.Orientation.Vertical)
+        main_layout.addWidget(vertical_splitter)
+        
+        # 上半部分容器
+        upper_widget = QWidget()
+        upper_layout = QVBoxLayout()
+        upper_widget.setLayout(upper_layout)
+        
+        # 创建水平分割器（用于提交历史和文件变化）
+        horizontal_splitter = QSplitter(Qt.Orientation.Horizontal)
+        upper_layout.addWidget(horizontal_splitter)
         
         # 左侧提交历史区域
         left_widget = QWidget()
@@ -63,14 +74,50 @@ class GitManagerWindow(QMainWindow):
         self.changes_tree = QTreeWidget()
         self.changes_tree.setHeaderLabels(["文件", "状态"])
         self.changes_tree.setColumnCount(2)
+        self.changes_tree.itemClicked.connect(self.on_file_clicked)
         right_layout.addWidget(self.changes_tree)
         
-        # 添加左右部件到分割器
-        splitter.addWidget(left_widget)
-        splitter.addWidget(right_widget)
+        # 添加左右部件到水平分割器
+        horizontal_splitter.addWidget(left_widget)
+        horizontal_splitter.addWidget(right_widget)
+        horizontal_splitter.setSizes([400, 800])
         
-        # 设置分割器初始大小
-        splitter.setSizes([400, 800])
+        # 添加上半部分到垂直分割器
+        vertical_splitter.addWidget(upper_widget)
+        
+        # 下半部分：文件差异查看区域
+        diff_widget = QWidget()
+        diff_layout = QVBoxLayout()
+        diff_widget.setLayout(diff_layout)
+        
+        self.diff_label = QLabel("文件差异:")
+        diff_layout.addWidget(self.diff_label)
+        
+        # 创建水平分割器用于显示文件差异
+        diff_splitter = QSplitter(Qt.Orientation.Horizontal)
+        diff_layout.addWidget(diff_splitter)
+        
+        # 左侧差异文本框
+        self.left_diff = QTextEdit()
+        self.left_diff.setReadOnly(True)
+        diff_splitter.addWidget(self.left_diff)
+        
+        # 中间差异文本框（用于merge情况）
+        self.middle_diff = QTextEdit()
+        self.middle_diff.setReadOnly(True)
+        self.middle_diff.hide()  # 默认隐藏
+        diff_splitter.addWidget(self.middle_diff)
+        
+        # 右侧差异文本框
+        self.right_diff = QTextEdit()
+        self.right_diff.setReadOnly(True)
+        diff_splitter.addWidget(self.right_diff)
+        
+        # 添加下半部分到垂直分割器
+        vertical_splitter.addWidget(diff_widget)
+        
+        # 设置垂直分割器的初始大小
+        vertical_splitter.setSizes([400, 400])
         
     def open_folder(self):
         folder_path = QFileDialog.getExistingDirectory(self, "选择Git仓库")
@@ -152,24 +199,24 @@ class GitManagerWindow(QMainWindow):
             
         # 从item文本中提取commit hash
         commit_hash = item.text().split()[0]
+        self.current_commit = self.git_manager.repo.commit(commit_hash)
         
         try:
-            commit = self.git_manager.repo.commit(commit_hash)
             # 获取父提交
-            parent = commit.parents[0] if commit.parents else None
+            parent = self.current_commit.parents[0] if self.current_commit.parents else None
             
             # 清空之前的显示
             self.changes_tree.clear()
             
             if parent:
                 # 获取与父提交的差异
-                diff = parent.diff(commit)
+                diff = parent.diff(self.current_commit)
                 for change in diff:
                     path_parts = change.a_path.split('/')
                     self.add_file_to_tree(path_parts, change.change_type)
             else:
                 # 如果是第一个提交,显示所有文件
-                for item in commit.tree.traverse():
+                for item in self.current_commit.tree.traverse():
                     if item.type == 'blob':  # 只显示文件,不显示目录
                         path_parts = item.path.split('/')
                         self.add_file_to_tree(path_parts, "新增")
@@ -180,11 +227,77 @@ class GitManagerWindow(QMainWindow):
             # 调整列宽以适应内容
             self.changes_tree.resizeColumnToContents(0)
             self.changes_tree.resizeColumnToContents(1)
+            
+            # 清空差异显示
+            self.left_diff.clear()
+            self.middle_diff.clear()
+            self.right_diff.clear()
                         
         except Exception as e:
             self.changes_tree.clear()
             error_item = QTreeWidgetItem(self.changes_tree)
             error_item.setText(0, f"获取文件变化失败: {str(e)}")
+            
+    def get_full_path(self, item):
+        """获取树形项的完整路径"""
+        path_parts = []
+        while item:
+            path_parts.insert(0, item.text(0))
+            item = item.parent()
+        return '/'.join(path_parts)
+            
+    def on_file_clicked(self, item):
+        """当点击文件项时显示文件差异"""
+        if not self.current_commit or not item:
+            return
+            
+        # 如果点击的是目录（有子项），不显示差异
+        if item.childCount() > 0:
+            return
+            
+        try:
+            file_path = self.get_full_path(item)
+            parent = self.current_commit.parents[0] if self.current_commit.parents else None
+            
+            # 检查是否是合并提交
+            is_merge = len(self.current_commit.parents) > 1
+            
+            if is_merge:
+                # 显示三方对比
+                self.middle_diff.show()
+                # 获取两个父提交的文件内容
+                parent1_content = parent.tree[file_path].data_stream.read().decode('utf-8')
+                parent2_content = self.current_commit.parents[1].tree[file_path].data_stream.read().decode('utf-8')
+                current_content = self.current_commit.tree[file_path].data_stream.read().decode('utf-8')
+                
+                self.left_diff.setText(parent1_content)
+                self.middle_diff.setText(parent2_content)
+                self.right_diff.setText(current_content)
+            else:
+                # 隐藏中间文本框
+                self.middle_diff.hide()
+                if parent:
+                    try:
+                        # 获取旧版本内容
+                        old_content = parent.tree[file_path].data_stream.read().decode('utf-8')
+                        self.left_diff.setText(old_content)
+                    except KeyError:
+                        # 文件在旧版本中不存在
+                        self.left_diff.setText("(文件不存在)")
+                        
+                    # 获取新版本内容
+                    new_content = self.current_commit.tree[file_path].data_stream.read().decode('utf-8')
+                    self.right_diff.setText(new_content)
+                else:
+                    # 第一个提交
+                    self.left_diff.setText("(新文件)")
+                    new_content = self.current_commit.tree[file_path].data_stream.read().decode('utf-8')
+                    self.right_diff.setText(new_content)
+                    
+        except Exception as e:
+            self.left_diff.setText(f"获取文件差异失败: {str(e)}")
+            self.middle_diff.clear()
+            self.right_diff.clear()
 
 def main():
     app = QApplication(sys.argv)
