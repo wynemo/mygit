@@ -27,11 +27,12 @@ class GitManager:
             
         commits = []
         for commit in self.repo.iter_commits(branch, max_count=limit):
+            # 只取第一行提交信息
+            message = commit.message.strip().split('\n')[0]
             commits.append({
                 'hash': commit.hexsha,
-                'message': commit.message.strip(),
+                'message': message,
                 'author': commit.author.name,
-                'date': commit.committed_datetime,
-                'parents': [p.hexsha for p in commit.parents]
+                'date': commit.committed_datetime.strftime('%Y-%m-%d %H:%M:%S')
             })
         return commits 
