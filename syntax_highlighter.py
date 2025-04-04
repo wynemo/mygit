@@ -194,10 +194,17 @@ def format_diff_content(old_content, new_content):
             diff_output = ""
             result = None
         except Exception as e:
-            print(f"An unexpected error occurred during git diff: {e}")
+            print(f"执行 Git diff 时发生意外错误: {e}") # 保持中文
             diff_output = ""
             result = None
             
+        # --- 调试: 打印原始 git diff 输出 ---
+        if diff_output:
+            print("--- 原始 Git Diff 输出 ---")
+            print(diff_output)
+            print("--- Git Diff 输出结束 ---")
+        # --- 结束调试 ---
+
         # If diff output is empty (files identical, error, or timeout), mark all lines as 'normal'
         if not diff_output or (result and result.returncode == 0):
             for i in range(len(original_old_lines)):

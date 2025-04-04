@@ -378,7 +378,7 @@ class GitManagerWindow(QMainWindow):
             else: # Initial commit
                  old_content = "" # No parent, so old content is empty
 
-            # --- Clear and Reset Scroll ---
+            # --- 清空并重置滚动条 ---
             self.left_diff.clear()
             self.middle_diff.clear()
             self.right_diff.clear()
@@ -386,48 +386,30 @@ class GitManagerWindow(QMainWindow):
             self.middle_diff.verticalScrollBar().setValue(0)
             self.right_diff.verticalScrollBar().setValue(0)
 
-            # --- Process Diff and Apply ---
+            # --- 处理并显示内容 (移除差异计算和高亮) ---
             if is_merge:
                 self.middle_diff.show()
-                
-                # Compare Parent1 vs Current (for left view)
-                old_line_info1, _ = format_diff_content(parent1_content, new_content)
-                # Compare Parent2 vs Current (for right view - need info for parent2 side)
-                old_line_info2, new_line_info2_vs_p2 = format_diff_content(parent2_content, new_content) # We need diff relative to P2 for right view highlighting
 
-                # Left view: Parent 1 content, highlighted based on diff with Current
-                self.left_diff.setPlainText(parent1_content) 
-                self.left_diff.set_diff_info(old_line_info1) # Highlight based on changes FROM parent1
-                self.left_diff.rehighlight()
+                # 为了打印 P2 vs New 的 diff，临时调用 format_diff_content
+                print("\n--- 即将比较: 右边 (Parent 2) vs 中间 (New) ---")
+                # 调用但不使用结果 (除了触发 syntax_highlighter.py 中的打印)
+                format_diff_content(parent2_content, new_content)
+                print("--- 比较结束 ---\n")
 
-                # Middle view: Current content (no diff highlighting needed relative to itself)
+                # 保持原有的文本设置逻辑 (无高亮)
+                self.left_diff.setPlainText(parent1_content)
                 self.middle_diff.setPlainText(new_content)
-                self.middle_diff.set_diff_info([]) # No diff markers
-                self.middle_diff.rehighlight()
+                self.right_diff.setPlainText(parent2_content)
 
-                # Right view: Parent 2 content, highlighted based on diff with Current
-                self.right_diff.setPlainText(parent2_content) 
-                self.right_diff.set_diff_info(old_line_info2) # Highlight based on changes FROM parent2
-                self.right_diff.rehighlight()
-
-            else: # Normal diff (or initial commit)
+            else: # 普通差异 (或初始提交)
                 self.middle_diff.hide()
-                
-                # Get structured diff info
-                old_line_info, new_line_info = format_diff_content(old_content, new_content)
-                
-                # Left view: Old content, highlighted if removed/changed
-                self.left_diff.setPlainText(old_content if old_content else "(New File)")
-                self.left_diff.set_diff_info(old_line_info)
-                self.left_diff.rehighlight()
 
-                # Right view: New content, highlighted if added/changed
-                self.right_diff.setPlainText(new_content if new_content else "(File Deleted)")
-                self.right_diff.set_diff_info(new_line_info)
-                self.right_diff.rehighlight()
-                
+                # 只设置文本内容
+                self.left_diff.setPlainText(old_content if old_content else "(新文件)")
+                self.right_diff.setPlainText(new_content if new_content else "(文件已删除)")
+
         except Exception as e:
-            # General error handling
+            # 通用错误处理
             print(f"Error displaying file diff for {item.text(0)}: {e}")
             import traceback
             traceback.print_exc() # Print detailed traceback
