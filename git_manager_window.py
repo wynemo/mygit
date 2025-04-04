@@ -390,14 +390,16 @@ class GitManagerWindow(QMainWindow):
             if is_merge:
                 self.middle_diff.show()
 
-                # --- 计算中间和右侧高亮所需差异 ---
-                # 比较 Parent 2 vs New Content, 获取 P2 删除/修改的行 (old) 和 New 新增/修改的行 (new)
+                # --- 计算高亮所需差异 ---
+                # 1. 比较 Parent 1 vs New Content, 获取 P1 中被删除/修改的行信息
+                old_line_info1, _ = format_diff_content(parent1_content, new_content)
+                # 2. 比较 Parent 2 vs New Content, 获取 P2 删除/修改的行 (old) 和 New 新增/修改的行 (new)
                 old_line_info2, new_line_info2 = format_diff_content(parent2_content, new_content)
 
                 # --- 设置视图内容和高亮 ---
-                # 左侧视图: 只显示 Parent 1 内容, 无高亮
+                # 左侧视图: 显示 Parent 1 内容, 高亮相对于 New 被删除/修改的行
                 self.left_diff.setPlainText(parent1_content)
-                self.left_diff.set_diff_info([])
+                self.left_diff.set_diff_info(old_line_info1) # 应用 old_line_info1
                 self.left_diff.rehighlight()
 
                 # 中间视图: 显示 New Content 内容, 高亮相对于 Parent 2 新增/修改的行
