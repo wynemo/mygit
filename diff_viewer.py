@@ -339,4 +339,170 @@ class DiffViewer(QWidget):
         
         # 触发重新高亮
         self.left_edit.rehighlight()
-        self.right_edit.rehighlight() 
+        self.right_edit.rehighlight()
+
+class MergeDiffViewer(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.diff_chunks = []
+        self._sync_vscroll_lock = False
+        self._sync_hscroll_lock = False
+        self.setup_ui()
+        
+    def setup_ui(self):
+        layout = QHBoxLayout()
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        # 创建三个编辑器：parent1, result, parent2
+        self.parent1_edit = DiffTextEdit()
+        self.result_edit = DiffTextEdit()
+        self.parent2_edit = DiffTextEdit()
+        
+        # 设置对象名称
+        self.parent1_edit.setObjectName('parent1_edit')
+        self.result_edit.setObjectName('result_edit')
+        self.parent2_edit.setObjectName('parent2_edit')
+        
+        # 设置滚动事件处理
+        self.parent1_edit.verticalScrollBar().valueChanged.connect(
+            lambda val: self._on_scroll(val, 'parent1'))
+        self.result_edit.verticalScrollBar().valueChanged.connect(
+            lambda val: self._on_scroll(val, 'result'))
+        self.parent2_edit.verticalScrollBar().valueChanged.connect(
+            lambda val: self._on_scroll(val, 'parent2'))
+        
+        # 设置水平滚动同步
+        self.parent1_edit.horizontalScrollBar().valueChanged.connect(
+            lambda val: self._sync_hscroll(val, 'parent1'))
+        self.result_edit.horizontalScrollBar().valueChanged.connect(
+            lambda val: self._sync_hscroll(val, 'result'))
+        self.parent2_edit.horizontalScrollBar().valueChanged.connect(
+            lambda val: self._sync_hscroll(val, 'parent2'))
+        
+        # 添加差异高亮器
+        self.parent1_highlighter = DiffCodeHighlighter(self.parent1_edit.document())
+        self.result_highlighter = DiffCodeHighlighter(self.result_edit.document())
+        self.parent2_highlighter = DiffCodeHighlighter(self.parent2_edit.document())
+        
+        # 添加到布局
+        layout.addWidget(self.parent1_edit)
+        layout.addWidget(self.result_edit)
+        layout.addWidget(self.parent2_edit)
+        self.setLayout(layout)
+        
+    def set_texts(self, parent1_text: str, result_text: str, parent2_text: str):
+        """设置要比较的三个文本"""
+        print("\n=== 设置新的三向文本进行比较 ===")
+        # 设置文本
+        self.parent1_edit.setPlainText(parent1_text)
+        self.result_edit.setPlainText(result_text)
+        self.parent2_edit.setPlainText(parent2_text)
+        
+        # 计算差异
+        self._compute_diffs(parent1_text, result_text, parent2_text)
+        
+    def _compute_diffs(self, parent1_text: str, result_text: str, parent2_text: str):
+        """计算三个文本之间的差异"""
+        print("\n=== 开始计算三向差异 ===")
+        
+        # 预处理文本行
+        parent1_lines = parent1_text.splitlines()
+        result_lines = result_text.splitlines()
+        parent2_lines = parent2_text.splitlines()
+        
+        print(f"Parent1行数: {len(parent1_lines)}")
+        print(f"Result行数: {len(result_lines)}")
+        print(f"Parent2行数: {len(parent2_lines)}")
+        
+        # 计算parent1和result之间的差异
+        parent1_matcher = difflib.SequenceMatcher(None, parent1_lines, result_lines)
+        parent1_info = []
+        for tag, i1, i2, j1, j2 in parent1_matcher.get_opcodes():
+            print(f"\nParent1差异块: {tag}, {i1}-{i2}, {j1}-{j2}")
+            if tag != 'equal':
+                for line in range(i1 + 1, i2 + 1):
+                    parent1_info.append((line, 'remove'))
+                    
+        # 计算parent2和result之间的差异
+        parent2_matcher = difflib.SequenceMatcher(None, result_lines, parent2_lines)
+        parent2_info = []
+        for tag, i1, i2, j1, j2 in parent2_matcher.get_opcodes():
+            print(f"\nParent2差异块: {tag}, {i1}-{i2}, {j1}-{j2}")
+            if tag != 'equal':
+                for line in range(j1 + 1, j2 + 1):
+                    parent2_info.append((line, 'add'))
+                    
+        # 更新差异高亮
+        self.parent1_edit.set_diff_info(parent1_info)
+        self.parent2_edit.set_diff_info(parent2_info)
+        
+        # 触发重新高亮
+        self.parent1_edit.rehighlight()
+        self.parent2_edit.rehighlight()
+        
+    def _on_scroll(self, value, source: str):
+        """处理滚动同步"""
+        if self._sync_vscroll_lock:
+            return
+            
+        self._sync_vscroll_lock = True
+        try:
+            print(f"\n=== {source} 滚动事件开始 ===")
+            
+            # 获取所有编辑器
+            editors = {
+                'parent1': self.parent1_edit,
+                'result': self.result_edit,
+                'parent2': self.parent2_edit
+            }
+            
+            source_edit = editors[source]
+            
+            # 获取当前视口中的行
+            cursor = source_edit.cursorForPosition(QPoint(0, 0))
+            current_line = cursor.blockNumber()
+            
+            # 同步其他编辑器的滚动
+            for target_name, target_edit in editors.items():
+                if target_name != source:
+                    # 计算目标文档中的滚动值
+                    target_doc_height = target_edit.document().size().height()
+                    target_line_count = target_edit.document().blockCount()
+                    avg_line_height = target_doc_height / target_line_count if target_line_count > 0 else 0
+                    
+                    # 使用当前行号计算目标滚动值
+                    target_scroll = int(current_line * avg_line_height)
+                    
+                    # 确保滚动值在有效范围内
+                    target_bar = target_edit.verticalScrollBar()
+                    target_max = target_bar.maximum()
+                    target_scroll = max(0, min(target_scroll, target_max))
+                    
+                    # 设置滚动条位置
+                    target_edit.verticalScrollBar().setValue(target_scroll)
+            
+            print(f"=== {source} 滚动事件结束 ===\n")
+                
+        finally:
+            self._sync_vscroll_lock = False
+            
+    def _sync_hscroll(self, value, source: str):
+        """处理水平滚动同步"""
+        if self._sync_hscroll_lock:
+            return
+            
+        try:
+            self._sync_hscroll_lock = True
+            editors = {
+                'parent1': self.parent1_edit,
+                'result': self.result_edit,
+                'parent2': self.parent2_edit
+            }
+            
+            # 同步其他编辑器的水平滚动
+            for name, editor in editors.items():
+                if name != source:
+                    editor.horizontalScrollBar().setValue(value)
+        finally:
+            self._sync_hscroll_lock = False 

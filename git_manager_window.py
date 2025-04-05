@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (QMainWindow, QFileDialog, QVBoxLayout,
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
 from git_manager import GitManager
-from diff_viewer import DiffViewer
+from diff_viewer import DiffViewer, MergeDiffViewer
 from settings import Settings
 from syntax_highlighter import format_diff_content
 import difflib
@@ -32,7 +32,7 @@ class GitManagerWindow(QMainWindow):
         
         # 创建顶部控制区域
         top_widget = QWidget()
-        top_widget.setFixedHeight(40)  # 固定顶部高度
+        top_widget.setFixedHeight(100)  # 固定顶部高度
         top_layout = QHBoxLayout()
         top_widget.setLayout(top_layout)
         main_layout.addWidget(top_widget)
@@ -64,6 +64,14 @@ class GitManagerWindow(QMainWindow):
         self.branch_combo.currentTextChanged.connect(self.on_branch_changed)
         top_layout.addWidget(self.branch_label)
         top_layout.addWidget(self.branch_combo)
+        
+        # 创建视图类型选择下拉框
+        self.view_type_label = QLabel("视图类型:")
+        self.view_type_combo = QComboBox()
+        self.view_type_combo.addItems(["双向对比", "三向对比"])
+        self.view_type_combo.currentTextChanged.connect(self.on_view_type_changed)
+        top_layout.addWidget(self.view_type_label)
+        top_layout.addWidget(self.view_type_combo)
         
         # 创建垂直分割器
         vertical_splitter = QSplitter(Qt.Orientation.Vertical)
@@ -128,7 +136,17 @@ class GitManagerWindow(QMainWindow):
         
         # 下半部分：文件差异查看区域
         self.diff_viewer = DiffViewer()
-        vertical_splitter.addWidget(self.diff_viewer)
+        self.merge_diff_viewer = MergeDiffViewer()
+        self.merge_diff_viewer.hide()  # 默认隐藏三向对比视图
+        
+        diff_container = QWidget()
+        diff_layout = QVBoxLayout()
+        diff_layout.setContentsMargins(0, 0, 0, 0)
+        diff_container.setLayout(diff_layout)
+        diff_layout.addWidget(self.diff_viewer)
+        diff_layout.addWidget(self.merge_diff_viewer)
+        
+        vertical_splitter.addWidget(diff_container)
         
         # 设置垂直分割器的初始大小比例 (2:3)
         total_height = self.height()
@@ -317,31 +335,42 @@ class GitManagerWindow(QMainWindow):
             file_path = self.get_full_path(item)
             parents = self.current_commit.parents
             
-            # Default contents
-            old_content = ""
-            new_content = ""
-            
-            # --- Fetch Content ---
+            # 获取当前提交的文件内容
             try:
-                new_content = self.current_commit.tree[file_path].data_stream.read().decode('utf-8', errors='replace')
+                current_content = self.current_commit.tree[file_path].data_stream.read().decode('utf-8', errors='replace')
             except KeyError:
                 print(f"File {file_path} not found in current commit tree.")
+                current_content = ""
             except Exception as e:
                 print(f"Error reading current content for {file_path}: {e}")
                 return
 
+            # 获取父提交的文件内容
+            parent_content = ""
             if parents:
                 try:
-                    old_content = parents[0].tree[file_path].data_stream.read().decode('utf-8', errors='replace')
-                except KeyError: pass
+                    parent_content = parents[0].tree[file_path].data_stream.read().decode('utf-8', errors='replace')
+                except KeyError:
+                    pass
                 except Exception as e:
                     print(f"Error reading parent content for {file_path}: {e}")
-                    old_content = f"(Error reading parent content: {e})"
-            else:
-                old_content = ""
+                    parent_content = ""
 
-            # 设置差异文本
-            self.diff_viewer.set_texts(old_content, new_content)
+            # 根据视图类型显示差异
+            if self.view_type_combo.currentText() == "双向对比":
+                self.diff_viewer.set_texts(parent_content, current_content)
+            else:
+                # 如果是三向对比，需要获取第二个父提交的内容
+                parent2_content = ""
+                if len(parents) > 1:
+                    try:
+                        parent2_content = parents[1].tree[file_path].data_stream.read().decode('utf-8', errors='replace')
+                    except KeyError:
+                        pass
+                    except Exception as e:
+                        print(f"Error reading parent2 content for {file_path}: {e}")
+                
+                self.merge_diff_viewer.set_texts(parent_content, current_content, parent2_content)
 
         except Exception as e:
             print(f"Error displaying file diff for {item.text(0)}: {e}")
@@ -377,3 +406,17 @@ class GitManagerWindow(QMainWindow):
         if not self.settings.settings.get('horizontal_splitter'):
             total_width = self.width()
             self.horizontal_splitter.setSizes([total_width // 3, total_width * 2 // 3])
+
+    def on_view_type_changed(self, view_type):
+        """当视图类型改变时切换显示的差异查看器"""
+        if view_type == "双向对比":
+            self.diff_viewer.show()
+            self.merge_diff_viewer.hide()
+        else:
+            self.diff_viewer.hide()
+            self.merge_diff_viewer.show()
+            
+        # 如果当前有选中的文件，重新触发文件点击事件以更新视图
+        current_item = self.changes_tree.currentItem()
+        if current_item:
+            self.on_file_clicked(current_item)
