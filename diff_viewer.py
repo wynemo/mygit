@@ -263,39 +263,30 @@ class DiffViewer(QWidget):
     def _compute_diff(self, left_text: str, right_text: str):
         """计算文本差异，忽略行尾空白字符的差异"""
         print("\n=== 开始计算差异 ===")
+        print("左侧文本示例:")
+        print(left_text[:200] + "..." if len(left_text) > 200 else left_text)
+        print("\n右侧文本示例:")
+        print(right_text[:200] + "..." if len(right_text) > 200 else right_text)
         
-        # 预处理文本行，去除行尾空白
-        left_lines = [line.rstrip() for line in left_text.splitlines()]
-        right_lines = [line.rstrip() for line in right_text.splitlines()]
+        # 预处理文本行
+        left_lines = left_text.splitlines()
+        right_lines = right_text.splitlines()
         
-        print(f"左侧文本行数: {len(left_lines)}")
+        print(f"\n左侧文本行数: {len(left_lines)}")
         print(f"右侧文本行数: {len(right_lines)}")
         
         # 使用 difflib 计算差异
-        matcher = difflib.SequenceMatcher(
-            lambda x: x.isspace(),  # 忽略空白行
-            left_lines,
-            right_lines,
-            autojunk=False  # 禁用自动junk检测
-        )
+        matcher = difflib.SequenceMatcher(None, left_lines, right_lines)
         
         self.diff_chunks = []
-        last_chunk = None
         
         print("\n差异块详情:")
         for tag, i1, i2, j1, j2 in matcher.get_opcodes():
             print(f"\n当前块: {tag}")
             print(f"左侧范围: {i1}-{i2}")
             print(f"右侧范围: {j1}-{j2}")
-            
-            # 尝试合并相邻的差异块
-            if last_chunk and tag != 'equal':
-                if (last_chunk.left_end == i1 and 
-                    last_chunk.right_end == j1 and 
-                    last_chunk.type != 'equal'):
-                    last_chunk.left_end = i2
-                    last_chunk.right_end = j2
-                    continue
+            print("左侧内容:", left_lines[i1:i2] if i1 < len(left_lines) else "[]")
+            print("右侧内容:", right_lines[j1:j2] if j1 < len(right_lines) else "[]")
             
             chunk = DiffChunk(
                 left_start=i1,
@@ -305,7 +296,6 @@ class DiffViewer(QWidget):
                 type=tag
             )
             self.diff_chunks.append(chunk)
-            last_chunk = chunk
             
         print("\n=== 差异计算完成 ===")
         print(f"总共发现 {len(self.diff_chunks)} 个差异块")
@@ -318,24 +308,30 @@ class DiffViewer(QWidget):
         left_info = []
         right_info = []
         
+        print("\n=== 更新差异高亮 ===")
         for chunk in self.diff_chunks:
-            if chunk.type != 'equal':
-                if chunk.type in ('delete', 'replace'):
-                    # 左侧显示删除
-                    for line in range(chunk.left_start, chunk.left_end):
-                        left_info.append((line, 'delete'))
-                        
-                if chunk.type in ('insert', 'replace'):
-                    # 右侧显示插入
-                    for line in range(chunk.right_start, chunk.right_end):
-                        right_info.append((line, 'insert'))
-                        
-                if chunk.type == 'replace':
-                    # 替换时两侧都标记为replace
-                    for line in range(chunk.left_start, chunk.left_end):
-                        left_info.append((line, 'replace'))
-                    for line in range(chunk.right_start, chunk.right_end):
-                        right_info.append((line, 'replace'))
+            print(f"\n处理差异块: {chunk.type}")
+            print(f"左侧范围: {chunk.left_start}-{chunk.left_end}")
+            print(f"右侧范围: {chunk.right_start}-{chunk.right_end}")
+            
+            if chunk.type == 'replace':
+                # 替换：两侧都标记
+                for line in range(chunk.left_start + 1, chunk.left_end + 1):
+                    left_info.append((line, 'remove'))
+                for line in range(chunk.right_start + 1, chunk.right_end + 1):
+                    right_info.append((line, 'add'))
+            elif chunk.type == 'delete':
+                # 删除：左侧标记
+                for line in range(chunk.left_start + 1, chunk.left_end + 1):
+                    left_info.append((line, 'remove'))
+            elif chunk.type == 'insert':
+                # 插入：右侧标记
+                for line in range(chunk.right_start + 1, chunk.right_end + 1):
+                    right_info.append((line, 'add'))
+            
+        print(f"\n最终差异信息:")
+        print(f"左侧: {left_info}")
+        print(f"右侧: {right_info}")
         
         # 设置高亮信息
         self.left_edit.set_diff_info(left_info)

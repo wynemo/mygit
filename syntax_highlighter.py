@@ -100,11 +100,15 @@ class DiffCodeHighlighter(CodeHighlighter):
         super().__init__(parent)
         # Store diff info as a dictionary for quick lookup: {line_number: change_type}
         self.diff_line_info = {}
-        # Define background formats for added/removed lines
+        
+        # 定义差异高亮的颜色
         self.diff_formats = {
-            'add': self.create_background_format('#e6ffe6'),  # Light green background
-            'remove': self.create_background_format('#ffe6e6') # Light red background
+            'add': self.create_background_format('#e6ffed'),      # 浅绿色背景
+            'remove': self.create_background_format('#ffeef0'),   # 浅红色背景
+            'replace': self.create_background_format('#fff5b1'),  # 浅黄色背景
+            'normal': None
         }
+        print("初始化DiffCodeHighlighter")
 
     def create_background_format(self, background_color):
         """Creates a QTextCharFormat with only background color."""
@@ -114,9 +118,11 @@ class DiffCodeHighlighter(CodeHighlighter):
 
     def set_diff_info(self, line_info):
         """Receives diff info and stores it as a dictionary."""
+        print(f"\n=== 设置差异信息 ===")
+        print(f"接收到的差异信息: {line_info}")
         self.diff_line_info = {line_num: change_type for line_num, change_type in line_info}
-        # Important: Trigger rehighlight after diff info changes
-        # self.rehighlight() # Triggering rehighlight should be done from main.py after setting text AND diff info
+        print(f"处理后的差异信息: {self.diff_line_info}")
+        self.rehighlight()
 
     def highlightBlock(self, text):
         """Applies syntax highlighting first, then diff background."""
@@ -125,16 +131,17 @@ class DiffCodeHighlighter(CodeHighlighter):
         
         # 2. Apply diff background highlighting
         current_block = self.currentBlock()
-        line_number = current_block.blockNumber() + 1 # QTextBlock is 0-indexed
+        line_number = current_block.blockNumber() + 1  # 转换为1-based行号
         
         if line_number in self.diff_line_info:
             change_type = self.diff_line_info[line_number]
+            print(f"高亮行 {line_number}: {change_type}")
             if change_type in self.diff_formats:
                 background_format = self.diff_formats[change_type]
-                # Apply background format to the entire block
-                # This might override some syntax formats if they also set background,
-                # but typically syntax highlighting only sets foreground color.
-                self.setFormat(0, len(text), background_format)
+                if background_format:
+                    # 应用背景格式到整行
+                    self.setFormat(0, len(text), background_format)
+                    print(f"应用{change_type}格式到行 {line_number}")
 
 def format_diff_content(old_content, new_content):
     """
