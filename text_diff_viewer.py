@@ -83,58 +83,76 @@ class GoHighlighter(QSyntaxHighlighter):
                 self.setFormat(start, end - start, format)
 
 class DiffHighlighter(QSyntaxHighlighter):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, editor_type=''):
         super().__init__(parent)
         self.diff_chunks = []
+        self.editor_type = editor_type
+        print(f"\n=== 初始化DiffHighlighter ===")
+        print(f"编辑器类型: {editor_type}")
         
         # 定义差异高亮的颜色
         self.diff_formats = {
-            'delete': self.create_format('#ffeef0', '#ff0000'),  # 浅红色背景，红色文字
-            'insert': self.create_format('#e6ffed', '#28a745'),  # 浅绿色背景，绿色文字
-            'replace': self.create_format('#fff5b1', '#735c0f'),  # 浅黄色背景，深黄色文字
+            'delete': self.create_format('#ffcccc', '#cc0000'),  # 更深的红色
+            'insert': self.create_format('#ccffcc', '#00cc00'),  # 更深的绿色
+            'replace': self.create_format('#ffffcc', '#cccc00'),  # 更深的黄色
             'equal': None
         }
+        print("差异格式已创建:", self.diff_formats)
         
     def create_format(self, background_color, text_color):
         """创建高亮格式，包含文字颜色和背景颜色"""
+        print(f"\n创建格式 - 背景: {background_color}, 文字: {text_color}")
         fmt = QTextCharFormat()
         fmt.setBackground(QColor(background_color))
         fmt.setForeground(QColor(text_color))
         return fmt
         
     def set_diff_chunks(self, chunks):
-        print(f"设置差异块到高亮器: {self.parent().objectName()}, 块数量: {len(chunks)}")
+        print(f"\n=== 设置差异块到高亮器 ===")
+        print(f"高亮器类型: {self.editor_type}")
+        print(f"块数量: {len(chunks)}")
+        for i, chunk in enumerate(chunks):
+            print(f"\n差异块 {i+1}:")
+            print(f"类型: {chunk.type}")
+            print(f"左侧范围: {chunk.left_start}-{chunk.left_end}")
+            print(f"右侧范围: {chunk.right_start}-{chunk.right_end}")
         self.diff_chunks = chunks
         self.rehighlight()
         
     def highlightBlock(self, text):
         block_number = self.currentBlock().blockNumber()
+        print(f"\n=== 高亮块 ===")
+        print(f"高亮器类型: {self.editor_type}")
+        print(f"当前块号: {block_number}")
+        print(f"文本内容: {text}")
         
         # 找到当前行所在的差异块
         current_chunk = None
         for chunk in self.diff_chunks:
             # 检查是否是左侧编辑器
-            if self.parent().objectName() == 'left_edit':
+            if self.editor_type == 'left':
                 if chunk.left_start <= block_number < chunk.left_end:
                     current_chunk = chunk
+                    print(f"找到左侧差异块: {chunk.type}")
                     break
             # 检查是否是右侧编辑器
-            elif self.parent().objectName() == 'right_edit':
+            elif self.editor_type == 'right':
                 if chunk.right_start <= block_number < chunk.right_end:
                     current_chunk = chunk
+                    print(f"找到右侧差异块: {chunk.type}")
                     break
         
         # 如果找到差异块，应用相应的格式
         if current_chunk and current_chunk.type != 'equal':
-            print(f"找到差异块: {current_chunk.type}")
+            print(f"应用差异块格式: {current_chunk.type}")
             # 根据编辑器和差异类型选择格式
             format_type = None
-            if self.parent().objectName() == 'left_edit':
+            if self.editor_type == 'left':
                 if current_chunk.type == 'delete':
                     format_type = 'delete'
                 elif current_chunk.type == 'replace':
                     format_type = 'replace'
-            else:  # right_edit
+            else:  # right
                 if current_chunk.type == 'insert':
                     format_type = 'insert'
                 elif current_chunk.type == 'replace':
@@ -146,12 +164,16 @@ class DiffHighlighter(QSyntaxHighlighter):
                 if format:
                     print(f"应用格式: {format_type}")
                     self.setFormat(0, len(text), format)
+                    print("格式已应用")
 
 class SyncedTextEdit(QPlainTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self.setFont(QFont('Courier New', 10))
+        self.setReadOnly(True)  # 设置为只读
+        print(f"\n=== 初始化SyncedTextEdit ===")
+        print(f"只读模式: {self.isReadOnly()}")
         
         # 添加行号区域
         self.line_number_area = LineNumberArea(self)
@@ -245,13 +267,9 @@ class DiffViewer(QWidget):
         self.right_edit.horizontalScrollBar().valueChanged.connect(
             lambda val: self._sync_hscroll(val, 1))
         
-        # 添加语法高亮器
-        self.left_highlighter = GoHighlighter(self.left_edit.document())
-        self.right_highlighter = GoHighlighter(self.right_edit.document())
-        
         # 添加差异高亮器
-        self.left_diff_highlighter = DiffHighlighter(self.left_edit.document())
-        self.right_diff_highlighter = DiffHighlighter(self.right_edit.document())
+        self.left_diff_highlighter = DiffHighlighter(self.left_edit.document(), 'left')
+        self.right_diff_highlighter = DiffHighlighter(self.right_edit.document(), 'right')
         
         # 添加到布局
         layout.addWidget(self.left_edit)
@@ -271,21 +289,20 @@ class DiffViewer(QWidget):
     def _compute_diff(self, left_text: str, right_text: str):
         """计算文本差异，忽略行尾空白字符的差异"""
         print("\n=== 开始计算差异 ===")
+        print("左侧文本示例:")
+        print(left_text[:200] + "..." if len(left_text) > 200 else left_text)
+        print("\n右侧文本示例:")
+        print(right_text[:200] + "..." if len(right_text) > 200 else right_text)
         
-        # 预处理文本行，去除行尾空白和行首空白
-        left_lines = [line.strip() for line in left_text.splitlines()]
-        right_lines = [line.strip() for line in right_text.splitlines()]
+        # 预处理文本行
+        left_lines = left_text.splitlines()
+        right_lines = right_text.splitlines()
         
-        print(f"左侧文本行数: {len(left_lines)}")
+        print(f"\n左侧文本行数: {len(left_lines)}")
         print(f"右侧文本行数: {len(right_lines)}")
         
-        # 使用 junk 参数忽略空白字符的差异
-        matcher = difflib.SequenceMatcher(
-            lambda x: x.isspace() or not x.strip(),  # 忽略空白行
-            left_lines,
-            right_lines,
-            autojunk=False  # 禁用自动junk检测
-        )
+        # 使用 difflib 计算差异
+        matcher = difflib.SequenceMatcher(None, left_lines, right_lines)
         
         self.diff_chunks = []
         last_chunk = None
@@ -295,34 +312,10 @@ class DiffViewer(QWidget):
             print(f"\n当前块: {tag}")
             print(f"左侧范围: {i1}-{i2}")
             print(f"右侧范围: {j1}-{j2}")
+            print("左侧内容:", left_lines[i1:i2] if i1 < len(left_lines) else "[]")
+            print("右侧内容:", right_lines[j1:j2] if j1 < len(right_lines) else "[]")
             
-            # 尝试合并相邻的差异块
-            if last_chunk and tag != 'equal':
-                if (last_chunk.left_end == i1 and 
-                    last_chunk.right_end == j1 and 
-                    last_chunk.type != 'equal'):
-                    last_chunk.left_end = i2
-                    last_chunk.right_end = j2
-                    continue
-            
-            # 对于相等的块，检查是否真的完全相等
-            if tag == 'equal':
-                # 打印相等块的内容进行比对
-                print("相等块内容比对:")
-                is_really_equal = True
-                for i, j in zip(range(i1, i2), range(j1, j2)):
-                    left_line = left_lines[i]
-                    right_line = right_lines[j]
-                    if left_line != right_line:
-                        print(f"发现不相等的行:")
-                        print(f"左侧第{i+1}行: {left_line}")
-                        print(f"右侧第{j+1}行: {right_line}")
-                        is_really_equal = False
-                        break
-                
-                if not is_really_equal:
-                    tag = 'replace'
-            
+            # 创建差异块
             chunk = DiffChunk(
                 left_start=i1,
                 left_end=i2,
@@ -331,12 +324,12 @@ class DiffViewer(QWidget):
                 type=tag
             )
             self.diff_chunks.append(chunk)
-            last_chunk = chunk
             
         print("\n=== 差异计算完成 ===")
         print(f"总共发现 {len(self.diff_chunks)} 个差异块")
         
         # 更新差异高亮
+        print("\n=== 更新差异高亮 ===")
         self.left_diff_highlighter.set_diff_chunks(self.diff_chunks)
         self.right_diff_highlighter.set_diff_chunks(self.diff_chunks)
         
@@ -458,23 +451,36 @@ class MainWindow(QMainWindow):
         self.load_test_data()
         
     def load_test_data(self):
-        # 创建简单的测试数据
-        left_text = ""
-        right_text = ""
+        # 创建测试数据
+        left_text = []
+        right_text = []
         
-        # 生成左边50行
+        # 生成100行测试数据
         for i in range(1, 101):
-            left_text += f"Line {i}\n"
-            right_text += f"Line {i}\n"
-            if i == 25:
-                right_text += "Inserted line 25\n"
-
-            if i == 35:
-                right_text += "Inserted line 35\n"
-
-            if i == 15:
-                left_text += "Inserted line 15\n"
+            # 基本行
+            base_line = f"Line {i}"
             
+            # 在特定行添加差异
+            if i == 15:
+                left_text.append(base_line)
+                left_text.append("This line only exists in left")  # 删除行
+                right_text.append(base_line)
+            elif i == 25:
+                left_text.append(base_line)
+                right_text.append(base_line)
+                right_text.append("This line only exists in right")  # 插入行
+            elif i == 35:
+                left_text.append("This is the left version")  # 替换行
+                right_text.append("This is the right version")  # 替换行
+            else:
+                left_text.append(base_line)
+                right_text.append(base_line)
+        
+        # 转换为文本
+        left_text = "\n".join(left_text)
+        right_text = "\n".join(right_text)
+        
+        # 设置文本
         self.diff_viewer.set_texts(left_text, right_text)
 
 if __name__ == '__main__':
