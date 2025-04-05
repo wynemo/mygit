@@ -6,9 +6,10 @@ from PyQt6.QtWidgets import (QMainWindow, QFileDialog, QVBoxLayout,
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
 from git_manager import GitManager
-from diff_viewer import DiffTextEdit
+from diff_viewer import DiffViewer
 from settings import Settings
 from syntax_highlighter import format_diff_content
+import difflib
 
 class GitManagerWindow(QMainWindow):
     def __init__(self):
@@ -126,43 +127,8 @@ class GitManagerWindow(QMainWindow):
         vertical_splitter.addWidget(upper_widget)
         
         # 下半部分：文件差异查看区域
-        diff_widget = QWidget()
-        diff_widget.setMinimumHeight(100)  # 设置最小高度
-        diff_layout = QHBoxLayout()
-        diff_layout.setContentsMargins(0, 0, 0, 0)
-        diff_widget.setLayout(diff_layout)
-        
-        # 创建水平分割器用于显示文件差异
-        diff_splitter = QSplitter(Qt.Orientation.Horizontal)
-        diff_splitter.setChildrenCollapsible(False)
-        diff_splitter.setOpaqueResize(False)  # 添加平滑调整
-        diff_splitter.setHandleWidth(8)  # 增加分割条宽度，更容易拖动
-        diff_layout.addWidget(diff_splitter)
-        
-        # 左侧差异文本框
-        self.left_diff = DiffTextEdit()
-        self.left_diff.setReadOnly(True)
-        self.left_diff.setMinimumWidth(200)  # 设置最小宽度
-        diff_splitter.addWidget(self.left_diff)
-        
-        # 中间差异文本框（用于merge情况）
-        self.middle_diff = DiffTextEdit()
-        self.middle_diff.setReadOnly(True)
-        self.middle_diff.setMinimumWidth(200)  # 设置最小宽度
-        self.middle_diff.hide()  # 默认隐藏
-        diff_splitter.addWidget(self.middle_diff)
-        
-        # 右侧差异文本框
-        self.right_diff = DiffTextEdit()
-        self.right_diff.setReadOnly(True)
-        self.right_diff.setMinimumWidth(200)  # 设置最小宽度
-        diff_splitter.addWidget(self.right_diff)
-        
-        # 设置文本框之间的滚动同步
-        self.setup_diff_sync()
-        
-        # 添加下半部分到垂直分割器
-        vertical_splitter.addWidget(diff_widget)
+        self.diff_viewer = DiffViewer()
+        vertical_splitter.addWidget(self.diff_viewer)
         
         # 设置垂直分割器的初始大小比例 (2:3)
         total_height = self.height()
@@ -171,7 +137,6 @@ class GitManagerWindow(QMainWindow):
         # 保存分割器引用以便后续使用
         self.vertical_splitter = vertical_splitter
         self.horizontal_splitter = horizontal_splitter
-        self.diff_splitter = diff_splitter
         
         # 从设置中恢复分割器状态
         self.restore_splitter_state()
@@ -328,9 +293,7 @@ class GitManagerWindow(QMainWindow):
             self.changes_tree.resizeColumnToContents(1)
             
             # 清空差异显示
-            self.left_diff.clear()
-            self.middle_diff.clear()
-            self.right_diff.clear()
+            # self.diff_viewer.clear()
                         
         except Exception as e:
             self.changes_tree.clear()
@@ -345,158 +308,50 @@ class GitManagerWindow(QMainWindow):
             item = item.parent()
         return '/'.join(path_parts)
             
-    def setup_diff_sync(self):
-        """设置差异文本框之间的滚动同步"""
-        # 左右文本框互相同步
-        self.left_diff.add_sync_scroll(self.right_diff)
-        self.right_diff.add_sync_scroll(self.left_diff)
-        
-        # 中间文本框与左右都同步
-        self.middle_diff.add_sync_scroll(self.left_diff)
-        self.middle_diff.add_sync_scroll(self.right_diff)
-        self.left_diff.add_sync_scroll(self.middle_diff)
-        self.right_diff.add_sync_scroll(self.middle_diff)
-        
     def on_file_clicked(self, item):
-        """当点击文件项时显示文件差异 (Revised Implementation)"""
+        """当点击文件项时显示文件差异"""
         if not self.current_commit or not item or item.childCount() > 0:
             return
             
         try:
             file_path = self.get_full_path(item)
             parents = self.current_commit.parents
-            is_merge = len(parents) > 1
             
             # Default contents
             old_content = ""
             new_content = ""
-            parent1_content = "" # For merge base (optional, could use parent[0])
-            parent2_content = "" # For merge source
             
             # --- Fetch Content ---
             try:
                 new_content = self.current_commit.tree[file_path].data_stream.read().decode('utf-8', errors='replace')
             except KeyError:
-                 # File might have been deleted in this commit, check diff status
-                 print(f"File {file_path} not found in current commit tree.")
-                 # If deleted, new_content remains ""
+                print(f"File {file_path} not found in current commit tree.")
             except Exception as e:
-                 print(f"Error reading current content for {file_path}: {e}")
-                 self.left_diff.setPlainText(f"Error reading current content:\n{e}")
-                 self.middle_diff.clear()
-                 self.right_diff.clear()
-                 return
+                print(f"Error reading current content for {file_path}: {e}")
+                return
 
-            if is_merge:
-                try:
-                    parent1_content = parents[0].tree[file_path].data_stream.read().decode('utf-8', errors='replace')
-                except KeyError: pass # File might not exist in parent 1
-                except Exception as e: print(f"Error reading parent1 content: {e}")
-                try:
-                    parent2_content = parents[1].tree[file_path].data_stream.read().decode('utf-8', errors='replace')
-                except KeyError: pass # File might not exist in parent 2
-                except Exception as e: print(f"Error reading parent2 content: {e}")
-                # For 3-way diff, 'old_content' often refers to the common ancestor (base)
-                # Finding the merge base can be complex, let's stick to comparing parents to current for now
-                old_content = parent1_content # Left view compares parent1 vs current
-                # Middle view shows current
-                # Right view compares parent2 vs current
-                
-            elif parents: # Single parent commit
+            if parents:
                 try:
                     old_content = parents[0].tree[file_path].data_stream.read().decode('utf-8', errors='replace')
-                except KeyError: 
-                     # File added in this commit, old_content remains ""
-                     pass 
+                except KeyError: pass
                 except Exception as e:
                     print(f"Error reading parent content for {file_path}: {e}")
                     old_content = f"(Error reading parent content: {e})"
-            else: # Initial commit
-                 old_content = "" # No parent, so old content is empty
+            else:
+                old_content = ""
 
-            # --- 清空并重置滚动条 ---
-            self.left_diff.clear()
-            self.middle_diff.clear()
-            self.right_diff.clear()
-            self.left_diff.verticalScrollBar().setValue(0)
-            self.middle_diff.verticalScrollBar().setValue(0)
-            self.right_diff.verticalScrollBar().setValue(0)
-
-            # --- 处理并显示内容 ---
-            if is_merge:
-                self.middle_diff.show()
-
-                # --- 计算高亮所需差异 ---
-                # 1. 比较 Parent 1 vs New Content, 获取 P1 删除/修改的行 (old1) 和 New 新增/修改的行 (new1)
-                old_line_info1, new_line_info1 = format_diff_content(parent1_content, new_content)
-                # 2. 比较 Parent 2 vs New Content, 获取 P2 删除/修改的行 (old2) 和 New 新增/修改的行 (new2)
-                old_line_info2, new_line_info2 = format_diff_content(parent2_content, new_content)
-
-                # --- 计算中间视图的综合高亮信息 --- 
-                middle_highlight_info = []
-                dict_new_info1 = dict(new_line_info1) # 转为字典以提高查找效率
-                dict_new_info2 = dict(new_line_info2)
-                num_lines_new = len(new_content.splitlines())
-
-                for ln in range(1, num_lines_new + 1):
-                    status1 = dict_new_info1.get(ln, 'normal')
-                    status2 = dict_new_info2.get(ln, 'normal')
-                    final_status = 'normal'
-
-                    # 如果相对于 P1 或 P2 是 'add'，则最终标记为 'add'
-                    if status1 == 'add' or status2 == 'add':
-                        final_status = 'add'
-                    # TODO: 可以扩展处理 'modify' 等类型, 需要 format_diff_content 支持
-
-                    if final_status != 'normal':
-                        middle_highlight_info.append((ln, final_status))
-                # --- 综合高亮计算结束 ---
-
-                # --- 设置视图内容和高亮 ---
-                # 左侧视图: 显示 Parent 1 内容, 高亮相对于 New 被删除/修改的行
-                self.left_diff.setPlainText(parent1_content)
-                self.left_diff.set_diff_info(old_line_info1) # 应用 old_line_info1
-                self.left_diff.rehighlight()
-
-                # 中间视图: 显示 New Content 内容, 高亮相对于 P1 或 P2 新增/修改的行
-                self.middle_diff.setPlainText(new_content)
-                self.middle_diff.set_diff_info(middle_highlight_info) # 应用综合高亮信息
-                self.middle_diff.rehighlight()
-
-                # 右侧视图: 显示 Parent 2 内容, 高亮相对于 New 被删除/修改的行
-                self.right_diff.setPlainText(parent2_content)
-                self.right_diff.set_diff_info(old_line_info2) # 应用 old_line_info2
-                self.right_diff.rehighlight()
-
-            else: # 普通差异 (或初始提交) - 保持原有逻辑
-                self.middle_diff.hide()
-
-                # 计算差异
-                old_line_info, new_line_info = format_diff_content(old_content, new_content)
-
-                # 设置文本和高亮
-                self.left_diff.setPlainText(old_content if old_content else "(新文件)")
-                self.left_diff.set_diff_info(old_line_info)
-                self.left_diff.rehighlight()
-
-                self.right_diff.setPlainText(new_content if new_content else "(文件已删除)")
-                self.right_diff.set_diff_info(new_line_info)
-                self.right_diff.rehighlight()
+            # 设置差异文本
+            self.diff_viewer.set_texts(old_content, new_content)
 
         except Exception as e:
-            # 通用错误处理
             print(f"Error displaying file diff for {item.text(0)}: {e}")
             import traceback
-            traceback.print_exc() # Print detailed traceback
-            self.left_diff.setPlainText(f"获取文件差异失败:\n{traceback.format_exc()}")
-            self.middle_diff.clear()
-            self.right_diff.clear()
+            traceback.print_exc()
 
     def save_splitter_state(self):
         """保存所有分割器的状态"""
         self.settings.settings['vertical_splitter'] = [pos for pos in self.vertical_splitter.sizes()]
         self.settings.settings['horizontal_splitter'] = [pos for pos in self.horizontal_splitter.sizes()]
-        self.settings.settings['diff_splitter'] = [pos for pos in self.diff_splitter.sizes()]
         self.settings.save_settings()
         
     def restore_splitter_state(self):
@@ -510,11 +365,6 @@ class GitManagerWindow(QMainWindow):
         horizontal_sizes = self.settings.settings.get('horizontal_splitter')
         if horizontal_sizes:
             self.horizontal_splitter.setSizes(horizontal_sizes)
-            
-        # 恢复差异分割器状态
-        diff_sizes = self.settings.settings.get('diff_splitter')
-        if diff_sizes:
-            self.diff_splitter.setSizes(diff_sizes)
             
     def resizeEvent(self, event):
         """处理窗口大小改变事件"""

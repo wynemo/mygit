@@ -1,7 +1,18 @@
-from PyQt6.QtWidgets import QPlainTextEdit, QWidget
-from PyQt6.QtCore import Qt, QRect, QSize
+from PyQt6.QtWidgets import QPlainTextEdit, QWidget, QHBoxLayout
+from PyQt6.QtCore import Qt, QRect, QSize, QPoint
 from PyQt6.QtGui import QFont, QPainter, QColor, QTextBlock, QTextCursor
 from syntax_highlighter import DiffCodeHighlighter
+from dataclasses import dataclass
+from typing import List, Optional
+import difflib
+
+@dataclass
+class DiffChunk:
+    left_start: int
+    left_end: int
+    right_start: int
+    right_end: int
+    type: str  # 'equal', 'insert', 'delete', 'replace'
 
 class LineNumberArea(QWidget):
     def __init__(self, editor):
@@ -21,6 +32,7 @@ class DiffTextEdit(QPlainTextEdit):
         self.highlighter = DiffCodeHighlighter(self.document())
         self.sync_scrolls = []  # 同步滚动的其他编辑器列表
         self.is_scrolling = False  # 防止递归滚动
+        self.diff_info = []  # 差异信息列表
         
         # 创建行号区域
         self.line_number_area = LineNumberArea(self)
@@ -51,53 +63,114 @@ class DiffTextEdit(QPlainTextEdit):
         if not self.is_scrolling:
             self.is_scrolling = True
             try:
-                # 计算滚动百分比
-                maximum = self.verticalScrollBar().maximum()
-                if maximum > 0:
-                    percentage = value / maximum
-                    # 同步其他编辑器的滚动
-                    for edit in self.sync_scrolls:
-                        other_maximum = edit.verticalScrollBar().maximum()
-                        target_value = int(percentage * other_maximum)
+                print(f"\n=== {self.objectName()} 滚动事件开始 ===")
+                
+                # 获取当前视口中的第一行
+                cursor = self.cursorForPosition(QPoint(0, 0))
+                current_line = cursor.blockNumber()
+                print(f"当前视口起始行: {current_line}")
+                
+                # 获取当前滚动位置的相对值
+                source_bar = self.verticalScrollBar()
+                max_value = source_bar.maximum()
+                relative_pos = value / max_value if max_value > 0 else 0
+                print(f"当前滚动相对位置: {relative_pos:.3f}")
+                
+                # 同步其他编辑器的滚动
+                for edit in self.sync_scrolls:
+                    # 根据差异信息调整目标行
+                    target_line = self._map_line_number(current_line, edit)
+                    print(f"映射到目标行: {target_line}")
+                    
+                    # 计算目标文档中的滚动值
+                    target_doc_height = edit.document().size().height()
+                    target_line_count = edit.document().blockCount()
+                    if target_line_count > 0:
+                        # 计算平均行高
+                        avg_line_height = target_doc_height / target_line_count
+                        # 根据目标行号计算滚动值
+                        target_scroll = int(target_line * avg_line_height)
+                        
                         # 确保值在有效范围内
-                        target_value = max(0, min(target_value, other_maximum))
-                        edit.verticalScrollBar().setValue(target_value)
-            except Exception as e:
-                print(f"滚动同步出错: {e}")
+                        target_maximum = edit.verticalScrollBar().maximum()
+                        target_scroll = max(0, min(target_scroll, target_maximum))
+                        print(f"目标滚动值: {target_scroll}")
+                        
+                        # 设置滚动值
+                        edit.verticalScrollBar().setValue(target_scroll)
+                
+                print(f"=== {self.objectName()} 滚动事件结束 ===\n")
+                
             finally:
                 self.is_scrolling = False
+                
+    def _map_line_number(self, line: int, target_edit) -> int:
+        """将当前编辑器的行号映射到目标编辑器的行号"""
+        # 获取父窗口
+        parent = self.parent()
+        if not parent or not hasattr(parent, 'diff_chunks'):
+            return line
+            
+        # 确定源和目标
+        is_source_left = self.objectName() == 'left_edit'
+        
+        # 遍历差异块
+        accumulated_diff = 0
+        for chunk in parent.diff_chunks:
+            if chunk.type != 'equal':
+                source_start = chunk.left_start if is_source_left else chunk.right_start
+                source_end = chunk.left_end if is_source_left else chunk.right_end
+                target_start = chunk.right_start if is_source_left else chunk.left_start
+                target_end = chunk.right_end if is_source_left else chunk.left_end
+                
+                if source_start <= line:
+                    # 计算差异块的大小差异
+                    source_size = source_end - source_start
+                    target_size = target_end - target_start
+                    size_diff = target_size - source_size
+                    
+                    # 如果在差异块内，根据相对位置调整
+                    if line < source_end:
+                        # 计算在差异块内的精确位置
+                        block_progress = (line - source_start) / max(1, source_size)
+                        # 调整目标行号，考虑差异块内的相对位置
+                        return target_start + int(block_progress * target_size)
+                    else:
+                        # 如果已经过了这个差异块，直接累加差异
+                        accumulated_diff += size_diff
+        
+        # 如果不在任何差异块内，应用累计的差异
+        return line + accumulated_diff
             
     def on_horizontal_scroll_changed(self, value):
         """水平滚动条值改变时的处理"""
         if not self.is_scrolling:
             self.is_scrolling = True
-            # 计算滚动百分比
-            maximum = self.horizontalScrollBar().maximum()
-            if maximum > 0:
-                percentage = value / maximum
-                # 同步其他编辑器的滚动
-                for edit in self.sync_scrolls:
-                    other_maximum = edit.horizontalScrollBar().maximum()
-                    target_value = int(percentage * other_maximum)
-                    target_value = max(0, min(target_value, other_maximum))
-                    edit.horizontalScrollBar().setValue(target_value)
-            self.is_scrolling = False
+            try:
+                # 计算滚动百分比
+                maximum = self.horizontalScrollBar().maximum()
+                if maximum > 0:
+                    percentage = value / maximum
+                    # 同步其他编辑器的滚动
+                    for edit in self.sync_scrolls:
+                        other_maximum = edit.horizontalScrollBar().maximum()
+                        target_value = int(percentage * other_maximum)
+                        target_value = max(0, min(target_value, other_maximum))
+                        edit.horizontalScrollBar().setValue(target_value)
+            finally:
+                self.is_scrolling = False
             
     def set_diff_info(self, line_info):
-        """Passes diff info to the highlighter."""
+        """设置差异信息"""
+        self.diff_info = line_info
         if isinstance(self.highlighter, DiffCodeHighlighter):
             self.highlighter.set_diff_info(line_info)
         else:
-             print("Warning: Highlighter is not DiffCodeHighlighter, cannot set diff info.")
+            print("Warning: Highlighter is not DiffCodeHighlighter")
 
     def rehighlight(self):
-        """Triggers rehighlighting."""
+        """触发重新高亮"""
         self.highlighter.rehighlight()
-        
-    def wheelEvent(self, event):
-        """处理鼠标滚轮事件"""
-        # 只调用父类方法处理滚动，同步交给 on_scroll_changed 处理
-        super().wheelEvent(event)
 
     def line_number_area_width(self):
         """计算行号区域的宽度"""
@@ -147,4 +220,127 @@ class DiffTextEdit(QPlainTextEdit):
             block = block.next()
             top = bottom
             bottom = top + self.blockBoundingRect(block).height()
-            block_number += 1 
+            block_number += 1
+
+class DiffViewer(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.diff_chunks = []
+        self.setup_ui()
+        
+    def setup_ui(self):
+        layout = QHBoxLayout()
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        # 创建左右两个编辑器
+        self.left_edit = DiffTextEdit()
+        self.right_edit = DiffTextEdit()
+        
+        # 设置对象名称以便识别
+        self.left_edit.setObjectName('left_edit')
+        self.right_edit.setObjectName('right_edit')
+        
+        # 设置同步滚动
+        self.left_edit.add_sync_scroll(self.right_edit)
+        self.right_edit.add_sync_scroll(self.left_edit)
+        
+        # 添加到布局
+        layout.addWidget(self.left_edit)
+        layout.addWidget(self.right_edit)
+        self.setLayout(layout)
+        
+    def set_texts(self, left_text: str, right_text: str):
+        """设置要比较的文本"""
+        print("\n=== 设置新的文本进行比较 ===")
+        # 先设置文本
+        self.left_edit.setPlainText(left_text)
+        self.right_edit.setPlainText(right_text)
+        
+        # 计算差异
+        self._compute_diff(left_text, right_text)
+        
+    def _compute_diff(self, left_text: str, right_text: str):
+        """计算文本差异，忽略行尾空白字符的差异"""
+        print("\n=== 开始计算差异 ===")
+        
+        # 预处理文本行，去除行尾空白
+        left_lines = [line.rstrip() for line in left_text.splitlines()]
+        right_lines = [line.rstrip() for line in right_text.splitlines()]
+        
+        print(f"左侧文本行数: {len(left_lines)}")
+        print(f"右侧文本行数: {len(right_lines)}")
+        
+        # 使用 difflib 计算差异
+        matcher = difflib.SequenceMatcher(
+            lambda x: x.isspace(),  # 忽略空白行
+            left_lines,
+            right_lines,
+            autojunk=False  # 禁用自动junk检测
+        )
+        
+        self.diff_chunks = []
+        last_chunk = None
+        
+        print("\n差异块详情:")
+        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+            print(f"\n当前块: {tag}")
+            print(f"左侧范围: {i1}-{i2}")
+            print(f"右侧范围: {j1}-{j2}")
+            
+            # 尝试合并相邻的差异块
+            if last_chunk and tag != 'equal':
+                if (last_chunk.left_end == i1 and 
+                    last_chunk.right_end == j1 and 
+                    last_chunk.type != 'equal'):
+                    last_chunk.left_end = i2
+                    last_chunk.right_end = j2
+                    continue
+            
+            chunk = DiffChunk(
+                left_start=i1,
+                left_end=i2,
+                right_start=j1,
+                right_end=j2,
+                type=tag
+            )
+            self.diff_chunks.append(chunk)
+            last_chunk = chunk
+            
+        print("\n=== 差异计算完成 ===")
+        print(f"总共发现 {len(self.diff_chunks)} 个差异块")
+        
+        # 更新差异高亮
+        self._update_diff_highlights()
+        
+    def _update_diff_highlights(self):
+        """更新两个编辑器的差异高亮"""
+        left_info = []
+        right_info = []
+        
+        for chunk in self.diff_chunks:
+            if chunk.type != 'equal':
+                if chunk.type in ('delete', 'replace'):
+                    # 左侧显示删除
+                    for line in range(chunk.left_start, chunk.left_end):
+                        left_info.append((line, 'delete'))
+                        
+                if chunk.type in ('insert', 'replace'):
+                    # 右侧显示插入
+                    for line in range(chunk.right_start, chunk.right_end):
+                        right_info.append((line, 'insert'))
+                        
+                if chunk.type == 'replace':
+                    # 替换时两侧都标记为replace
+                    for line in range(chunk.left_start, chunk.left_end):
+                        left_info.append((line, 'replace'))
+                    for line in range(chunk.right_start, chunk.right_end):
+                        right_info.append((line, 'replace'))
+        
+        # 设置高亮信息
+        self.left_edit.set_diff_info(left_info)
+        self.right_edit.set_diff_info(right_info)
+        
+        # 触发重新高亮
+        self.left_edit.rehighlight()
+        self.right_edit.rehighlight() 
