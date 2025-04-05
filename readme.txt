@@ -31,4 +31,6 @@ https://git-scm.com/docs/git-mergetool
 
 3-views 里面 还是尽量对齐文本， 自己看 meld目录别人怎么实现的 我只关心对齐文本的内容 我们现在用的qt6
 
+不是让你改main.py 我是让你改现有3-views
+
 
