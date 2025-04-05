@@ -390,34 +390,34 @@ class DiffViewer(QWidget):
                         
                         # 如果在差异块内，根据相对位置调整
                         if current_line < source_end:
+                            # 计算在差异块内的精确位置
                             block_progress = (current_line - source_start) / max(1, source_size)
-                            accumulated_diff += int(size_diff * block_progress)
+                            # 调整目标行号，考虑差异块内的相对位置
+                            target_line = target_start + int(block_progress * target_size)
                             print(f"在差异块内 [{source_start}, {source_end}] -> [{target_start}, {target_end}]")
-                            print(f"块内进度: {block_progress:.2f}, 累计调整: {accumulated_diff}")
+                            print(f"块内进度: {block_progress:.2f}, 目标行: {target_line}")
+                            break  # 找到当前所在的差异块后就停止
                         else:
+                            # 如果已经过了这个差异块，直接累加差异
                             accumulated_diff += size_diff
                             print(f"经过差异块 [{source_start}, {source_end}] -> [{target_start}, {target_end}]")
                             print(f"累计调整: {accumulated_diff}")
             
-            target_line += accumulated_diff
-            
+            # 如果不在任何差异块内，应用累计的差异
+            if target_line == current_line:
+                target_line += accumulated_diff
+
             # 4. 计算目标文档中的滚动值
             target_bar = target_edit.verticalScrollBar()
             target_max = target_bar.maximum()
             
-            # 使用相对位置计算目标滚动值
-            target_scroll = int(relative_pos * target_max)
+            # 根据目标行号计算滚动值
+            target_doc_height = target_edit.document().size().height()
+            target_line_count = target_edit.document().blockCount()
+            avg_line_height = target_doc_height / target_line_count if target_line_count > 0 else 0
             
-            # 根据差异块调整滚动值
-            if accumulated_diff != 0:
-                # 计算每行的平均高度
-                target_doc_height = target_edit.document().size().height()
-                target_line_count = target_edit.document().blockCount()
-                avg_line_height = target_doc_height / target_line_count if target_line_count > 0 else 0
-                
-                # 根据累计差异调整滚动值
-                adjustment = accumulated_diff * avg_line_height
-                target_scroll = int(target_scroll + adjustment)
+            # 直接使用目标行号计算滚动值
+            target_scroll = int(target_line * avg_line_height)
             
             # 确保滚动值在有效范围内
             target_scroll = max(0, min(target_scroll, target_max))
