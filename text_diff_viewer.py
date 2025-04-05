@@ -260,53 +260,45 @@ class SyncedTextEdit(QPlainTextEdit):
                     return
                     
                 current_line = first_visible_block.blockNumber()
-                print(f"\n=== 滚动同步调试 ===")
-                print(f"当前行: {current_line}")
                 
-                # 计算目标行号
+                # 计算同步点（屏幕中点）
+                viewport_height = self.viewport().height()
+                font_height = self.fontMetrics().height()
+                visible_lines = viewport_height / font_height
+                syncpoint = visible_lines / 2
+                
+                # 对于文档开头和结尾的特殊处理
+                if current_line < syncpoint:
+                    # 在文档开头，同步点线性降低
+                    syncpoint = current_line / 2
+                elif current_line > self.document().blockCount() - visible_lines:
+                    # 在文档结尾，保持在屏幕中点
+                    pass
+                
                 target_line = current_line
                 
-                # 考虑差异块的影响
+                # 处理差异块
                 for chunk in self.diff_chunks:
                     if chunk.type != 'equal':
-                        # 计算到差异块的距离
-                        distance_to_chunk = chunk.left_start - current_line
-                        print(f"差异块: {chunk.type}, 起始行: {chunk.left_start}, 结束行: {chunk.left_end}")
-                        print(f"到差异块的距离: {distance_to_chunk}")
-                        
-                        # 在经过差异块后保持补偿
-                        if current_line >= chunk.left_start:
-                            if current_line == chunk.left_start:
-                                print("触发差异块补偿")
-                            # 计算差异
-                            left_size = chunk.left_end - chunk.left_start
-                            right_size = chunk.right_end - chunk.right_start
-                            diff = right_size - left_size
-                            
-                            # 计算相对位置
-                            if left_size > 0:
-                                rel_pos = (current_line - chunk.left_start) / left_size
-                                # 应用补偿
-                                compensation = int(rel_pos * diff)
-                                print(f"补偿值: {compensation}, 相对位置: {rel_pos}")
-                                target_line += compensation
+                        # 如果当前行在差异块内
+                        if chunk.left_start <= current_line < chunk.left_end:
+                            # 计算在差异块内的相对位置
+                            block_pos = (current_line - chunk.left_start)
+                            block_size = chunk.left_end - chunk.left_start
+                            if block_size > 0:
+                                fraction = block_pos / block_size
+                                # 计算目标位置
+                                target_block_size = chunk.right_end - chunk.right_start
+                                target_line = chunk.right_start + fraction * target_block_size
                 
-                print(f"最终目标行: {target_line}")
-                
-                # 确保目标行在有效范围内
-                target_line = max(0, min(target_line, self._sync_target.document().blockCount() - 1))
-                
-                # 计算目标滚动位置
-                target_block = self._sync_target.document().findBlockByNumber(target_line)
+                # 设置目标滚动位置
+                target_block = self._sync_target.document().findBlockByNumber(int(target_line))
                 if target_block.isValid():
-                    target_scroll_bar = self._sync_target.verticalScrollBar()
-                    target_max = target_scroll_bar.maximum()
-                    target_min = target_scroll_bar.minimum()
-                    
-                    # 使用相对位置来设置目标滚动条
-                    target_value = int(target_min + (value / self.verticalScrollBar().maximum()) * (target_max - target_min))
-                    target_value = max(target_min, min(target_value, target_max))
-                    target_scroll_bar.setValue(target_value)
+                    y = self._sync_target.blockBoundingGeometry(target_block).translated(
+                        self._sync_target.contentOffset()).top()
+                    # 考虑同步点的位置
+                    y -= syncpoint * font_height
+                    self._sync_target.verticalScrollBar().setValue(int(y))
                     
             finally:
                 self._is_syncing = False
