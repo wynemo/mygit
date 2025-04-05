@@ -129,37 +129,26 @@ class DiffHighlighter(QSyntaxHighlighter):
         # 找到当前行所在的差异块
         current_chunk = None
         for chunk in self.diff_chunks:
-            # 检查是否是左侧编辑器
-            if self.editor_type == 'left':
+            # 检查是否是parent1编辑器
+            if self.editor_type == 'parent1':
                 if chunk.left_start <= block_number < chunk.left_end:
                     current_chunk = chunk
-                    print(f"找到左侧差异块: {chunk.type}")
+                    print(f"找到parent1差异块: {chunk.type}")
                     break
-            # 检查是否是右侧编辑器
-            elif self.editor_type == 'right':
+            # 检查是否是parent2编辑器
+            elif self.editor_type == 'parent2':
                 if chunk.right_start <= block_number < chunk.right_end:
                     current_chunk = chunk
-                    print(f"找到右侧差异块: {chunk.type}")
+                    print(f"找到parent2差异块: {chunk.type}")
                     break
         
         # 如果找到差异块，应用相应的格式
         if current_chunk and current_chunk.type != 'equal':
             print(f"应用差异块格式: {current_chunk.type}")
-            # 根据编辑器和差异类型选择格式
-            format_type = None
-            if self.editor_type == 'left':
-                if current_chunk.type == 'delete':
-                    format_type = 'delete'
-                elif current_chunk.type == 'replace':
-                    format_type = 'replace'
-            else:  # right
-                if current_chunk.type == 'insert':
-                    format_type = 'insert'
-                elif current_chunk.type == 'replace':
-                    format_type = 'replace'
+            format_type = current_chunk.type
             
             # 应用格式
-            if format_type and format_type in self.diff_formats:
+            if format_type in self.diff_formats:
                 format = self.diff_formats[format_type]
                 if format:
                     print(f"应用格式: {format_type}")
@@ -437,51 +426,242 @@ class DiffViewer(QWidget):
         finally:
             self._sync_hscroll_lock = False
 
+class MergeDiffViewer(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setup_ui()
+        self.diff_chunks = []
+        self._sync_vscroll_lock = False
+        self._sync_hscroll_lock = False
+        
+    def setup_ui(self):
+        layout = QHBoxLayout()
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        # 创建三个编辑器：parent1, result, parent2
+        self.parent1_edit = SyncedTextEdit()
+        self.result_edit = SyncedTextEdit()
+        self.parent2_edit = SyncedTextEdit()
+        
+        # 设置对象名称
+        self.parent1_edit.setObjectName('parent1_edit')
+        self.result_edit.setObjectName('result_edit')
+        self.parent2_edit.setObjectName('parent2_edit')
+        
+        # 设置滚动事件处理
+        self.parent1_edit.verticalScrollBar().valueChanged.connect(
+            lambda val: self._on_scroll(val, 'parent1'))
+        self.result_edit.verticalScrollBar().valueChanged.connect(
+            lambda val: self._on_scroll(val, 'result'))
+        self.parent2_edit.verticalScrollBar().valueChanged.connect(
+            lambda val: self._on_scroll(val, 'parent2'))
+        
+        # 设置水平滚动同步
+        self.parent1_edit.horizontalScrollBar().valueChanged.connect(
+            lambda val: self._sync_hscroll(val, 'parent1'))
+        self.result_edit.horizontalScrollBar().valueChanged.connect(
+            lambda val: self._sync_hscroll(val, 'result'))
+        self.parent2_edit.horizontalScrollBar().valueChanged.connect(
+            lambda val: self._sync_hscroll(val, 'parent2'))
+        
+        # 添加差异高亮器
+        self.parent1_highlighter = DiffHighlighter(self.parent1_edit.document(), 'parent1')
+        self.result_highlighter = DiffHighlighter(self.result_edit.document(), 'result')
+        self.parent2_highlighter = DiffHighlighter(self.parent2_edit.document(), 'parent2')
+        
+        # 添加到布局
+        layout.addWidget(self.parent1_edit)
+        layout.addWidget(self.result_edit)
+        layout.addWidget(self.parent2_edit)
+        self.setLayout(layout)
+        
+    def set_texts(self, parent1_text: str, result_text: str, parent2_text: str):
+        """设置要比较的三个文本"""
+        print("\n=== 设置新的三向文本进行比较 ===")
+        # 设置文本
+        self.parent1_edit.setPlainText(parent1_text)
+        self.result_edit.setPlainText(result_text)
+        self.parent2_edit.setPlainText(parent2_text)
+        
+        # 计算差异
+        self._compute_diffs(parent1_text, result_text, parent2_text)
+        
+    def _compute_diffs(self, parent1_text: str, result_text: str, parent2_text: str):
+        """计算三个文本之间的差异"""
+        print("\n=== 开始计算三向差异 ===")
+        
+        # 预处理文本行
+        parent1_lines = parent1_text.splitlines()
+        result_lines = result_text.splitlines()
+        parent2_lines = parent2_text.splitlines()
+        
+        print(f"Parent1行数: {len(parent1_lines)}")
+        print(f"Result行数: {len(result_lines)}")
+        print(f"Parent2行数: {len(parent2_lines)}")
+        
+        # 计算parent1和result之间的差异
+        parent1_matcher = difflib.SequenceMatcher(None, parent1_lines, result_lines)
+        parent1_chunks = []
+        for tag, i1, i2, j1, j2 in parent1_matcher.get_opcodes():
+            print(f"\nParent1差异块: {tag}, {i1}-{i2}, {j1}-{j2}")
+            # 注意：对于parent1，我们需要反转insert和delete的概念
+            chunk_type = tag
+            if tag == 'insert':
+                chunk_type = 'delete'  # result中有，parent1中没有
+            elif tag == 'delete':
+                chunk_type = 'insert'  # parent1中有，result中没有
+            
+            chunk = DiffChunk(
+                left_start=i1,
+                left_end=i2,
+                right_start=j1,
+                right_end=j2,
+                type=chunk_type
+            )
+            parent1_chunks.append(chunk)
+            
+        # 计算parent2和result之间的差异
+        parent2_matcher = difflib.SequenceMatcher(None, result_lines, parent2_lines)
+        parent2_chunks = []
+        for tag, i1, i2, j1, j2 in parent2_matcher.get_opcodes():
+            print(f"\nParent2差异块: {tag}, {i1}-{i2}, {j1}-{j2}")
+            chunk = DiffChunk(
+                left_start=i1,
+                left_end=i2,
+                right_start=j1,
+                right_end=j2,
+                type=tag
+            )
+            parent2_chunks.append(chunk)
+            
+        print(f"\nParent1差异块数量: {len(parent1_chunks)}")
+        print(f"Parent2差异块数量: {len(parent2_chunks)}")
+        
+        # 更新差异高亮
+        self.parent1_highlighter.set_diff_chunks(parent1_chunks)
+        self.parent2_highlighter.set_diff_chunks(parent2_chunks)
+
+    def _on_scroll(self, value, source: str):
+        """处理滚动同步
+        Args:
+            value: 滚动条的值
+            source: 滚动源('parent1', 'result', 'parent2')
+        """
+        if self._sync_vscroll_lock:
+            return
+            
+        self._sync_vscroll_lock = True
+        try:
+            print(f"\n=== {source} 滚动事件开始 ===")
+            
+            # 获取所有编辑器
+            editors = {
+                'parent1': self.parent1_edit,
+                'result': self.result_edit,
+                'parent2': self.parent2_edit
+            }
+            
+            source_edit = editors[source]
+            
+            # 获取当前视口中的行
+            cursor = source_edit.cursorForPosition(QPoint(0, 0))
+            current_line = cursor.blockNumber()
+            
+            # 同步其他编辑器的滚动
+            for target_name, target_edit in editors.items():
+                if target_name != source:
+                    # 计算目标文档中的滚动值
+                    target_doc_height = target_edit.document().size().height()
+                    target_line_count = target_edit.document().blockCount()
+                    avg_line_height = target_doc_height / target_line_count if target_line_count > 0 else 0
+                    
+                    # 使用当前行号计算目标滚动值
+                    target_scroll = int(current_line * avg_line_height)
+                    
+                    # 确保滚动值在有效范围内
+                    target_bar = target_edit.verticalScrollBar()
+                    target_max = target_bar.maximum()
+                    target_scroll = max(0, min(target_scroll, target_max))
+                    
+                    # 设置滚动条位置
+                    target_edit.verticalScrollBar().setValue(target_scroll)
+            
+            print(f"=== {source} 滚动事件结束 ===\n")
+                
+        finally:
+            self._sync_vscroll_lock = False
+            
+    def _sync_hscroll(self, value, source: str):
+        """处理水平滚动同步"""
+        if self._sync_hscroll_lock:
+            return
+            
+        try:
+            self._sync_hscroll_lock = True
+            editors = {
+                'parent1': self.parent1_edit,
+                'result': self.result_edit,
+                'parent2': self.parent2_edit
+            }
+            
+            # 同步其他编辑器的水平滚动
+            for name, editor in editors.items():
+                if name != source:
+                    editor.horizontalScrollBar().setValue(value)
+        finally:
+            self._sync_hscroll_lock = False
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Text Diff Viewer")
+        self.setWindowTitle("Text Merge Viewer")
         self.resize(1200, 800)
         
-        # Create diff viewer
-        self.diff_viewer = DiffViewer()
-        self.setCentralWidget(self.diff_viewer)
+        # 创建三向对比视图
+        self.merge_viewer = MergeDiffViewer()
+        self.setCentralWidget(self.merge_viewer)
         
-        # Load test data
+        # 加载测试数据
         self.load_test_data()
         
     def load_test_data(self):
         # 创建测试数据
-        left_text = []
-        right_text = []
+        parent1_text = []
+        result_text = []
+        parent2_text = []
         
         # 生成100行测试数据
         for i in range(1, 101):
-            # 基本行
             base_line = f"Line {i}"
             
-            # 在特定行添加差异
             if i == 15:
-                left_text.append(base_line)
-                left_text.append("This line only exists in left")  # 删除行
-                right_text.append(base_line)
+                parent1_text.append(base_line)
+                parent1_text.append("This line only exists in parent1")
+                result_text.append(base_line)
+                parent2_text.append(base_line)
             elif i == 25:
-                left_text.append(base_line)
-                right_text.append(base_line)
-                right_text.append("This line only exists in right")  # 插入行
+                parent1_text.append(base_line)
+                result_text.append(base_line)
+                result_text.append("This line exists in result and parent2")
+                parent2_text.append(base_line)
+                parent2_text.append("This line exists in result and parent2")
             elif i == 35:
-                left_text.append("This is the left version")  # 替换行
-                right_text.append("This is the right version")  # 替换行
+                parent1_text.append("Parent1 version")
+                result_text.append("Result version")
+                parent2_text.append("Parent2 version")
             else:
-                left_text.append(base_line)
-                right_text.append(base_line)
+                parent1_text.append(base_line)
+                result_text.append(base_line)
+                parent2_text.append(base_line)
         
         # 转换为文本
-        left_text = "\n".join(left_text)
-        right_text = "\n".join(right_text)
+        parent1_text = "\n".join(parent1_text)
+        result_text = "\n".join(result_text)
+        parent2_text = "\n".join(parent2_text)
         
         # 设置文本
-        self.diff_viewer.set_texts(left_text, right_text)
+        self.merge_viewer.set_texts(parent1_text, result_text, parent2_text)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
