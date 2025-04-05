@@ -274,9 +274,10 @@ class SyncedTextEdit(QPlainTextEdit):
                         print(f"差异块: {chunk.type}, 起始行: {chunk.left_start}, 结束行: {chunk.left_end}")
                         print(f"到差异块的距离: {distance_to_chunk}")
                         
-                        # 如果当前行在差异块内或之后
+                        # 在经过差异块后保持补偿
                         if current_line >= chunk.left_start:
-                            print("触发差异块内补偿")
+                            if current_line == chunk.left_start:
+                                print("触发差异块补偿")
                             # 计算差异
                             left_size = chunk.left_end - chunk.left_start
                             right_size = chunk.right_end - chunk.right_start
