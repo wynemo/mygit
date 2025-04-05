@@ -467,7 +467,13 @@ class MainWindow(QMainWindow):
             left_text += f"Line {i}\n"
             right_text += f"Line {i}\n"
             if i == 25:
-                right_text += "Inserted line\n"
+                right_text += "Inserted line 25\n"
+
+            if i == 35:
+                right_text += "Inserted line 35\n"
+
+            if i == 15:
+                left_text += "Inserted line 15\n"
             
         self.diff_viewer.set_texts(left_text, right_text)
 
