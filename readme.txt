@@ -18,5 +18,6 @@
 
 https://github.com/microsoft/vscode/pull/155039/files
 https://github.com/chrisbra/vim-diff-enhanced
+https://git-scm.com/docs/git-mergetool
 
 滚动的时候，有动态的对齐，要把一样的文本块对齐
