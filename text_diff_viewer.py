@@ -235,73 +235,12 @@ class SyncedTextEdit(QPlainTextEdit):
         self.updateRequest.connect(self.update_line_number_area)
         self.update_line_number_area_width()
         
-        # 滚动同步相关
-        self._sync_target = None
-        self._is_syncing = False
-        self.verticalScrollBar().valueChanged.connect(self._on_scroll)
+        # 差异块信息
         self.diff_chunks = []
-        
-    def set_sync_target(self, target):
-        """设置同步目标编辑器"""
-        self._sync_target = target
         
     def set_diff_chunks(self, chunks):
         """设置差异块信息"""
         self.diff_chunks = chunks
-        
-    def _on_scroll(self, value):
-        """处理滚动事件"""
-        if not self._is_syncing and self._sync_target:
-            self._is_syncing = True
-            try:
-                # 获取当前可见的第一行
-                first_visible_block = self.firstVisibleBlock()
-                if not first_visible_block.isValid():
-                    return
-                    
-                current_line = first_visible_block.blockNumber()
-                
-                # 计算同步点（屏幕中点）
-                viewport_height = self.viewport().height()
-                font_height = self.fontMetrics().height()
-                visible_lines = viewport_height / font_height
-                syncpoint = visible_lines / 2
-                
-                # 对于文档开头和结尾的特殊处理
-                if current_line < syncpoint:
-                    # 在文档开头，同步点线性降低
-                    syncpoint = current_line / 2
-                elif current_line > self.document().blockCount() - visible_lines:
-                    # 在文档结尾，保持在屏幕中点
-                    pass
-                
-                target_line = current_line
-                
-                # 处理差异块
-                for chunk in self.diff_chunks:
-                    if chunk.type != 'equal':
-                        # 如果当前行在差异块内
-                        if chunk.left_start <= current_line < chunk.left_end:
-                            # 计算在差异块内的相对位置
-                            block_pos = (current_line - chunk.left_start)
-                            block_size = chunk.left_end - chunk.left_start
-                            if block_size > 0:
-                                fraction = block_pos / block_size
-                                # 计算目标位置
-                                target_block_size = chunk.right_end - chunk.right_start
-                                target_line = chunk.right_start + fraction * target_block_size
-                
-                # 设置目标滚动位置
-                target_block = self._sync_target.document().findBlockByNumber(int(target_line))
-                if target_block.isValid():
-                    y = self._sync_target.blockBoundingGeometry(target_block).translated(
-                        self._sync_target.contentOffset()).top()
-                    # 考虑同步点的位置
-                    y -= syncpoint * font_height
-                    self._sync_target.verticalScrollBar().setValue(int(y))
-                    
-            finally:
-                self._is_syncing = False
         
     def line_number_area_width(self):
         digits = len(str(max(1, self.blockCount())))
@@ -322,7 +261,7 @@ class SyncedTextEdit(QPlainTextEdit):
         cr = self.contentsRect()
         self.line_number_area.setGeometry(QRect(cr.left(), cr.top(),
                                               self.line_number_area_width(), cr.height()))
-
+                                              
     def line_number_area_paint_event(self, event):
         """绘制行号区域"""
         painter = QPainter(self.line_number_area)
@@ -362,6 +301,8 @@ class DiffViewer(QWidget):
         super().__init__()
         self.setup_ui()
         self.diff_chunks = []
+        self._sync_vscroll_lock = False
+        self._sync_hscroll_lock = False
         
     def setup_ui(self):
         layout = QHBoxLayout()
@@ -376,9 +317,16 @@ class DiffViewer(QWidget):
         self.right_edit = SyncedTextEdit()
         self.right_edit.setObjectName('right_edit')
         
-        # 设置互相同步
-        self.left_edit.set_sync_target(self.right_edit)
-        self.right_edit.set_sync_target(self.left_edit)
+        # 设置滚动事件处理
+        self.left_edit.verticalScrollBar().valueChanged.connect(
+            self._on_left_scroll)
+        self.right_edit.verticalScrollBar().valueChanged.connect(
+            self._on_right_scroll)
+        
+        self.left_edit.horizontalScrollBar().valueChanged.connect(
+            lambda val: self._sync_hscroll(val, 0))
+        self.right_edit.horizontalScrollBar().valueChanged.connect(
+            lambda val: self._sync_hscroll(val, 1))
         
         # 添加语法高亮器
         self.left_highlighter = GoHighlighter(self.left_edit.document())
@@ -478,6 +426,179 @@ class DiffViewer(QWidget):
         # 更新编辑器的差异块信息
         self.left_edit.set_diff_chunks(self.diff_chunks)
         self.right_edit.set_diff_chunks(self.diff_chunks)
+
+    def _calc_relative_position(self, line_number, total_lines):
+        """计算行号对应的相对位置（0-1之间）"""
+        if total_lines <= 1:
+            return 0.0
+        return line_number / (total_lines - 1)
+
+    def _calc_target_line(self, relative_pos, total_lines):
+        """根据相对位置计算目标行号"""
+        if total_lines <= 1:
+            return 0
+        return relative_pos * (total_lines - 1)
+
+    def _on_left_scroll(self, value):
+        """处理左侧编辑器的滚动事件"""
+        if self._sync_vscroll_lock:
+            return
+            
+        self._sync_vscroll_lock = True
+        try:
+            print("\n=== 左侧滚动事件开始 ===")
+            
+            # 1. 获取当前滚动位置的相对值
+            left_bar = self.left_edit.verticalScrollBar()
+            max_value = left_bar.maximum()
+            relative_pos = value / max_value if max_value > 0 else 0
+            print(f"当前滚动相对位置: {relative_pos:.3f}")
+            
+            # 2. 获取当前视口中的行
+            cursor = self.left_edit.cursorForPosition(QPoint(0, 0))
+            current_line = cursor.blockNumber()
+            print(f"当前视口起始行: {current_line}")
+            
+            # 3. 根据差异块调整目标位置
+            target_line = current_line
+            accumulated_diff = 0
+            for chunk in self.diff_chunks:
+                if chunk.type != 'equal':
+                    if chunk.left_start <= current_line:
+                        # 计算差异块的大小差异
+                        left_size = chunk.left_end - chunk.left_start
+                        right_size = chunk.right_end - chunk.right_start
+                        size_diff = right_size - left_size
+                        
+                        # 如果在差异块内，根据相对位置调整
+                        if current_line < chunk.left_end:
+                            block_progress = (current_line - chunk.left_start) / max(1, left_size)
+                            accumulated_diff += int(size_diff * block_progress)
+                            print(f"在差异块内 [{chunk.left_start}, {chunk.left_end}] -> [{chunk.right_start}, {chunk.right_end}]")
+                            print(f"块内进度: {block_progress:.2f}, 累计调整: {accumulated_diff}")
+                        else:
+                            accumulated_diff += size_diff
+                            print(f"经过差异块 [{chunk.left_start}, {chunk.left_end}] -> [{chunk.right_start}, {chunk.right_end}]")
+                            print(f"累计调整: {accumulated_diff}")
+            
+            target_line += accumulated_diff
+            
+            # 4. 计算目标文档中的滚动值
+            right_bar = self.right_edit.verticalScrollBar()
+            right_max = right_bar.maximum()
+            
+            # 使用相对位置计算目标滚动值
+            target_scroll = int(relative_pos * right_max)
+            
+            # 根据差异块调整滚动值
+            if accumulated_diff != 0:
+                # 计算每行的平均高度
+                right_doc_height = self.right_edit.document().size().height()
+                right_line_count = self.right_edit.document().blockCount()
+                avg_line_height = right_doc_height / right_line_count if right_line_count > 0 else 0
+                
+                # 根据累计差异调整滚动值
+                adjustment = accumulated_diff * avg_line_height
+                target_scroll = int(target_scroll + adjustment)
+            
+            # 确保滚动值在有效范围内
+            target_scroll = max(0, min(target_scroll, right_max))
+            print(f"目标行: {target_line}, 目标滚动值: {target_scroll}")
+            
+            # 设置滚动条位置
+            self.right_edit.verticalScrollBar().setValue(target_scroll)
+            
+            print("=== 左侧滚动事件结束 ===\n")
+                
+        finally:
+            self._sync_vscroll_lock = False
+            
+    def _on_right_scroll(self, value):
+        """处理右侧编辑器的滚动事件"""
+        if self._sync_vscroll_lock:
+            return
+            
+        self._sync_vscroll_lock = True
+        try:
+            print("\n=== 右侧滚动事件开始 ===")
+            
+            # 1. 获取当前滚动位置的相对值
+            right_bar = self.right_edit.verticalScrollBar()
+            max_value = right_bar.maximum()
+            relative_pos = value / max_value if max_value > 0 else 0
+            print(f"当前滚动相对位置: {relative_pos:.3f}")
+            
+            # 2. 获取当前视口中的行
+            cursor = self.right_edit.cursorForPosition(QPoint(0, 0))
+            current_line = cursor.blockNumber()
+            print(f"当前视口起始行: {current_line}")
+            
+            # 3. 根据差异块调整目标位置
+            target_line = current_line
+            accumulated_diff = 0
+            for chunk in self.diff_chunks:
+                if chunk.type != 'equal':
+                    if chunk.right_start <= current_line:
+                        # 计算差异块的大小差异
+                        left_size = chunk.left_end - chunk.left_start
+                        right_size = chunk.right_end - chunk.right_start
+                        size_diff = left_size - right_size
+                        
+                        # 如果在差异块内，根据相对位置调整
+                        if current_line < chunk.right_end:
+                            block_progress = (current_line - chunk.right_start) / max(1, right_size)
+                            accumulated_diff += int(size_diff * block_progress)
+                            print(f"在差异块内 [{chunk.right_start}, {chunk.right_end}] -> [{chunk.left_start}, {chunk.left_end}]")
+                            print(f"块内进度: {block_progress:.2f}, 累计调整: {accumulated_diff}")
+                        else:
+                            accumulated_diff += size_diff
+                            print(f"经过差异块 [{chunk.right_start}, {chunk.right_end}] -> [{chunk.left_start}, {chunk.left_end}]")
+                            print(f"累计调整: {accumulated_diff}")
+            
+            target_line += accumulated_diff
+            
+            # 4. 计算目标文档中的滚动值
+            left_bar = self.left_edit.verticalScrollBar()
+            left_max = left_bar.maximum()
+            
+            # 使用相对位置计算目标滚动值
+            target_scroll = int(relative_pos * left_max)
+            
+            # 根据差异块调整滚动值
+            if accumulated_diff != 0:
+                # 计算每行的平均高度
+                left_doc_height = self.left_edit.document().size().height()
+                left_line_count = self.left_edit.document().blockCount()
+                avg_line_height = left_doc_height / left_line_count if left_line_count > 0 else 0
+                
+                # 根据累计差异调整滚动值
+                adjustment = accumulated_diff * avg_line_height
+                target_scroll = int(target_scroll + adjustment)
+            
+            # 确保滚动值在有效范围内
+            target_scroll = max(0, min(target_scroll, left_max))
+            print(f"目标行: {target_line}, 目标滚动值: {target_scroll}")
+            
+            # 设置滚动条位置
+            self.left_edit.verticalScrollBar().setValue(target_scroll)
+            
+            print("=== 右侧滚动事件结束 ===\n")
+                
+        finally:
+            self._sync_vscroll_lock = False
+            
+    def _sync_hscroll(self, value, master_idx):
+        """处理水平滚动同步"""
+        if self._sync_hscroll_lock:
+            return
+            
+        try:
+            self._sync_hscroll_lock = True
+            editors = [self.left_edit, self.right_edit]
+            target = editors[1 - master_idx]  # 另一个编辑器
+            target.horizontalScrollBar().setValue(value)
+        finally:
+            self._sync_hscroll_lock = False
 
     def _get_visible_lines(self, edit: SyncedTextEdit) -> Tuple[int, int]:
         """获取当前可见的行范围"""
