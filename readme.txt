@@ -14,4 +14,9 @@
 
 对于文件比较，我需要你解析git diff信息，以这个为基准，然后在框里把差异渲染出来
 
-3-views 里面 还是尽量对齐文本
+3-views 里面 还是尽量对齐文本 请你去网上查一下 3-views 怎么实现的
+
+https://github.com/microsoft/vscode/pull/155039/files
+https://github.com/chrisbra/vim-diff-enhanced
+
+滚动的时候，有动态的对齐，要把一样的文本块对齐
