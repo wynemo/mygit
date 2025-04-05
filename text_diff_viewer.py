@@ -147,82 +147,6 @@ class DiffHighlighter(QSyntaxHighlighter):
                     print(f"应用格式: {format_type}")
                     self.setFormat(0, len(text), format)
 
-    def _compute_diff(self, left_text: str, right_text: str):
-        """计算文本差异，忽略行尾空白字符的差异"""
-        print("\n=== 开始计算差异 ===")
-        
-        # 预处理文本行，去除行尾空白和行首空白
-        left_lines = [line.strip() for line in left_text.splitlines()]
-        right_lines = [line.strip() for line in right_text.splitlines()]
-        
-        print(f"左侧文本行数: {len(left_lines)}")
-        print(f"右侧文本行数: {len(right_lines)}")
-        
-        # 使用 junk 参数忽略空白字符的差异
-        matcher = difflib.SequenceMatcher(
-            lambda x: x.isspace() or not x.strip(),  # 忽略空白行
-            left_lines,
-            right_lines,
-            autojunk=False  # 禁用自动junk检测
-        )
-        
-        self.diff_chunks = []
-        last_chunk = None
-        
-        print("\n差异块详情:")
-        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-            print(f"\n当前块: {tag}")
-            print(f"左侧范围: {i1}-{i2}")
-            print(f"右侧范围: {j1}-{j2}")
-            
-            # 尝试合并相邻的差异块
-            if last_chunk and tag != 'equal':
-                if (last_chunk.left_end == i1 and 
-                    last_chunk.right_end == j1 and 
-                    last_chunk.type != 'equal'):
-                    last_chunk.left_end = i2
-                    last_chunk.right_end = j2
-                    continue
-            
-            # 对于相等的块，检查是否真的完全相等
-            if tag == 'equal':
-                # 打印相等块的内容进行比对
-                print("相等块内容比对:")
-                is_really_equal = True
-                for i, j in zip(range(i1, i2), range(j1, j2)):
-                    left_line = left_lines[i]
-                    right_line = right_lines[j]
-                    if left_line != right_line:
-                        print(f"发现不相等的行:")
-                        print(f"左侧第{i+1}行: {left_line}")
-                        print(f"右侧第{j+1}行: {right_line}")
-                        is_really_equal = False
-                        break
-                
-                if not is_really_equal:
-                    tag = 'replace'
-            
-            chunk = DiffChunk(
-                left_start=i1,
-                left_end=i2,
-                right_start=j1,
-                right_end=j2,
-                type=tag
-            )
-            self.diff_chunks.append(chunk)
-            last_chunk = chunk
-            
-        print("\n=== 差异计算完成 ===")
-        print(f"总共发现 {len(self.diff_chunks)} 个差异块")
-        
-        # 更新差异高亮
-        self.left_diff_highlighter.set_diff_chunks(self.diff_chunks)
-        self.right_diff_highlighter.set_diff_chunks(self.diff_chunks)
-        
-        # 更新编辑器的差异块信息
-        self.left_edit.set_diff_chunks(self.diff_chunks)
-        self.right_edit.set_diff_chunks(self.diff_chunks)
-
 class SyncedTextEdit(QPlainTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -234,13 +158,6 @@ class SyncedTextEdit(QPlainTextEdit):
         self.blockCountChanged.connect(self.update_line_number_area_width)
         self.updateRequest.connect(self.update_line_number_area)
         self.update_line_number_area_width()
-        
-        # 差异块信息
-        self.diff_chunks = []
-        
-    def set_diff_chunks(self, chunks):
-        """设置差异块信息"""
-        self.diff_chunks = chunks
         
     def line_number_area_width(self):
         digits = len(str(max(1, self.blockCount())))
@@ -423,21 +340,9 @@ class DiffViewer(QWidget):
         self.left_diff_highlighter.set_diff_chunks(self.diff_chunks)
         self.right_diff_highlighter.set_diff_chunks(self.diff_chunks)
         
-        # 更新编辑器的差异块信息
-        self.left_edit.set_diff_chunks(self.diff_chunks)
-        self.right_edit.set_diff_chunks(self.diff_chunks)
-
-    def _calc_relative_position(self, line_number, total_lines):
-        """计算行号对应的相对位置（0-1之间）"""
-        if total_lines <= 1:
-            return 0.0
-        return line_number / (total_lines - 1)
-
-    def _calc_target_line(self, relative_pos, total_lines):
-        """根据相对位置计算目标行号"""
-        if total_lines <= 1:
-            return 0
-        return relative_pos * (total_lines - 1)
+        # 不再需要更新编辑器的差异块信息，因为这个功能已被移除
+        # self.left_edit.set_diff_chunks(self.diff_chunks)
+        # self.right_edit.set_diff_chunks(self.diff_chunks)
 
     def _on_scroll(self, value, is_left_scroll: bool):
         """统一处理滚动事件
@@ -539,7 +444,6 @@ class DiffViewer(QWidget):
         finally:
             self._sync_hscroll_lock = False
 
-        
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
