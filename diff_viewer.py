@@ -28,7 +28,7 @@ class LineNumberArea(QWidget):
 class DiffTextEdit(QPlainTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFont(QFont('Courier New', 10))
+        # self.setFont(QFont('Courier New', 10))
         self.highlighter = DiffCodeHighlighter(self.document())
         self.sync_scrolls = []  # 同步滚动的其他编辑器列表
         self.is_scrolling = False  # 防止递归滚动
