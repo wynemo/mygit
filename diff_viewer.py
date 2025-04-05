@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QPlainTextEdit, QWidget
 from PyQt6.QtCore import Qt, QRect, QSize
-from PyQt6.QtGui import QFont, QPainter, QColor, QTextBlock
+from PyQt6.QtGui import QFont, QPainter, QColor, QTextBlock, QTextCursor
 from syntax_highlighter import DiffCodeHighlighter
 
 class LineNumberArea(QWidget):
@@ -73,15 +73,14 @@ class DiffTextEdit(QPlainTextEdit):
             self.is_scrolling = True
             # 计算滚动百分比
             maximum = self.horizontalScrollBar().maximum()
-            if maximum == 0:
-                percentage = 0
-            else:
+            if maximum > 0:
                 percentage = value / maximum
-                
-            # 同步其他编辑器的滚动
-            for edit in self.sync_scrolls:
-                other_maximum = edit.horizontalScrollBar().maximum()
-                edit.horizontalScrollBar().setValue(int(percentage * other_maximum))
+                # 同步其他编辑器的滚动
+                for edit in self.sync_scrolls:
+                    other_maximum = edit.horizontalScrollBar().maximum()
+                    target_value = int(percentage * other_maximum)
+                    target_value = max(0, min(target_value, other_maximum))
+                    edit.horizontalScrollBar().setValue(target_value)
             self.is_scrolling = False
             
     def set_diff_info(self, line_info):
@@ -89,7 +88,6 @@ class DiffTextEdit(QPlainTextEdit):
         if isinstance(self.highlighter, DiffCodeHighlighter):
             self.highlighter.set_diff_info(line_info)
         else:
-             # Fallback or error handling if highlighter is not the expected type
              print("Warning: Highlighter is not DiffCodeHighlighter, cannot set diff info.")
 
     def rehighlight(self):

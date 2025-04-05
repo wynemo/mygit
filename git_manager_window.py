@@ -25,11 +25,16 @@ class GitManagerWindow(QMainWindow):
         
         # 创建主布局
         main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
         main_widget.setLayout(main_layout)
         
         # 创建顶部控制区域
+        top_widget = QWidget()
+        top_widget.setFixedHeight(40)  # 固定顶部高度
         top_layout = QHBoxLayout()
-        main_layout.addLayout(top_layout)
+        top_widget.setLayout(top_layout)
+        main_layout.addWidget(top_widget)
         
         # 创建打开文件夹按钮和最近文件夹按钮的容器
         folder_layout = QHBoxLayout()
@@ -61,20 +66,30 @@ class GitManagerWindow(QMainWindow):
         
         # 创建垂直分割器
         vertical_splitter = QSplitter(Qt.Orientation.Vertical)
+        vertical_splitter.setChildrenCollapsible(False)
+        vertical_splitter.setOpaqueResize(False)  # 添加平滑调整
+        vertical_splitter.setHandleWidth(8)  # 增加分割条宽度，更容易拖动
         main_layout.addWidget(vertical_splitter)
         
         # 上半部分容器
         upper_widget = QWidget()
-        upper_layout = QVBoxLayout()
+        upper_widget.setMinimumHeight(100)  # 设置最小高度
+        upper_layout = QHBoxLayout()
+        upper_layout.setContentsMargins(0, 0, 0, 0)
         upper_widget.setLayout(upper_layout)
         
         # 创建水平分割器（用于提交历史和文件变化）
         horizontal_splitter = QSplitter(Qt.Orientation.Horizontal)
+        horizontal_splitter.setChildrenCollapsible(False)
+        horizontal_splitter.setOpaqueResize(False)  # 添加平滑调整
+        horizontal_splitter.setHandleWidth(8)  # 增加分割条宽度，更容易拖动
         upper_layout.addWidget(horizontal_splitter)
         
         # 左侧提交历史区域
         left_widget = QWidget()
+        left_widget.setMinimumWidth(200)  # 设置最小宽度
         left_layout = QVBoxLayout()
+        left_layout.setContentsMargins(5, 5, 5, 5)
         left_widget.setLayout(left_layout)
         
         self.history_label = QLabel("提交历史:")
@@ -85,13 +100,14 @@ class GitManagerWindow(QMainWindow):
         
         # 右侧文件变化区域
         right_widget = QWidget()
+        right_widget.setMinimumWidth(200)  # 设置最小宽度
         right_layout = QVBoxLayout()
+        right_layout.setContentsMargins(5, 5, 5, 5)
         right_widget.setLayout(right_layout)
         
         self.changes_label = QLabel("文件变化:")
         right_layout.addWidget(self.changes_label)
         
-        # 使用QTreeWidget替代QTextEdit
         self.changes_tree = QTreeWidget()
         self.changes_tree.setHeaderLabels(["文件", "状态"])
         self.changes_tree.setColumnCount(2)
@@ -101,37 +117,45 @@ class GitManagerWindow(QMainWindow):
         # 添加左右部件到水平分割器
         horizontal_splitter.addWidget(left_widget)
         horizontal_splitter.addWidget(right_widget)
-        horizontal_splitter.setSizes([400, 800])
+        
+        # 设置水平分割器的初始大小比例 (1:2)
+        total_width = self.width()
+        horizontal_splitter.setSizes([total_width // 3, total_width * 2 // 3])
         
         # 添加上半部分到垂直分割器
         vertical_splitter.addWidget(upper_widget)
         
         # 下半部分：文件差异查看区域
         diff_widget = QWidget()
-        diff_layout = QVBoxLayout()
+        diff_widget.setMinimumHeight(100)  # 设置最小高度
+        diff_layout = QHBoxLayout()
+        diff_layout.setContentsMargins(0, 0, 0, 0)
         diff_widget.setLayout(diff_layout)
-        
-        self.diff_label = QLabel("文件差异:")
-        diff_layout.addWidget(self.diff_label)
         
         # 创建水平分割器用于显示文件差异
         diff_splitter = QSplitter(Qt.Orientation.Horizontal)
+        diff_splitter.setChildrenCollapsible(False)
+        diff_splitter.setOpaqueResize(False)  # 添加平滑调整
+        diff_splitter.setHandleWidth(8)  # 增加分割条宽度，更容易拖动
         diff_layout.addWidget(diff_splitter)
         
         # 左侧差异文本框
         self.left_diff = DiffTextEdit()
         self.left_diff.setReadOnly(True)
+        self.left_diff.setMinimumWidth(200)  # 设置最小宽度
         diff_splitter.addWidget(self.left_diff)
         
         # 中间差异文本框（用于merge情况）
         self.middle_diff = DiffTextEdit()
         self.middle_diff.setReadOnly(True)
+        self.middle_diff.setMinimumWidth(200)  # 设置最小宽度
         self.middle_diff.hide()  # 默认隐藏
         diff_splitter.addWidget(self.middle_diff)
         
         # 右侧差异文本框
         self.right_diff = DiffTextEdit()
         self.right_diff.setReadOnly(True)
+        self.right_diff.setMinimumWidth(200)  # 设置最小宽度
         diff_splitter.addWidget(self.right_diff)
         
         # 设置文本框之间的滚动同步
@@ -140,8 +164,20 @@ class GitManagerWindow(QMainWindow):
         # 添加下半部分到垂直分割器
         vertical_splitter.addWidget(diff_widget)
         
-        # 设置垂直分割器的初始大小
-        vertical_splitter.setSizes([400, 400])
+        # 设置垂直分割器的初始大小比例 (2:3)
+        total_height = self.height()
+        vertical_splitter.setSizes([total_height * 2 // 5, total_height * 3 // 5])
+        
+        # 保存分割器引用以便后续使用
+        self.vertical_splitter = vertical_splitter
+        self.horizontal_splitter = horizontal_splitter
+        self.diff_splitter = diff_splitter
+        
+        # 从设置中恢复分割器状态
+        self.restore_splitter_state()
+        
+        # 在窗口关闭时保存分割器状态
+        self.destroyed.connect(self.save_splitter_state)
         
         # 在初始化完成后，尝试打开上次的文件夹
         last_folder = self.settings.get_last_folder()
@@ -455,3 +491,39 @@ class GitManagerWindow(QMainWindow):
             self.left_diff.setPlainText(f"获取文件差异失败:\n{traceback.format_exc()}")
             self.middle_diff.clear()
             self.right_diff.clear()
+
+    def save_splitter_state(self):
+        """保存所有分割器的状态"""
+        self.settings.settings['vertical_splitter'] = [pos for pos in self.vertical_splitter.sizes()]
+        self.settings.settings['horizontal_splitter'] = [pos for pos in self.horizontal_splitter.sizes()]
+        self.settings.settings['diff_splitter'] = [pos for pos in self.diff_splitter.sizes()]
+        self.settings.save_settings()
+        
+    def restore_splitter_state(self):
+        """恢复所有分割器的状态"""
+        # 恢复垂直分割器状态
+        vertical_sizes = self.settings.settings.get('vertical_splitter')
+        if vertical_sizes:
+            self.vertical_splitter.setSizes(vertical_sizes)
+            
+        # 恢复水平分割器状态
+        horizontal_sizes = self.settings.settings.get('horizontal_splitter')
+        if horizontal_sizes:
+            self.horizontal_splitter.setSizes(horizontal_sizes)
+            
+        # 恢复差异分割器状态
+        diff_sizes = self.settings.settings.get('diff_splitter')
+        if diff_sizes:
+            self.diff_splitter.setSizes(diff_sizes)
+            
+    def resizeEvent(self, event):
+        """处理窗口大小改变事件"""
+        super().resizeEvent(event)
+        # 如果没有保存的分割器状态,则使用默认比例
+        if not self.settings.settings.get('vertical_splitter'):
+            total_height = self.height()
+            # 调整比例，让下半部分占据更多空间
+            self.vertical_splitter.setSizes([total_height * 1 // 3, total_height * 2 // 3])
+        if not self.settings.settings.get('horizontal_splitter'):
+            total_width = self.width()
+            self.horizontal_splitter.setSizes([total_width // 3, total_width * 2 // 3])
