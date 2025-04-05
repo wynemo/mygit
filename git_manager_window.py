@@ -32,7 +32,7 @@ class GitManagerWindow(QMainWindow):
         
         # 创建顶部控制区域
         top_widget = QWidget()
-        top_widget.setFixedHeight(40)  # 固定顶部高度
+        top_widget.setFixedHeight(100)  # 固定顶部高度
         top_layout = QHBoxLayout()
         top_widget.setLayout(top_layout)
         main_layout.addWidget(top_widget)
