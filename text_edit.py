@@ -1,4 +1,4 @@
-from PyQt6.QtCore import QRect, Qt, QSize
+from PyQt6.QtCore import QRect, QSize, Qt
 from PyQt6.QtGui import QColor, QPainter
 from PyQt6.QtWidgets import QPlainTextEdit, QWidget
 

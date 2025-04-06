@@ -1,5 +1,6 @@
-import git
 from typing import List, Optional
+
+import git
 
 
 class GitManager:

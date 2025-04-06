@@ -1,5 +1,7 @@
 import sys
+
 from PyQt6.QtWidgets import QApplication
+
 from git_manager_window import GitManagerWindow
 
 
