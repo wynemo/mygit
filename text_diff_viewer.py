@@ -85,8 +85,8 @@ class GoHighlighter(QSyntaxHighlighter):
 class DiffHighlighter(QSyntaxHighlighter):
     def __init__(self, parent=None, editor_type=''):
         super().__init__(parent)
-        self.diff_chunks = []
         self.editor_type = editor_type
+        self.diff_chunks = []
         print(f"\n=== 初始化DiffHighlighter ===")
         print(f"编辑器类型: {editor_type}")
         
@@ -108,6 +108,7 @@ class DiffHighlighter(QSyntaxHighlighter):
         return fmt
         
     def set_diff_chunks(self, chunks):
+        """设置差异块"""
         print(f"\n=== 设置差异块到高亮器 ===")
         print(f"高亮器类型: {self.editor_type}")
         print(f"块数量: {len(chunks)}")
@@ -120,6 +121,7 @@ class DiffHighlighter(QSyntaxHighlighter):
         self.rehighlight()
         
     def highlightBlock(self, text):
+        """高亮当前文本块"""
         block_number = self.currentBlock().blockNumber()
         print(f"\n=== 高亮块 ===")
         print(f"高亮器类型: {self.editor_type}")
@@ -130,13 +132,13 @@ class DiffHighlighter(QSyntaxHighlighter):
         current_chunk = None
         for chunk in self.diff_chunks:
             # 检查是否是parent1编辑器
-            if self.editor_type == 'parent1':
+            if self.editor_type == 'parent1_edit':
                 if chunk.left_start <= block_number < chunk.left_end:
                     current_chunk = chunk
                     print(f"找到parent1差异块: {chunk.type}")
                     break
             # 检查是否是parent2编辑器
-            elif self.editor_type == 'parent2':
+            elif self.editor_type == 'parent2_edit':
                 if chunk.right_start <= block_number < chunk.right_end:
                     current_chunk = chunk
                     print(f"找到parent2差异块: {chunk.type}")
@@ -169,6 +171,17 @@ class SyncedTextEdit(QPlainTextEdit):
         self.blockCountChanged.connect(self.update_line_number_area_width)
         self.updateRequest.connect(self.update_line_number_area)
         self.update_line_number_area_width()
+        
+        # 初始化差异信息
+        self.diff_info = []
+        # 从对象名称获取编辑器类型
+        editor_type = self.objectName() or ''
+        self.highlighter = DiffHighlighter(self.document(), editor_type)
+        
+    def set_diff_info(self, diff_info):
+        """设置差异信息并更新高亮"""
+        self.diff_info = diff_info
+        self.highlighter.set_diff_chunks(diff_info)
         
     def line_number_area_width(self):
         digits = len(str(max(1, self.blockCount())))
@@ -465,11 +478,6 @@ class MergeDiffViewer(QWidget):
         self.parent2_edit.horizontalScrollBar().valueChanged.connect(
             lambda val: self._sync_hscroll(val, 'parent2'))
         
-        # 添加差异高亮器
-        self.parent1_highlighter = DiffHighlighter(self.parent1_edit.document(), 'parent1')
-        self.result_highlighter = DiffHighlighter(self.result_edit.document(), 'result')
-        self.parent2_highlighter = DiffHighlighter(self.parent2_edit.document(), 'parent2')
-        
         # 添加到布局
         layout.addWidget(self.parent1_edit)
         layout.addWidget(self.result_edit)
@@ -503,27 +511,22 @@ class MergeDiffViewer(QWidget):
         # 计算parent1和result之间的差异
         parent1_matcher = difflib.SequenceMatcher(None, parent1_lines, result_lines)
         parent1_chunks = []
+        
         for tag, i1, i2, j1, j2 in parent1_matcher.get_opcodes():
             print(f"\nParent1差异块: {tag}, {i1}-{i2}, {j1}-{j2}")
-            # 注意：对于parent1，我们需要反转insert和delete的概念
-            chunk_type = tag
-            if tag == 'insert':
-                chunk_type = 'delete'  # result中有，parent1中没有
-            elif tag == 'delete':
-                chunk_type = 'insert'  # parent1中有，result中没有
-            
             chunk = DiffChunk(
                 left_start=i1,
                 left_end=i2,
                 right_start=j1,
                 right_end=j2,
-                type=chunk_type
+                type=tag
             )
             parent1_chunks.append(chunk)
-            
+                    
         # 计算parent2和result之间的差异
         parent2_matcher = difflib.SequenceMatcher(None, result_lines, parent2_lines)
         parent2_chunks = []
+        
         for tag, i1, i2, j1, j2 in parent2_matcher.get_opcodes():
             print(f"\nParent2差异块: {tag}, {i1}-{i2}, {j1}-{j2}")
             chunk = DiffChunk(
@@ -534,13 +537,11 @@ class MergeDiffViewer(QWidget):
                 type=tag
             )
             parent2_chunks.append(chunk)
-            
-        print(f"\nParent1差异块数量: {len(parent1_chunks)}")
-        print(f"Parent2差异块数量: {len(parent2_chunks)}")
-        
+                    
         # 更新差异高亮
-        self.parent1_highlighter.set_diff_chunks(parent1_chunks)
-        self.parent2_highlighter.set_diff_chunks(parent2_chunks)
+        self.parent1_edit.highlighter.set_diff_chunks(parent1_chunks)
+        self.result_edit.highlighter.set_diff_chunks([])  # 中间不需要高亮
+        self.parent2_edit.highlighter.set_diff_chunks(parent2_chunks)
 
     def _on_scroll(self, value, source: str):
         """处理滚动同步

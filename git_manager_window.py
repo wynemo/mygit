@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (QMainWindow, QFileDialog, QVBoxLayout,
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
 from git_manager import GitManager
-from diff_viewer import DiffViewer, MergeDiffViewer
+from text_diff_viewer import DiffViewer, MergeDiffViewer
 from settings import Settings
 from syntax_highlighter import format_diff_content
 import difflib
