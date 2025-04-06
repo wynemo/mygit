@@ -63,14 +63,6 @@ class GitManagerWindow(QMainWindow):
         top_layout.addWidget(self.branch_label)
         top_layout.addWidget(self.branch_combo)
         
-        # 创建视图类型选择下拉框
-        self.view_type_label = QLabel("视图类型:")
-        self.view_type_combo = QComboBox()
-        self.view_type_combo.addItems(["双向对比", "三向对比"])
-        self.view_type_combo.currentTextChanged.connect(self.on_view_type_changed)
-        top_layout.addWidget(self.view_type_label)
-        top_layout.addWidget(self.view_type_combo)
-        
         # 创建垂直分割器
         vertical_splitter = QSplitter(Qt.Orientation.Vertical)
         vertical_splitter.setChildrenCollapsible(False)
@@ -367,30 +359,35 @@ class GitManagerWindow(QMainWindow):
                 except Exception as e:
                     print(f"Error getting git diff for {file_path}: {e}")
 
-            # 根据视图类型显示差异
-            if self.view_type_combo.currentText() == "双向对比":
-                # 使用 GitDiffCalculator
+            # 根据父提交数量自动判断使用双向还是三向对比
+            if len(parents) <= 1:
+                # 使用双向对比
+                self.diff_viewer.show()
+                self.merge_diff_viewer.hide()
                 diff_calculator = GitDiffCalculator(git_diff_output)
                 self.diff_viewer.diff_calculator = diff_calculator
                 self.diff_viewer.set_texts(parent_content, current_content)
             else:
-                # 如果是三向对比，需要获取第二个父提交的内容
+                # 使用三向对比
+                self.diff_viewer.hide()
+                self.merge_diff_viewer.show()
+                
+                # 获取第二个父提交的内容
                 parent2_content = ""
                 git_diff_output2 = None
-                if len(parents) > 1:
-                    try:
-                        parent2_content = parents[1].tree[file_path].data_stream.read().decode('utf-8', errors='replace')
-                        # 获取第二个父提交的差异
-                        git_diff_output2 = self.git_manager.repo.git.diff(
-                            parents[1].hexsha,
-                            self.current_commit.hexsha,
-                            '--',
-                            file_path
-                        )
-                    except KeyError:
-                        pass
-                    except Exception as e:
-                        print(f"Error reading parent2 content for {file_path}: {e}")
+                try:
+                    parent2_content = parents[1].tree[file_path].data_stream.read().decode('utf-8', errors='replace')
+                    # 获取第二个父提交的差异
+                    git_diff_output2 = self.git_manager.repo.git.diff(
+                        parents[1].hexsha,
+                        self.current_commit.hexsha,
+                        '--',
+                        file_path
+                    )
+                except KeyError:
+                    pass
+                except Exception as e:
+                    print(f"Error reading parent2 content for {file_path}: {e}")
                 
                 # 为三向对比创建两个差异计算器
                 diff_calculator1 = GitDiffCalculator(git_diff_output)
@@ -435,17 +432,3 @@ class GitManagerWindow(QMainWindow):
         if not self.settings.settings.get('horizontal_splitter'):
             total_width = self.width()
             self.horizontal_splitter.setSizes([total_width // 3, total_width * 2 // 3])
-
-    def on_view_type_changed(self, view_type):
-        """当视图类型改变时切换显示的差异查看器"""
-        if view_type == "双向对比":
-            self.diff_viewer.show()
-            self.merge_diff_viewer.hide()
-        else:
-            self.diff_viewer.hide()
-            self.merge_diff_viewer.show()
-            
-        # 如果当前有选中的文件，重新触发文件点击事件以更新视图
-        current_item = self.changes_tree.currentItem()
-        if current_item:
-            self.on_file_clicked(current_item)
