@@ -6,10 +6,6 @@ from diff_highlighter import DiffHighlighter
 from text_edit import SyncedTextEdit
 
 
-
-
-
-
 class DiffViewer(QWidget):
     def __init__(self, diff_calculator: DiffCalculator = None):
         super().__init__()
@@ -17,7 +13,7 @@ class DiffViewer(QWidget):
         self.diff_chunks = []
         self._sync_vscroll_lock = False
         self._sync_hscroll_lock = False
-        
+
         # 设置差异计算器，默认为 DifflibCalculator
         self.diff_calculator = diff_calculator or DifflibCalculator()
 
@@ -80,7 +76,7 @@ class DiffViewer(QWidget):
 
         # 使用差异计算器计算差异
         self.diff_chunks = self.diff_calculator.compute_diff(left_text, right_text)
-        
+
         print("\n=== 差异计算完成 ===")
         print(f"总共发现 {len(self.diff_chunks)} 个差异块")
 
@@ -217,7 +213,7 @@ class MergeDiffViewer(QWidget):
         self.diff_chunks = []
         self._sync_vscroll_lock = False
         self._sync_hscroll_lock = False
-        
+
         # 设置差异计算器，默认为 DifflibCalculator
         self.diff_calculator = diff_calculator or DifflibCalculator()
 
