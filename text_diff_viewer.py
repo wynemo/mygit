@@ -77,9 +77,39 @@ class DiffHighlighter(QSyntaxHighlighter):
                     print(f"找到右侧差异块: {chunk.type}")
                     break
             elif self.editor_type == 'result_edit':
-                # 对于三向合并中的结果编辑器，可能需要特殊处理
-                # 这里可以根据需要添加特定的高亮逻辑
-                pass
+                # 对于三向合并中的结果编辑器，需要同时检查与两个父版本的差异
+                parent1_chunk = None
+                parent2_chunk = None
+                
+                # 查找与 parent1 的差异
+                for chunk in self.diff_chunks:
+                    if chunk.right_start <= block_number < chunk.right_end:
+                        parent1_chunk = chunk
+                        break
+                
+                # 查找与 parent2 的差异
+                for chunk in self.diff_chunks:
+                    if chunk.left_start <= block_number < chunk.left_end:
+                        parent2_chunk = chunk
+                        break
+                
+                # 根据差异情况设置不同的高亮
+                if parent1_chunk and parent2_chunk:
+                    # 与两个父版本都不同
+                    if parent1_chunk.type != 'equal' and parent2_chunk.type != 'equal':
+                        current_chunk = parent1_chunk
+                        # 使用特殊的冲突颜色
+                        conflict_format = self.create_format('#ffccff', '#cc00cc')  # 紫色
+                        self.setFormat(0, len(text), conflict_format)
+                        return
+                    elif parent1_chunk.type != 'equal':
+                        current_chunk = parent1_chunk
+                    else:
+                        current_chunk = parent2_chunk
+                elif parent1_chunk:
+                    current_chunk = parent1_chunk
+                elif parent2_chunk:
+                    current_chunk = parent2_chunk
         
         # 如果找到差异块，应用相应的格式
         if current_chunk and current_chunk.type != 'equal':
@@ -109,9 +139,14 @@ class SyncedTextEdit(QPlainTextEdit):
         
         # 初始化差异信息
         self.diff_info = []
-        # 从对象名称获取编辑器类型
-        editor_type = self.objectName() or ''
-        self.highlighter = DiffHighlighter(self.document(), editor_type)
+        self.highlighter = None
+        
+    def setObjectName(self, name: str) -> None:
+        super().setObjectName(name)
+        # 在设置对象名称后创建高亮器
+        if self.highlighter is None:
+            self.highlighter = DiffHighlighter(self.document(), name)
+            print(f"创建高亮器，类型: {name}")
         
     def set_diff_info(self, diff_info):
         """设置差异信息并更新高亮"""
@@ -474,8 +509,12 @@ class MergeDiffViewer(QWidget):
             parent2_chunks.append(chunk)
                     
         # 更新差异高亮
+        print("\n=== 更新差异高亮 ===")
+        print(f"Parent1差异块数量: {len(parent1_chunks)}")
+        print(f"Parent2差异块数量: {len(parent2_chunks)}")
+        
         self.parent1_edit.highlighter.set_diff_chunks(parent1_chunks)
-        self.result_edit.highlighter.set_diff_chunks([])  # 中间不需要高亮
+        self.result_edit.highlighter.set_diff_chunks(parent1_chunks + parent2_chunks)
         self.parent2_edit.highlighter.set_diff_chunks(parent2_chunks)
 
     def _on_scroll(self, value, source: str):
