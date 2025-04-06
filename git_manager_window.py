@@ -1,11 +1,12 @@
 import os
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction, QFont
 from PyQt6.QtWidgets import (QComboBox, QFileDialog, QHBoxLayout, QLabel,
                              QListWidget, QMainWindow, QMenu, QPushButton,
                              QSplitter, QToolButton, QTreeWidget,
-                             QTreeWidgetItem, QVBoxLayout, QWidget)
+                             QTreeWidgetItem, QVBoxLayout, QWidget, QDialog,
+                             QFormLayout, QDialogButtonBox, QLineEdit)
 
 from diff_calculator import GitDiffCalculator
 from git_manager import GitManager
@@ -66,6 +67,12 @@ class GitManagerWindow(QMainWindow):
         self.branch_combo.currentTextChanged.connect(self.on_branch_changed)
         top_layout.addWidget(self.branch_label)
         top_layout.addWidget(self.branch_combo)
+
+        # 创建设置按钮
+        self.settings_button = QToolButton()
+        self.settings_button.setText("⚙")  # 使用齿轮符号
+        self.settings_button.clicked.connect(self.show_settings_dialog)
+        top_layout.addWidget(self.settings_button)
 
         # 创建垂直分割器
         vertical_splitter = QSplitter(Qt.Orientation.Vertical)
@@ -455,3 +462,37 @@ class GitManagerWindow(QMainWindow):
         if not self.settings.settings.get("horizontal_splitter"):
             total_width = self.width()
             self.horizontal_splitter.setSizes([total_width // 3, total_width * 2 // 3])
+
+    def show_settings_dialog(self):
+        """显示设置对话框"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("设置")
+        layout = QFormLayout(dialog)
+
+        # 创建字体输入文本框
+        font_edit = QLineEdit()
+        font_edit.setText(self.settings.get_font_family())
+        layout.addRow("字体:", font_edit)
+
+        # 添加确定和取消按钮
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addRow(buttons)
+
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            # 保存字体设置
+            self.settings.set_font_family(font_edit.text())
+            # 应用字体设置
+            self.apply_font_settings()
+
+    def apply_font_settings(self):
+        """应用字体设置"""
+        font = QFont(self.settings.get_font_family())
+        # 设置所有文本部件的字体
+        self.history_list.setFont(font)
+        self.changes_tree.setFont(font)
+        self.diff_viewer.setFont(font)
+        self.merge_diff_viewer.setFont(font)

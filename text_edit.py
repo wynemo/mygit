@@ -3,6 +3,7 @@ from PyQt6.QtGui import QColor, QFont, QPainter
 from PyQt6.QtWidgets import QPlainTextEdit, QWidget
 
 from diff_highlighter import DiffHighlighter
+from settings import Settings
 
 
 class LineNumberArea(QWidget):
@@ -20,7 +21,8 @@ class LineNumberArea(QWidget):
 class SyncedTextEdit(QPlainTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
-        #self.setFont(QFont("Zed Mono, LXGW WenKai", 10))
+        settings = Settings()
+        self.setFont(QFont(settings.get_font_family(), 10))
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self.setReadOnly(True)  # 设置为只读
         print("\n=== 初始化SyncedTextEdit ===")

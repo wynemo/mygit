@@ -20,6 +20,7 @@ class Settings:
             "recent_folders": [],  # 最近打开的文件夹列表
             "last_folder": None,  # 上次打开的文件夹
             "max_recent": 10,  # 最大记录数
+            "font_family": "Courier New",  # 默认字体
         }
 
         # 加载已有设置
@@ -71,3 +72,12 @@ class Settings:
     def get_last_folder(self):
         """获取上次打开的文件夹"""
         return self.settings["last_folder"]
+
+    def get_font_family(self):
+        """获取字体设置"""
+        return self.settings.get("font_family", "Courier New")
+
+    def set_font_family(self, font_family):
+        """设置字体"""
+        self.settings["font_family"] = font_family
+        self.save_settings()
