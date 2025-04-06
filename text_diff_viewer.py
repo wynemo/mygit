@@ -56,33 +56,36 @@ class DiffHighlighter(QSyntaxHighlighter):
     def highlightBlock(self, text):
         """高亮当前文本块"""
         block_number = self.currentBlock().blockNumber()
-        print(f"\n=== 高亮块 ===")
+        print(f"\n=== 高亮块详细信息 ===")
         print(f"高亮器类型: {self.editor_type}")
         print(f"当前块号: {block_number}")
         print(f"文本内容: {text}")
+        print(f"差异块数量: {len(self.diff_chunks)}")
         
         # 找到当前行所在的差异块
         current_chunk = None
         for chunk in self.diff_chunks:
-            # 检查是否是parent1编辑器
-            if self.editor_type == 'parent1_edit':
+            # 根据编辑器类型决定如何处理差异
+            if self.editor_type in ['left', 'parent1_edit']:
                 if chunk.left_start <= block_number < chunk.left_end:
                     current_chunk = chunk
-                    print(f"找到parent1差异块: {chunk.type}")
+                    print(f"找到左侧差异块: {chunk.type}")
                     break
-            # 检查是否是parent2编辑器
-            elif self.editor_type == 'parent2_edit':
+            elif self.editor_type in ['right', 'parent2_edit']:
                 if chunk.right_start <= block_number < chunk.right_end:
                     current_chunk = chunk
-                    print(f"找到parent2差异块: {chunk.type}")
+                    print(f"找到右侧差异块: {chunk.type}")
                     break
+            elif self.editor_type == 'result_edit':
+                # 对于三向合并中的结果编辑器，可能需要特殊处理
+                # 这里可以根据需要添加特定的高亮逻辑
+                pass
         
         # 如果找到差异块，应用相应的格式
         if current_chunk and current_chunk.type != 'equal':
             print(f"应用差异块格式: {current_chunk.type}")
             format_type = current_chunk.type
             
-            # 应用格式
             if format_type in self.diff_formats:
                 format = self.diff_formats[format_type]
                 if format:
@@ -94,7 +97,6 @@ class SyncedTextEdit(QPlainTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
-        self.setFont(QFont('Courier New', 10))
         self.setReadOnly(True)  # 设置为只读
         print(f"\n=== 初始化SyncedTextEdit ===")
         print(f"只读模式: {self.isReadOnly()}")
