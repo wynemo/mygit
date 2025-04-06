@@ -8,8 +8,6 @@ from PyQt6.QtGui import QAction
 from git_manager import GitManager
 from text_diff_viewer import DiffViewer, MergeDiffViewer
 from settings import Settings
-from syntax_highlighter import format_diff_content
-import difflib
 
 class GitManagerWindow(QMainWindow):
     def __init__(self):
