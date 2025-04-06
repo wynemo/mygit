@@ -376,14 +376,29 @@ class GitManagerWindow(QMainWindow):
             else:
                 # 如果是三向对比，需要获取第二个父提交的内容
                 parent2_content = ""
+                git_diff_output2 = None
                 if len(parents) > 1:
                     try:
                         parent2_content = parents[1].tree[file_path].data_stream.read().decode('utf-8', errors='replace')
+                        # 获取第二个父提交的差异
+                        git_diff_output2 = self.git_manager.repo.git.diff(
+                            parents[1].hexsha,
+                            self.current_commit.hexsha,
+                            '--',
+                            file_path
+                        )
                     except KeyError:
                         pass
                     except Exception as e:
                         print(f"Error reading parent2 content for {file_path}: {e}")
                 
+                # 为三向对比创建两个差异计算器
+                diff_calculator1 = GitDiffCalculator(git_diff_output)
+                diff_calculator2 = GitDiffCalculator(git_diff_output2)
+                #todo 这个感觉有问题，ai估计每处理好
+                
+                # 设置差异计算器
+                self.merge_diff_viewer.diff_calculator = diff_calculator1
                 self.merge_diff_viewer.set_texts(parent_content, current_content, parent2_content)
 
         except Exception as e:

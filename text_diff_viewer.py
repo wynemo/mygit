@@ -383,12 +383,15 @@ class DiffViewer(QWidget):
 
 
 class MergeDiffViewer(QWidget):
-    def __init__(self):
+    def __init__(self, diff_calculator: DiffCalculator = None):
         super().__init__()
         self.setup_ui()
         self.diff_chunks = []
         self._sync_vscroll_lock = False
         self._sync_hscroll_lock = False
+        
+        # 设置差异计算器，默认为 DifflibCalculator
+        self.diff_calculator = diff_calculator or DifflibCalculator()
 
     def setup_ui(self):
         layout = QHBoxLayout()
@@ -458,26 +461,10 @@ class MergeDiffViewer(QWidget):
         print(f"Parent2行数: {len(parent2_lines)}")
 
         # 计算parent1和result之间的差异
-        parent1_matcher = difflib.SequenceMatcher(None, parent1_lines, result_lines)
-        parent1_chunks = []
-
-        for tag, i1, i2, j1, j2 in parent1_matcher.get_opcodes():
-            print(f"\nParent1差异块: {tag}, {i1}-{i2}, {j1}-{j2}")
-            chunk = DiffChunk(
-                left_start=i1, left_end=i2, right_start=j1, right_end=j2, type=tag
-            )
-            parent1_chunks.append(chunk)
+        parent1_chunks = self.diff_calculator.compute_diff(parent1_text, result_text)
 
         # 计算parent2和result之间的差异
-        parent2_matcher = difflib.SequenceMatcher(None, result_lines, parent2_lines)
-        parent2_chunks = []
-
-        for tag, i1, i2, j1, j2 in parent2_matcher.get_opcodes():
-            print(f"\nParent2差异块: {tag}, {i1}-{i2}, {j1}-{j2}")
-            chunk = DiffChunk(
-                left_start=i1, left_end=i2, right_start=j1, right_end=j2, type=tag
-            )
-            parent2_chunks.append(chunk)
+        parent2_chunks = self.diff_calculator.compute_diff(result_text, parent2_text)
 
         # 更新差异高亮
         print("\n=== 更新差异高亮 ===")

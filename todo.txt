@@ -1,1 +1,5 @@
-1. merge view还是有问题，比较高亮 让ai打印出git diff的信息，和界面比较
+
+
+                diff_calculator1 = GitDiffCalculator(git_diff_output)
+                diff_calculator2 = GitDiffCalculator(git_diff_output2)
+                #todo 这个感觉有问题，ai估计每处理好
