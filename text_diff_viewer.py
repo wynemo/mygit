@@ -1,14 +1,11 @@
-from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-                            QPlainTextEdit, QScrollBar, QFrame, QApplication)
-from PyQt6.QtCore import Qt, pyqtSignal, QRect, QSize, QPoint
-from PyQt6.QtGui import (QPainter, QColor, QFont, QSyntaxHighlighter, 
-                        QTextCharFormat, QTextCursor)
-from dataclasses import dataclass
-from typing import List, Tuple, Optional
 import difflib
-import re
-import time
-import sys
+from dataclasses import dataclass
+
+from PyQt6.QtCore import QPoint, QRect, QSize, Qt
+from PyQt6.QtGui import (QColor, QFont, QPainter, QSyntaxHighlighter,
+                         QTextCharFormat)
+from PyQt6.QtWidgets import QHBoxLayout, QPlainTextEdit, QWidget
+
 
 @dataclass
 class DiffChunk:
