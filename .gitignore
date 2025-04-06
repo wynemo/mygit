@@ -12,3 +12,5 @@ wheels/
 
 .DS_Store
 *.bk
+meld
+.vscode
