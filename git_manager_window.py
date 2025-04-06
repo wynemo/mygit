@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (QMainWindow, QFileDialog, QVBoxLayout,
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
 from git_manager import GitManager
-from text_diff_viewer import DiffViewer, MergeDiffViewer
+from text_diff_viewer import DiffViewer, GitDiffCalculator, MergeDiffViewer
 from settings import Settings
 
 class GitManagerWindow(QMainWindow):
@@ -354,8 +354,24 @@ class GitManagerWindow(QMainWindow):
                     print(f"Error reading parent content for {file_path}: {e}")
                     parent_content = ""
 
+            # 获取 git diff 输出
+            git_diff_output = None
+            if parents:
+                try:
+                    git_diff_output = self.git_manager.repo.git.diff(
+                        parents[0].hexsha,
+                        self.current_commit.hexsha,
+                        '--',
+                        file_path
+                    )
+                except Exception as e:
+                    print(f"Error getting git diff for {file_path}: {e}")
+
             # 根据视图类型显示差异
             if self.view_type_combo.currentText() == "双向对比":
+                # 使用 GitDiffCalculator
+                diff_calculator = GitDiffCalculator(git_diff_output)
+                self.diff_viewer.diff_calculator = diff_calculator
                 self.diff_viewer.set_texts(parent_content, current_content)
             else:
                 # 如果是三向对比，需要获取第二个父提交的内容
