@@ -1,5 +1,7 @@
 import difflib
 from dataclasses import dataclass
+from abc import ABC, abstractmethod
+from typing import List
 
 from PyQt6.QtCore import QPoint
 from PyQt6.QtWidgets import QHBoxLayout, QWidget
@@ -17,13 +19,70 @@ class DiffChunk:
     type: str  # 'equal', 'insert', 'delete', 'replace'
 
 
+class DiffCalculator(ABC):
+    """差异计算器基类"""
+    
+    @abstractmethod
+    def compute_diff(self, left_text: str, right_text: str) -> List[DiffChunk]:
+        """计算两个文本之间的差异
+        
+        Args:
+            left_text: 左侧文本
+            right_text: 右侧文本
+            
+        Returns:
+            差异块列表
+        """
+        pass
+
+
+class DifflibCalculator(DiffCalculator):
+    """基于 difflib 的差异计算器"""
+    
+    def compute_diff(self, left_text: str, right_text: str) -> List[DiffChunk]:
+        """使用 difflib 计算文本差异"""
+        left_lines = left_text.splitlines()
+        right_lines = right_text.splitlines()
+        
+        matcher = difflib.SequenceMatcher(None, left_lines, right_lines)
+        chunks = []
+        
+        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+            chunk = DiffChunk(
+                left_start=i1,
+                left_end=i2,
+                right_start=j1,
+                right_end=j2,
+                type=tag
+            )
+            chunks.append(chunk)
+            
+        return chunks
+
+
+class GitDiffCalculator(DiffCalculator):
+    """基于 git diff 输出的差异计算器"""
+    
+    def compute_diff(self, left_text: str, right_text: str) -> List[DiffChunk]:
+        """解析 git diff 输出并转换为差异块列表
+        
+        注意：这个实现需要 git diff 的输出作为输入，而不是直接比较文本。
+        实际使用时需要修改接口以接受 git diff 输出。
+        """
+        # TODO: 实现 git diff 解析逻辑
+        raise NotImplementedError("Git diff calculator not implemented yet")
+
+
 class DiffViewer(QWidget):
-    def __init__(self):
+    def __init__(self, diff_calculator: DiffCalculator = None):
         super().__init__()
         self.setup_ui()
         self.diff_chunks = []
         self._sync_vscroll_lock = False
         self._sync_hscroll_lock = False
+        
+        # 设置差异计算器，默认为 DifflibCalculator
+        self.diff_calculator = diff_calculator or DifflibCalculator()
 
     def setup_ui(self):
         layout = QHBoxLayout()
@@ -75,41 +134,17 @@ class DiffViewer(QWidget):
         self._compute_diff(left_text, right_text)
 
     def _compute_diff(self, left_text: str, right_text: str):
-        """计算文本差异，忽略行尾空白字符的差异"""
+        """计算文本差异，使用配置的差异计算器"""
         print("\n=== 开始计算差异 ===")
         print("左侧文本示例:")
         print(left_text[:200] + "..." if len(left_text) > 200 else left_text)
         print("\n右侧文本示例:")
         print(right_text[:200] + "..." if len(right_text) > 200 else right_text)
 
-        # 预处理文本行
-        left_lines = left_text.splitlines()
-        right_lines = right_text.splitlines()
-
-        print(f"\n左侧文本行数: {len(left_lines)}")
-        print(f"右侧文本行数: {len(right_lines)}")
-
-        # 使用 difflib 计算差异
-        matcher = difflib.SequenceMatcher(None, left_lines, right_lines)
-
-        self.diff_chunks = []
-        last_chunk = None
-
-        print("\n差异块详情:")
-        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-            print(f"\n当前块: {tag}")
-            print(f"左侧范围: {i1}-{i2}")
-            print(f"右侧范围: {j1}-{j2}")
-            print("左侧内容:", left_lines[i1:i2] if i1 < len(left_lines) else "[]")
-            print("右侧内容:", right_lines[j1:j2] if j1 < len(right_lines) else "[]")
-
-            # 创建差异块
-            chunk = DiffChunk(
-                left_start=i1, left_end=i2, right_start=j1, right_end=j2, type=tag
-            )
-            self.diff_chunks.append(chunk)
-
-        print("\n=== 差异计算完成 ===")
+        # 使用差异计算器计算差异
+        self.diff_chunks = self.diff_calculator.compute_diff(left_text, right_text)
+        
+        print(f"\n=== 差异计算完成 ===")
         print(f"总共发现 {len(self.diff_chunks)} 个差异块")
 
         # 更新差异高亮
