@@ -2,11 +2,12 @@ import os
 from PyQt6.QtWidgets import (QMainWindow, QFileDialog, QVBoxLayout, 
                            QWidget, QPushButton, QListWidget, QHBoxLayout, 
                            QLabel, QComboBox, QSplitter, QTreeWidget, QTreeWidgetItem,
-                           QTextEdit, QMenu, QToolButton)
+                           QMenu, QToolButton)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
 from git_manager import GitManager
-from text_diff_viewer import DiffViewer, GitDiffCalculator, MergeDiffViewer
+from text_diff_viewer import DiffViewer, MergeDiffViewer
+from diff_calculator import GitDiffCalculator
 from settings import Settings
 
 class GitManagerWindow(QMainWindow):
