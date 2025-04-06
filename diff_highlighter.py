@@ -6,7 +6,7 @@ class DiffHighlighter(QSyntaxHighlighter):
         super().__init__(parent)
         self.editor_type = editor_type
         self.diff_chunks = []
-        print(f"\n=== 初始化DiffHighlighter ===")
+        print("\n=== 初始化DiffHighlighter ===")
         print(f"编辑器类型: {editor_type}")
         
         # 定义差异高亮的颜色
@@ -28,7 +28,7 @@ class DiffHighlighter(QSyntaxHighlighter):
         
     def set_diff_chunks(self, chunks):
         """设置差异块"""
-        print(f"\n=== 设置差异块到高亮器 ===")
+        print("\n=== 设置差异块到高亮器 ===")
         print(f"高亮器类型: {self.editor_type}")
         print(f"块数量: {len(chunks)}")
         for i, chunk in enumerate(chunks):
@@ -42,7 +42,7 @@ class DiffHighlighter(QSyntaxHighlighter):
     def highlightBlock(self, text):
         """高亮当前文本块"""
         block_number = self.currentBlock().blockNumber()
-        print(f"\n=== 高亮块详细信息 ===")
+        print("\n=== 高亮块详细信息 ===")
         print(f"高亮器类型: {self.editor_type}")
         print(f"当前块号: {block_number}")
         print(f"文本内容: {text}")

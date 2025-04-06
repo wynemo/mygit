@@ -20,7 +20,7 @@ class SyncedTextEdit(QPlainTextEdit):
         super().__init__(parent)
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self.setReadOnly(True)  # 设置为只读
-        print(f"\n=== 初始化SyncedTextEdit ===")
+        print("\n=== 初始化SyncedTextEdit ===")
         print(f"只读模式: {self.isReadOnly()}")
         
         # 添加行号区域
