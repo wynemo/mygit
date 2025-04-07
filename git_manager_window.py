@@ -181,19 +181,54 @@ class GitManagerWindow(QMainWindow):
         view_action = QAction("查看文件", self)
         copy_path_action = QAction("复制文件路径", self)
         revert_action = QAction("还原更改", self)
+        compare_action = QAction("与工作区比较", self)  # 新增菜单项
         
         # Add actions to menu
         menu.addAction(view_action)
         menu.addAction(copy_path_action)
         menu.addAction(revert_action)
+        menu.addAction(compare_action)  # 添加到菜单
         
         # Connect actions to placeholder functions
         view_action.triggered.connect(lambda: print(f"查看文件: {self.get_full_path(item)}"))
         copy_path_action.triggered.connect(lambda: print(f"复制路径: {self.get_full_path(item)}"))
         revert_action.triggered.connect(lambda: print(f"还原更改: {self.get_full_path(item)}"))
+        compare_action.triggered.connect(lambda: self.compare_with_working(item))
         
         # Show the menu at cursor position
         menu.exec(self.changes_tree.viewport().mapToGlobal(position))
+
+    def compare_with_working(self, item):
+        """比较选中的历史版本文件与工作区文件"""
+        try:
+            file_path = self.get_full_path(item)
+        
+            # 获取历史版本的文件内容
+            old_content = (
+                self.current_commit.tree[file_path]
+                .data_stream.read()
+                .decode("utf-8", errors="replace")
+            )
+            
+            # 获取工作区的文件内容
+            working_file_path = os.path.join(self.git_manager.repo.working_dir, file_path)
+            if os.path.exists(working_file_path):
+                with open(working_file_path, 'r', encoding='utf-8', errors='replace') as f:
+                    new_content = f.read()
+            else:
+                new_content = ""
+
+            # 创建并显示比较对话框
+            dialog = CompareWithWorkingDialog(
+                f"比较 {file_path}",
+                old_content,
+                new_content,
+                self
+            )
+            dialog.exec()
+        
+        except Exception as e:
+            print(f"比较文件失败: {str(e)}")
 
     def update_recent_menu(self):
         """更新最近文件夹菜单"""
@@ -523,3 +558,15 @@ class GitManagerWindow(QMainWindow):
         self.changes_tree.setFont(font)
         self.diff_viewer.setFont(font)
         self.merge_diff_viewer.setFont(font)
+
+class CompareWithWorkingDialog(QDialog):
+    def __init__(self, title, old_content, new_content, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.resize(800, 600)
+        
+        layout = QVBoxLayout(self)
+        self.diff_viewer = DiffViewer()
+        layout.addWidget(self.diff_viewer)
+        
+        self.diff_viewer.set_texts(old_content, new_content)
