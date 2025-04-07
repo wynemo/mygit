@@ -3,3 +3,6 @@
                 diff_calculator1 = GitDiffCalculator(git_diff_output)
                 diff_calculator2 = GitDiffCalculator(git_diff_output2)
                 #todo 这个感觉有问题，ai估计每处理好
+
+
+提交历史 是不是该用 QTreeWidget
