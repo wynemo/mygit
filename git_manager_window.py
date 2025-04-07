@@ -124,6 +124,9 @@ class GitManagerWindow(QMainWindow):
         self.changes_tree.itemClicked.connect(self.on_file_clicked)
         right_layout.addWidget(self.changes_tree)
 
+        self.changes_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.changes_tree.customContextMenuRequested.connect(self.show_file_context_menu)
+
         # 添加左右部件到水平分割器
         horizontal_splitter.addWidget(left_widget)
         horizontal_splitter.addWidget(right_widget)
@@ -167,6 +170,30 @@ class GitManagerWindow(QMainWindow):
         last_folder = self.settings.get_last_folder()
         if last_folder and os.path.exists(last_folder):
             self.open_folder(last_folder)
+
+    def show_file_context_menu(self, position):
+        """显示文件的右键菜单"""
+        item = self.changes_tree.itemAt(position)
+        if item and item.childCount() == 0:  # Only show menu for files, not directories
+            menu = QMenu()
+        
+        # Create menu actions
+        view_action = QAction("查看文件", self)
+        copy_path_action = QAction("复制文件路径", self)
+        revert_action = QAction("还原更改", self)
+        
+        # Add actions to menu
+        menu.addAction(view_action)
+        menu.addAction(copy_path_action)
+        menu.addAction(revert_action)
+        
+        # Connect actions to placeholder functions
+        view_action.triggered.connect(lambda: print(f"查看文件: {self.get_full_path(item)}"))
+        copy_path_action.triggered.connect(lambda: print(f"复制路径: {self.get_full_path(item)}"))
+        revert_action.triggered.connect(lambda: print(f"还原更改: {self.get_full_path(item)}"))
+        
+        # Show the menu at cursor position
+        menu.exec(self.changes_tree.viewport().mapToGlobal(position))
 
     def update_recent_menu(self):
         """更新最近文件夹菜单"""
