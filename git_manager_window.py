@@ -120,6 +120,7 @@ class GitManagerWindow(QMainWindow):
         self.history_graph_list = CommitGraphView()
         self.history_graph_list.setHeaderLabels(["提交图", "提交ID", "提交信息", "作者", "日期"])
         self.history_graph_list.itemClicked.connect(self.on_commit_clicked)
+        left_layout.addWidget(self.history_graph_list)
 
         # 设置列宽
         self.history_graph_list.setColumnWidth(0, 150)  # 图形列
@@ -387,7 +388,8 @@ class GitManagerWindow(QMainWindow):
             return
 
         # 从item文本中提取commit hash
-        commit_hash = item.text(0)
+        commit_hash = item.text(0) or item.text(1)
+        # print(f'commit_hash is {commit_hash} text is {item.text(0)}')
         self.current_commit = self.git_manager.repo.commit(commit_hash)
 
         try:
