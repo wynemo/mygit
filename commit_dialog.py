@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QTextEdit,
                            QTreeWidget, QTreeWidgetItem, QHBoxLayout,
                            QSplitter, QWidget, QMessageBox)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from text_diff_viewer import DiffViewer
 
 class AIGeneratorThread(QThread):
     finished = pyqtSignal(str)  # 成功信号
@@ -160,6 +161,10 @@ class CommitDialog(QDialog):
         self.ai_thread.finished.connect(self._on_message_generated)
         self.ai_thread.error.connect(self._on_generation_error)
         
+        # 为两个树形控件添加点击事件处理
+        self.staged_tree.itemClicked.connect(lambda item: self.show_file_diff(item, True))
+        self.unstaged_tree.itemClicked.connect(lambda item: self.show_file_diff(item, False))
+        
     def refresh_file_status(self):
         """刷新文件状态显示"""
         self.staged_tree.clear()
@@ -263,3 +268,59 @@ class CommitDialog(QDialog):
         """重置AI按钮状态"""
         self.ai_button.setEnabled(True)
         self.ai_button.setText("✨")
+    
+    def show_file_diff(self, item, is_staged):
+        """显示文件差异"""
+        try:
+            file_path = item.text(0)
+            repo = self.git_manager.repo
+            
+            # 创建差异查看对话框
+            diff_dialog = QDialog(self)
+            diff_dialog.setWindowTitle(f"文件差异 - {file_path}")
+            diff_dialog.resize(800, 600)
+            
+            layout = QVBoxLayout(diff_dialog)
+            diff_viewer = DiffViewer()
+            layout.addWidget(diff_viewer)
+            
+            # 获取文件内容
+            if is_staged:
+                # 对于暂存区文件，比较 HEAD 和暂存区
+                try:
+                    old_content = repo.git.show(f"HEAD:{file_path}")
+                except:
+                    # 如果是新文件，HEAD中没有内容
+                    old_content = ""
+                new_content = repo.git.show(f":{file_path}")  # 暂存区内容
+            else:
+                # 对于未暂存文件，比较暂存区和工作区
+                if item.text(1) == 'Untracked':
+                    # 未跟踪文件，显示空内容和当前文件内容
+                    old_content = ""
+                    try:
+                        with open(f"{repo.working_dir}/{file_path}", 'r', encoding='utf-8') as f:
+                            new_content = f.read()
+                    except Exception as e:
+                        new_content = f"Error reading file: {str(e)}"
+                else:
+                    # 已修改文件，比较暂存区和工作区
+                    try:
+                        old_content = repo.git.show(f":{file_path}")  # 暂存区内容
+                    except:
+                        old_content = ""
+                    try:
+                        with open(f"{repo.working_dir}/{file_path}", 'r', encoding='utf-8') as f:
+                            new_content = f.read()
+                    except Exception as e:
+                        new_content = f"Error reading file: {str(e)}"
+            
+            # 设置差异内容
+            diff_viewer.set_texts(old_content, new_content)
+            
+            # 显示对话框
+            diff_dialog.exec()
+            
+        except Exception as e:
+            logging.exception("显示文件差异失败")
+            QMessageBox.critical(self, "错误", f"显示文件差异失败: {str(e)}")
