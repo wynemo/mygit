@@ -12,6 +12,7 @@ from commit_graph import CommitGraphView
 from diff_calculator import GitDiffCalculator
 from git_manager import GitManager
 from settings import Settings
+from commit_dialog import CommitDialog
 from text_diff_viewer import DiffViewer, MergeDiffViewer
 
 
@@ -68,6 +69,14 @@ class GitManagerWindow(QMainWindow):
         self.branch_combo.currentTextChanged.connect(self.on_branch_changed)
         top_layout.addWidget(self.branch_label)
         top_layout.addWidget(self.branch_combo)
+
+        # 添加提交按钮
+        self.commit_button = QPushButton("提交")
+        self.commit_button.clicked.connect(self.show_commit_dialog)
+        top_layout.addWidget(self.commit_button)
+
+        # 添加设置按钮
+        self.settings_button = QToolButton()
 
         # 创建设置按钮
         self.settings_button = QToolButton()
@@ -193,6 +202,22 @@ class GitManagerWindow(QMainWindow):
         last_folder = self.settings.get_last_folder()
         if last_folder and os.path.exists(last_folder):
             self.open_folder(last_folder)
+
+    def show_commit_dialog(self):
+        """显示提交对话框"""
+        if not self.git_manager:
+            return
+            
+        dialog = CommitDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            commit_message = dialog.get_commit_message()
+            if commit_message:
+                try:
+                    self.git_manager.repo.index.commit(commit_message)
+                    # 更新提交历史
+                    self.update_commit_history()
+                except Exception as e:
+                    print(f"提交失败: {str(e)}")
 
     def show_file_context_menu(self, position):
         """显示文件的右键菜单"""
