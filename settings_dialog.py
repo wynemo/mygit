@@ -29,6 +29,10 @@ class SettingsDialog(QDialog):
         self.model_name_edit = QLineEdit()
         self.model_name_edit.setText(self.settings.settings.get("model_name", ""))
         layout.addRow("Model Name:", self.model_name_edit)
+
+        self.prompt = QLineEdit()
+        self.prompt.setText(self.settings.settings.get("prompt", ""))
+        layout.addRow("Prompt:", self.prompt)
         
         # 添加确定和取消按钮
         buttons = QDialogButtonBox(
@@ -48,6 +52,7 @@ class SettingsDialog(QDialog):
         self.settings.settings["api_url"] = self.api_url_edit.text()
         self.settings.settings["api_secret"] = self.api_secret_edit.text()
         self.settings.settings["model_name"] = self.model_name_edit.text()
+        self.settings.settings["prompt"] = self.prompt.text()
         
         # 保存设置到文件
         self.settings.save_settings()
