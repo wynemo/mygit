@@ -234,6 +234,7 @@ class CommitDialog(QDialog):
             staged = repo.index.diff('HEAD')
             for diff in staged:
                 diff_str = repo.git.diff('HEAD', diff.a_path, cached=True)
+                print(f"File: {diff.a_path}\n")
                 diffs.append(f"File: {diff.a_path}\n{diff_str}")
             
             if not diffs:
