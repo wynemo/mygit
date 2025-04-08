@@ -211,14 +211,7 @@ class GitManagerWindow(QMainWindow):
             
         dialog = CommitDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            commit_message = dialog.get_commit_message()
-            if commit_message:
-                try:
-                    self.git_manager.repo.index.commit(commit_message)
-                    # 更新提交历史
-                    self.update_commit_history()
-                except Exception as e:
-                    print(f"提交失败: {str(e)}")
+            pass
 
     def show_file_context_menu(self, position):
         """显示文件的右键菜单"""
