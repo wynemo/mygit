@@ -330,8 +330,8 @@ class CommitDialog(QDialog):
             logging.exception("显示文件差异失败")
             QMessageBox.critical(self, "错误", f"显示文件差异失败: {str(e)}")
     
-    def commit_and_push(self):
-        """执行提交并推送"""
+    def accept(self):
+        """处理确认操作"""
         try:
             # 获取提交信息
             commit_message = self.get_commit_message()
@@ -347,7 +347,21 @@ class CommitDialog(QDialog):
             
             # 执行提交
             self.git_manager.repo.index.commit(commit_message)
+            super().accept()
             
+        except Exception as e:
+            logging.exception("提交失败")
+            QMessageBox.critical(self, "错误", f"提交失败: {str(e)}")
+
+    def commit_and_push(self):
+        """执行提交并推送"""
+        try:
+            # 先执行提交
+            self.accept()
+            if self.result() != QDialog.DialogCode.Accepted:
+                # 如果提交失败，直接返回
+                return
+                
             # 获取当前分支
             current = self.git_manager.repo.active_branch
             
@@ -359,9 +373,8 @@ class CommitDialog(QDialog):
             if push_info[0].flags & push_info[0].ERROR:
                 raise Exception("Push failed")
                 
-            QMessageBox.information(self, "成功", "提交并推送成功")
-            self.accept()
+            QMessageBox.information(self, "成功", "推送成功")
             
         except Exception as e:
-            logging.exception("提交并推送失败")
-            QMessageBox.critical(self, "错误", f"提交并推送失败: {str(e)}")
+            logging.exception("推送失败")
+            QMessageBox.critical(self, "错误", f"推送失败: {str(e)}")
