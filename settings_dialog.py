@@ -33,7 +33,7 @@ class SettingsDialog(QDialog):
         layout.addRow("Model Name:", self.model_name_edit)
 
         self.prompt = QLineEdit()
-        self.prompt.setText(self.settings.settings.get("prompt", ""))
+        self.prompt.setText(self.settings.settings.get("prompt", "帮我生成commit 信息，用中文"))
         layout.addRow("Prompt:", self.prompt)
         
         # 添加确定和取消按钮
