@@ -142,15 +142,19 @@ class CommitDialog(QDialog):
         
         splitter.addWidget(commit_widget)
         
-        # 按钮区域
+        # 修改按钮区域
         button_box = QDialogButtonBox()
         self.commit_button = button_box.addButton("Commit", 
                                                 QDialogButtonBox.ButtonRole.AcceptRole)
+        self.commit_and_push_button = button_box.addButton("Commit & Push", 
+                                                          QDialogButtonBox.ButtonRole.ActionRole)
         self.cancel_button = button_box.addButton("Cancel", 
                                                 QDialogButtonBox.ButtonRole.RejectRole)
         
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
+        # 连接信号
+        self.commit_button.clicked.connect(self.accept)
+        self.commit_and_push_button.clicked.connect(self.commit_and_push)
+        self.cancel_button.clicked.connect(self.reject)
         layout.addWidget(button_box)
         
         # 初始化显示文件状态
@@ -325,3 +329,39 @@ class CommitDialog(QDialog):
         except Exception as e:
             logging.exception("显示文件差异失败")
             QMessageBox.critical(self, "错误", f"显示文件差异失败: {str(e)}")
+    
+    def commit_and_push(self):
+        """执行提交并推送"""
+        try:
+            # 获取提交信息
+            commit_message = self.get_commit_message()
+            if not commit_message:
+                QMessageBox.warning(self, "警告", "请输入提交信息")
+                return
+                
+            # 检查是否有暂存的文件
+            staged = self.git_manager.repo.index.diff('HEAD')
+            if not staged:
+                QMessageBox.warning(self, "警告", "没有暂存的文件")
+                return
+            
+            # 执行提交
+            self.git_manager.repo.index.commit(commit_message)
+            
+            # 获取当前分支
+            current = self.git_manager.repo.active_branch
+            
+            # 执行推送
+            origin = self.git_manager.repo.remote(name='origin')
+            push_info = origin.push(refspec=f'{current.name}:{current.name}')
+            
+            # 检查推送结果
+            if push_info[0].flags & push_info[0].ERROR:
+                raise Exception("Push failed")
+                
+            QMessageBox.information(self, "成功", "提交并推送成功")
+            self.accept()
+            
+        except Exception as e:
+            logging.exception("提交并推送失败")
+            QMessageBox.critical(self, "错误", f"提交并推送失败: {str(e)}")
