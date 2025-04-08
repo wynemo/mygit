@@ -111,7 +111,8 @@ class CommitDialog(QDialog):
         """取消暂存选中的文件"""
         file_path = item.text(0)
         try:
-            self.git_manager.repo.index.remove([file_path])
+            # 使用 git reset 来取消暂存，而不是 remove
+            self.git_manager.repo.git.reset('HEAD', file_path)
             self.refresh_file_status()
         except Exception as e:
             print(f"无法取消暂存文件: {str(e)}")
