@@ -166,8 +166,8 @@ class CommitDialog(QDialog):
         self.ai_thread.error.connect(self._on_generation_error)
         
         # 为两个树形控件添加点击事件处理
-        self.staged_tree.itemClicked.connect(lambda item: self.show_file_diff(item, True))
-        self.unstaged_tree.itemClicked.connect(lambda item: self.show_file_diff(item, False))
+        self.staged_tree.itemDoubleClicked.connect(lambda item: self.show_file_diff(item, True))
+        self.unstaged_tree.itemDoubleClicked.connect(lambda item: self.show_file_diff(item, False))
         
     def refresh_file_status(self):
         """刷新文件状态显示"""
