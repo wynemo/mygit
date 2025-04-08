@@ -1,6 +1,8 @@
 from PyQt6.QtWidgets import (QDialog, QFormLayout, QLineEdit, 
                            QDialogButtonBox)
 
+# from git_manager_window import GitManagerWindow
+
 class SettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -57,6 +59,4 @@ class SettingsDialog(QDialog):
         # 保存设置到文件
         self.settings.save_settings()
         
-        # 应用字体设置
-        self.parent.apply_font_settings()
         super().accept()

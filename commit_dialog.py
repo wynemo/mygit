@@ -1,7 +1,12 @@
+import aiohttp
+import asyncio
+import logging
+import json
+
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QTextEdit, 
                            QPushButton, QLabel, QDialogButtonBox,
                            QTreeWidget, QTreeWidgetItem, QHBoxLayout,
-                           QSplitter, QWidget)
+                           QSplitter, QWidget, QMessageBox)
 from PyQt6.QtCore import Qt
 
 class CommitDialog(QDialog):
@@ -11,6 +16,7 @@ class CommitDialog(QDialog):
         self.setMinimumWidth(600)
         self.setMinimumHeight(400)
         self.git_manager = parent.git_manager
+        self.parent_window = parent
         
         # 创建主布局
         layout = QVBoxLayout(self)
@@ -69,8 +75,16 @@ class CommitDialog(QDialog):
         commit_widget = QWidget()
         commit_layout = QVBoxLayout(commit_widget)
         
+        message_header = QHBoxLayout()
         message_label = QLabel("Commit Message:")
-        commit_layout.addWidget(message_label)
+        ai_button = QPushButton("✨")
+        ai_button.setFixedWidth(30)
+        ai_button.setToolTip("使用AI生成提交信息")
+        ai_button.clicked.connect(self.generate_commit_message)
+        message_header.addWidget(message_label)
+        message_header.addWidget(ai_button)
+        message_header.addStretch()
+        commit_layout.addLayout(message_header)
         
         self.message_edit = QTextEdit()
         commit_layout.addWidget(self.message_edit)
@@ -167,3 +181,68 @@ class CommitDialog(QDialog):
                 self.refresh_file_status()
             except Exception as e:
                 print(f"无法取消暂存文件: {str(e)}")
+
+    async def call_ai_api(self, diff_content):
+        """调用AI API生成提交信息"""
+        settings = self.parent_window.settings.settings
+        api_url = settings.get("api_url", "").rstrip("/") + "/v1/chat/completions"
+        api_secret = settings.get("api_secret", "")
+        model_name = settings.get("model_name", "")
+        prompt = settings.get("prompt", "请根据以下Git变更生成一个简洁的提交信息：")
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_secret}"
+        }
+
+        messages = [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": diff_content}
+        ]
+
+        data = {
+            "model": model_name,
+            "messages": messages
+        }
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(api_url, headers=headers, json=data) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        return result["choices"][0]["message"]["content"]
+                    else:
+                        error_text = await response.text()
+                        raise Exception(f"API调用失败: {response.status} - {error_text}")
+        except Exception as e:
+            raise Exception(f"API请求失败: {str(e)}")
+
+    def generate_commit_message(self):
+        """生成提交信息"""
+        try:
+            # 获取已暂存文件的变更
+            repo = self.git_manager.repo
+            diffs = []
+            
+            # 获取暂存区的变更
+            staged = repo.index.diff('HEAD')
+            for diff in staged:
+                diff_str = repo.git.diff('HEAD', diff.a_path, cached=True)
+                diffs.append(f"File: {diff.a_path}\n{diff_str}")
+            
+            if not diffs:
+                QMessageBox.warning(self, "警告", "没有已暂存的文件变更")
+                return
+
+            diff_content = "\n\n".join(diffs)
+            
+            # 使用asyncio运行异步API调用
+            loop = asyncio.get_event_loop()
+            commit_message = loop.run_until_complete(self.call_ai_api(diff_content))
+            
+            # 设置生成的提交信息
+            self.message_edit.setText(commit_message)
+            
+        except Exception as e:
+            logging.exception("生成提交信息失败")
+            QMessageBox.critical(self, "错误", f"生成提交信息失败: {str(e)}")
