@@ -49,44 +49,44 @@ class GitManager:
             print(f"获取提交历史失败: {str(e)}")
             return []
 
-    def get_commit_graph(self, branch: str = "", limit: int = 50) -> List[dict]:
+    def get_commit_graph(self, branch: str = "", limit: int = 50) -> dict:
         """获取提交图数据"""
         if not self.repo:
-            return []
+            return {'commits': [], 'branch_colors': {}}
 
         try:
             if not branch:
                 branch = self.repo.active_branch.name
 
-            # 获取所有分支名称
+            # 获取所有分支名称和颜色映射
             branches = {b.name: b for b in self.repo.branches}
-            
-            # 使用字典记录每个分支的颜色
-            branch_colors = {}
-            for idx, name in enumerate(branches.keys()):
-                # 使用预定义的颜色列表循环使用
-                colors = ['#e11d21', '#fbca04', '#009800', '#006b75', '#207de5', '#0052cc', '#5319e7']
-                branch_colors[name] = colors[idx % len(colors)]
+            colors = ['#e11d21', '#fbca04', '#009800', '#006b75', '#207de5', '#0052cc', '#5319e7']
+            branch_colors = {name: colors[idx % len(colors)] for idx, name in enumerate(branches)}
+
+            # 预先获取每个分支的所有提交
+            branch_commits = {}
+            for branch_name, branch_ref in branches.items():
+                branch_commits[branch_name] = set(
+                    commit.hexsha for commit in self.repo.iter_commits(branch_ref.name)
+                )
 
             commits = []
-            # 获取提交图数据
+            # 获取主分支的提交历史
             for commit in self.repo.iter_commits(branch, max_count=limit):
-                # 确定此提交属于哪些分支
-                commit_branches = []
-                for branch_name, branch_ref in branches.items():
-                    if commit in self.repo.iter_commits(branch_ref.name):
-                        commit_branches.append(branch_name)
+                # 检查提交属于哪些分支
+                commit_branches = [
+                    branch_name
+                    for branch_name, commit_set in branch_commits.items()
+                    if commit.hexsha in commit_set
+                ]
 
-                # 获取父提交
-                parents = [parent.hexsha for parent in commit.parents]
-                
                 commits.append({
                     'hash': commit.hexsha,
                     'message': commit.message.strip().split('\n')[0],
                     'author': commit.author.name,
                     'date': commit.committed_datetime.strftime('%Y-%m-%d %H:%M:%S'),
                     'branches': commit_branches,
-                    'parents': parents
+                    'parents': [parent.hexsha for parent in commit.parents]
                 })
 
             return {
@@ -95,4 +95,4 @@ class GitManager:
             }
         except Exception as e:
             print(f"获取提交图失败: {str(e)}")
-            return []
+            return {'commits': [], 'branch_colors': {}}
