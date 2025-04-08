@@ -38,6 +38,24 @@ class CommitGraphView(QTreeWidget):
             
             self.commit_positions[commit['hash']] = QPoint(x, y)
             
+    def calculate_positions(self):
+        """计算每个提交的位置"""
+        self.commit_positions.clear()
+        
+        for idx, commit in enumerate(self.commits):
+            # 计算垂直位置 (不需要考虑滚动偏移，在绘制时处理)
+            y = idx * self.ROW_HEIGHT + self.ROW_HEIGHT // 2
+            
+            # 根据分支计算水平位置
+            branch_idx = 0
+            if commit['branches']:
+                branch_name = commit['branches'][0]
+                branch_idx = list(self.branch_colors.keys()).index(branch_name)
+            
+            x = branch_idx * self.COLUMN_WIDTH + self.COLUMN_WIDTH
+            
+            self.commit_positions[commit['hash']] = QPoint(x, y)
+
     def paintEvent(self, event):
         """重写绘制事件"""
         super().paintEvent(event)
@@ -48,14 +66,30 @@ class CommitGraphView(QTreeWidget):
         painter = QPainter(self.viewport())
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
+        # 获取滚动条位置
+        v_scroll = self.verticalScrollBar().value()
+        h_scroll = self.horizontalScrollBar().value()
+        
         # 绘制连线和提交点
         for commit in self.commits:
-            current_pos = self.commit_positions[commit['hash']]
+            # 应用滚动偏移
+            current_pos = QPoint(
+                self.commit_positions[commit['hash']].x() - h_scroll,
+                self.commit_positions[commit['hash']].y() - v_scroll
+            )
+            
+            # 检查是否在可见区域内
+            if not (0 <= current_pos.y() <= self.viewport().height()):
+                continue
             
             # 绘制到父提交的连线
             for parent_hash in commit['parents']:
                 if parent_hash in self.commit_positions:
-                    parent_pos = self.commit_positions[parent_hash]
+                    # 应用滚动偏移到父节点位置
+                    parent_pos = QPoint(
+                        self.commit_positions[parent_hash].x() - h_scroll,
+                        self.commit_positions[parent_hash].y() - v_scroll
+                    )
                     
                     # 确定连线颜色
                     line_color = QColor('#cccccc')
