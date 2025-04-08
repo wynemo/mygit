@@ -27,17 +27,41 @@ class CommitDialog(QDialog):
         files_label = QLabel("Changed Files:")
         files_layout.addWidget(files_label)
         
-        # 暂存和未暂存文件的树形控件
+        # 暂存区域
+        staged_widget = QWidget()
+        staged_layout = QVBoxLayout(staged_widget)
+        staged_header = QHBoxLayout()
+        staged_label = QLabel("Staged Files")
+        unstage_button = QPushButton("-")
+        unstage_button.setFixedWidth(30)
+        unstage_button.clicked.connect(self.unstage_selected_file)
+        staged_header.addWidget(staged_label)
+        staged_header.addWidget(unstage_button)
+        staged_header.addStretch()
+        staged_layout.addLayout(staged_header)
+        
         self.staged_tree = QTreeWidget()
         self.staged_tree.setHeaderLabels(["Staged Files", "Status"])
-        self.staged_tree.itemDoubleClicked.connect(self.unstage_file)
+        staged_layout.addWidget(self.staged_tree)
+        files_layout.addWidget(staged_widget)
+        
+        # 未暂存区域
+        unstaged_widget = QWidget()
+        unstaged_layout = QVBoxLayout(unstaged_widget)
+        unstaged_header = QHBoxLayout()
+        unstaged_label = QLabel("Unstaged Files")
+        stage_button = QPushButton("+")
+        stage_button.setFixedWidth(30)
+        stage_button.clicked.connect(self.stage_selected_file)
+        unstaged_header.addWidget(unstaged_label)
+        unstaged_header.addWidget(stage_button)
+        unstaged_header.addStretch()
+        unstaged_layout.addLayout(unstaged_header)
         
         self.unstaged_tree = QTreeWidget()
         self.unstaged_tree.setHeaderLabels(["Unstaged Files", "Status"])
-        self.unstaged_tree.itemDoubleClicked.connect(self.stage_file)
-        
-        files_layout.addWidget(self.staged_tree)
-        files_layout.addWidget(self.unstaged_tree)
+        unstaged_layout.addWidget(self.unstaged_tree)
+        files_layout.addWidget(unstaged_widget)
         
         splitter.addWidget(files_widget)
         
@@ -98,24 +122,48 @@ class CommitDialog(QDialog):
             item.setText(0, file_path)
             item.setText(1, 'Untracked')
     
-    def stage_file(self, item):
-        """暂存选中的文件"""
-        file_path = item.text(0)
-        try:
-            self.git_manager.repo.index.add([file_path])
-            self.refresh_file_status()
-        except Exception as e:
-            print(f"无法暂存文件: {str(e)}")
+    # def stage_file(self, item):
+    #     """暂存选中的文件"""
+    #     file_path = item.text(0)
+    #     try:
+    #         self.git_manager.repo.index.add([file_path])
+    #         self.refresh_file_status()
+    #     except Exception as e:
+    #         print(f"无法暂存文件: {str(e)}")
     
-    def unstage_file(self, item):
-        """取消暂存选中的文件"""
-        file_path = item.text(0)
-        try:
-            # 使用 git reset 来取消暂存，而不是 remove
-            self.git_manager.repo.git.reset('HEAD', file_path)
-            self.refresh_file_status()
-        except Exception as e:
-            print(f"无法取消暂存文件: {str(e)}")
+    # def unstage_file(self, item):
+    #     """取消暂存选中的文件"""
+    #     file_path = item.text(0)
+    #     try:
+    #         # 使用 git reset 来取消暂存，而不是 remove
+    #         self.git_manager.repo.git.reset('HEAD', file_path)
+    #         self.refresh_file_status()
+    #     except Exception as e:
+    #         print(f"无法取消暂存文件: {str(e)}")
     
     def get_commit_message(self):
         return self.message_edit.toPlainText()
+    
+    def stage_selected_file(self):
+        """暂存选中的文件"""
+        selected_items = self.unstaged_tree.selectedItems()
+        if selected_items:
+            item = selected_items[0]
+            file_path = item.text(0)
+            try:
+                self.git_manager.repo.index.add([file_path])
+                self.refresh_file_status()
+            except Exception as e:
+                print(f"无法暂存文件: {str(e)}")
+
+    def unstage_selected_file(self):
+        """取消暂存选中的文件"""
+        selected_items = self.staged_tree.selectedItems()
+        if selected_items:
+            item = selected_items[0]
+            file_path = item.text(0)
+            try:
+                self.git_manager.repo.git.reset('HEAD', file_path)
+                self.refresh_file_status()
+            except Exception as e:
+                print(f"无法取消暂存文件: {str(e)}")
