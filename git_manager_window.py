@@ -13,6 +13,7 @@ from diff_calculator import GitDiffCalculator
 from git_manager import GitManager
 from settings import Settings
 from commit_dialog import CommitDialog
+from settings_dialog import SettingsDialog
 from text_diff_viewer import DiffViewer, MergeDiffViewer
 
 
@@ -598,37 +599,9 @@ class GitManagerWindow(QMainWindow):
 
     def show_settings_dialog(self):
         """显示设置对话框"""
-        dialog = QDialog(self)
-        dialog.setWindowTitle("设置")
-        layout = QFormLayout(dialog)
+        dialog = SettingsDialog(self)
+        dialog.exec()
 
-        # 创建字体输入文本框
-        font_edit = QLineEdit()
-        font_edit.setText(self.settings.get_font_family())
-        layout.addRow("字体:", font_edit)
-
-        # 添加确定和取消按钮
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addRow(buttons)
-
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            # 保存字体设置
-            self.settings.set_font_family(font_edit.text())
-            # 应用字体设置
-            self.apply_font_settings()
-
-    def apply_font_settings(self):
-        """应用字体设置"""
-        font = QFont(self.settings.get_font_family())
-        # 设置所有文本部件的字体
-        self.history_list.setFont(font)
-        self.changes_tree.setFont(font)
-        self.diff_viewer.setFont(font)
-        self.merge_diff_viewer.setFont(font)
 
 class CompareWithWorkingDialog(QDialog):
     def __init__(self, title, old_content, new_content, parent=None):
