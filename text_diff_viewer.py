@@ -309,6 +309,14 @@ class MergeDiffViewer(QWidget):
                     elif source == "parent2" and target_name == "result":
                         diff_chunks = self.parent2_chunks
                         is_left_scroll = False
+                    elif source == "parent1" and target_name == "parent2":
+                        # 通过 parent1->result 和 result->parent2 的差异推导出 parent1->parent2 的差异
+                        diff_chunks = self.parent1_chunks + self.parent2_chunks
+                        is_left_scroll = True
+                    elif source == "parent2" and target_name == "parent1":
+                        # 通过 parent2->result 和 result->parent1 的差异推导出 parent2->parent1 的差异
+                        diff_chunks = self.parent2_chunks + self.parent1_chunks
+                        is_left_scroll = False
                     else:
                         # 如果不需要考虑差异块，直接使用行号同步
                         diff_chunks = []
