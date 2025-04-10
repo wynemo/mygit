@@ -1,394 +1,707 @@
-import asyncio
+# 文本处理函数
+import random
+import re
+import html
+import markdown2
 import json
-import threading
-import time
-import uuid
-from queue import Empty, Queue
-
-from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import StreamingResponse
-import requests
-
+from bs4 import BeautifulSoup
+from bs4.element import NavigableString
+from markdown2 import markdown
 from core.config import settings
-from core.connection import ConnectionManager
+from services.fastgpt import fastgpt_process
+from services.qwen_voice import call_qwen_voice_api
+from services.language import fasttext_is_language
+from core.enums import get_voice_config_by_lang
 from core.logger import setup_logger
+import threading
+from queue import Queue, Empty
+from typing import Generator
+import time
+import sys
+import os # Added import
 from core.text_buffer import TextBuffer
-from crud import create_text_match
-from db import get_session
-from services.text import process_text
-from utils.multiple_latex import check_multiple_latex
-
-# 创建一个新的连接管理器实例
-connection_manager = ConnectionManager()
 
 logger = setup_logger(__name__)
-router = APIRouter()
+
+def process_image_sizes(text):
+    """处理图片尺寸的预处理器"""
+    def replace(match):
+        alt = match.group(1)
+        url = match.group(2)
+        width = match.group(3)
+        height = match.group(4) if match.group(4) else width
+
+        return f'<img src="{url}" alt="{alt}" width="{width}" height="{height}">'
+
+    # 匹配带尺寸的图片语法
+    pattern = r'!\[(.*?)\]\((.*?)\)\{(\d+)(?:x(\d+))?\}'
+    return re.sub(pattern, replace, text)
+
+# 创建图片预处理器类
+class ImagePreprocessor:
+    def run(self, text):
+        import re
+        pattern = r'!\[(.*?)\]\((.*?)\)(\{\{\{.*?\}\}\})?'
+        def replace(match):
+            alt = match.group(1)
+            src = match.group(2)
+            attrs = match.group(3)
+            if attrs:
+                width = re.search(r'width="(\d+)"', attrs)
+                height = re.search(r'height="(\d+)"', attrs)
+                img_attrs = []
+                if width:
+                    img_attrs.append(f'width="{width.group(1)}"')
+                if height:
+                    img_attrs.append(f'height="{height.group(1)}"')
+                return f'<img src="{src}" alt="{alt}" {" ".join(img_attrs)}>'
+            return f'<img src="{src}" alt="{alt}">'
+        return re.sub(pattern, replace, text)
+
+# 初始化 Markdown 转换器（模块级别）
+markdown_converter = markdown2.Markdown(extras=[
+    'tables',
+    'fenced-code-blocks',
+    'markdown-in-html',
+    'break-on-newline',
+    'attr_list',
+    'images',
+    'cuddled-lists',
+    'task_list',
+    'sane_lists',
+    'footnotes',
+    'strike',
+    'toc',
+    'wiki-tables',
+    'tables_extra',
+    'html-classes',
+    'numbering',
+    'def_list',
+    'containers',
+    'emoji',
+    'header-ids',
+    'smarty-pants',
+    'markdown-in-html',
+    'ordinal-lists',
+])
+
+def convert_markdown_to_html(markdown_text):
+    """转换 Markdown 为 HTML 的主函数"""
+    # 预处理表格分隔符，确保使用正确的短横线
+    def normalize_table_separators(text):
+        # 将所有表格分隔符中的长横线（—）替换为短横线（-）
+        text = re.sub(r'\|\s*[—]+\s*\|', '| - |', text)
+        # 保持多列表格的格式
+        text = re.sub(r'\|\s*[—]+\s*(?=\|)', '| - ', text)
+        return text
+
+    # 解码整个文本的 HTML 实体
+    processed_text = html.unescape(markdown_text)
+
+    # 规范化表格分隔符
+    processed_text = normalize_table_separators(processed_text)
+
+    # 预处理图片
+    # processed_text = process_image_sizes(processed_text)
+    # processed_text = ImagePreprocessor().run(processed_text)
+
+    # 使用全局的 markdown 转换器
+    html_content = markdown_converter.convert(processed_text)
+
+    return html_content
 
 
+# 使用markdown2库将md转换为纯文本，
+# 增加了代码使其更改后以保留序号
+def convert_text_to_plain_markdown2(text: str) -> str:
+    """使用markdown2库将md转换为纯文本,保留序号和原始换行格式"""
+    logger.info("\n[DEBUG] 开始转换 Markdown 为纯文本...")
+    logger.info(f"[DEBUG] 原始输入文本:\n{text}")
 
-def thread_forward(
-    stop_flag: threading.Event,
-    disconnect_flag: threading.Event,
-    request_body: dict,
-    headers: dict,
-    queue_in: Queue,
-    request_messages: list,
-    raw_responses: list,
-):
+    # 如果文本不包含任何Markdown标记，直接返回原文本
+    if not any(marker in text for marker in ['#', '*', '_', '`', '>', '-', '+', '[', ']', '|']):
+        return text
+
+    # 转换为HTML
+    html_content = convert_markdown_to_html(text)
+    logger.info(f"[DEBUG] 转换后的 HTML:\n{json.dumps(html_content, ensure_ascii=False)}")
+
+    # 使用BeautifulSoup处理HTML，保留换行符
+    soup = BeautifulSoup(html_content, 'html.parser')
+
+    # 添加序号到列表项
+    add_numbers_to_li(soup)
+
+    for img in soup.find_all('img'):
+        # img_md = soup.new_string(f'![{img.get("alt", "")}]({img.get("src", "")})')
+        img_md = soup.new_string(f'![{img.get("alt", "")}]({img.get("src", "")})')
+        img.replace_with(img_md)
+
+    # 获取所有文本内容，保留换行和空格
+    text_content = soup.get_text(separator='\n', strip=False)
+
+    # 保持原始的前后空行和缩进
+    leading_spaces = len(text) - len(text.lstrip())
+    leading_newlines = len(text) - len(text.lstrip('\n'))
+    trailing_spaces = len(text) - len(text.rstrip())
+    trailing_newlines = len(text) - len(text.rstrip('\n'))
+
+    # 重建文本，保留原始格式
+    result = (
+        '\n' * leading_newlines +
+        ' ' * leading_spaces +
+        text_content.strip() +
+        ' ' * trailing_spaces +
+        '\n' * trailing_newlines
+    )
+
+    logger.info(f"[DEBUG] 提取的纯文本:\n{result}")
+    return result
+
+def add_numbers_to_li(soup):
+
+    # 找到所有的 ol 标签
+    for ol in soup.find_all('ol'):
+        # 对每个 ol 中的 li 进行编号
+        for i, li in enumerate(ol.find_all('li', recursive=False), 1):
+            # 在 li 的开头插入序号
+            li.insert(0, NavigableString(f"{i}. "))
+
+# 按照 '|' 符号分段
+# 返回一个列表，列表中的每个元素是一个字符串
+# 在分段过程中 需要保留 '|' 符号
+def split_by_pipe(text):
+    """
+    按 '|' 符号分段，保留 '|' 符号、换行符和其他特殊字符。
+    如果没有 '|' 符号，则返回包含原始文本的列表。
+    返回:
+        list: 包含分段后文本的列表，每个分段都包含 '|' 符号
+    """
+    # 如果文本中没有 '|' 符号，直接返回原文本作为列表的唯一元素
+    if '|' not in text:
+        logger.info(f"[DEBUG] 文本中没有分隔符，返回原文本: [{text}]")
+        return [text]
+
+    # 如果文本不是以 '|' 开头，在开头添加一个
+    if not text.startswith('|'):
+        text = '|' + text
+
+    # 使用正则表达式进行分割，使用 lookahead 来保留分隔符
+    segments = re.split(r'(?=\|)', text)
+
+    logger.info(f"[DEBUG] 分段结果: {segments}")  # 调试信息
+    return segments
+
+"""
+定义一个函数 : 去除掉文本中的所有非文本内容
+
+这一段是 发给qwen之前的文本处理  避免qwen处理非文本内容出现错误
+
+包含公式的处理逻辑不需要调用以下函数，因为在AI对话中会单独进行处理
+"""
+def remove_all_symbols(input_text):
+    # 定义各语言的 Unicode 范围
+    ranges = {
+        'zh': r'\u4e00-\u9fff',  # 中文
+        'en': r'A-Za-z',         # 英文
+        'ja': r'\u3040-\u30ff\u31f0-\u31ff\u3400-\u4dbf',  # 日文
+        'ar': r'\u0600-\u06ff',  # 阿拉伯文
+        'es_fr_de': r'\u00C0-\u00FF',  # 西班牙文、法文、德文（含重音字符）
+        'ru': r'\u0400-\u04FF',  # 俄文
+        'el': r'\u0370-\u03FF',  # 希腊字母
+        'digits': r'0-9'         # 数字
+    }
+
+    # 合并所有语言的字符范围
+    allowed_characters = ''.join(ranges.values())
+
+    # 创建正则表达式模式，匹配不在允许范围内的字符
+    pattern = re.compile(f'[^{allowed_characters}]')
+
+    # 将不在允许范围内的字符替换为空格
+    filtered_text = pattern.sub(' ', input_text)
+
+    # 去除多余的连续空格
+    filtered_text = re.sub(r'\s+', ' ', filtered_text).strip()
+
+    return filtered_text
+
+# 判断文本中是否含有公式
+def has_formula(text_segment):
+    """
+    判断文本段是否包含 LaTeX 公式。
+    """
+    latex_patterns = [
+        r'\$\$.*?\$\$',                    # 双美元符号包围的公式
+        r'\$(?!\d+(?:\.\d+)?(?!\d)).*?\$', # 单美元符号包围的公式（排除金额）
+        r'\\\(.*?\\\)',                    # \( \) 包围的公式
+        r'\\\[.*?\\\]',                    # \[ \] 包围的公式
+        r'\\begin\{[^}]+\}.*?\\end\{[^}]+\}'  # \begin{} \end{} 环境，允许不同环境名
+    ]
+
+    for pattern in latex_patterns:
+        if re.search(pattern, text_segment, re.DOTALL):
+            return True
+    return False
+
+def handle_formula_segment(text_segment):
+    """处理包含公式的文本段"""
+    logger.info(f"\n[DEBUG] 处理公式段: {text_segment}")
+    # 定义一个messages 列表
+    messages = [
+        {"role": "user", "content": text_segment}
+    ]
+
+    # 调用fastgpt的AI对话接口
     try:
-        logger.info("[FORWARD] 开始转发请求到后端服务器...")
-        forward_url = "https://gpt.qimingdaren.com/api/v1/chat/completions"
+        fastgpt_response = fastgpt_process(api_key=settings.FASTGPT_API_KEY, messages=messages)
+    except Exception as e:
+        logger.error(f"[DEBUG] 调用fastgpt的AI对话接口失败: {e}")
+        return None
 
-        # 只保留必要的请求头
-        forward_headers = {
-            "Authorization": headers.get("authorization"),
-            "Content-Type": "application/json",
+    return fastgpt_response
+
+
+
+def handle_non_formula_segment(text_segment):
+    """
+    处理不包含公式的文本段，保留原有的空白字符和分隔符。
+
+
+    返回:
+        list: 包含分段后文本的列表
+    """
+    logger.info(f"\n[DEBUG] 处理非公式段: {text_segment}")
+
+    split_pattern = r'([，；,。,;])'
+
+    # 检查是否包含任何分隔符
+    if not re.search(split_pattern, text_segment):
+        logger.info(f"[DEBUG] 没有分隔符，返回原文本: [{text_segment}]")
+        return [text_segment]
+
+    # 使用re.split并保留分隔符
+    parts = re.split(split_pattern, text_segment)
+
+    # 合并分隔符和文本
+    result = []
+    for i in range(0, len(parts)-1, 2):
+        if parts[i]:  # 如果文本部分不为空
+            result.append(parts[i] + parts[i+1])
+
+    # 处理最后一个部分
+    if parts[-1]:
+        result.append(parts[-1])
+
+    logger.info(f"[DEBUG] 处理后的列表: {result}")
+    return result
+
+
+
+# 定义函数： 判断当前文本是否全是空格
+def is_all_space(text):
+    """
+    判断当前文本是否全是空白字符（包括空格、制表符、换行符等）
+    返回:
+        bool: True 如果文本只包含空白字符，False 否则
+    """
+    if not text:  # 处理空字符串
+        return True
+
+    # 检查是否所有字符都是空白字符
+    # string.whitespace 包含所有空白字符: 空格、制表符、换行符等
+    return all(char.isspace() for char in text)
+
+# 定义函数：公式语音处理
+def formula_voice_process(index, source_text, pure_text, headers=None):
+    """
+    处理公式语音
+    index： 序号编号
+    source_text： 原始文本
+    pure_text： 纯文本 经过markdown2转换后的文本
+    """
+    # 调用FastGPT的AI 对话功能
+    fastgpt_response = handle_formula_segment(pure_text)
+    logger.info(f"[DEBUG] 返回数据: {fastgpt_response}")
+    # 判断当前文本是否是纯文本  或者字段为空
+    if is_all_space(fastgpt_response) or fastgpt_response == None:
+        logger.info(f"[DEBUG] 返回数据是纯文本: {fastgpt_response}")
+        return {
+            "index": index,
+            "text": fastgpt_response,# 翻译过后的文本
+            "content": source_text, # 原始文本
+            "tts": settings.EMPTY_VOICE_URL, # 默认空音频
+        }  # 返回默认音频  这里是出现错误后的运行逻辑处理
+
+    # 使用文本函数检查语言类型  以下使用的是fasttext库
+    language, confidence = fasttext_is_language(fastgpt_response)
+
+    voice_config = get_voice_config_by_lang(language)
+    if not headers:
+        headers = {}
+    model = headers.get('model', voice_config.get("model"))
+    voice = headers.get("voice", voice_config.get("voice"))
+
+    # 调用qwen的音频处理接口
+    qwen_tts = call_qwen_voice_api(api_key=settings.QWEN_VOICE_API_KEY, text=fastgpt_response, model=model, voice=voice)
+
+    logger.info(f"[DEBUG] 返回数据: {fastgpt_response}")
+
+    # 构建返回值
+    result = {
+        "index": index,  # 应该定义一个全局变量 来记录当前的index 因为整个列表的index 是连续的
+        "text": fastgpt_response, #fastgpt 翻译后的文本
+        "content": source_text,  # 最开始没有做任何处理的原始文本
+        "tts": qwen_tts,
+        "language": language,
+        "confidence": confidence
+    }
+    return result
+
+def has_image(text):
+    """检查文本是否包含图片链接"""
+    # 匹配markdown格式的图片链接
+    image_patterns = [
+        r'!\[.*?\]\(.*?\)',           # 基本图片语法 ![alt](url)
+        r'!\[.*?\]\(.*?\)\{.*?\}',    # 带尺寸的图片 ![alt](url){100x200}
+        r'<img.*?>'                    # HTML格式图片标签
+    ]
+
+    for pattern in image_patterns:
+        if re.search(pattern, text):
+            return True
+    return False
+
+# 定义函数： 处理普通文本
+def normal_text_process(index, source_text, pure_text, headers=None):
+    """
+    处理普通文本
+    1、检查是否包含图片链接
+    2、删除掉非文本内容
+    3、判断是否为全是空格
+    4、判断语言类型
+    5、调用qwen的音频处理接口
+
+    index： 序号编号
+    source_text： 原始文本
+    pure_text： 纯文本 经过markdown2转换后的文本
+    """
+    logger.info(f"\n[DEBUG] 开始处理普通文本:原始文本是{source_text} 纯文本是{pure_text}")
+
+    try:
+        # 1. 首先检查是否包含图片链接
+        if has_image(pure_text):
+            logger.info("[DEBUG] 检测到图片链接，返回空音频")
+            return {
+                "index": index,
+                "text": pure_text,
+                "content": source_text,
+                "tts": settings.EMPTY_VOICE_URL,
+                "status": "success"  # 添加状态标记
+            }
+
+        # 2. 删除非文本内容
+        filtered_text = remove_all_symbols(pure_text)
+        logger.info(f"[DEBUG] 过滤后的文本: {filtered_text}")
+
+        # 3. 判断是否全是空格
+        if is_all_space(filtered_text):
+            return {
+                "index": index,
+                "text": pure_text,
+                "content": source_text,
+                "tts": settings.EMPTY_VOICE_URL,
+            }
+
+        # 4. 判断语言类型
+        language, confidence = fasttext_is_language(filtered_text)
+        logger.info(f"[DEBUG] 检测到语言: {language}, 置信度: {confidence}")
+
+        # 获取对应语言的语音配置
+        voice_config = get_voice_config_by_lang(language)
+        if not headers:
+            headers = {}
+        model = headers.get('model', voice_config.get("model"))
+        voice = headers.get("voice", voice_config.get("voice"))
+
+        # 5. 调用qwen的音频处理接口
+        try:
+            qwen_tts = call_qwen_voice_api(
+                api_key=settings.QWEN_VOICE_API_KEY,
+                text=filtered_text,
+                model=model,
+                voice=voice
+            )
+            logger.info("[DEBUG] 音频生成成功")
+        except Exception as e:
+            logger.error(f"[DEBUG] 音频生成失败: {e}")
+            return {
+                "index": index,
+                "text": pure_text,
+                "content": source_text,
+                "tts": settings.EMPTY_VOICE_URL,
+            }
+
+        # 构建返回结果
+        result = {
+            "index": index,
+            "text": filtered_text,
+            "content": source_text,
+            "tts": qwen_tts,
+            "language": language,
+            "confidence": confidence
         }
 
-        response = requests.post(
-            forward_url,
-            headers=forward_headers,
-            json=request_body,
-            stream=True,
-            timeout=60,
-        )
+        logger.info(f"[DEBUG] 处理完成: {result}")
+        return result
 
-        logger.info(f"[FORWARD] 请求headers: {headers} request_body: {request_body}")
+    except Exception as e:
+        logger.error(f"处理文本时发生错误: {str(e)}")
+        return {
+            "index": index,
+            "text": pure_text,
+            "content": source_text,
+            "tts": settings.EMPTY_VOICE_URL,
+            "status": "error",
+            "error": str(e)
+        }
+    finally:
+        # 确保清理任何需要关闭的资源
+        pass
 
-        if response.status_code != 200:
-            logger.error(f"[FORWARD] 后端请求失败，状态码: {response.status_code}")
-            queue_in.put("[DONE]")
-            return
+def process_text(global_index, input_text, headers=None) -> Generator[dict, None, None]:
+    """
+    主处理函数 - 使用多线程处理并实时返回结果
 
-        for line in response.iter_lines(decode_unicode=True):
-            logger.debug(f"[FORWARD] 接收到后端数据: {line}")
-            if stop_flag.is_set() or disconnect_flag.is_set():
-                logger.debug("[FORWARD] 停止转发线程标志位已设置，退出线程...")
+    工作原理：
+    1. 使用多线程并发处理文本段
+    2. 通过生成器（Generator）实时返回处理结果
+    3. 使用队列（Queue）在线程间安全传递数据
+
+    参数：
+        global_index: 起始索引
+        input_text: 需要处理的输入文本
+
+    返回：
+        Generator[dict, None, None]: 返回一个生成器，逐个产出处理结果
+    """
+    # 初始化线程同步所需的数据结构
+    result_queue = Queue()  # 线程安全的队列，用于存储处理结果
+    index_lock = threading.Lock()  # 线程锁，用于保护索引计数器
+    audio_index = global_index  # 音频片段的索引计数器
+    threads = []  # 存储所有工作线程
+    active_threads = threading.Event()  # 用于跟踪是否还有活动线程
+    active_threads.set()  # 设置事件为活动状态
+
+    try:
+        # 将输入文本按 '|' 分段
+        segments = split_by_pipe(input_text)
+        total_segments = len(segments)
+        processed_count = 0  # 已处理段落计数器
+
+        def process_segment(segment: str):
+            """
+            工作线程函数：处理单个文本段
+            每个文本段在独立的线程中处理，处理结果放入队列
+            """
+            nonlocal audio_index, processed_count
+            try:
+                # 提取纯文本
+                pure_text = convert_text_to_plain_markdown2(segment)
+                # 如果文本段全是空格，则返回空音频
+                if is_all_space(pure_text):
+                    with index_lock:
+                        current_index = audio_index
+                        audio_index += 1
+
+                    result = {
+                        "index": current_index,
+                        "text": "",
+                        "content": segment,
+                        "tts": settings.EMPTY_VOICE_URL,
+                        "status": "success"
+                    }
+                    result_queue.put(result)
+                elif has_formula(pure_text):
+                    with index_lock:
+                        current_index = audio_index
+                        audio_index += 1
+                    # 带有公式的文本处理方法
+                    result = formula_voice_process(current_index, segment, pure_text, headers=headers)
+                    result_queue.put(result)
+                else:
+                    # 不带有公式的文本处理方法 这里采用[，；,。,;] 符号进行分段
+                    processed_segments = handle_non_formula_segment(segment)
+                    for item in processed_segments:
+                        with index_lock:
+                            current_index = audio_index
+                            audio_index += 1
+                        # 将文本提取纯文本
+                        pure_text = convert_text_to_plain_markdown2(item)
+                        logger.info(f'item {item} --------------------> pure_text {pure_text}')
+                        # 将文本处理成音频
+                        result = normal_text_process(current_index, item, pure_text, headers=headers)
+                        result_queue.put(result)
+                # 随机休眠一段时间，避免请求过于频繁
+                time.sleep(random.randint(100, 3500) / 1000)
+            except Exception as e:
+                logger.exception("处理文本段时出错")
+                with index_lock:
+                    current_index = audio_index
+                    audio_index += 1
+                result = {
+                    "index": current_index,
+                    "text": segment,
+                    "content": segment,
+                    "tts": settings.EMPTY_VOICE_URL,
+                    "status": "error",
+                    "error": str(e)
+                }
+                result_queue.put(result)
+            finally:
+                with index_lock:
+                    # 更新处理计数，当所有段落处理完成时通知主线程
+                    nonlocal processed_count
+                    processed_count += 1
+                    if processed_count >= total_segments:
+                        active_threads.clear()  # 标记所有处理完成
+
+        # 为每个文本段创建并启动工作线程
+        for segment in segments:
+            thread = threading.Thread(
+                target=process_segment,
+                args=(segment,),
+                daemon=True  # 设置为守护线程，主线程结束时自动终止
+            )
+            threads.append(thread)
+            thread.start()
+
+        # 主循环：从队列中获取并yield结果
+        # 当还有活动线程或队列非空时继续运行
+        while active_threads.is_set() or not result_queue.empty():
+            try:
+                # 尝试从队列获取结果，设置超时以避免死锁
+                result = result_queue.get(timeout=0.1)
+                yield result  # 实时返回处理结果
+            except Empty:
+                continue  # 队列暂时为空，继续等待
+
+    except Exception as e:
+        # 处理主流程异常
+        logger.error(f"处理文本时发生错误: {str(e)}")
+        yield {
+            "index": global_index,
+            "text": input_text,
+            "content": input_text,
+            "tts": settings.EMPTY_VOICE_URL,
+            "status": "error",
+            "error": str(e)
+        }
+    finally:
+        # 清理工作：等待所有线程完成并处理剩余结果
+        for thread in threads:
+            thread.join(timeout=1.0)
+
+        # 确保队列中的所有结果都被处理
+        while not result_queue.empty():
+            try:
+                result = result_queue.get_nowait()
+                yield result
+            except Empty:
                 break
 
-            if not line:
-                continue
+        logger.info("所有线程处理完成")
 
-            if line.startswith("data: "):
-                data_str = line[6:]
-                if data_str.strip() == "[DONE]":
-                    logger.debug("[FORWARD] 接收到后端结束标志 [DONE]")
-                    queue_in.put("[DONE]")
-                    logger.debug(
-                        f"[FORWARD] 当前请求收集到的所有消息: {request_messages}"
-                    )
-                    break
-                try:
-                    data_json = json.loads(data_str)
-                    raw_responses.append(data_json)
-                    content = (
-                        data_json.get("choices", [{}])[0]
-                        .get("delta", {})
-                        .get("content")
-                    )
-                    if content is not None:
-                        logger.debug(f"[FORWARD] 接收到内容: {repr(content)}")
-                        queue_in.put(content)
-                        request_messages.append(content)
-                except json.JSONDecodeError as e:
-                    logger.error(f"[FORWARD] JSON解析错误: {e}")
-                    continue
+def read_file(file_path: str) -> str:
+    """
+    读取文件内容
 
-    except Exception as e:
-        logger.exception(f"[FORWARD] 转发线程异常: {e}", exc_info=True)
-    finally:
-        stop_flag.set()
-        logger.debug(f"[FORWARD] 当前请求收集到的所有消息: {request_messages}")
-        logger.debug(
-            f"[FORWARD] 当前请求的所有原始响应数据: {json.dumps(raw_responses, ensure_ascii=False)}"
-        )
-        logger.info("[FORWARD] 转发线程已结束")
+    Args:
+        file_path: 文件路径
 
-
-def thread_process(
-    index: int,
-    stop_flag: threading.Event,
-    disconnect_flag: threading.Event,
-    queue_in: Queue,
-    queue_out: Queue,
-    base_url: str,
-    headers: dict = None,
-):
-    all_input_text = ""
-    # 使用字典存储索引对应的内容
-    output_chunks = {}
+    Returns:
+        str: 文件内容
+    """
     try:
-        current_index = index
-        text_buffer = TextBuffer()
-        multiple_line_latex = ""
+        with open(file_path, 'r', encoding='utf-8') as file:
+            return file.read()
+    except Exception as e:
+        logger.error(f"读取文件失败: {str(e)}")
+        return ""
 
-        while (
-            not stop_flag.is_set() or not queue_in.empty()
-        ) and not disconnect_flag.is_set():
-            try:
-                content = queue_in.get(timeout=0.1)
-                logger.debug(f"[PROCESS] 收到输入内容: {content}")
+if __name__ == "__main__":
 
-                if content == "[DONE]":
-                    logger.info("[PROCESS] 收到结束标志")
-                    stop_flag.set()
-                    lines = text_buffer.read_all()
-                    logger.debug(f"[PROCESS] 处理队列中剩余的数据: {lines}")
-                else:
-                    all_input_text += content
-                    text_buffer.append(content)
-                    lines = text_buffer.read_lines()
+    _html = """
+    <ol>
+        <li>升级小火箭 <strong>安装证书</strong> 启用mitm</li>
+        <li>第二步<a href="#">链接</a>操作</li>
+        <li>第三步操作</li>
+    </ol>
+    <p>其他内容</p>
+    <ol>
+        <li>另一个列表第一步</li>
+        <li>另一个列表第二步</li>
+    </ol>
+    """
 
-                for line in lines:
-                    if line is not None:
-                        input_text = line
-                        logger.debug(
-                            f"[PROCESS] 处理文本: {repr(line)}, 当前index: {current_index}"
-                        )
+    soup = BeautifulSoup(_html, 'html.parser')
+    add_numbers_to_li(soup)
+    # print(str(soup))
+    # exit(0)
+    #
 
-                        input_text, multiple_line_latex = check_multiple_latex(line, multiple_line_latex, "$$", "$$")
-                        if input_text is None:
-                            continue
+    # sample_text = read_file("/Users/tommygreen/Documents/work/realtime-advio/services/realtime.md")
+    # logger.info(f"[DEBUG] 测试样例:\n{sample_text}")
+    # for each in sample_text.split('\n'):
+    #     o = convert_text_to_plain_markdown2(each)
+    #     print(o)
+    # exit(0)
 
-                        input_text, multiple_line_latex = check_multiple_latex(input_text, multiple_line_latex, r"\[", r"\]")
-                        if input_text is None:
-                            continue
+    # 设置信号处理
+    import signal
+    def signal_handler(signum, frame):
+        logger.info("接收到退出信号，正在清理...")
+        sys.exit(0)
 
-                        input_text, multiple_line_latex = check_multiple_latex(input_text, multiple_line_latex, r"\begin", r"\end")
-                        if input_text is None:
-                            continue
-
-                        logger.debug(f"---------- input_text is {input_text}")
-
-                        for result in process_text(current_index, input_text, headers=headers):
-                            if result:
-                                try:
-                                    # 将内容按index存储到字典中
-                                    result_index = result["index"]
-                                    output_chunks[result_index] = result["content"]
-                                    queue_out.put(result, timeout=1)
-                                    logger.debug(f"[PROCESS] 发送处理结果: {result}")
-                                    if result_index >= current_index:
-                                        current_index = result_index + 1
-                                    logger.info(f"current_index is {current_index}")
-                                except:
-                                    logger.warning("[PROCESS] 无法将结果放入输出队列，可能客户端已断开。")
-                                    disconnect_flag.set()
-                                    break
-
-            except Empty:
-                logger.debug(
-                    f"[PROCESS] 输入队列为空，继续循环：标志位 stop_flag: {stop_flag.is_set()}, 当前index: {current_index}, 输入队列大小: {queue_in.qsize()}, 输出队列大小: {queue_out.qsize()}"
-                )
-                continue
-
-    finally:
-        if settings.STORE_TEXT_RECORD == "yes":
-            session = None
-            try:
-                session = next(get_session())
-                # 按索引顺序拼接输出文本
-                all_output_text = ""
-                for idx in sorted(output_chunks.keys()):
-                    all_output_text += output_chunks[idx]
-
-                # 创建新记录
-                create_text_match(
-                    session=session,
-                    input_text=all_input_text,
-                    output_text=all_output_text,
-                    is_matching=all_input_text==all_output_text
-                )
-            except:
-                if session:
-                    session.rollback()
-                logger.exception("create record error")
-            finally:
-                if session:
-                    session.close()
-
-        if not disconnect_flag.is_set():
-            try:
-                queue_out.put("[DONE]", timeout=1)
-                logger.info("[PROCESS] 已发送 [DONE] 标记到输出队列")
-            except:
-                logger.warning(
-                    "[PROCESS] 无法将 [DONE] 放入输出队列，可能客户端已断开。"
-                )
-        else:
-            logger.info("[PROCESS] disconnect_flag 已设置，不发送 [DONE] 标记")
-
-        logger.info(f"[PROCESS] 处理线程已结束，最终index: {current_index}")
-        logger.debug(
-            f"[PROCESS] 队列状态 - 输入队列大小: {queue_in.qsize()}, 输出队列大小: {queue_out.qsize()}"
-        )
-        logger.debug(
-            f"[PROCESS] 队列状态 - 输入队列数据: {json.dumps(list(queue_in.queue), ensure_ascii=False)}, 输出队列数据: {json.dumps(list(queue_out.queue), ensure_ascii=False)}"
-        )
-
-
-@router.post("/real_time_audio")
-async def real_time_audio(request: Request):
-    client_id = str(uuid.uuid4())
-    queue_in = None
-    queue_out = None
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
 
     try:
-        host = request.headers.get("host", "")
-        forwarded_proto = request.headers.get("x-forwarded-proto", "http")
-        base_url = f"{forwarded_proto}://{host}"
+        logger.info("\n[DEBUG] ====== 程序开始 ======")
+        # 获取当前脚本文件所在的目录
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        # 构建相对于脚本目录的 realtime.md 路径
+        realtime_md_path = os.path.join(script_dir, "realtime.md")
+        sample_text = read_file(realtime_md_path)
+        logger.info(f"[DEBUG] 测试样例:\n{sample_text}")
+        index = 0
 
-        client_id = request.headers.get("X-Client-ID") or str(uuid.uuid4())
-        logger.info(f"[MAIN] 新的CURL客户端连接: {client_id}, base_url: {base_url}")
+        buffer = TextBuffer()
+        buffer.append(sample_text)
+        lines = buffer.read_all()
+        for line in lines:
 
-        if connection_manager.is_active(client_id):
-            logger.warning(f"[MAIN] 检测到重复的客户端ID: {client_id}")
-            raise HTTPException(status_code=400, detail="Client ID already in use")
+            generator = process_text(index, line)
+            results = []
 
-        queue_in = Queue(maxsize=1000)
-        queue_out = Queue(maxsize=1000)
+            for item in generator:
+                results.append(item)
+                logger.info(f"处理结果: {json.dumps(item, ensure_ascii=False)}")
 
-        try:
-            request_body = await request.json()
-        except json.JSONDecodeError as e:
-            logger.error(f"[MAIN] JSON解析错误: {e}")
-            raise HTTPException(
-                status_code=400, detail=f"Invalid JSON format: {str(e)}"
-            )
+            logger.info("\n[DEBUG] ====== 程序结束 ======")
+            logger.info(f"最终输出:\n{json.dumps(results, ensure_ascii=False)}")
 
-        request_messages = []
-        raw_responses = []
-        stop_flag = threading.Event()
-        disconnect_flag = threading.Event()
+            text_list = [item['text'] for item in results]
+            logger.info(f"最终朗读文本:\n{''.join(text_list)}")
 
-        connection_manager.add_connection(client_id, stop_flag, disconnect_flag)
+            text_list = [item['content'] for item in results]
+            logger.info(f"最终原始文本:\n{''.join(text_list)}")
 
-        async def event_generator():
-            try:
-                connection_time = time.time()
-                last_activity = time.time()
+            index += 1
 
-                initial_message = (
-                    'event: connected\ndata: {"status":"connected","client_id":"'
-                    + client_id
-                    + '"}\n\n'
-                )
-                logger.debug(f"[SSE] 发送连接成功消息: {initial_message}")
-                yield initial_message
-
-                while True:
-                    current_time = time.time()
-
-                    if await request.is_disconnected():
-                        logger.warning(
-                            f"[SSE] 检测到客户端断开连接 - 客户端ID: {client_id}"
-                        )
-                        raise ConnectionError("Client disconnected")
-
-                    try:
-                        data = queue_out.get_nowait()
-                        last_activity = current_time
-
-                        if data == "[DONE]":
-                            done_message = "event: complete\ndata: [DONE]\n\n"
-                            logger.info(f"[SSE] 发送结束消息: {done_message}")
-                            logger.debug(
-                                f"[SSE] 输出队列中的数据: {json.dumps(list(queue_out.queue), ensure_ascii=False)}"
-                            )
-                            yield done_message
-                            break
-
-                        response_data = data
-                        message = json.dumps(response_data, ensure_ascii=False)
-                        sse_message = (
-                            f"event: message\nid: {current_time}\ndata: {message}\n\n"
-                        )
-                        logger.debug(f"[SSE] 发送数据消息: {sse_message}")
-                        yield sse_message
-
-                    except Empty:
-                        if current_time - last_activity > 5:
-                            keep_alive = {
-                                "type": "keep-alive",
-                                "id": client_id,
-                                "timestamp": current_time,
-                            }
-                            ping_message = f"event: ping\ndata: {json.dumps(keep_alive, ensure_ascii=False)}\n\n"
-                            logger.debug(f"[SSE] 发送心跳消息: {ping_message}")
-                            yield ping_message
-                            last_activity = current_time
-
-                        await asyncio.sleep(0.1)
-
-            except Exception as e:
-                logger.error(
-                    f"[MAIN] CURL客户端 {client_id} 生成器异常: {e}", exc_info=True
-                )
-                error_data = json.dumps({"error": str(e)})
-                yield f"event: error\ndata: {error_data}\n\n"
-            finally:
-                duration = time.time() - connection_time
-                logger.info(
-                    f"[MAIN] CURL客户端 {client_id} 连接结束，持续时间: {duration:.2f}秒"
-                )
-                stop_flag.set()
-                connection_manager.remove_connection(client_id)
-
-                while not queue_out.empty():
-                    try:
-                        queue_out.get_nowait()
-                    except Empty:
-                        break
-
-        thread1 = threading.Thread(
-            target=thread_forward,
-            args=(
-                stop_flag,
-                disconnect_flag,
-                request_body,
-                request.headers,
-                queue_in,
-                request_messages,
-                raw_responses,
-            ),
-            daemon=True,
-        )
-        thread1.start()
-
-        thread2 = threading.Thread(
-            target=thread_process,
-            args=(0, stop_flag, disconnect_flag, queue_in, queue_out, base_url, request.headers),
-            daemon=True,
-        )
-        thread2.start()
-
-        return StreamingResponse(
-            event_generator(),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache, no-transform",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",
-                "X-Client-ID": client_id,
-                "Content-Type": "text/event-stream",
-                "Transfer-Encoding": "chunked",
-            },
-        )
-
+    except KeyboardInterrupt:
+        logger.info("程序被用户中断")
     except Exception as e:
-        logger.error(
-            f"[MAIN] 处理请求发生异常 - 客户端ID: {client_id}, 异常信息: {e}",
-            exc_info=True,
-        )
-        if queue_in is not None and queue_out is not None:
-            logger.error(
-                f"[MAIN] 异常发生时队列状态 - 输入队列大小: {queue_in.qsize()}, 输出队列大小: {queue_out.qsize()}"
-            )
-        if connection_manager.is_active(client_id):
-            connection_manager.remove_connection(client_id)
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/health")
-async def health_check():
-    return {"status": "healthy"}
+        logger.error(f"程序执行出错: {str(e)}")
+    finally:
+        logger.info("程序清理完成")
