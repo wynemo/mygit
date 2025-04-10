@@ -1,4 +1,6 @@
 import sys
+import os
+from pathlib import Path
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
 
@@ -28,6 +30,33 @@ class MainWindow(QMainWindow):
         self.load_test_data()
 
     def load_test_data(self):
+        # 获取tests文件夹路径
+        tests_dir = Path(__file__).parent / "tests"
+        
+        # 检查tests文件夹是否存在
+        if not tests_dir.exists():
+            print("Warning: tests directory not found, using default test data")
+            # 使用默认测试数据
+            self._load_default_test_data()
+            return
+
+        # 读取测试文件
+        try:
+            parent1_text = (tests_dir / "parent1.txt").read_text()
+            result_text = (tests_dir / "result.txt").read_text()
+            parent2_text = (tests_dir / "parent2.txt").read_text()
+        except FileNotFoundError as e:
+            print(f"Warning: Test file not found: {e}")
+            self._load_default_test_data()
+            return
+
+        # 设置三向对比视图的文本
+        self.merge_viewer.set_texts(parent1_text, result_text, parent2_text)
+
+        # 设置双向对比视图的文本（比较parent1和parent2）
+        self.diff_viewer.set_texts(parent1_text, parent2_text)
+
+    def _load_default_test_data(self):
         # 创建测试数据
         parent1_text = []
         result_text = []
