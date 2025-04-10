@@ -1,0 +1,394 @@
+import asyncio
+import json
+import threading
+import time
+import uuid
+from queue import Empty, Queue
+
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
+import requests
+
+from core.config import settings
+from core.connection import ConnectionManager
+from core.logger import setup_logger
+from core.text_buffer import TextBuffer
+from crud import create_text_match
+from db import get_session
+from services.text import process_text
+from utils.multiple_latex import check_multiple_latex
+
+# 创建一个新的连接管理器实例
+connection_manager = ConnectionManager()
+
+logger = setup_logger(__name__)
+router = APIRouter()
+
+
+
+def thread_forward(
+    stop_flag: threading.Event,
+    disconnect_flag: threading.Event,
+    request_body: dict,
+    headers: dict,
+    queue_in: Queue,
+    request_messages: list,
+    raw_responses: list,
+):
+    try:
+        logger.info("[FORWARD] 开始转发请求到后端服务器...")
+        forward_url = "https://gpt.qimingdaren.com/api/v1/chat/completions"
+
+        # 只保留必要的请求头
+        forward_headers = {
+            "Authorization": headers.get("authorization"),
+            "Content-Type": "application/json",
+        }
+
+        response = requests.post(
+            forward_url,
+            headers=forward_headers,
+            json=request_body,
+            stream=True,
+            timeout=60,
+        )
+
+        logger.info(f"[FORWARD] 请求headers: {headers} request_body: {request_body}")
+
+        if response.status_code != 200:
+            logger.error(f"[FORWARD] 后端请求失败，状态码: {response.status_code}")
+            queue_in.put("[DONE]")
+            return
+
+        for line in response.iter_lines(decode_unicode=True):
+            logger.debug(f"[FORWARD] 接收到后端数据: {line}")
+            if stop_flag.is_set() or disconnect_flag.is_set():
+                logger.debug("[FORWARD] 停止转发线程标志位已设置，退出线程...")
+                break
+
+            if not line:
+                continue
+
+            if line.startswith("data: "):
+                data_str = line[6:]
+                if data_str.strip() == "[DONE]":
+                    logger.debug("[FORWARD] 接收到后端结束标志 [DONE]")
+                    queue_in.put("[DONE]")
+                    logger.debug(
+                        f"[FORWARD] 当前请求收集到的所有消息: {request_messages}"
+                    )
+                    break
+                try:
+                    data_json = json.loads(data_str)
+                    raw_responses.append(data_json)
+                    content = (
+                        data_json.get("choices", [{}])[0]
+                        .get("delta", {})
+                        .get("content")
+                    )
+                    if content is not None:
+                        logger.debug(f"[FORWARD] 接收到内容: {repr(content)}")
+                        queue_in.put(content)
+                        request_messages.append(content)
+                except json.JSONDecodeError as e:
+                    logger.error(f"[FORWARD] JSON解析错误: {e}")
+                    continue
+
+    except Exception as e:
+        logger.exception(f"[FORWARD] 转发线程异常: {e}", exc_info=True)
+    finally:
+        stop_flag.set()
+        logger.debug(f"[FORWARD] 当前请求收集到的所有消息: {request_messages}")
+        logger.debug(
+            f"[FORWARD] 当前请求的所有原始响应数据: {json.dumps(raw_responses, ensure_ascii=False)}"
+        )
+        logger.info("[FORWARD] 转发线程已结束")
+
+
+def thread_process(
+    index: int,
+    stop_flag: threading.Event,
+    disconnect_flag: threading.Event,
+    queue_in: Queue,
+    queue_out: Queue,
+    base_url: str,
+    headers: dict = None,
+):
+    all_input_text = ""
+    # 使用字典存储索引对应的内容
+    output_chunks = {}
+    try:
+        current_index = index
+        text_buffer = TextBuffer()
+        multiple_line_latex = ""
+
+        while (
+            not stop_flag.is_set() or not queue_in.empty()
+        ) and not disconnect_flag.is_set():
+            try:
+                content = queue_in.get(timeout=0.1)
+                logger.debug(f"[PROCESS] 收到输入内容: {content}")
+
+                if content == "[DONE]":
+                    logger.info("[PROCESS] 收到结束标志")
+                    stop_flag.set()
+                    lines = text_buffer.read_all()
+                    logger.debug(f"[PROCESS] 处理队列中剩余的数据: {lines}")
+                else:
+                    all_input_text += content
+                    text_buffer.append(content)
+                    lines = text_buffer.read_lines()
+
+                for line in lines:
+                    if line is not None:
+                        input_text = line
+                        logger.debug(
+                            f"[PROCESS] 处理文本: {repr(line)}, 当前index: {current_index}"
+                        )
+
+                        input_text, multiple_line_latex = check_multiple_latex(line, multiple_line_latex, "$$", "$$")
+                        if input_text is None:
+                            continue
+
+                        input_text, multiple_line_latex = check_multiple_latex(input_text, multiple_line_latex, r"\[", r"\]")
+                        if input_text is None:
+                            continue
+
+                        input_text, multiple_line_latex = check_multiple_latex(input_text, multiple_line_latex, r"\begin", r"\end")
+                        if input_text is None:
+                            continue
+
+                        logger.debug(f"---------- input_text is {input_text}")
+
+                        for result in process_text(current_index, input_text, headers=headers):
+                            if result:
+                                try:
+                                    # 将内容按index存储到字典中
+                                    result_index = result["index"]
+                                    output_chunks[result_index] = result["content"]
+                                    queue_out.put(result, timeout=1)
+                                    logger.debug(f"[PROCESS] 发送处理结果: {result}")
+                                    if result_index >= current_index:
+                                        current_index = result_index + 1
+                                    logger.info(f"current_index is {current_index}")
+                                except:
+                                    logger.warning("[PROCESS] 无法将结果放入输出队列，可能客户端已断开。")
+                                    disconnect_flag.set()
+                                    break
+
+            except Empty:
+                logger.debug(
+                    f"[PROCESS] 输入队列为空，继续循环：标志位 stop_flag: {stop_flag.is_set()}, 当前index: {current_index}, 输入队列大小: {queue_in.qsize()}, 输出队列大小: {queue_out.qsize()}"
+                )
+                continue
+
+    finally:
+        if settings.STORE_TEXT_RECORD == "yes":
+            session = None
+            try:
+                session = next(get_session())
+                # 按索引顺序拼接输出文本
+                all_output_text = ""
+                for idx in sorted(output_chunks.keys()):
+                    all_output_text += output_chunks[idx]
+
+                # 创建新记录
+                create_text_match(
+                    session=session,
+                    input_text=all_input_text,
+                    output_text=all_output_text,
+                    is_matching=all_input_text==all_output_text
+                )
+            except:
+                if session:
+                    session.rollback()
+                logger.exception("create record error")
+            finally:
+                if session:
+                    session.close()
+
+        if not disconnect_flag.is_set():
+            try:
+                queue_out.put("[DONE]", timeout=1)
+                logger.info("[PROCESS] 已发送 [DONE] 标记到输出队列")
+            except:
+                logger.warning(
+                    "[PROCESS] 无法将 [DONE] 放入输出队列，可能客户端已断开。"
+                )
+        else:
+            logger.info("[PROCESS] disconnect_flag 已设置，不发送 [DONE] 标记")
+
+        logger.info(f"[PROCESS] 处理线程已结束，最终index: {current_index}")
+        logger.debug(
+            f"[PROCESS] 队列状态 - 输入队列大小: {queue_in.qsize()}, 输出队列大小: {queue_out.qsize()}"
+        )
+        logger.debug(
+            f"[PROCESS] 队列状态 - 输入队列数据: {json.dumps(list(queue_in.queue), ensure_ascii=False)}, 输出队列数据: {json.dumps(list(queue_out.queue), ensure_ascii=False)}"
+        )
+
+
+@router.post("/real_time_audio")
+async def real_time_audio(request: Request):
+    client_id = str(uuid.uuid4())
+    queue_in = None
+    queue_out = None
+
+    try:
+        host = request.headers.get("host", "")
+        forwarded_proto = request.headers.get("x-forwarded-proto", "http")
+        base_url = f"{forwarded_proto}://{host}"
+
+        client_id = request.headers.get("X-Client-ID") or str(uuid.uuid4())
+        logger.info(f"[MAIN] 新的CURL客户端连接: {client_id}, base_url: {base_url}")
+
+        if connection_manager.is_active(client_id):
+            logger.warning(f"[MAIN] 检测到重复的客户端ID: {client_id}")
+            raise HTTPException(status_code=400, detail="Client ID already in use")
+
+        queue_in = Queue(maxsize=1000)
+        queue_out = Queue(maxsize=1000)
+
+        try:
+            request_body = await request.json()
+        except json.JSONDecodeError as e:
+            logger.error(f"[MAIN] JSON解析错误: {e}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid JSON format: {str(e)}"
+            )
+
+        request_messages = []
+        raw_responses = []
+        stop_flag = threading.Event()
+        disconnect_flag = threading.Event()
+
+        connection_manager.add_connection(client_id, stop_flag, disconnect_flag)
+
+        async def event_generator():
+            try:
+                connection_time = time.time()
+                last_activity = time.time()
+
+                initial_message = (
+                    'event: connected\ndata: {"status":"connected","client_id":"'
+                    + client_id
+                    + '"}\n\n'
+                )
+                logger.debug(f"[SSE] 发送连接成功消息: {initial_message}")
+                yield initial_message
+
+                while True:
+                    current_time = time.time()
+
+                    if await request.is_disconnected():
+                        logger.warning(
+                            f"[SSE] 检测到客户端断开连接 - 客户端ID: {client_id}"
+                        )
+                        raise ConnectionError("Client disconnected")
+
+                    try:
+                        data = queue_out.get_nowait()
+                        last_activity = current_time
+
+                        if data == "[DONE]":
+                            done_message = "event: complete\ndata: [DONE]\n\n"
+                            logger.info(f"[SSE] 发送结束消息: {done_message}")
+                            logger.debug(
+                                f"[SSE] 输出队列中的数据: {json.dumps(list(queue_out.queue), ensure_ascii=False)}"
+                            )
+                            yield done_message
+                            break
+
+                        response_data = data
+                        message = json.dumps(response_data, ensure_ascii=False)
+                        sse_message = (
+                            f"event: message\nid: {current_time}\ndata: {message}\n\n"
+                        )
+                        logger.debug(f"[SSE] 发送数据消息: {sse_message}")
+                        yield sse_message
+
+                    except Empty:
+                        if current_time - last_activity > 5:
+                            keep_alive = {
+                                "type": "keep-alive",
+                                "id": client_id,
+                                "timestamp": current_time,
+                            }
+                            ping_message = f"event: ping\ndata: {json.dumps(keep_alive, ensure_ascii=False)}\n\n"
+                            logger.debug(f"[SSE] 发送心跳消息: {ping_message}")
+                            yield ping_message
+                            last_activity = current_time
+
+                        await asyncio.sleep(0.1)
+
+            except Exception as e:
+                logger.error(
+                    f"[MAIN] CURL客户端 {client_id} 生成器异常: {e}", exc_info=True
+                )
+                error_data = json.dumps({"error": str(e)})
+                yield f"event: error\ndata: {error_data}\n\n"
+            finally:
+                duration = time.time() - connection_time
+                logger.info(
+                    f"[MAIN] CURL客户端 {client_id} 连接结束，持续时间: {duration:.2f}秒"
+                )
+                stop_flag.set()
+                connection_manager.remove_connection(client_id)
+
+                while not queue_out.empty():
+                    try:
+                        queue_out.get_nowait()
+                    except Empty:
+                        break
+
+        thread1 = threading.Thread(
+            target=thread_forward,
+            args=(
+                stop_flag,
+                disconnect_flag,
+                request_body,
+                request.headers,
+                queue_in,
+                request_messages,
+                raw_responses,
+            ),
+            daemon=True,
+        )
+        thread1.start()
+
+        thread2 = threading.Thread(
+            target=thread_process,
+            args=(0, stop_flag, disconnect_flag, queue_in, queue_out, base_url, request.headers),
+            daemon=True,
+        )
+        thread2.start()
+
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache, no-transform",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+                "X-Client-ID": client_id,
+                "Content-Type": "text/event-stream",
+                "Transfer-Encoding": "chunked",
+            },
+        )
+
+    except Exception as e:
+        logger.error(
+            f"[MAIN] 处理请求发生异常 - 客户端ID: {client_id}, 异常信息: {e}",
+            exc_info=True,
+        )
+        if queue_in is not None and queue_out is not None:
+            logger.error(
+                f"[MAIN] 异常发生时队列状态 - 输入队列大小: {queue_in.qsize()}, 输出队列大小: {queue_out.qsize()}"
+            )
+        if connection_manager.is_active(client_id):
+            connection_manager.remove_connection(client_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/health")
+async def health_check():
+    return {"status": "healthy"}

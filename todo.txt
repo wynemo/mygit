@@ -34,3 +34,6 @@ setup(
 python setup.py py2app
 
 这样就会在 dist 目录下生成一个带有正确图标的 .app 文件。
+
+
+滚动同步还是有些问题，就tests下文件滚动看起来都有问题

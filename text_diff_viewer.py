@@ -255,13 +255,16 @@ class MergeDiffViewer(QWidget):
         self._compute_diffs(parent1_text, result_text, parent2_text)
 
     def _compute_diffs(self, parent1_text: str, result_text: str, parent2_text: str):
+        """计算三个文本之间的差异"""
+        # 计算 parent1 和 result 的差异
+        self.parent1_chunks = self.diff_calculator.compute_diff(parent1_text, result_text)
+        # 计算 result 和 parent2 的差异
+        self.parent2_chunks = self.diff_calculator.compute_diff(result_text, parent2_text)
 
-        parent1_chunks = self.diff_calculator.compute_diff(parent1_text, result_text)
-        parent2_chunks = self.diff_calculator.compute_diff(result_text, parent2_text)
-
-        self.parent1_edit.highlighter.set_diff_chunks(parent1_chunks)
-        self.result_edit.highlighter.set_diff_chunks(parent1_chunks + parent2_chunks)
-        self.parent2_edit.highlighter.set_diff_chunks(parent2_chunks)
+        # 设置高亮
+        self.parent1_edit.highlighter.set_diff_chunks(self.parent1_chunks)
+        self.result_edit.highlighter.set_diff_chunks(self.parent1_chunks + self.parent2_chunks)
+        self.parent2_edit.highlighter.set_diff_chunks(self.parent2_chunks)
 
     def _on_scroll(self, value, source: str):
         """处理滚动同步
@@ -288,26 +291,79 @@ class MergeDiffViewer(QWidget):
             # 获取当前视口中的行
             cursor = source_edit.cursorForPosition(QPoint(0, 0))
             current_line = cursor.blockNumber()
+            print(f"当前视口起始行: {current_line}")
 
             # 同步其他编辑器的滚动
             for target_name, target_edit in editors.items():
                 if target_name != source:
+                    # 根据源和目标确定使用哪个差异块
+                    if source == "parent1" and target_name == "result":
+                        diff_chunks = self.parent1_chunks
+                        is_left_scroll = True
+                    elif source == "result" and target_name == "parent1":
+                        diff_chunks = self.parent1_chunks
+                        is_left_scroll = False
+                    elif source == "result" and target_name == "parent2":
+                        diff_chunks = self.parent2_chunks
+                        is_left_scroll = True
+                    elif source == "parent2" and target_name == "result":
+                        diff_chunks = self.parent2_chunks
+                        is_left_scroll = False
+                    else:
+                        # 如果不需要考虑差异块，直接使用行号同步
+                        diff_chunks = []
+                        is_left_scroll = True
+
+                    # 根据差异块调整目标位置
+                    target_line = current_line
+                    accumulated_diff = 0
+                    for chunk in diff_chunks:
+                        if chunk.type != "equal":
+                            source_start = chunk.left_start if is_left_scroll else chunk.right_start
+                            source_end = chunk.left_end if is_left_scroll else chunk.right_end
+                            target_start = chunk.right_start if is_left_scroll else chunk.left_start
+                            target_end = chunk.right_end if is_left_scroll else chunk.left_end
+
+                            if source_start <= current_line:
+                                # 计算差异块的大小差异
+                                source_size = source_end - source_start
+                                target_size = target_end - target_start
+                                size_diff = target_size - source_size
+
+                                # 如果在差异块内，根据相对位置调整
+                                if current_line < source_end:
+                                    # 计算在差异块内的精确位置
+                                    block_progress = (current_line - source_start) / max(1, source_size)
+                                    # 调整目标行号，考虑差异块内的相对位置
+                                    target_line = target_start + int(block_progress * target_size)
+                                    print(f"在差异块内 [{source_start}, {source_end}] -> [{target_start}, {target_end}]")
+                                    print(f"块内进度: {block_progress:.2f}, 目标行: {target_line}")
+                                    break
+                                else:
+                                    # 如果已经过了这个差异块，直接累加差异
+                                    accumulated_diff += size_diff
+                                    print(f"经过差异块 [{source_start}, {source_end}] -> [{target_start}, {target_end}]")
+                                    print(f"累计调整: {accumulated_diff}")
+
+                    # 如果不在任何差异块内，应用累计的差异
+                    if target_line == current_line:
+                        target_line += accumulated_diff
+
                     # 计算目标文档中的滚动值
-                    target_doc_height = target_edit.document().size().height()
-                    target_line_count = target_edit.document().blockCount()
-                    avg_line_height = (
-                        target_doc_height / target_line_count
-                        if target_line_count > 0
-                        else 0
-                    )
-
-                    # 使用当前行号计算目标滚动值
-                    target_scroll = int(current_line * avg_line_height)
-
-                    # 确保滚动值在有效范围内
                     target_bar = target_edit.verticalScrollBar()
                     target_max = target_bar.maximum()
+
+                    # 根据目标行号计算滚动值
+                    target_doc_height = target_edit.document().size().height()
+                    target_line_count = target_edit.document().blockCount()
+                    avg_line_height = target_doc_height / target_line_count if target_line_count > 0 else 0
+
+                    # 直接使用目标行号计算滚动值
+                    target_scroll = int(target_line * avg_line_height)
+
+                    # 确保滚动值在有效范围内
                     target_scroll = max(0, min(target_scroll, target_max))
+                    print(f"目标行: {target_line}, 目标滚动值: {target_scroll}")
 
                     # 设置滚动条位置
                     target_edit.verticalScrollBar().setValue(target_scroll)
