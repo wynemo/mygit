@@ -31,7 +31,7 @@ class AIGeneratorThread(QThread):
     
     async def _call_ai_api(self):
         """调用AI API生成提交信息"""
-        api_url = self.settings.get("api_url", "").rstrip("/") + "/v1/chat/completions"
+        api_url = self.settings.get("api_url", "").rstrip("/") + "/chat/completions"
         api_secret = self.settings.get("api_secret", "")
         model_name = self.settings.get("model_name", "")
         prompt = self.settings.get("prompt", "请根据以下Git变更生成一个简洁的提交信息：")
