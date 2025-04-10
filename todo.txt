@@ -40,3 +40,7 @@ python setup.py py2app
 似乎是在不同的框往下滚动时 行为不一样
 
 git diff那块估计有问题
+
+DiffViewer
+MergeDiffViewer
+下一阶段，合并这两个
