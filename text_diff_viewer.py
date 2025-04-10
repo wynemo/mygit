@@ -10,7 +10,6 @@ class DiffViewer(QWidget):
     def __init__(self, diff_calculator: DiffCalculator = None):
         super().__init__()
         self.setup_ui()
-        self.diff_chunks = []
         self._sync_vscroll_lock = False
         self._sync_hscroll_lock = False
 
@@ -67,27 +66,11 @@ class DiffViewer(QWidget):
         self._compute_diff(left_text, right_text)
 
     def _compute_diff(self, left_text: str, right_text: str):
-        """计算文本差异，使用配置的差异计算器"""
-        print("\n=== 开始计算差异 ===")
-        print("左侧文本示例:")
-        print(left_text[:200] + "..." if len(left_text) > 200 else left_text)
-        print("\n右侧文本示例:")
-        print(right_text[:200] + "..." if len(right_text) > 200 else right_text)
 
-        # 使用差异计算器计算差异
         self.diff_chunks = self.diff_calculator.compute_diff(left_text, right_text)
 
-        print("\n=== 差异计算完成 ===")
-        print(f"总共发现 {len(self.diff_chunks)} 个差异块")
-
-        # 更新差异高亮
-        print("\n=== 更新差异高亮 ===")
         self.left_diff_highlighter.set_diff_chunks(self.diff_chunks)
         self.right_diff_highlighter.set_diff_chunks(self.diff_chunks)
-
-        # 不再需要更新编辑器的差异块信息，因为这个功能已被移除
-        # self.left_edit.set_diff_chunks(self.diff_chunks)
-        # self.right_edit.set_diff_chunks(self.diff_chunks)
 
     def _on_scroll(self, value, is_left_scroll: bool):
         """统一处理滚动事件
@@ -272,28 +255,9 @@ class MergeDiffViewer(QWidget):
         self._compute_diffs(parent1_text, result_text, parent2_text)
 
     def _compute_diffs(self, parent1_text: str, result_text: str, parent2_text: str):
-        """计算三个文本之间的差异"""
-        print("\n=== 开始计算三向差异 ===")
 
-        # 预处理文本行
-        parent1_lines = parent1_text.splitlines()
-        result_lines = result_text.splitlines()
-        parent2_lines = parent2_text.splitlines()
-
-        print(f"Parent1行数: {len(parent1_lines)}")
-        print(f"Result行数: {len(result_lines)}")
-        print(f"Parent2行数: {len(parent2_lines)}")
-
-        # 计算parent1和result之间的差异
         parent1_chunks = self.diff_calculator.compute_diff(parent1_text, result_text)
-
-        # 计算parent2和result之间的差异
         parent2_chunks = self.diff_calculator.compute_diff(result_text, parent2_text)
-
-        # 更新差异高亮
-        print("\n=== 更新差异高亮 ===")
-        print(f"Parent1差异块数量: {len(parent1_chunks)}")
-        print(f"Parent2差异块数量: {len(parent2_chunks)}")
 
         self.parent1_edit.highlighter.set_diff_chunks(parent1_chunks)
         self.result_edit.highlighter.set_diff_chunks(parent1_chunks + parent2_chunks)
