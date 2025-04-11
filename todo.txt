@@ -44,3 +44,5 @@ git diff那块估计有问题
 DiffViewer
 MergeDiffViewer
 下一阶段，合并这两个
+
+git diff 单元测试
