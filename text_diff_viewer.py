@@ -127,9 +127,12 @@ class DiffViewer(QWidget):
                                 1, source_size
                             )
                             # 调整目标行号，考虑差异块内的相对位置
-                            target_line = target_start + int(
-                                block_progress * target_size
-                            )
+                            if target_size == 0:
+                                # 对于删除块，使用当前行号减去删除的行数
+                                target_line = current_line - (source_end - source_start)
+                            else:
+                                # 对于其他类型的块，使用相对位置计算
+                                target_line = target_start + int(block_progress * target_size)
                             print(
                                 f"在差异块内 [{source_start}, {source_end}] -> [{target_start}, {target_end}]"
                             )
@@ -343,7 +346,12 @@ class MergeDiffViewer(QWidget):
                                     # 计算在差异块内的精确位置
                                     block_progress = (current_line - source_start) / max(1, source_size)
                                     # 调整目标行号，考虑差异块内的相对位置
-                                    target_line = target_start + int(block_progress * target_size)
+                                    if target_size == 0:
+                                        # 对于删除块，使用当前行号减去删除的行数
+                                        target_line = current_line - (source_end - source_start)
+                                    else:
+                                        # 对于其他类型的块，使用相对位置计算
+                                        target_line = target_start + int(block_progress * target_size)
                                     print(f"在差异块内 [{source_start}, {source_end}] -> [{target_start}, {target_end}]")
                                     print(f"块内进度: {block_progress:.2f}, 目标行: {target_line}")
                                     break
