@@ -1,7 +1,7 @@
 from PyQt6.QtCore import QPoint
 from PyQt6.QtWidgets import QHBoxLayout, QWidget
 
-from diff_calculator import DiffCalculator, DifflibCalculator
+from diff_calculator import DiffCalculator, DiffChunk, DifflibCalculator
 from diff_highlighter import DiffHighlighter
 from text_edit import SyncedTextEdit
 
@@ -263,8 +263,69 @@ class MergeDiffViewer(DiffViewer):
 
         # 设置高亮
         self.parent1_edit.highlighter.set_diff_chunks(self.parent1_chunks)
-        self.result_edit.highlighter.set_diff_chunks(self.parent1_chunks + self.parent2_chunks)
         self.parent2_edit.highlighter.set_diff_chunks(self.parent2_chunks)
+        
+        # 为 result 编辑器创建转换后的差异块
+        result_chunks = []
+        
+        # 获取 result 中的所有行
+        result_lines = result_text.splitlines()
+        
+        # 创建一个映射来标记每一行的状态
+        line_status = {}  # key: line_number, value: (in_parent1, in_parent2)
+        
+        # 初始化所有行的状态
+        for i in range(len(result_lines)):
+            line_status[i] = [True, True]  # 默认在两个父版本中都存在
+            
+        # 处理 parent1 的差异
+        for chunk in self.parent1_chunks:
+            if chunk.type != "equal":
+                # 标记这些行与 parent1 不同
+                for i in range(chunk.right_start, chunk.right_end):
+                    line_status[i][0] = False
+                    
+        # 处理 parent2 的差异
+        for chunk in self.parent2_chunks:
+            if chunk.type != "equal":
+                # 标记这些行与 parent2 不同
+                for i in range(chunk.left_start, chunk.left_end):
+                    line_status[i][1] = False
+        
+        # 根据行状态创建差异块
+        current_chunk = None
+        for line_num, (in_parent1, in_parent2) in line_status.items():
+            chunk_type = None
+            if not in_parent1 and not in_parent2:
+                chunk_type = "conflict"  # 与两个父版本都不同
+            elif not in_parent1:
+                chunk_type = "parent1_diff"  # 只与 parent1 不同
+            elif not in_parent2:
+                chunk_type = "parent2_diff"  # 只与 parent2 不同
+            
+            if chunk_type:
+                if current_chunk is None or current_chunk.type != chunk_type:
+                    if current_chunk:
+                        result_chunks.append(current_chunk)
+                    current_chunk = DiffChunk(
+                        left_start=line_num,
+                        left_end=line_num + 1,
+                        right_start=line_num,
+                        right_end=line_num + 1,
+                        type=chunk_type
+                    )
+                else:
+                    current_chunk.left_end = line_num + 1
+                    current_chunk.right_end = line_num + 1
+            else:
+                if current_chunk:
+                    result_chunks.append(current_chunk)
+                    current_chunk = None
+        
+        if current_chunk:
+            result_chunks.append(current_chunk)
+        
+        self.result_edit.highlighter.set_diff_chunks(result_chunks)
 
     def _on_scroll(self, value, source: str):
         """处理滚动同步
