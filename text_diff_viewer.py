@@ -45,10 +45,8 @@ class DiffViewer(QWidget):
         )
 
         # 添加差异高亮器
-        self.left_diff_highlighter = DiffHighlighter(self.left_edit.document(), "left")
-        self.right_diff_highlighter = DiffHighlighter(
-            self.right_edit.document(), "right"
-        )
+        self.left_edit.highlighter = DiffHighlighter(self.left_edit.document(), "left")
+        self.right_edit.highlighter = DiffHighlighter(self.right_edit.document(), "right")
 
         # 添加到布局
         layout.addWidget(self.left_edit)
@@ -68,8 +66,8 @@ class DiffViewer(QWidget):
     def _compute_diff(self, left_text: str, right_text: str):
         self.diff_chunks = self.diff_calculator.compute_diff(left_text, right_text)
 
-        self.left_diff_highlighter.set_diff_chunks(self.diff_chunks)
-        self.right_diff_highlighter.set_diff_chunks(self.diff_chunks)
+        self.left_edit.highlighter.set_diff_chunks(self.diff_chunks)
+        self.right_edit.highlighter.set_diff_chunks(self.diff_chunks)
 
     def _calculate_target_line(self, current_line: int, diff_chunks: list, is_left_scroll: bool) -> int:
         """计算目标行号
