@@ -45,11 +45,6 @@ class SyncedTextEdit(QPlainTextEdit):
             self.highlighter = DiffHighlighter(self.document(), name)
             print(f"创建高亮器，类型: {name}")
 
-    def set_diff_info(self, diff_info):
-        """设置差异信息并更新高亮"""
-        self.diff_info = diff_info
-        self.highlighter.set_diff_chunks(diff_info)
-
     def line_number_area_width(self):
         digits = len(str(max(1, self.blockCount())))
         space = 3 + self.fontMetrics().horizontalAdvance("9") * digits
