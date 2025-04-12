@@ -35,7 +35,6 @@ class SyncedTextEdit(QPlainTextEdit):
         self.update_line_number_area_width()
 
         # 初始化差异信息
-        self.diff_info = []
         self.highlighter = None
 
     def setObjectName(self, name: str) -> None:
