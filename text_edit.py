@@ -1,5 +1,5 @@
 from PyQt6.QtCore import QRect, QSize, Qt
-from PyQt6.QtGui import QColor, QFont, QPainter
+from PyQt6.QtGui import QColor, QFont, QPainter, QPen
 from PyQt6.QtWidgets import QPlainTextEdit, QWidget
 
 from diff_highlighter import DiffHighlighter
@@ -94,3 +94,45 @@ class SyncedTextEdit(QPlainTextEdit):
             top = bottom
             bottom = top + self.blockBoundingRect(block).height()
             block_number += 1
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self.viewport())
+        pen = QPen(QColor("#666666"))
+        pen.setWidth(2)
+        painter.setPen(pen)
+
+        # 遍历所有差异块
+        for chunk in self.highlighter.diff_chunks:
+            if (
+                chunk.type == "delete"
+                and (
+                    chunk.right_start == chunk.right_end
+                    and self.objectName() == "right_edit"
+                )
+                or (
+                    chunk.left_start == chunk.left_end
+                    and self.objectName() == "left_edit"
+                )
+            ):
+                pos = (
+                    chunk.right_start
+                    if chunk.left_start == chunk.left_end
+                    else chunk.left_start
+                )
+                print(
+                    f"{self.objectName()} 删除块: {chunk.right_start} - {chunk.right_end} {chunk}"
+                )
+                # 在差异块的末尾画线
+                block = self.document().findBlockByLineNumber(pos)
+                if block.isValid():
+                    # 获取这一行的底部位置
+                    bottom = (
+                        self.blockBoundingGeometry(block)
+                        .translated(self.contentOffset())
+                        .bottom()
+                    )
+                    # 画一条横线
+                    painter.drawLine(
+                        0, int(bottom), self.viewport().width(), int(bottom)
+                    )
