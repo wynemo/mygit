@@ -102,6 +102,11 @@ class SyncedTextEdit(QPlainTextEdit):
         pen.setWidth(2)
         painter.setPen(pen)
 
+        # 获取当前视口的可见区域
+        viewport_rect = self.viewport().rect()
+        viewport_top = viewport_rect.top()
+        viewport_bottom = viewport_rect.bottom()
+
         # 遍历所有差异块
         for chunk in self.highlighter.diff_chunks:
             if chunk.type == "delete" and (
@@ -119,19 +124,22 @@ class SyncedTextEdit(QPlainTextEdit):
                     if chunk.left_start == chunk.left_end
                     else chunk.right_start
                 ) - 1
-                print(
-                    f"{self.objectName()} 删除块: {chunk.right_start} - {chunk.right_end} {chunk}"
-                )
-                # 在差异块的末尾画线
                 block = self.document().findBlockByLineNumber(pos)
                 if block.isValid():
-                    # 获取这一行的底部位置
-                    bottom = (
-                        self.blockBoundingGeometry(block)
-                        .translated(self.contentOffset())
-                        .bottom()
-                    )
-                    # 画一条横线
-                    painter.drawLine(
-                        0, int(bottom), self.viewport().width(), int(bottom)
-                    )
+                    # 获取这一行的几何信息
+                    block_geometry = self.blockBoundingGeometry(block)
+                    block_rect = block_geometry.translated(self.contentOffset())
+                    block_top = block_rect.top()
+                    block_bottom = block_rect.bottom()
+
+                    # 只绘制在可见区域内的行
+                    if block_bottom >= viewport_top and block_top <= viewport_bottom:
+                        painter.drawLine(
+                            0,
+                            int(block_bottom),
+                            self.viewport().width(),
+                            int(block_bottom),
+                        )
+                        print(
+                            f"{self.objectName()} 删除块: {chunk.right_start} - {chunk.right_end} {chunk}"
+                        )
