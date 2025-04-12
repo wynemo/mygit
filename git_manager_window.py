@@ -510,8 +510,8 @@ class GitManagerWindow(QMainWindow):
                 # 使用双向对比
                 self.diff_viewer.show()
                 self.merge_diff_viewer.hide()
-                diff_calculator = GitDiffCalculator(git_diff_output)
-                self.diff_viewer.diff_calculator = diff_calculator
+                # diff_calculator = GitDiffCalculator(git_diff_output)
+                # self.diff_viewer.diff_calculator = diff_calculator
                 self.diff_viewer.set_texts(parent_content, current_content)
             else:
                 # 使用三向对比
