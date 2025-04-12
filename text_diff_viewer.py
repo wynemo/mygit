@@ -1,5 +1,6 @@
 from PyQt6.QtCore import QPoint
 from PyQt6.QtWidgets import QHBoxLayout, QWidget
+import logging
 
 from diff_calculator import DiffCalculator, DiffChunk, DifflibCalculator
 from diff_highlighter import DiffHighlighter
@@ -55,7 +56,7 @@ class DiffViewer(QWidget):
 
     def set_texts(self, left_text: str, right_text: str):
         """设置要比较的文本"""
-        print("\n=== 设置新的文本进行比较 ===")
+        logging.debug("\n=== 设置新的文本进行比较 ===")
         # 先设置文本
         self.left_edit.setPlainText(left_text)
         self.right_edit.setPlainText(right_text)
@@ -104,14 +105,14 @@ class DiffViewer(QWidget):
                         else:
                             # 对于其他类型的块，使用相对位置计算
                             target_line = target_start + int(block_progress * target_size)
-                        print(f"在差异块内 [{source_start}, {source_end}] -> [{target_start}, {target_end}]")
-                        print(f"块内进度: {block_progress:.2f}, 目标行: {target_line}")
+                        logging.debug(f"在差异块内 [{source_start}, {source_end}] -> [{target_start}, {target_end}]")
+                        logging.debug(f"块内进度: {block_progress:.2f}, 目标行: {target_line}")
                         break
                     else:
                         # 如果已经过了这个差异块，直接累加差异
                         accumulated_diff += size_diff
-                        print(f"经过差异块 [{source_start}, {source_end}] -> [{target_start}, {target_end}]")
-                        print(f"累计调整: {accumulated_diff}")
+                        logging.debug(f"经过差异块 [{source_start}, {source_end}] -> [{target_start}, {target_end}]")
+                        logging.debug(f"累计调整: {accumulated_diff}")
 
         # 如果不在任何差异块内，应用累计的差异
         if target_line == current_line:
@@ -152,7 +153,7 @@ class DiffViewer(QWidget):
 
         self._sync_vscroll_lock = True
         try:
-            print(f"\n=== {'左侧' if is_left_scroll else '右侧'} 滚动事件开始 ===")
+            logging.debug(f"\n=== {'左侧' if is_left_scroll else '右侧'} 滚动事件开始 ===")
 
             # 获取源编辑器和目标编辑器
             source_edit = self.left_edit if is_left_scroll else self.right_edit
@@ -161,19 +162,19 @@ class DiffViewer(QWidget):
             # 获取当前视口中的行
             cursor = source_edit.cursorForPosition(QPoint(0, 0))
             current_line = cursor.blockNumber()
-            print(f"当前视口起始行: {current_line}")
+            logging.debug(f"当前视口起始行: {current_line}")
 
             # 计算目标行号
             target_line = self._calculate_target_line(current_line, self.diff_chunks, is_left_scroll)
 
             # 计算滚动值
             target_scroll = self._calculate_scroll_value(target_edit, target_line)
-            print(f"目标行: {target_line}, 目标滚动值: {target_scroll}")
+            logging.debug(f"目标行: {target_line}, 目标滚动值: {target_scroll}")
 
             # 设置滚动条位置
             target_edit.verticalScrollBar().setValue(target_scroll)
 
-            print(f"=== {'左侧' if is_left_scroll else '右侧'} 滚动事件结束 ===\n")
+            logging.debug(f"=== {'左侧' if is_left_scroll else '右侧'} 滚动事件结束 ===\n")
 
         finally:
             self._sync_vscroll_lock = False
@@ -243,7 +244,7 @@ class MergeDiffViewer(DiffViewer):
 
     def set_texts(self, parent1_text: str, result_text: str, parent2_text: str):
         """设置要比较的三个文本"""
-        print("\n=== 设置新的三向文本进行比较 ===")
+        logging.debug("\n=== 设置新的三向文本进行比较 ===")
         # 设置文本
         self.parent1_edit.setPlainText(parent1_text)
         self.result_edit.setPlainText(result_text)
@@ -336,7 +337,7 @@ class MergeDiffViewer(DiffViewer):
 
         self._sync_vscroll_lock = True
         try:
-            print(f"\n=== {source} 滚动事件开始 ===")
+            logging.debug(f"\n=== {source} 滚动事件开始 ===")
 
             # 获取所有编辑器
             editors = {
@@ -350,7 +351,7 @@ class MergeDiffViewer(DiffViewer):
             # 获取当前视口中的行
             cursor = source_edit.cursorForPosition(QPoint(0, 0))
             current_line = cursor.blockNumber()
-            print(f"当前视口起始行: {current_line}")
+            logging.debug(f"当前视口起始行: {current_line}")
 
             # 同步其他编辑器的滚动
             for target_name, target_edit in editors.items():
@@ -386,12 +387,12 @@ class MergeDiffViewer(DiffViewer):
 
                     # 计算滚动值
                     target_scroll = self._calculate_scroll_value(target_edit, target_line)
-                    print(f"目标行: {target_line}, 目标滚动值: {target_scroll}")
+                    logging.debug(f"目标行: {target_line}, 目标滚动值: {target_scroll}")
 
                     # 设置滚动条位置
                     target_edit.verticalScrollBar().setValue(target_scroll)
 
-            print(f"=== {source} 滚动事件结束 ===\n")
+            logging.debug(f"=== {source} 滚动事件结束 ===\n")
 
         finally:
             self._sync_vscroll_lock = False

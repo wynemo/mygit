@@ -1,4 +1,5 @@
 from PyQt6.QtGui import QColor, QSyntaxHighlighter, QTextCharFormat
+import logging
 
 
 class DiffHighlighter(QSyntaxHighlighter):
@@ -6,8 +7,8 @@ class DiffHighlighter(QSyntaxHighlighter):
         super().__init__(parent)
         self.editor_type = editor_type
         self.diff_chunks = []
-        print("\n=== 初始化DiffHighlighter ===")
-        print(f"编辑器类型: {editor_type}")
+        logging.debug("\n=== 初始化DiffHighlighter ===")
+        logging.debug(f"编辑器类型: {editor_type}")
 
         # 定义差异高亮的颜色
         self.diff_formats = {
@@ -16,11 +17,11 @@ class DiffHighlighter(QSyntaxHighlighter):
             "replace": self.create_format("#ffffcc", "#cccc00"),  # 更深的黄色
             "equal": None,
         }
-        print("差异格式已创建:", self.diff_formats)
+        logging.debug("差异格式已创建: %s", self.diff_formats)
 
     def create_format(self, background_color, text_color):
         """创建高亮格式，包含文字颜色和背景颜色"""
-        print(f"\n创建格式 - 背景: {background_color}, 文字: {text_color}")
+        logging.debug(f"\n创建格式 - 背景: {background_color}, 文字: {text_color}")
         fmt = QTextCharFormat()
         fmt.setBackground(QColor(background_color))
         fmt.setForeground(QColor(text_color))
@@ -28,25 +29,25 @@ class DiffHighlighter(QSyntaxHighlighter):
 
     def set_diff_chunks(self, chunks):
         """设置差异块"""
-        print("\n=== 设置差异块到高亮器 ===")
-        print(f"高亮器类型: {self.editor_type}")
-        print(f"块数量: {len(chunks)}")
+        logging.debug("\n=== 设置差异块到高亮器 ===")
+        logging.debug(f"高亮器类型: {self.editor_type}")
+        logging.debug(f"块数量: {len(chunks)}")
         for i, chunk in enumerate(chunks):
-            print(f"\n差异块 {i+1}:")
-            print(f"类型: {chunk.type}")
-            print(f"左侧范围: {chunk.left_start}-{chunk.left_end}")
-            print(f"右侧范围: {chunk.right_start}-{chunk.right_end}")
+            logging.debug(f"\n差异块 {i+1}:")
+            logging.debug(f"类型: {chunk.type}")
+            logging.debug(f"左侧范围: {chunk.left_start}-{chunk.left_end}")
+            logging.debug(f"右侧范围: {chunk.right_start}-{chunk.right_end}")
         self.diff_chunks = chunks
         self.rehighlight()
 
     def highlightBlock(self, text):
         """高亮当前文本块"""
         block_number = self.currentBlock().blockNumber()
-        print("\n=== 高亮块详细信息 ===")
-        print(f"高亮器类型: {self.editor_type}")
-        print(f"当前块号: {block_number}")
-        print(f"文本内容: {text}")
-        print(f"差异块数量: {len(self.diff_chunks)}")
+        logging.debug("\n=== 高亮块详细信息 ===")
+        logging.debug(f"高亮器类型: {self.editor_type}")
+        logging.debug(f"当前块号: {block_number}")
+        logging.debug(f"文本内容: {text}")
+        logging.debug(f"差异块数量: {len(self.diff_chunks)}")
 
         # 找到当前行所在的差异块
         current_chunk = None
@@ -55,12 +56,12 @@ class DiffHighlighter(QSyntaxHighlighter):
             if self.editor_type in ["left", "parent1_edit"]:
                 if chunk.left_start <= block_number < chunk.left_end:
                     current_chunk = chunk
-                    print(f"找到左侧差异块: {chunk.type}")
+                    logging.debug(f"找到左侧差异块: {chunk.type}")
                     break
             elif self.editor_type in ["right", "parent2_edit"]:
                 if chunk.right_start <= block_number < chunk.right_end:
                     current_chunk = chunk
-                    print(f"找到右侧差异块: {chunk.type}")
+                    logging.debug(f"找到右侧差异块: {chunk.type}")
                     break
             elif self.editor_type == "result_edit":
                 # 对于三向合并中的结果编辑器，需要同时检查与两个父版本的差异
@@ -101,12 +102,12 @@ class DiffHighlighter(QSyntaxHighlighter):
 
         # 如果找到差异块，应用相应的格式
         if current_chunk and current_chunk.type != "equal":
-            print(f"应用差异块格式: {current_chunk.type}")
+            logging.debug(f"应用差异块格式: {current_chunk.type}")
             format_type = current_chunk.type
 
             if format_type in self.diff_formats:
                 format = self.diff_formats[format_type]
                 if format:
-                    print(f"应用格式: {format_type}")
+                    logging.debug(f"应用格式: {format_type}")
                     self.setFormat(0, len(text), format)
-                    print("格式已应用")
+                    logging.debug("格式已应用")
