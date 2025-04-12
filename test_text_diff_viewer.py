@@ -54,7 +54,7 @@ class MainWindow(QMainWindow):
         self.merge_viewer.set_texts(parent1_text, result_text, parent2_text)
 
         # 设置双向对比视图的文本（比较parent1和parent2）
-        self.diff_viewer.set_texts(parent1_text, parent2_text)
+        self.diff_viewer.set_texts(parent2_text, result_text)
 
     def _load_default_test_data(self):
         # 创建测试数据
@@ -95,7 +95,7 @@ class MainWindow(QMainWindow):
         self.merge_viewer.set_texts(parent1_text, result_text, parent2_text)
 
         # 设置双向对比视图的文本（比较parent1和parent2）
-        self.diff_viewer.set_texts(parent1_text, parent2_text)
+        self.diff_viewer.set_texts(parent2_text, result_text)
 
 
 if __name__ == "__main__":
