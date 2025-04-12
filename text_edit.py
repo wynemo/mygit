@@ -104,9 +104,8 @@ class SyncedTextEdit(QPlainTextEdit):
 
         # 遍历所有差异块
         for chunk in self.highlighter.diff_chunks:
-            if (
-                chunk.type == "delete"
-                and (
+            if chunk.type == "delete" and (
+                (
                     chunk.right_start == chunk.right_end
                     and self.objectName() == "right_edit"
                 )
@@ -116,10 +115,10 @@ class SyncedTextEdit(QPlainTextEdit):
                 )
             ):
                 pos = (
-                    chunk.right_start
+                    chunk.left_start
                     if chunk.left_start == chunk.left_end
-                    else chunk.left_start
-                )
+                    else chunk.right_start
+                ) - 1
                 print(
                     f"{self.objectName()} 删除块: {chunk.right_start} - {chunk.right_end} {chunk}"
                 )
