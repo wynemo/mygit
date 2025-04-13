@@ -16,3 +16,10 @@ dev = [
     "isort>=6.0.1",
     "ruff>=0.11.4",
 ]
+
+[tool.ruff.lint]
+# Enable the flake8-logging-format rules
+select = ["G"]
+
+# Logger objects that should be checked
+logger-objects = ["app.logger", "logger"]
