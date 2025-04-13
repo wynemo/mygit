@@ -105,14 +105,14 @@ class DiffViewer(QWidget):
                         else:
                             # 对于其他类型的块，使用相对位置计算
                             target_line = target_start + int(block_progress * target_size)
-                        logging.debug(f"在差异块内 [{source_start}, {source_end}] -> [{target_start}, {target_end}]")
-                        logging.debug(f"块内进度: {block_progress:.2f}, 目标行: {target_line}")
+                        logging.debug("在差异块内 [%d, %d] -> [%d, %d]", source_start, source_end, target_start, target_end)
+                        logging.debug("块内进度: %.2f, 目标行: %d", block_progress, target_line)
                         break
                     else:
                         # 如果已经过了这个差异块，直接累加差异
                         accumulated_diff += size_diff
-                        logging.debug(f"经过差异块 [{source_start}, {source_end}] -> [{target_start}, {target_end}]")
-                        logging.debug(f"累计调整: {accumulated_diff}")
+                        logging.debug("经过差异块 [%d, %d] -> [%d, %d]", source_start, source_end, target_start, target_end)
+                        logging.debug("累计调整: %d", accumulated_diff)
 
         # 如果不在任何差异块内，应用累计的差异
         if target_line == current_line:
@@ -153,7 +153,7 @@ class DiffViewer(QWidget):
 
         self._sync_vscroll_lock = True
         try:
-            logging.debug(f"\n=== {'左侧' if is_left_scroll else '右侧'} 滚动事件开始 ===")
+            logging.debug("\n=== %s 滚动事件开始 ===", "左侧" if is_left_scroll else "右侧")
 
             # 获取源编辑器和目标编辑器
             source_edit = self.left_edit if is_left_scroll else self.right_edit
@@ -162,19 +162,19 @@ class DiffViewer(QWidget):
             # 获取当前视口中的行
             cursor = source_edit.cursorForPosition(QPoint(0, 0))
             current_line = cursor.blockNumber()
-            logging.debug(f"当前视口起始行: {current_line}")
+            logging.debug("当前视口起始行: %d", current_line)
 
             # 计算目标行号
             target_line = self._calculate_target_line(current_line, self.diff_chunks, is_left_scroll)
 
             # 计算滚动值
             target_scroll = self._calculate_scroll_value(target_edit, target_line)
-            logging.debug(f"目标行: {target_line}, 目标滚动值: {target_scroll}")
+            logging.debug("目标行: %d, 目标滚动值: %d", target_line, target_scroll)
 
             # 设置滚动条位置
             target_edit.verticalScrollBar().setValue(target_scroll)
 
-            logging.debug(f"=== {'左侧' if is_left_scroll else '右侧'} 滚动事件结束 ===\n")
+            logging.debug("=== %s 滚动事件结束 ===\n", "左侧" if is_left_scroll else "右侧")
 
         finally:
             self._sync_vscroll_lock = False
@@ -337,7 +337,7 @@ class MergeDiffViewer(DiffViewer):
 
         self._sync_vscroll_lock = True
         try:
-            logging.debug(f"\n=== {source} 滚动事件开始 ===")
+            logging.debug("\n=== %s 滚动事件开始 ===", source)
 
             # 获取所有编辑器
             editors = {
@@ -351,7 +351,7 @@ class MergeDiffViewer(DiffViewer):
             # 获取当前视口中的行
             cursor = source_edit.cursorForPosition(QPoint(0, 0))
             current_line = cursor.blockNumber()
-            logging.debug(f"当前视口起始行: {current_line}")
+            logging.debug("当前视口起始行: %d", current_line)
 
             # 同步其他编辑器的滚动
             for target_name, target_edit in editors.items():
@@ -387,12 +387,12 @@ class MergeDiffViewer(DiffViewer):
 
                     # 计算滚动值
                     target_scroll = self._calculate_scroll_value(target_edit, target_line)
-                    logging.debug(f"目标行: {target_line}, 目标滚动值: {target_scroll}")
+                    logging.debug("目标行: %d, 目标滚动值: %d", target_line, target_scroll)
 
                     # 设置滚动条位置
                     target_edit.verticalScrollBar().setValue(target_scroll)
 
-            logging.debug(f"=== {source} 滚动事件结束 ===\n")
+            logging.debug("=== %s 滚动事件结束 ===\n", source)
 
         finally:
             self._sync_vscroll_lock = False
