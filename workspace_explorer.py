@@ -110,24 +110,46 @@ class FileTreeWidget(QTreeWidget):
         super().__init__(parent)
         self.setDragEnabled(True)
         self.itemDoubleClicked.connect(self._handle_double_click)
-        # self.itemClicked.connect(self._handle_double_click)
+        self.drag_start_pos = None
+        self.is_dragging = False
         
     def mousePressEvent(self, event):
         print("mousePressEvent")
-        super().mousePressEvent(event)
         if event.button() == Qt.MouseButton.LeftButton:
-            item = self.itemAt(event.pos())
-            if item and os.path.isfile(item.data(0, Qt.ItemDataRole.UserRole)):
-                print('drag')
-                drag = QDrag(self)
-                mime_data = QMimeData()
-                mime_data.setText(item.data(0, Qt.ItemDataRole.UserRole))
-                drag.setMimeData(mime_data)
-                drag.exec()
-                
+            self.drag_start_pos = event.pos()
+        super().mousePressEvent(event)
+        
+    def mouseMoveEvent(self, event):
+        if not (event.buttons() & Qt.MouseButton.LeftButton) or not self.drag_start_pos:
+            return
+            
+        # 如果移动距离太小，不开始拖放
+        if (event.pos() - self.drag_start_pos).manhattanLength() < 10:
+            return
+            
+        item = self.itemAt(self.drag_start_pos)
+        if item and os.path.isfile(item.data(0, Qt.ItemDataRole.UserRole)):
+            print('drag')
+            self.is_dragging = True
+            drag = QDrag(self)
+            mime_data = QMimeData()
+            mime_data.setText(item.data(0, Qt.ItemDataRole.UserRole))
+            drag.setMimeData(mime_data)
+            drag.exec()
+            self.is_dragging = False
+            self.drag_start_pos = None
+           
+    def mouseReleaseEvent(self, event):
+        print("mouseReleaseEvent")
+        self.drag_start_pos = None
+        super().mouseReleaseEvent(event)
+           
     def _handle_double_click(self, item):
         """处理双击事件"""
         print("handle_double_click")
+        if self.is_dragging:  # 如果正在拖放，不处理双击
+            return
+            
         file_path = item.data(0, Qt.ItemDataRole.UserRole)
         if os.path.isfile(file_path):
             # 获取父部件(WorkspaceExplorer)的引用
