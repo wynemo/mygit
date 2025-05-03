@@ -118,6 +118,7 @@ class FileTreeWidget(QTreeWidget):
         if event.button() == Qt.MouseButton.LeftButton:
             item = self.itemAt(event.pos())
             if item and os.path.isfile(item.data(0, Qt.ItemDataRole.UserRole)):
+                print('drag')
                 drag = QDrag(self)
                 mime_data = QMimeData()
                 mime_data.setText(item.data(0, Qt.ItemDataRole.UserRole))
