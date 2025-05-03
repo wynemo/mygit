@@ -110,8 +110,10 @@ class FileTreeWidget(QTreeWidget):
         super().__init__(parent)
         self.setDragEnabled(True)
         self.itemDoubleClicked.connect(self._handle_double_click)
+        # self.itemClicked.connect(self._handle_double_click)
         
     def mousePressEvent(self, event):
+        print("mousePressEvent")
         super().mousePressEvent(event)
         if event.button() == Qt.MouseButton.LeftButton:
             item = self.itemAt(event.pos())
@@ -124,6 +126,7 @@ class FileTreeWidget(QTreeWidget):
                 
     def _handle_double_click(self, item):
         """处理双击事件"""
+        print("handle_double_click")
         file_path = item.data(0, Qt.ItemDataRole.UserRole)
         if os.path.isfile(file_path):
             # 获取父部件(WorkspaceExplorer)的引用
