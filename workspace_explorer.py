@@ -105,17 +105,6 @@ class WorkspaceExplorer(QWidget):
         except Exception as e:
             print(f"Error loading directory {path}: {e}")
             
-    def on_file_clicked(self, item):
-        """处理文件点击事件"""
-        file_path = item.data(0, Qt.ItemDataRole.UserRole)
-        if os.path.isfile(file_path):
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                self.file_editor.setText(content)
-            except Exception as e:
-                self.file_editor.setText(f"Error reading file: {e}") 
-
 class FileTreeWidget(QTreeWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
