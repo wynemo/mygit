@@ -15,6 +15,7 @@ from settings import Settings
 from commit_dialog import CommitDialog
 from settings_dialog import SettingsDialog
 from text_diff_viewer import DiffViewer, MergeDiffViewer
+from workspace_explorer import WorkspaceExplorer
 
 
 class GitManagerWindow(QMainWindow):
@@ -171,6 +172,18 @@ class GitManagerWindow(QMainWindow):
         # 添加上半部分到垂直分割器
         vertical_splitter.addWidget(upper_widget)
 
+        # 添加工作区浏览器
+        self.workspace_explorer = WorkspaceExplorer()
+        vertical_splitter.addWidget(self.workspace_explorer)
+
+        # 调整垂直分割器的比例(2:3:3)
+        total_height = self.height()
+        vertical_splitter.setSizes([
+            total_height * 2 // 8,  # 提交历史区域
+            total_height * 3 // 8,  # diff查看区域
+            total_height * 3 // 8   # 工作区浏览器
+        ])
+
         # 下半部分：文件差异查看区域
         self.diff_viewer = DiffViewer()
         self.merge_diff_viewer = MergeDiffViewer()
@@ -313,6 +326,9 @@ class GitManagerWindow(QMainWindow):
             # 更新UI
             self.update_branches()
             self.update_commit_history()
+            
+            # 更新工作区浏览器
+            self.workspace_explorer.set_workspace_path(folder_path)
         else:
             self.history_list.clear()
             self.history_list.addItem("所选文件夹不是有效的Git仓库")
