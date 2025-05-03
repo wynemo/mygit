@@ -18,7 +18,7 @@ class WorkspaceExplorer(QWidget):
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         
         # 创建文件树
-        self.file_tree = FileTreeWidget()
+        self.file_tree = FileTreeWidget(self)  # 传入self作为父部件
         self.file_tree.setHeaderLabels(["工作区文件"])
         
         # 创建标签页组件
@@ -109,6 +109,7 @@ class FileTreeWidget(QTreeWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setDragEnabled(True)
+        self.itemDoubleClicked.connect(self._handle_double_click)
         
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
@@ -119,4 +120,16 @@ class FileTreeWidget(QTreeWidget):
                 mime_data = QMimeData()
                 mime_data.setText(item.data(0, Qt.ItemDataRole.UserRole))
                 drag.setMimeData(mime_data)
-                drag.exec() 
+                drag.exec()
+                
+    def _handle_double_click(self, item):
+        """处理双击事件"""
+        file_path = item.data(0, Qt.ItemDataRole.UserRole)
+        if os.path.isfile(file_path):
+            # 获取父部件(WorkspaceExplorer)的引用
+            workspace_explorer = self.parent()
+            while workspace_explorer and not isinstance(workspace_explorer, WorkspaceExplorer):
+                workspace_explorer = workspace_explorer.parent()
+            
+            if workspace_explorer:
+                workspace_explorer.open_file_in_tab(file_path) 
