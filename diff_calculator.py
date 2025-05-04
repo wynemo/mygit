@@ -50,7 +50,7 @@ class DifflibCalculator(DiffCalculator):
         return chunks
 
 
-# 似乎这个用不到了，git diff
+# todo 似乎这个用不到了，git diff，就直接用文本的差异来实现吧
 class GitDiffCalculator(DiffCalculator):
     """基于 git diff 输出的差异计算器"""
 
