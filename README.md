@@ -55,23 +55,9 @@ python main.py
 - `syntax_highlighter.py`: 代码语法高亮
 - `settings.py`: 程序设置管理
 
-## 贡献指南
-
-欢迎提交 Pull Request 来改进项目。请确保遵循以下步骤：
-
-1. Fork 项目
-2. 创建新的功能分支
-3. 提交更改
-4. 推送到分支
-5. 创建 Pull Request
-
 ## 许可证
 
 MIT License - 详见 [LICENSE](LICENSE) 文件
-
-## 问题反馈
-
-如有任何问题，请创建 Issue 或联系项目维护者。
 
 ## todos
 
