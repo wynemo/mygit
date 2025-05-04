@@ -50,6 +50,7 @@ class DifflibCalculator(DiffCalculator):
         return chunks
 
 
+# 似乎这个用不到了，git diff
 class GitDiffCalculator(DiffCalculator):
     """基于 git diff 输出的差异计算器"""
 
