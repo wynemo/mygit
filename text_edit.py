@@ -1,3 +1,5 @@
+import logging
+
 from PyQt6.QtCore import QRect, QSize, Qt
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen
 from PyQt6.QtWidgets import QPlainTextEdit, QWidget
@@ -25,8 +27,8 @@ class SyncedTextEdit(QPlainTextEdit):
         self.setFont(QFont(settings.get_font_family(), 10))
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self.setReadOnly(True)  # 设置为只读
-        print("\n=== 初始化SyncedTextEdit ===")
-        print(f"只读模式: {self.isReadOnly()}")
+        logging.debug("\n=== 初始化SyncedTextEdit ===")
+        logging.debug(f"只读模式: {self.isReadOnly()}")
 
         # 添加行号区域
         self.line_number_area = LineNumberArea(self)
@@ -42,7 +44,7 @@ class SyncedTextEdit(QPlainTextEdit):
         # 在设置对象名称后创建高亮器
         if self.highlighter is None:
             self.highlighter = DiffHighlighter(self.document(), name)
-            print(f"创建高亮器，类型: {name}")
+            logging.debug(f"创建高亮器，类型: {name}")
 
     def line_number_area_width(self):
         digits = len(str(max(1, self.blockCount())))
@@ -140,6 +142,6 @@ class SyncedTextEdit(QPlainTextEdit):
                             self.viewport().width(),
                             int(block_bottom),
                         )
-                        print(
+                        logging.debug(
                             f"{self.objectName()} 删除块: {chunk.right_start} - {chunk.right_end} {chunk}"
                         )
