@@ -2,19 +2,31 @@ import os
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
-from PyQt6.QtWidgets import (QComboBox, QFileDialog, QHBoxLayout, QLabel,
-                           QMainWindow, QMenu, QPushButton, QSplitter,
-                           QToolButton, QVBoxLayout, QWidget, QDialog)
+from PyQt6.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMenu,
+    QPushButton,
+    QSplitter,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
+from commit_dialog import CommitDialog
+from commit_history_view import CommitHistoryView
+from compare_view import CompareView
 from compare_with_working_dialog import CompareWithWorkingDialog
+from file_changes_view import FileChangesView
 from git_manager import GitManager
 from settings import Settings
-from commit_dialog import CommitDialog
 from settings_dialog import SettingsDialog
-from commit_history_view import CommitHistoryView
-from file_changes_view import FileChangesView
-from compare_view import CompareView
 from workspace_explorer import WorkspaceExplorer
+
 
 class GitManagerWindow(QMainWindow):
     def __init__(self):
@@ -106,14 +118,14 @@ class GitManagerWindow(QMainWindow):
         self.commit_history_view = CommitHistoryView()
         self.file_changes_view = FileChangesView()
         self.compare_view = CompareView()
-        
+
         # 连接信号
         self.commit_history_view.commit_selected.connect(self.on_commit_selected)
         self.file_changes_view.file_selected.connect(self.on_file_selected)
         self.file_changes_view.compare_with_working_requested.connect(
             self.show_compare_with_working_dialog
         )
-        
+
         # 添加到布局
         horizontal_splitter.addWidget(self.commit_history_view)
         horizontal_splitter.addWidget(self.file_changes_view)
@@ -130,11 +142,13 @@ class GitManagerWindow(QMainWindow):
 
         # 调整垂直分割器的比例(2:3:3)
         total_height = self.height()
-        vertical_splitter.setSizes([
-            total_height * 2 // 8,  # 提交历史区域
-            total_height * 3 // 8,  # diff查看区域
-            total_height * 3 // 8   # 工作区浏览器
-        ])
+        vertical_splitter.setSizes(
+            [
+                total_height * 2 // 8,  # 提交历史区域
+                total_height * 3 // 8,  # diff查看区域
+                total_height * 3 // 8,  # 工作区浏览器
+            ]
+        )
 
         # 设置水平分割器的初始大小比例 (1:2)
         total_width = self.width()
@@ -159,7 +173,7 @@ class GitManagerWindow(QMainWindow):
         """显示提交对话框"""
         if not self.git_manager:
             return
-            
+
         dialog = CommitDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             pass
@@ -205,7 +219,7 @@ class GitManagerWindow(QMainWindow):
             # 更新UI
             self.update_branches()
             self.update_commit_history()
-            
+
             # 更新工作区浏览器
             self.workspace_explorer.set_workspace_path(folder_path)
         else:
@@ -241,7 +255,7 @@ class GitManagerWindow(QMainWindow):
             return
         self.current_commit = self.git_manager.repo.commit(commit_hash)
         self.file_changes_view.update_changes(self.git_manager, self.current_commit)
-    
+
     def on_file_selected(self, file_path):
         """当选择文件时更新比较视图"""
         if not self.current_commit:
@@ -257,24 +271,26 @@ class GitManagerWindow(QMainWindow):
                 .data_stream.read()
                 .decode("utf-8", errors="replace")
             )
-            
+
             # 获取工作区的文件内容
-            working_file_path = os.path.join(self.git_manager.repo.working_dir, file_path)
+            working_file_path = os.path.join(
+                self.git_manager.repo.working_dir, file_path
+            )
             if os.path.exists(working_file_path):
-                with open(working_file_path, 'r', encoding='utf-8', errors='replace') as f:
+                with open(
+                    working_file_path, "r", encoding="utf-8", errors="replace"
+                ) as f:
                     new_content = f.read()
             else:
                 new_content = ""
 
             # 创建并显示比较对话框
+            # todo 这个要改造，看readme里的todo
             dialog = CompareWithWorkingDialog(
-                f"比较 {file_path}",
-                old_content,
-                new_content,
-                self
+                f"比较 {file_path}", old_content, new_content, self
             )
             dialog.exec()
-        
+
         except Exception as e:
             print(f"比较文件失败: {str(e)}")
 
