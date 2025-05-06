@@ -14,3 +14,5 @@ wheels/
 *.bk
 meld
 .vscode
+
+.zed/
