@@ -405,11 +405,11 @@ class GitManagerWindow(QMainWindow):
         """显示设置对话框"""
         dialog = SettingsDialog(self)
         dialog.exec()
-        
+
     def close_tab(self, index):
         """关闭标签页"""
         # 不允许关闭提交历史标签页（假设它总是索引0）
         if index == 0:
             return
-            
+
         self.tab_widget.removeTab(index)

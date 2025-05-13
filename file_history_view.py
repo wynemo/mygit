@@ -16,6 +16,9 @@ class FileHistoryView(QWidget):
 
         # 尝试从父窗口获取git_manager
         main_window = self.window()
+        print("FileHistoryView main_window", id(main_window), main_window)
+
+        print(f"has git manager: {hasattr(main_window, 'git_manager')}")
         if hasattr(main_window, "git_manager") and main_window.git_manager:
             print("获取到git_manager")
             self.git_manager = main_window.git_manager
