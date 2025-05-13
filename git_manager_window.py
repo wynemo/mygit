@@ -122,6 +122,7 @@ class GitManagerWindow(QMainWindow):
 
         self.tab_widget = QTabWidget()
         self.tab_widget.setTabsClosable(True)
+        self.tab_widget.tabCloseRequested.connect(self.close_tab)
         self.tab_widget.addTab(self.commit_history_view, "提交历史")
 
         # 连接信号
@@ -404,3 +405,11 @@ class GitManagerWindow(QMainWindow):
         """显示设置对话框"""
         dialog = SettingsDialog(self)
         dialog.exec()
+        
+    def close_tab(self, index):
+        """关闭标签页"""
+        # 不允许关闭提交历史标签页（假设它总是索引0）
+        if index == 0:
+            return
+            
+        self.tab_widget.removeTab(index)
