@@ -122,6 +122,7 @@ class GitManagerWindow(QMainWindow):
 
         self.tab_widget = QTabWidget()
         self.tab_widget.setTabsClosable(True)
+        self.tab_widget.addTab(self.commit_history_view, "提交历史")
 
         # 连接信号
         self.commit_history_view.commit_selected.connect(self.on_commit_selected)
@@ -131,7 +132,6 @@ class GitManagerWindow(QMainWindow):
         )
 
         # 添加到布局
-        horizontal_splitter.addWidget(self.commit_history_view)
         horizontal_splitter.addWidget(self.tab_widget)
         horizontal_splitter.addWidget(self.file_changes_view)
 
