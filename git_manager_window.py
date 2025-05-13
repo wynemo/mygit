@@ -120,6 +120,9 @@ class GitManagerWindow(QMainWindow):
         self.file_changes_view = FileChangesView()
         # self.compare_view = CompareView() # 不再需要单个的 compare_view 实例
 
+        self.tab_widget = QTabWidget()
+        self.tab_widget.setTabsClosable(True)
+
         # 连接信号
         self.commit_history_view.commit_selected.connect(self.on_commit_selected)
         self.file_changes_view.file_selected.connect(self.on_file_selected)
@@ -129,6 +132,7 @@ class GitManagerWindow(QMainWindow):
 
         # 添加到布局
         horizontal_splitter.addWidget(self.commit_history_view)
+        horizontal_splitter.addWidget(self.tab_widget)
         horizontal_splitter.addWidget(self.file_changes_view)
 
         # 添加上半部分到垂直分割器
