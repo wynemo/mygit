@@ -144,11 +144,7 @@ class GitManagerWindow(QMainWindow):
         self.workspace_explorer = WorkspaceExplorer()
         right_area_splitter.addWidget(self.workspace_explorer)
 
-        # 创建比较视图的TabWidget
-        self.compare_tab_widget = QTabWidget()
-        self.compare_tab_widget.setTabsClosable(True)
-        self.compare_tab_widget.tabCloseRequested.connect(self.close_compare_tab)
-        right_area_splitter.addWidget(self.compare_tab_widget)
+        self.compare_tab_widget = self.workspace_explorer.tab_widget
         
         # 将右侧区域的分割器添加到主垂直分割器
         vertical_splitter.addWidget(right_area_splitter)
@@ -299,12 +295,12 @@ class GitManagerWindow(QMainWindow):
         new_tab_index = self.compare_tab_widget.addTab(compare_view_instance, unique_tab_title)
         self.compare_tab_widget.setCurrentIndex(new_tab_index)
 
-    def close_compare_tab(self, index):
-        """关闭比较视图的标签页"""
-        widget_to_close = self.compare_tab_widget.widget(index)
-        self.compare_tab_widget.removeTab(index)
-        if widget_to_close:
-            widget_to_close.deleteLater() # 确保Qt对象被正确删除
+    # def close_compare_tab(self, index):
+    #     """关闭比较视图的标签页"""
+    #     widget_to_close = self.compare_tab_widget.widget(index)
+    #     self.compare_tab_widget.removeTab(index)
+    #     if widget_to_close:
+    #         widget_to_close.deleteLater() # 确保Qt对象被正确删除
 
     def show_compare_with_working_dialog(self, file_path):
         """显示与工作区比较的对话框"""
