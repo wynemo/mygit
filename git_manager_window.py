@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QMenu,
     QPushButton,
     QSplitter,
+    QTabWidget,  # 添加 QTabWidget 导入
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -117,7 +118,7 @@ class GitManagerWindow(QMainWindow):
         # 创建主要视图组件
         self.commit_history_view = CommitHistoryView()
         self.file_changes_view = FileChangesView()
-        self.compare_view = CompareView()
+        # self.compare_view = CompareView() # 不再需要单个的 compare_view 实例
 
         # 连接信号
         self.commit_history_view.commit_selected.connect(self.on_commit_selected)
@@ -133,30 +134,46 @@ class GitManagerWindow(QMainWindow):
         # 添加上半部分到垂直分割器
         vertical_splitter.addWidget(upper_widget)
 
+        # 创建右侧区域的水平分割器 (用于工作区浏览器和比较视图Tab)
+        right_area_splitter = QSplitter(Qt.Orientation.Horizontal)
+        right_area_splitter.setChildrenCollapsible(False)
+        right_area_splitter.setOpaqueResize(False)
+        right_area_splitter.setHandleWidth(8)
+
         # 添加工作区浏览器
         self.workspace_explorer = WorkspaceExplorer()
-        vertical_splitter.addWidget(self.workspace_explorer)
+        right_area_splitter.addWidget(self.workspace_explorer)
 
-        # 添加比较视图
-        vertical_splitter.addWidget(self.compare_view)
+        # 创建比较视图的TabWidget
+        self.compare_tab_widget = QTabWidget()
+        self.compare_tab_widget.setTabsClosable(True)
+        self.compare_tab_widget.tabCloseRequested.connect(self.close_compare_tab)
+        right_area_splitter.addWidget(self.compare_tab_widget)
+        
+        # 将右侧区域的分割器添加到主垂直分割器
+        vertical_splitter.addWidget(right_area_splitter)
 
-        # 调整垂直分割器的比例(2:3:3)
+        # 调整垂直分割器的比例 (例如: 2:6, 上半部分占 2/8, 下半部分占 6/8)
         total_height = self.height()
         vertical_splitter.setSizes(
             [
-                total_height * 2 // 8,  # 提交历史区域
-                total_height * 3 // 8,  # diff查看区域
-                total_height * 3 // 8,  # 工作区浏览器
+                total_height * 2 // 8,  # 提交历史和文件变化区域
+                total_height * 6 // 8,  # 工作区和比较视图区域
             ]
         )
 
-        # 设置水平分割器的初始大小比例 (1:2)
+        # 设置主水平分割器的初始大小比例 (1:2)
         total_width = self.width()
         horizontal_splitter.setSizes([total_width // 3, total_width * 2 // 3])
+        
+        # 设置右侧区域水平分割器的初始大小比例 (1:1)
+        right_area_splitter.setSizes([total_width // 2, total_width // 2])
+
 
         # 保存分割器引用以便后续使用
         self.vertical_splitter = vertical_splitter
         self.horizontal_splitter = horizontal_splitter
+        self.right_area_splitter = right_area_splitter # 保存新分割器的引用
 
         # 从设置中恢复分割器状态
         self.restore_splitter_state()
@@ -257,10 +274,37 @@ class GitManagerWindow(QMainWindow):
         self.file_changes_view.update_changes(self.git_manager, self.current_commit)
 
     def on_file_selected(self, file_path):
-        """当选择文件时更新比较视图"""
-        if not self.current_commit:
+        """当选择文件时，在TabWidget中显示比较视图"""
+        if not self.current_commit or not self.git_manager:
             return
-        self.compare_view.show_diff(self.git_manager, self.current_commit, file_path)
+
+        # 生成一个唯一的标签页标识符，例如 "commit_hash:file_path"
+        # 为简化，我们先用 file_path 作为标题，并检查是否已存在
+        # 更健壮的方式是存储一个映射：tab_key -> tab_index
+        
+        tab_title = os.path.basename(file_path)
+        commit_short_hash = self.current_commit.hexsha[:7]
+        unique_tab_title = f"{tab_title} @ {commit_short_hash}"
+
+        # 检查是否已存在具有相同唯一标题的标签页
+        for i in range(self.compare_tab_widget.count()):
+            if self.compare_tab_widget.tabText(i) == unique_tab_title:
+                self.compare_tab_widget.setCurrentIndex(i)
+                return
+
+        # 如果不存在，创建新的CompareView实例并添加
+        compare_view_instance = CompareView()
+        compare_view_instance.show_diff(self.git_manager, self.current_commit, file_path)
+        
+        new_tab_index = self.compare_tab_widget.addTab(compare_view_instance, unique_tab_title)
+        self.compare_tab_widget.setCurrentIndex(new_tab_index)
+
+    def close_compare_tab(self, index):
+        """关闭比较视图的标签页"""
+        widget_to_close = self.compare_tab_widget.widget(index)
+        self.compare_tab_widget.removeTab(index)
+        if widget_to_close:
+            widget_to_close.deleteLater() # 确保Qt对象被正确删除
 
     def show_compare_with_working_dialog(self, file_path):
         """显示与工作区比较的对话框"""
@@ -302,19 +346,28 @@ class GitManagerWindow(QMainWindow):
         self.settings.settings["horizontal_splitter"] = [
             pos for pos in self.horizontal_splitter.sizes()
         ]
+        self.settings.settings["right_area_splitter"] = [ # 保存新分割器状态
+            pos for pos in self.right_area_splitter.sizes()
+        ]
         self.settings.save_settings()
 
     def restore_splitter_state(self):
         """恢复所有分割器的状态"""
         # 恢复垂直分割器状态
         vertical_sizes = self.settings.settings.get("vertical_splitter")
-        if vertical_sizes:
+        if vertical_sizes and len(vertical_sizes) == len(self.vertical_splitter.sizes()):
             self.vertical_splitter.setSizes(vertical_sizes)
 
         # 恢复水平分割器状态
         horizontal_sizes = self.settings.settings.get("horizontal_splitter")
-        if horizontal_sizes:
+        if horizontal_sizes and len(horizontal_sizes) == len(self.horizontal_splitter.sizes()):
             self.horizontal_splitter.setSizes(horizontal_sizes)
+        
+        # 恢复右侧区域水平分割器状态
+        right_area_sizes = self.settings.settings.get("right_area_splitter")
+        if right_area_sizes and len(right_area_sizes) == len(self.right_area_splitter.sizes()):
+            self.right_area_splitter.setSizes(right_area_sizes)
+
 
     def resizeEvent(self, event):
         """处理窗口大小改变事件"""
@@ -322,13 +375,23 @@ class GitManagerWindow(QMainWindow):
         # 如果没有保存的分割器状态,则使用默认比例
         if not self.settings.settings.get("vertical_splitter"):
             total_height = self.height()
-            # 调整比例，让下半部分占据更多空间
+            # 调整垂直分割器的默认比例 (例如: 2:6)
             self.vertical_splitter.setSizes(
-                [total_height * 1 // 3, total_height * 2 // 3]
+                 [total_height * 2 // 8, total_height * 6 // 8]
             )
-        if not self.settings.settings.get("horizontal_splitter"):
-            total_width = self.width()
-            self.horizontal_splitter.setSizes([total_width // 3, total_width * 2 // 3])
+        if not self.settings.settings.get("horizontal_splitter"): # 主水平分割器
+            total_width = self.width() # 这是上半部分的宽度
+            # horizontal_splitter 在 upper_widget 中，其宽度应基于 upper_widget
+            # 不过，在初始化时设置比例通常足够，resizeEvent 更多是窗口整体调整后的事情
+            # 我们在 __init__ 中已设置了 horizontal_splitter.setSizes
+            # 此处可以保持原样或针对性调整
+            pass # horizontal_splitter 的宽度由其父控件和初始比例决定
+
+        if not self.settings.settings.get("right_area_splitter"): # 右侧区域水平分割器
+            # right_area_splitter 的宽度由其父控件 (vertical_splitter的下半部分) 和初始比例决定
+            # ���们在 __init__ 中已设置了 right_area_splitter.setSizes
+            pass
+
 
     def show_settings_dialog(self):
         """显示设置对话框"""
