@@ -1,5 +1,5 @@
-import sys
 import os
+import sys
 from pathlib import Path
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
@@ -32,7 +32,7 @@ class MainWindow(QMainWindow):
     def load_test_data(self):
         # 获取tests文件夹路径
         tests_dir = Path(__file__).parent / "tests"
-        
+
         # 检查tests文件夹是否存在
         if not tests_dir.exists():
             print("Warning: tests directory not found, using default test data")

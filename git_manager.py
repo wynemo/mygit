@@ -52,7 +52,7 @@ class GitManager:
     def get_commit_graph(self, branch: str = "", limit: int = 50) -> dict:
         """获取提交图数据"""
         if not self.repo:
-            return {'commits': [], 'branch_colors': {}}
+            return {"commits": [], "branch_colors": {}}
 
         try:
             if not branch:
@@ -60,8 +60,18 @@ class GitManager:
 
             # 获取所有分支名称和颜色映射
             branches = {b.name: b for b in self.repo.branches}
-            colors = ['#e11d21', '#fbca04', '#009800', '#006b75', '#207de5', '#0052cc', '#5319e7']
-            branch_colors = {name: colors[idx % len(colors)] for idx, name in enumerate(branches)}
+            colors = [
+                "#e11d21",
+                "#fbca04",
+                "#009800",
+                "#006b75",
+                "#207de5",
+                "#0052cc",
+                "#5319e7",
+            ]
+            branch_colors = {
+                name: colors[idx % len(colors)] for idx, name in enumerate(branches)
+            }
 
             # 预先获取每个分支的所有提交
             branch_commits = {}
@@ -80,19 +90,18 @@ class GitManager:
                     if commit.hexsha in commit_set
                 ]
 
-                commits.append({
-                    'hash': commit.hexsha,
-                    'message': commit.message.strip().split('\n')[0],
-                    'author': commit.author.name,
-                    'date': commit.committed_datetime.strftime('%Y-%m-%d %H:%M:%S'),
-                    'branches': commit_branches,
-                    'parents': [parent.hexsha for parent in commit.parents]
-                })
+                commits.append(
+                    {
+                        "hash": commit.hexsha,
+                        "message": commit.message.strip().split("\n")[0],
+                        "author": commit.author.name,
+                        "date": commit.committed_datetime.strftime("%Y-%m-%d %H:%M:%S"),
+                        "branches": commit_branches,
+                        "parents": [parent.hexsha for parent in commit.parents],
+                    }
+                )
 
-            return {
-                'commits': commits,
-                'branch_colors': branch_colors
-            }
+            return {"commits": commits, "branch_colors": branch_colors}
         except Exception as e:
             print(f"获取提交图失败: {str(e)}")
-            return {'commits': [], 'branch_colors': {}}
+            return {"commits": [], "branch_colors": {}}

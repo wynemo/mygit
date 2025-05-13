@@ -1,5 +1,6 @@
-from PyQt6.QtGui import QColor, QSyntaxHighlighter, QTextCharFormat
 import logging
+
+from PyQt6.QtGui import QColor, QSyntaxHighlighter, QTextCharFormat
 
 
 class DiffHighlighter(QSyntaxHighlighter):
@@ -33,7 +34,7 @@ class DiffHighlighter(QSyntaxHighlighter):
         logging.debug("高亮器类型: %s", self.editor_type)
         logging.debug("块数量: %d", len(chunks))
         for i, chunk in enumerate(chunks):
-            logging.debug("\n差异块 %d:", i+1)
+            logging.debug("\n差异块 %d:", i + 1)
             logging.debug("类型: %s", chunk.type)
             logging.debug("左侧范围: %d-%d", chunk.left_start, chunk.left_end)
             logging.debug("右侧范围: %d-%d", chunk.right_start, chunk.right_end)

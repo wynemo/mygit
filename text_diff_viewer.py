@@ -1,6 +1,7 @@
+import logging
+
 from PyQt6.QtCore import QPoint
 from PyQt6.QtWidgets import QHBoxLayout, QWidget
-import logging
 
 from diff_calculator import DiffCalculator, DiffChunk, DifflibCalculator
 from diff_highlighter import DiffHighlighter
@@ -47,7 +48,9 @@ class DiffViewer(QWidget):
 
         # 添加差异高亮器
         self.left_edit.highlighter = DiffHighlighter(self.left_edit.document(), "left")
-        self.right_edit.highlighter = DiffHighlighter(self.right_edit.document(), "right")
+        self.right_edit.highlighter = DiffHighlighter(
+            self.right_edit.document(), "right"
+        )
 
         # 添加到布局
         layout.addWidget(self.left_edit)
@@ -70,7 +73,9 @@ class DiffViewer(QWidget):
         self.left_edit.highlighter.set_diff_chunks(self.diff_chunks)
         self.right_edit.highlighter.set_diff_chunks(self.diff_chunks)
 
-    def _calculate_target_line(self, current_line: int, diff_chunks: list, is_left_scroll: bool) -> int:
+    def _calculate_target_line(
+        self, current_line: int, diff_chunks: list, is_left_scroll: bool
+    ) -> int:
         """计算目标行号
         Args:
             current_line: 当前行号
@@ -97,21 +102,39 @@ class DiffViewer(QWidget):
                     # 如果在差异块内，根据相对位置调整
                     if current_line < source_end:
                         # 计算在差异块内的精确位置
-                        block_progress = (current_line - source_start) / max(1, source_size)
+                        block_progress = (current_line - source_start) / max(
+                            1, source_size
+                        )
                         # 调整目标行号，考虑差异块内的相对位置
                         if target_size == 0:
                             # 对于删除块，使用当前行号减去删除的行数
                             target_line = current_line - (source_end - source_start)
                         else:
                             # 对于其他类型的块，使用相对位置计算
-                            target_line = target_start + int(block_progress * target_size)
-                        logging.debug("在差异块内 [%d, %d] -> [%d, %d]", source_start, source_end, target_start, target_end)
-                        logging.debug("块内进度: %.2f, 目标行: %d", block_progress, target_line)
+                            target_line = target_start + int(
+                                block_progress * target_size
+                            )
+                        logging.debug(
+                            "在差异块内 [%d, %d] -> [%d, %d]",
+                            source_start,
+                            source_end,
+                            target_start,
+                            target_end,
+                        )
+                        logging.debug(
+                            "块内进度: %.2f, 目标行: %d", block_progress, target_line
+                        )
                         break
                     else:
                         # 如果已经过了这个差异块，直接累加差异
                         accumulated_diff += size_diff
-                        logging.debug("经过差异块 [%d, %d] -> [%d, %d]", source_start, source_end, target_start, target_end)
+                        logging.debug(
+                            "经过差异块 [%d, %d] -> [%d, %d]",
+                            source_start,
+                            source_end,
+                            target_start,
+                            target_end,
+                        )
                         logging.debug("累计调整: %d", accumulated_diff)
 
         # 如果不在任何差异块内，应用累计的差异
@@ -119,7 +142,9 @@ class DiffViewer(QWidget):
             target_line += accumulated_diff
         return target_line
 
-    def _calculate_scroll_value(self, target_edit: SyncedTextEdit, target_line: int) -> int:
+    def _calculate_scroll_value(
+        self, target_edit: SyncedTextEdit, target_line: int
+    ) -> int:
         """计算滚动值
         Args:
             target_edit: 目标编辑器
@@ -134,7 +159,9 @@ class DiffViewer(QWidget):
         # 根据目标行号计算滚动值
         target_doc_height = target_edit.document().size().height()
         target_line_count = target_edit.document().blockCount()
-        avg_line_height = target_doc_height / target_line_count if target_line_count > 0 else 0
+        avg_line_height = (
+            target_doc_height / target_line_count if target_line_count > 0 else 0
+        )
 
         # 直接使用目标行号计算滚动值
         target_scroll = int(target_line * avg_line_height)
@@ -153,7 +180,9 @@ class DiffViewer(QWidget):
 
         self._sync_vscroll_lock = True
         try:
-            logging.debug("\n=== %s 滚动事件开始 ===", "左侧" if is_left_scroll else "右侧")
+            logging.debug(
+                "\n=== %s 滚动事件开始 ===", "左侧" if is_left_scroll else "右侧"
+            )
 
             # 获取源编辑器和目标编辑器
             source_edit = self.left_edit if is_left_scroll else self.right_edit
@@ -165,7 +194,9 @@ class DiffViewer(QWidget):
             logging.debug("当前视口起始行: %d", current_line)
 
             # 计算目标行号
-            target_line = self._calculate_target_line(current_line, self.diff_chunks, is_left_scroll)
+            target_line = self._calculate_target_line(
+                current_line, self.diff_chunks, is_left_scroll
+            )
 
             # 计算滚动值
             target_scroll = self._calculate_scroll_value(target_edit, target_line)
@@ -174,7 +205,9 @@ class DiffViewer(QWidget):
             # 设置滚动条位置
             target_edit.verticalScrollBar().setValue(target_scroll)
 
-            logging.debug("=== %s 滚动事件结束 ===\n", "左侧" if is_left_scroll else "右侧")
+            logging.debug(
+                "=== %s 滚动事件结束 ===\n", "左侧" if is_left_scroll else "右侧"
+            )
 
         finally:
             self._sync_vscroll_lock = False
@@ -256,41 +289,45 @@ class MergeDiffViewer(DiffViewer):
     def _compute_diffs(self, parent1_text: str, result_text: str, parent2_text: str):
         """计算三个文本之间的差异"""
         # 计算 parent1 和 result 的差异
-        self.parent1_chunks = self.diff_calculator.compute_diff(parent1_text, result_text)
+        self.parent1_chunks = self.diff_calculator.compute_diff(
+            parent1_text, result_text
+        )
         # 计算 result 和 parent2 的差异
-        self.parent2_chunks = self.diff_calculator.compute_diff(result_text, parent2_text)
+        self.parent2_chunks = self.diff_calculator.compute_diff(
+            result_text, parent2_text
+        )
 
         # 设置高亮
         self.parent1_edit.highlighter.set_diff_chunks(self.parent1_chunks)
         self.parent2_edit.highlighter.set_diff_chunks(self.parent2_chunks)
-        
+
         # 为 result 编辑器创建转换后的差异块
         result_chunks = []
-        
+
         # 获取 result 中的所有行
         result_lines = result_text.splitlines()
-        
+
         # 创建一个映射来标记每一行的状态
         line_status = {}  # key: line_number, value: (in_parent1, in_parent2)
-        
+
         # 初始化所有行的状态
         for i in range(len(result_lines)):
             line_status[i] = [True, True]  # 默认在两个父版本中都存在
-            
+
         # 处理 parent1 的差异
         for chunk in self.parent1_chunks:
             if chunk.type != "equal":
                 # 标记这些行与 parent1 不同
                 for i in range(chunk.right_start, chunk.right_end):
                     line_status[i][0] = False
-                    
+
         # 处理 parent2 的差异
         for chunk in self.parent2_chunks:
             if chunk.type != "equal":
                 # 标记这些行与 parent2 不同
                 for i in range(chunk.left_start, chunk.left_end):
                     line_status[i][1] = False
-        
+
         # 根据行状态创建差异块
         current_chunk = None
         for line_num, (in_parent1, in_parent2) in line_status.items():
@@ -301,7 +338,7 @@ class MergeDiffViewer(DiffViewer):
                 chunk_type = "parent1_diff"  # 只与 parent1 不同
             elif not in_parent2:
                 chunk_type = "parent2_diff"  # 只与 parent2 不同
-            
+
             if chunk_type:
                 if current_chunk is None or current_chunk.type != chunk_type:
                     if current_chunk:
@@ -311,7 +348,7 @@ class MergeDiffViewer(DiffViewer):
                         left_end=line_num + 1,
                         right_start=line_num,
                         right_end=line_num + 1,
-                        type=chunk_type
+                        type=chunk_type,
                     )
                 else:
                     current_chunk.left_end = line_num + 1
@@ -320,10 +357,10 @@ class MergeDiffViewer(DiffViewer):
                 if current_chunk:
                     result_chunks.append(current_chunk)
                     current_chunk = None
-        
+
         if current_chunk:
             result_chunks.append(current_chunk)
-        
+
         self.result_edit.highlighter.set_diff_chunks(result_chunks)
 
     def _on_scroll(self, value, source: str):
@@ -383,11 +420,17 @@ class MergeDiffViewer(DiffViewer):
                         is_left_scroll = True
 
                     # 计算目标行号
-                    target_line = self._calculate_target_line(current_line, diff_chunks, is_left_scroll)
+                    target_line = self._calculate_target_line(
+                        current_line, diff_chunks, is_left_scroll
+                    )
 
                     # 计算滚动值
-                    target_scroll = self._calculate_scroll_value(target_edit, target_line)
-                    logging.debug("目标行: %d, 目标滚动值: %d", target_line, target_scroll)
+                    target_scroll = self._calculate_scroll_value(
+                        target_edit, target_line
+                    )
+                    logging.debug(
+                        "目标行: %d, 目标滚动值: %d", target_line, target_scroll
+                    )
 
                     # 设置滚动条位置
                     target_edit.verticalScrollBar().setValue(target_scroll)
