@@ -121,6 +121,14 @@ class GitManagerWindow(QMainWindow):
         # self.compare_view = CompareView() # 不再需要单个的 compare_view 实例
 
         self.tab_widget = QTabWidget()
+        self.tab_widget.setTabPosition(QTabWidget.TabPosition.North)
+        self.tab_widget.setStyleSheet(
+            """
+            QTabWidget::tab-bar {
+                left: 5px; /* 或者 0px, 根据您的偏好 */
+            }
+        """
+        )
         self.tab_widget.setTabsClosable(True)
         self.tab_widget.tabCloseRequested.connect(self.close_tab)
         self.tab_widget.addTab(self.commit_history_view, "提交历史")
