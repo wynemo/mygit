@@ -3,6 +3,7 @@ import os
 from PyQt6.QtCore import QMimeData, Qt
 from PyQt6.QtGui import QDrag, QDragEnterEvent, QDropEvent
 from PyQt6.QtWidgets import (
+    QMenu,
     QSplitter,
     QTabWidget,
     QTextEdit,
@@ -11,6 +12,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from file_history_view import FileHistoryView
 
 
 class WorkspaceExplorer(QWidget):
@@ -124,6 +127,8 @@ class FileTreeWidget(QTreeWidget):
         self.itemDoubleClicked.connect(self._handle_double_click)
         self.drag_start_pos = None
         self.is_dragging = False
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._show_context_menu)
 
     def mousePressEvent(self, event):
         print("mousePressEvent")
@@ -173,3 +178,49 @@ class FileTreeWidget(QTreeWidget):
 
             if workspace_explorer:
                 workspace_explorer.open_file_in_tab(file_path)
+                
+    def _show_context_menu(self, position):
+        """显示右键菜单"""
+        item = self.itemAt(position)
+        if not item:
+            return
+            
+        file_path = item.data(0, Qt.ItemDataRole.UserRole)
+        if not os.path.isfile(file_path):
+            return
+            
+        context_menu = QMenu(self)
+        
+        # 添加"文件历史"菜单项
+        history_action = context_menu.addAction("文件历史")
+        history_action.triggered.connect(lambda: self._show_file_history(file_path))
+        
+        # 在鼠标位置显示菜单
+        context_menu.exec(self.mapToGlobal(position))
+        
+    def _show_file_history(self, file_path):
+        """显示文件历史"""
+        # 获取GitManagerWindow的引用
+        main_window = self.window()
+        
+        # 确认是否能找到主窗口的tab_widget
+        if not hasattr(main_window, 'tab_widget'):
+            print("无法找到主窗口的标签页组件")
+            return
+            
+        # 创建文件历史视图
+        file_history_view = FileHistoryView(file_path)
+        
+        # 在GitManagerWindow的tab_widget中添加新标签页
+        file_name = os.path.basename(file_path)
+        tab_title = f"{file_name} 历史"
+        
+        # 检查标签页是否已存在
+        for i in range(main_window.tab_widget.count()):
+            if main_window.tab_widget.tabText(i) == tab_title:
+                main_window.tab_widget.setCurrentIndex(i)
+                return
+        
+        # 添加新标签页
+        main_window.tab_widget.addTab(file_history_view, tab_title)
+        main_window.tab_widget.setCurrentIndex(main_window.tab_widget.count() - 1)
