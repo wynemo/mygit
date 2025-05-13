@@ -285,13 +285,15 @@ class GitManagerWindow(QMainWindow):
         """当选择文件时，在TabWidget中显示比较视图"""
         if not self.current_commit or not self.git_manager:
             return
+        self._on_file_selected(file_path, self.current_commit)
 
+    def _on_file_selected(self, file_path, current_commit):
         # 生成一个唯一的标签页标识符，例如 "commit_hash:file_path"
         # 为简化，我们先用 file_path 作为标题，并检查是否已存在
         # 更健壮的方式是存储一个映射：tab_key -> tab_index
 
         tab_title = os.path.basename(file_path)
-        commit_short_hash = self.current_commit.hexsha[:7]
+        commit_short_hash = current_commit.hexsha[:7]
         unique_tab_title = f"{tab_title} @ {commit_short_hash}"
 
         # 检查是否已存在具有相同唯一标题的标签页
@@ -302,9 +304,7 @@ class GitManagerWindow(QMainWindow):
 
         # 如果不存在，创建新的CompareView实例并添加
         compare_view_instance = CompareView()
-        compare_view_instance.show_diff(
-            self.git_manager, self.current_commit, file_path
-        )
+        compare_view_instance.show_diff(self.git_manager, current_commit, file_path)
 
         new_tab_index = self.compare_tab_widget.addTab(
             compare_view_instance, unique_tab_title

@@ -6,8 +6,6 @@ from PyQt6.QtWidgets import QLabel, QTreeWidget, QTreeWidgetItem, QVBoxLayout, Q
 
 
 class FileHistoryView(QWidget):
-    commit_selected = pyqtSignal(str)  # 发送提交哈希的信号
-
     def __init__(self, file_path, parent=None):
         super().__init__(parent)
         self.file_path = file_path
@@ -82,12 +80,12 @@ class FileHistoryView(QWidget):
         """当用户点击提交记录时触发"""
         commit_hash = item.data(0, 256)  # Qt.ItemDataRole.UserRole = 256
         if commit_hash:
-            self.commit_selected.emit(commit_hash)
-
             # 尝试在主窗口的标签页中打开比较视图
             main_window = self.window()
-            if hasattr(main_window, "on_file_selected"):
+            if hasattr(main_window, "_on_file_selected"):
                 # 获取相对于git仓库根目录的文件路径
                 repo_path = self.git_manager.repo.working_dir
                 relative_path = os.path.relpath(self.file_path, repo_path)
-                main_window.on_file_selected(relative_path)
+
+                current_commit = main_window.git_manager.repo.commit(commit_hash)
+                main_window._on_file_selected(relative_path, current_commit)
