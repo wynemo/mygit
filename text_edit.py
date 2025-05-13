@@ -28,7 +28,7 @@ class SyncedTextEdit(QPlainTextEdit):
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self.setReadOnly(True)  # 设置为只读
         logging.debug("\n=== 初始化SyncedTextEdit ===")
-        logging.debug(f"只读模式: {self.isReadOnly()}")
+        logging.debug("只读模式: {}", self.isReadOnly())
 
         # 添加行号区域
         self.line_number_area = LineNumberArea(self)
@@ -44,7 +44,7 @@ class SyncedTextEdit(QPlainTextEdit):
         # 在设置对象名称后创建高亮器
         if self.highlighter is None:
             self.highlighter = DiffHighlighter(self.document(), name)
-            logging.debug(f"创建高亮器，类型: {name}")
+            logging.debug("创建高亮器，类型: {}", name)
 
     def line_number_area_width(self):
         digits = len(str(max(1, self.blockCount())))
@@ -143,5 +143,9 @@ class SyncedTextEdit(QPlainTextEdit):
                             int(block_bottom),
                         )
                         logging.debug(
-                            f"{self.objectName()} 删除块: {chunk.right_start} - {chunk.right_end} {chunk}"
+                            "{} 删除块: {} - {} {}",
+                            self.objectName(),
+                            chunk.right_start,
+                            chunk.right_end,
+                            chunk,
                         )
