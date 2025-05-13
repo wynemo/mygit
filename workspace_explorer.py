@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
 )
 
 from file_history_view import FileHistoryView
+from text_edit import SyncedTextEdit
 
 
 class WorkspaceExplorer(QWidget):
@@ -75,9 +76,9 @@ class WorkspaceExplorer(QWidget):
                 content = f.read()
 
             # 创建新的文本编辑器
-            text_edit = QTextEdit()
+            text_edit = SyncedTextEdit()
             text_edit.setProperty("file_path", file_path)
-            text_edit.setText(content)
+            text_edit.setPlainText(content)
 
             # 添加新标签页
             file_name = os.path.basename(file_path)
