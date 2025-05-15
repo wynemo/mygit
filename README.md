@@ -35,7 +35,8 @@ source .venv/bin/activate  # Linux/macOS
 ```
 
 或者使用uv启动:
-     uv run main.py
+
+    uv run main.py
 
 3. 安装依赖：
 ```bash
