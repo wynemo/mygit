@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 
 import aiohttp
@@ -46,9 +45,7 @@ class AIGeneratorThread(QThread):
         api_url = self.settings.get("api_url", "").rstrip("/") + "/chat/completions"
         api_secret = self.settings.get("api_secret", "")
         model_name = self.settings.get("model_name", "")
-        prompt = self.settings.get(
-            "prompt", "请根据以下Git变更生成一个简洁的提交信息："
-        )
+        prompt = self.settings.get("prompt", "请根据以下Git变更生成一个简洁的提交信息：")
 
         headers = {
             "Content-Type": "application/json",
@@ -156,15 +153,9 @@ class CommitDialog(QDialog):
 
         # 修改按钮区域
         button_box = QDialogButtonBox()
-        self.commit_button = button_box.addButton(
-            "Commit", QDialogButtonBox.ButtonRole.AcceptRole
-        )
-        self.commit_and_push_button = button_box.addButton(
-            "Commit & Push", QDialogButtonBox.ButtonRole.ActionRole
-        )
-        self.cancel_button = button_box.addButton(
-            "Cancel", QDialogButtonBox.ButtonRole.RejectRole
-        )
+        self.commit_button = button_box.addButton("Commit", QDialogButtonBox.ButtonRole.AcceptRole)
+        self.commit_and_push_button = button_box.addButton("Commit & Push", QDialogButtonBox.ButtonRole.ActionRole)
+        self.cancel_button = button_box.addButton("Cancel", QDialogButtonBox.ButtonRole.RejectRole)
 
         # 连接信号
         self.commit_button.clicked.connect(self.accept)
@@ -181,12 +172,8 @@ class CommitDialog(QDialog):
         self.ai_thread.error.connect(self._on_generation_error)
 
         # 为两个树形控件添加点击事件处理
-        self.staged_tree.itemDoubleClicked.connect(
-            lambda item: self.show_file_diff(item, True)
-        )
-        self.unstaged_tree.itemDoubleClicked.connect(
-            lambda item: self.show_file_diff(item, False)
-        )
+        self.staged_tree.itemDoubleClicked.connect(lambda item: self.show_file_diff(item, True))
+        self.unstaged_tree.itemDoubleClicked.connect(lambda item: self.show_file_diff(item, False))
 
     def refresh_file_status(self):
         """刷新文件状态显示"""
@@ -323,9 +310,7 @@ class CommitDialog(QDialog):
                     # 未跟踪文件，显示空内容和当前文件内容
                     old_content = ""
                     try:
-                        with open(
-                            f"{repo.working_dir}/{file_path}", "r", encoding="utf-8"
-                        ) as f:
+                        with open(f"{repo.working_dir}/{file_path}", "r", encoding="utf-8") as f:
                             new_content = f.read()
                     except Exception as e:
                         new_content = f"Error reading file: {str(e)}"
@@ -336,9 +321,7 @@ class CommitDialog(QDialog):
                     except:
                         old_content = ""
                     try:
-                        with open(
-                            f"{repo.working_dir}/{file_path}", "r", encoding="utf-8"
-                        ) as f:
+                        with open(f"{repo.working_dir}/{file_path}", "r", encoding="utf-8") as f:
                             new_content = f.read()
                     except Exception as e:
                         new_content = f"Error reading file: {str(e)}"

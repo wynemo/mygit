@@ -1,7 +1,6 @@
 import os
 from datetime import datetime
 
-from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QLabel, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget
 
 
