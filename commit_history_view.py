@@ -9,6 +9,12 @@ class CommitHistoryView(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.loaded_count = 0  # cursor生成
+        self.load_batch_size = 50  # cursor生成
+        self.git_manager = None  # cursor生成
+        self.branch = None  # cursor生成
+        self._loading = False  # cursor生成
+        self._all_loaded = False  # cursor生成
         self.setup_ui()
 
     def setup_ui(self):
@@ -29,6 +35,9 @@ class CommitHistoryView(QWidget):
         self.history_list.setColumnWidth(3, 150)  # Date
         layout.addWidget(self.history_list)
 
+        # 滚动到底部自动加载更多 (cursor生成)
+        self.history_list.verticalScrollBar().valueChanged.connect(self._on_scroll)
+
         # 图形化提交历史
         self.history_graph_list = CommitGraphView()
         self.history_graph_list.setHeaderLabels(
@@ -41,23 +50,40 @@ class CommitHistoryView(QWidget):
 
     def update_history(self, git_manager, branch):
         """更新提交历史"""
-        if branch == "all":
-            self.history_graph_list.clear()
-            self.history_list.hide()
-            self.history_graph_list.show()
-            graph_data = git_manager.get_commit_graph("main")
-            self.history_graph_list.set_commit_data(graph_data)
-        else:
-            self.history_list.clear()
-            self.history_graph_list.hide()
-            self.history_list.show()
-            commits = git_manager.get_commit_history(branch)
-            for commit in commits:
-                item = QTreeWidgetItem(self.history_list)
-                item.setText(0, commit["hash"][:7])
-                item.setText(1, commit["message"])
-                item.setText(2, commit["author"])
-                item.setText(3, commit["date"])
+        self.git_manager = git_manager  # cursor生成
+        self.branch = branch  # cursor生成
+        self.loaded_count = 0  # cursor生成
+        self._all_loaded = False  # cursor生成
+        self.history_list.clear()
+        self.load_more_commits()  # cursor生成
+
+    def load_more_commits(self):
+        """加载更多提交历史 (cursor生成)"""
+        if self._loading or self._all_loaded:
+            return
+        self._loading = True
+        print("加载更多提交历史...", self.loaded_count)  # cursor生成
+        if not self.git_manager or not self.branch:
+            self._loading = False
+            return
+        commits = self.git_manager.get_commit_history(self.branch, self.load_batch_size, self.loaded_count)  # cursor生成
+        for commit in commits:
+            item = QTreeWidgetItem(self.history_list)
+            item.setText(0, commit["hash"][:7])
+            item.setText(1, commit["message"])
+            item.setText(2, commit["author"])
+            item.setText(3, commit["date"])
+        self.loaded_count += len(commits)  # cursor生成
+        if len(commits) < self.load_batch_size:  # 没有更多了
+            self._all_loaded = True  # cursor生成
+        self._loading = False
+
+    def _on_scroll(self, value):
+        # 滚动到底部时自动加载更多 (cursor生成)
+        scroll_bar = self.history_list.verticalScrollBar()
+        if value == scroll_bar.maximum() and not self._all_loaded:
+            print("滚动到底部，自动加载更多...")  # cursor生成
+            self.load_more_commits()
 
     def on_commit_clicked(self, item):
         """当点击提交时发出信号"""

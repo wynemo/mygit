@@ -22,19 +22,17 @@ class GitManager:
             return []
         return [branch.name for branch in self.repo.branches]
 
-    def get_commit_history(self, branch: str = "master", limit: int = 50) -> List[dict]:
-        """获取提交历史"""
+    def get_commit_history(self, branch: str = "master", limit: int = 50, skip: int = 0) -> List[dict]:
+        """获取提交历史 (cursor生成)"""
         if not self.repo:
             return []
 
         try:
-            # 如果分支名为空,使用当前分支
             if not branch:
                 branch = self.repo.active_branch.name
 
             commits = []
-            for commit in self.repo.iter_commits(branch, max_count=limit):
-                # 只取第一行提交信息
+            for commit in self.repo.iter_commits(branch, max_count=limit, skip=skip):  # cursor生成
                 message = commit.message.strip().split("\n")[0]
                 commits.append(
                     {
