@@ -79,14 +79,15 @@ class FileHistoryView(QWidget):
     def on_commit_clicked(self, item):
         """当用户点击提交记录时触发"""
         # 需要改为在右侧显示文件变化
+        # 根据拿到的文件路径 commit信息 这个GitManagerWindow.compare_view 需要对改动进行显示
         commit_hash = item.data(0, 256)  # Qt.ItemDataRole.UserRole = 256
         if commit_hash:
             # 尝试在主窗口的标签页中打开比较视图
             main_window = self.window()
-            if hasattr(main_window, "_on_file_selected"):
+            if hasattr(main_window, "compare_view"):
                 # 获取相对于git仓库根目录的文件路径
                 repo_path = self.git_manager.repo.working_dir
                 relative_path = os.path.relpath(self.file_path, repo_path)
 
                 current_commit = main_window.git_manager.repo.commit(commit_hash)
-                main_window._on_file_selected(relative_path, current_commit)
+                main_window.compare_view.show_diff(main_window.git_manager, current_commit, relative_path)

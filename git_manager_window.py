@@ -115,14 +115,15 @@ class GitManagerWindow(QMainWindow):
         horizontal_splitter.setHandleWidth(8)  # 增加分割条宽度，更容易拖动
         upper_layout.addWidget(horizontal_splitter)
 
-        # 添加一个 CompareView，默认隐藏，点击“提交历史”也隐藏
-        # 切换到单个文件历史的标签页时，才显示
-        # 点击标签页里的FileHistoryView的commit时，触发 FileHistoryView.on_commit_clicked 根据拿到的文件路径 commit信息 这个CompareView需要对改动进行显示
-
         # 创建主要视图组件
         self.commit_history_view = CommitHistoryView() # 左侧
         self.file_changes_view = FileChangesView() # 右侧
-        # self.compare_view = CompareView() # 不再需要单个的 compare_view 实例
+
+        # 添加一个 CompareView，默认隐藏，点击“提交历史”也隐藏
+        # 切换到单个文件历史的标签页时，才显示
+        # 点击标签页里的FileHistoryView的commit时，触发 FileHistoryView.on_commit_clicked 根据拿到的文件路径 commit信息 这个CompareView需要对改动进行显示
+        self.compare_view = CompareView() # 右侧
+        self.compare_view.hide()
 
         # 这个tab 包含提交历史和单个文件历史，文件历史可以有多个标签
         self.tab_widget = QTabWidget()
@@ -137,7 +138,7 @@ class GitManagerWindow(QMainWindow):
         self.tab_widget.setTabsClosable(True)
         self.tab_widget.tabCloseRequested.connect(self.close_tab)
         self.tab_widget.addTab(self.commit_history_view, "提交历史")
-
+        self.tab_widget.currentChanged.connect(self.on_tab_changed)
         # 连接信号
         self.commit_history_view.commit_selected.connect(self.on_commit_selected)
         self.file_changes_view.file_selected.connect(self.on_file_selected)
@@ -148,6 +149,7 @@ class GitManagerWindow(QMainWindow):
         # 添加到布局
         horizontal_splitter.addWidget(self.tab_widget)
         horizontal_splitter.addWidget(self.file_changes_view)
+        horizontal_splitter.addWidget(self.compare_view)
 
         # 添加上半部分到垂直分割器
         vertical_splitter.addWidget(upper_widget)
@@ -426,3 +428,12 @@ class GitManagerWindow(QMainWindow):
             return
 
         self.tab_widget.removeTab(index)
+
+    def on_tab_changed(self, index):
+        """当标签页改变时"""
+        if index == 0:
+            self.compare_view.hide()
+            self.file_changes_view.show()
+        else:
+            self.compare_view.show()
+            self.file_changes_view.hide()
