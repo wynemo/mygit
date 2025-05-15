@@ -78,6 +78,7 @@ class FileHistoryView(QWidget):
 
     def on_commit_clicked(self, item):
         """当用户点击提交记录时触发"""
+        # 需要改为在右侧显示文件变化
         commit_hash = item.data(0, 256)  # Qt.ItemDataRole.UserRole = 256
         if commit_hash:
             # 尝试在主窗口的标签页中打开比较视图

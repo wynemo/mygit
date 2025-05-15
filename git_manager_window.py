@@ -115,6 +115,10 @@ class GitManagerWindow(QMainWindow):
         horizontal_splitter.setHandleWidth(8)  # 增加分割条宽度，更容易拖动
         upper_layout.addWidget(horizontal_splitter)
 
+        # 添加一个 CompareView，默认隐藏，点击“提交历史”也隐藏
+        # 切换到单个文件历史的标签页时，才显示
+        # 点击标签页里的FileHistoryView的commit时，触发 FileHistoryView.on_commit_clicked 根据拿到的文件路径 commit信息 这个CompareView需要对改动进行显示
+
         # 创建主要视图组件
         self.commit_history_view = CommitHistoryView() # 左侧
         self.file_changes_view = FileChangesView() # 右侧
