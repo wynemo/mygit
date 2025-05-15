@@ -55,9 +55,21 @@ python main.py
 - `main.py`: 程序入口
 - `git_manager.py`: Git操作核心功能
 - `git_manager_window.py`: 图形界面实现
-- `diff_viewer.py`: 代码差异查看器
-- `syntax_highlighter.py`: 代码语法高亮
+- `commit_dialog.py`: 提交对话框
+- `commit_graph.py`: 提交图绘制
+- `commit_history_view.py`: 提交历史视图
+- `compare_view.py`: 比较视图
+- `compare_with_working_dialog.py`: 与工作区比较对话框
+- `diff_calculator.py`: 差异计算器
+- `diff_highlighter.py`: 差异高亮
+- `file_changes_view.py`: 文件更改视图
+- `file_history_view.py`: 文件历史视图
 - `settings.py`: 程序设置管理
+- `settings_dialog.py`: 设置对话框
+- `syntax_highlighter.py`: 语法高亮
+- `text_diff_viewer.py`: 文本差异查看器
+- `text_edit.py`: 文本编辑器组件
+- `workspace_explorer.py`: 工作区文件浏览器
 
 ## 许可证
 
