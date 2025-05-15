@@ -116,8 +116,8 @@ class GitManagerWindow(QMainWindow):
         upper_layout.addWidget(horizontal_splitter)
 
         # 创建主要视图组件
-        self.commit_history_view = CommitHistoryView()
-        self.file_changes_view = FileChangesView()
+        self.commit_history_view = CommitHistoryView() # 左侧
+        self.file_changes_view = FileChangesView() # 右侧
         # self.compare_view = CompareView() # 不再需要单个的 compare_view 实例
 
         # 这个tab 包含提交历史和单个文件历史，文件历史可以有多个标签
