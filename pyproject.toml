@@ -17,8 +17,10 @@ dev = [
 ]
 
 [tool.ruff.lint]
-# Enable the flake8-logging-format rules
-select = ["G"]
+select = [
+    "G",    # G Enable the flake8-logging-format rules
+    "F821", # Checks for uses of undefined names.
+]
 
 # Logger objects that should be checked
 logger-objects = ["app.logger", "logger"]
