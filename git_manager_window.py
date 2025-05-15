@@ -120,6 +120,7 @@ class GitManagerWindow(QMainWindow):
         self.file_changes_view = FileChangesView()
         # self.compare_view = CompareView() # 不再需要单个的 compare_view 实例
 
+        # 这个tab 包含提交历史和单个文件历史，文件历史可以有多个标签
         self.tab_widget = QTabWidget()
         self.tab_widget.setTabPosition(QTabWidget.TabPosition.North)
         self.tab_widget.setStyleSheet(
