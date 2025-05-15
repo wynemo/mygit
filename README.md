@@ -34,6 +34,9 @@ source .venv/bin/activate  # Linux/macOS
 .venv\Scripts\activate  # Windows
 ```
 
+或者使用uv启动:
+     uv run main.py
+
 3. 安装依赖：
 ```bash
 pip install -r requirements.txt
