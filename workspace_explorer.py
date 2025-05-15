@@ -1,7 +1,7 @@
 import os
 
-from PyQt6.QtCore import QMimeData, Qt
-from PyQt6.QtGui import QDrag, QDragEnterEvent, QDropEvent
+from PyQt6.QtCore import QMimeData, QPoint, Qt
+from PyQt6.QtGui import QAction, QDrag, QDragEnterEvent, QDropEvent
 from PyQt6.QtWidgets import (
     QMenu,
     QSplitter,
@@ -41,6 +41,13 @@ class WorkspaceExplorer(QWidget):
         self.tab_widget.setAcceptDrops(True)
         self.tab_widget.dragEnterEvent = self.tab_drag_enter_event
         self.tab_widget.dropEvent = self.tab_drop_event
+
+        self.tab_widget.tabBar().setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu
+        )
+        self.tab_widget.tabBar().customContextMenuRequested.connect(
+            self.show_tab_context_menu
+        )
 
         # 添加组件到分割器
         self.splitter.addWidget(self.file_tree)
@@ -119,6 +126,24 @@ class WorkspaceExplorer(QWidget):
 
         except Exception as e:
             print(f"Error loading directory {path}: {e}")
+
+    def show_tab_context_menu(self, pos: QPoint):
+        tab_index = self.tab_widget.tabBar().tabAt(pos)
+        if tab_index == -1:
+            return
+
+        menu = QMenu(self)
+
+        close_others_action = QAction("关闭其他标签页", self)
+        close_others_action.triggered.connect(lambda: self.close_other_tabs(tab_index))
+        menu.addAction(close_others_action)
+
+        menu.exec(self.tab_widget.tabBar().mapToGlobal(pos))
+
+    def close_other_tabs(self, current_index):
+        for i in reversed(range(self.tab_widget.count())):
+            if i != current_index:
+                self.tab_widget.removeTab(i)
 
 
 class FileTreeWidget(QTreeWidget):
