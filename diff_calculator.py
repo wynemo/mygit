@@ -52,7 +52,7 @@ class DifflibCalculator(DiffCalculator):
 class GitDiffCalculator(DiffCalculator):
     """基于 git diff 输出的差异计算器"""
 
-    def __init__(self, git_diff_output: str = None):
+    def __init__(self, git_diff_output: str | None = None):
         """初始化差异计算器
 
         Args:
