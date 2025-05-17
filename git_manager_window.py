@@ -102,18 +102,18 @@ class GitManagerWindow(QMainWindow):
         main_layout.addWidget(vertical_splitter)
 
         # 上半部分容器
-        upper_widget = QWidget()
-        upper_widget.setMinimumHeight(100)  # 设置最小高度
-        upper_layout = QHBoxLayout()
-        upper_layout.setContentsMargins(0, 0, 0, 0)
-        upper_widget.setLayout(upper_layout)
+        bottom_widget = QWidget()
+        bottom_widget.setMinimumHeight(100)  # 设置最小高度
+        bottom_layout = QHBoxLayout()
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
+        bottom_widget.setLayout(bottom_layout)
 
         # 创建水平分割器（用于提交历史和文件变化）
         horizontal_splitter = QSplitter(Qt.Orientation.Horizontal)
         horizontal_splitter.setChildrenCollapsible(False)
         horizontal_splitter.setOpaqueResize(False)  # 添加平滑调整
         horizontal_splitter.setHandleWidth(8)  # 增加分割条宽度，更容易拖动
-        upper_layout.addWidget(horizontal_splitter)
+        bottom_layout.addWidget(horizontal_splitter)
 
         # 创建主要视图组件
         self.commit_history_view = CommitHistoryView() # 左侧
@@ -168,7 +168,7 @@ class GitManagerWindow(QMainWindow):
         vertical_splitter.addWidget(right_area_splitter)
 
         # 添加下半部分到垂直分割器
-        vertical_splitter.addWidget(upper_widget)
+        vertical_splitter.addWidget(bottom_widget)
 
         # 调整垂直分割器的比例 (例如: 6:2, 上半部分占 6/8, 下半部分占 2/8)
         total_height = self.height()
