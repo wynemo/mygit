@@ -42,9 +42,7 @@ class DifflibCalculator(DiffCalculator):
         chunks = []
 
         for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-            chunk = DiffChunk(
-                left_start=i1, left_end=i2, right_start=j1, right_end=j2, type=tag
-            )
+            chunk = DiffChunk(left_start=i1, left_end=i2, right_start=j1, right_end=j2, type=tag)
             chunks.append(chunk)
 
         return chunks
@@ -58,7 +56,7 @@ class GitDiffCalculator(DiffCalculator):
         """初始化差异计算器
 
         Args:
-            git_diff_output: git diff 命令的原始输出，如果提供则使用它来计算差异
+            git_diff_output: git diff 命令的原始输出, 如果提供则使用它来计算差异
         """
         self.git_diff_output = git_diff_output
 
@@ -80,9 +78,7 @@ class GitDiffCalculator(DiffCalculator):
         else:
             return self._compute_diff_with_difflib(left_text, right_text)
 
-    def _compute_diff_with_difflib(
-        self, left_text: str, right_text: str
-    ) -> List[DiffChunk]:
+    def _compute_diff_with_difflib(self, left_text: str, right_text: str) -> List[DiffChunk]:
         """使用 difflib 计算差异"""
         left_lines = left_text.splitlines()
         right_lines = right_text.splitlines()
@@ -98,9 +94,7 @@ class GitDiffCalculator(DiffCalculator):
                 "replace": "replace",
             }[tag]
 
-            chunk = DiffChunk(
-                left_start=i1, left_end=i2, right_start=j1, right_end=j2, type=diff_type
-            )
+            chunk = DiffChunk(left_start=i1, left_end=i2, right_start=j1, right_end=j2, type=diff_type)
             chunks.append(chunk)
 
         return chunks
