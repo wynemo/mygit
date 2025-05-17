@@ -50,7 +50,7 @@ class DifflibCalculator(DiffCalculator):
         return chunks
 
 
-# todo 似乎这个用不到了，git diff，就直接用文本的差异来实现吧
+# todo 似乎这个用不到了, git diff, 就直接用文本的差异来实现吧
 class GitDiffCalculator(DiffCalculator):
     """基于 git diff 输出的差异计算器"""
 
@@ -65,7 +65,7 @@ class GitDiffCalculator(DiffCalculator):
     def compute_diff(self, left_text: str, right_text: str) -> List[DiffChunk]:
         """计算文本差异
 
-        如果提供了 git_diff_output，则使用它来计算差异；
+        如果提供了 git_diff_output, 则使用它来计算差异;
         否则回退到使用 difflib 计算差异。
 
         Args:
@@ -141,7 +141,7 @@ class GitDiffCalculator(DiffCalculator):
                         left_end=left_start + left_count - 1,
                         right_start=right_start - 1,
                         right_end=right_start + right_count - 1,
-                        type="replace",  # 默认类型，后续会根据内容调整
+                        type="replace",  # 默认类型, 后续会根据内容调整
                     )
                     left_line = left_start - 1
                     right_line = right_start - 1
