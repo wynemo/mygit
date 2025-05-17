@@ -101,7 +101,7 @@ class GitManagerWindow(QMainWindow):
         vertical_splitter.setHandleWidth(8)  # 增加分割条宽度，更容易拖动
         main_layout.addWidget(vertical_splitter)
 
-        # 上半部分容器
+        # 下半部分容器
         bottom_widget = QWidget()
         bottom_widget.setMinimumHeight(100)  # 设置最小高度
         bottom_layout = QHBoxLayout()
@@ -116,13 +116,13 @@ class GitManagerWindow(QMainWindow):
         bottom_layout.addWidget(horizontal_splitter)
 
         # 创建主要视图组件
-        self.commit_history_view = CommitHistoryView() # 左侧
-        self.file_changes_view = FileChangesView() # 右侧
+        self.commit_history_view = CommitHistoryView()  # 左侧
+        self.file_changes_view = FileChangesView()  # 右侧
 
         # 添加一个 CompareView，默认隐藏，点击“提交历史”也隐藏
         # 切换到单个文件历史的标签页时，才显示
         # 点击标签页里的FileHistoryView的commit时，触发 FileHistoryView.on_commit_clicked 根据拿到的文件路径 commit信息 这个CompareView需要对改动进行显示
-        self.compare_view = CompareView() # 右侧
+        self.compare_view = CompareView()  # 右侧
         self.compare_view.hide()
 
         # 这个tab 包含提交历史和单个文件历史，文件历史可以有多个标签
@@ -142,9 +142,7 @@ class GitManagerWindow(QMainWindow):
         # 连接信号
         self.commit_history_view.commit_selected.connect(self.on_commit_selected)
         self.file_changes_view.file_selected.connect(self.on_file_selected)
-        self.file_changes_view.compare_with_working_requested.connect(
-            self.show_compare_with_working_dialog
-        )
+        self.file_changes_view.compare_with_working_requested.connect(self.show_compare_with_working_dialog)
 
         # 添加到布局
         horizontal_splitter.addWidget(self.tab_widget)
@@ -174,7 +172,6 @@ class GitManagerWindow(QMainWindow):
         # 设置主水平分割器的初始大小比例 (1:2)
         total_width = self.width()
         horizontal_splitter.setSizes([total_width // 3, total_width * 2 // 3])
-
 
         # 保存分割器引用以便后续使用
         self.vertical_splitter = vertical_splitter
@@ -303,9 +300,7 @@ class GitManagerWindow(QMainWindow):
         compare_view_instance = CompareView()
         compare_view_instance.show_diff(self.git_manager, current_commit, file_path)
 
-        new_tab_index = self.compare_tab_widget.addTab(
-            compare_view_instance, unique_tab_title
-        )
+        new_tab_index = self.compare_tab_widget.addTab(compare_view_instance, unique_tab_title)
         self.compare_tab_widget.setCurrentIndex(new_tab_index)
 
     # def close_compare_tab(self, index):
@@ -319,29 +314,19 @@ class GitManagerWindow(QMainWindow):
         """显示与工作区比较的对话框"""
         try:
             # 获取历史版本的文件内容
-            old_content = (
-                self.current_commit.tree[file_path]
-                .data_stream.read()
-                .decode("utf-8", errors="replace")
-            )
+            old_content = self.current_commit.tree[file_path].data_stream.read().decode("utf-8", errors="replace")
 
             # 获取工作区的文件内容
-            working_file_path = os.path.join(
-                self.git_manager.repo.working_dir, file_path
-            )
+            working_file_path = os.path.join(self.git_manager.repo.working_dir, file_path)
             if os.path.exists(working_file_path):
-                with open(
-                    working_file_path, "r", encoding="utf-8", errors="replace"
-                ) as f:
+                with open(working_file_path, "r", encoding="utf-8", errors="replace") as f:
                     new_content = f.read()
             else:
                 new_content = ""
 
             # 创建并显示比较对话框
             # todo 这个要改造，看readme里的todo
-            dialog = CompareWithWorkingDialog(
-                f"比较 {file_path}", old_content, new_content, self
-            )
+            dialog = CompareWithWorkingDialog(f"比较 {file_path}", old_content, new_content, self)
             dialog.exec()
 
         except Exception as e:
@@ -349,28 +334,20 @@ class GitManagerWindow(QMainWindow):
 
     def save_splitter_state(self):
         """保存所有分割器的状态"""
-        self.settings.settings["vertical_splitter"] = [
-            pos for pos in self.vertical_splitter.sizes()
-        ]
-        self.settings.settings["horizontal_splitter"] = [
-            pos for pos in self.horizontal_splitter.sizes()
-        ]
+        self.settings.settings["vertical_splitter"] = [pos for pos in self.vertical_splitter.sizes()]
+        self.settings.settings["horizontal_splitter"] = [pos for pos in self.horizontal_splitter.sizes()]
         self.settings.save_settings()
 
     def restore_splitter_state(self):
         """恢复所有分割器的状态"""
         # 恢复垂直分割器状态
         vertical_sizes = self.settings.settings.get("vertical_splitter")
-        if vertical_sizes and len(vertical_sizes) == len(
-            self.vertical_splitter.sizes()
-        ):
+        if vertical_sizes and len(vertical_sizes) == len(self.vertical_splitter.sizes()):
             self.vertical_splitter.setSizes(vertical_sizes)
 
         # 恢复水平分割器状态
         horizontal_sizes = self.settings.settings.get("horizontal_splitter")
-        if horizontal_sizes and len(horizontal_sizes) == len(
-            self.horizontal_splitter.sizes()
-        ):
+        if horizontal_sizes and len(horizontal_sizes) == len(self.horizontal_splitter.sizes()):
             self.horizontal_splitter.setSizes(horizontal_sizes)
 
     def resizeEvent(self, event):
@@ -380,9 +357,7 @@ class GitManagerWindow(QMainWindow):
         if not self.settings.settings.get("vertical_splitter"):
             total_height = self.height()
             # 调整垂直分割器的默认比例 (例如: 2:6)
-            self.vertical_splitter.setSizes(
-                [total_height * 6 // 8, total_height * 2 // 8]
-            )
+            self.vertical_splitter.setSizes([total_height * 6 // 8, total_height * 2 // 8])
         if not self.settings.settings.get("horizontal_splitter"):  # 主水平分割器
             total_width = self.width()  # 这是上半部分的宽度
             # horizontal_splitter 在 upper_widget 中，其宽度应基于 upper_widget
