@@ -151,8 +151,6 @@ class GitManagerWindow(QMainWindow):
         horizontal_splitter.addWidget(self.file_changes_view)
         horizontal_splitter.addWidget(self.compare_view)
 
-        # 添加上半部分到垂直分割器
-        vertical_splitter.addWidget(upper_widget)
 
         # 创建右侧区域的水平分割器 (用于工作区浏览器和比较视图Tab)
         right_area_splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -169,12 +167,15 @@ class GitManagerWindow(QMainWindow):
         # 将右侧区域的分割器添加到主垂直分割器
         vertical_splitter.addWidget(right_area_splitter)
 
-        # 调整垂直分割器的比例 (例如: 2:6, 上半部分占 2/8, 下半部分占 6/8)
+        # 添加下半部分到垂直分割器
+        vertical_splitter.addWidget(upper_widget)
+
+        # 调整垂直分割器的比例 (例如: 6:2, 上半部分占 6/8, 下半部分占 2/8)
         total_height = self.height()
         vertical_splitter.setSizes(
             [
-                total_height * 2 // 8,  # 提交历史和文件变化区域
-                total_height * 6 // 8,  # 工作区和比较视图区域
+                total_height * 6 // 8,  # 提交历史和文件变化区域
+                total_height * 2 // 8,  # 工作区和比较视图区域
             ]
         )
 
@@ -401,7 +402,7 @@ class GitManagerWindow(QMainWindow):
             total_height = self.height()
             # 调整垂直分割器的默认比例 (例如: 2:6)
             self.vertical_splitter.setSizes(
-                [total_height * 2 // 8, total_height * 6 // 8]
+                [total_height * 6 // 8, total_height * 2 // 8]
             )
         if not self.settings.settings.get("horizontal_splitter"):  # 主水平分割器
             total_width = self.width()  # 这是上半部分的宽度
