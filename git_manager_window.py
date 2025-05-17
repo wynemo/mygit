@@ -151,21 +151,13 @@ class GitManagerWindow(QMainWindow):
         horizontal_splitter.addWidget(self.file_changes_view)
         horizontal_splitter.addWidget(self.compare_view)
 
-
-        # 创建右侧区域的水平分割器 (用于工作区浏览器和比较视图Tab)
-        right_area_splitter = QSplitter(Qt.Orientation.Horizontal)
-        right_area_splitter.setChildrenCollapsible(False)
-        right_area_splitter.setOpaqueResize(False)
-        right_area_splitter.setHandleWidth(8)
-
         # 添加工作区浏览器
         self.workspace_explorer = WorkspaceExplorer()
-        right_area_splitter.addWidget(self.workspace_explorer)
 
         self.compare_tab_widget = self.workspace_explorer.tab_widget
 
         # 将右侧区域的分割器添加到主垂直分割器
-        vertical_splitter.addWidget(right_area_splitter)
+        vertical_splitter.addWidget(self.workspace_explorer)
 
         # 添加下半部分到垂直分割器
         vertical_splitter.addWidget(bottom_widget)
@@ -183,13 +175,10 @@ class GitManagerWindow(QMainWindow):
         total_width = self.width()
         horizontal_splitter.setSizes([total_width // 3, total_width * 2 // 3])
 
-        # 设置右侧区域水平分割器的初始大小比例 (1:1)
-        right_area_splitter.setSizes([total_width // 2, total_width // 2])
 
         # 保存分割器引用以便后续使用
         self.vertical_splitter = vertical_splitter
         self.horizontal_splitter = horizontal_splitter
-        self.right_area_splitter = right_area_splitter  # 保存新分割器的引用
 
         # 从设置中恢复分割器状态
         self.restore_splitter_state()
@@ -366,9 +355,6 @@ class GitManagerWindow(QMainWindow):
         self.settings.settings["horizontal_splitter"] = [
             pos for pos in self.horizontal_splitter.sizes()
         ]
-        self.settings.settings["right_area_splitter"] = [  # 保存新分割器状态
-            pos for pos in self.right_area_splitter.sizes()
-        ]
         self.settings.save_settings()
 
     def restore_splitter_state(self):
@@ -387,13 +373,6 @@ class GitManagerWindow(QMainWindow):
         ):
             self.horizontal_splitter.setSizes(horizontal_sizes)
 
-        # 恢复右侧区域水平分割器状态
-        right_area_sizes = self.settings.settings.get("right_area_splitter")
-        if right_area_sizes and len(right_area_sizes) == len(
-            self.right_area_splitter.sizes()
-        ):
-            self.right_area_splitter.setSizes(right_area_sizes)
-
     def resizeEvent(self, event):
         """处理窗口大小改变事件"""
         super().resizeEvent(event)
@@ -411,11 +390,6 @@ class GitManagerWindow(QMainWindow):
             # 我们在 __init__ 中已设置了 horizontal_splitter.setSizes
             # 此处可以保持原样或针对性调整
             pass  # horizontal_splitter 的宽度由其父控件和初始比例决定
-
-        if not self.settings.settings.get("right_area_splitter"):  # 右侧区域水平分割器
-            # right_area_splitter 的宽度由其父控件 (vertical_splitter的下半部分) 和初始比例决定
-            # ���们在 __init__ 中已设置了 right_area_splitter.setSizes
-            pass
 
     def show_settings_dialog(self):
         """显示设置对话框"""
