@@ -334,8 +334,8 @@ class GitManagerWindow(QMainWindow):
 
     def save_splitter_state(self):
         """保存所有分割器的状态"""
-        self.settings.settings["vertical_splitter"] = [pos for pos in self.vertical_splitter.sizes()]
-        self.settings.settings["horizontal_splitter"] = [pos for pos in self.horizontal_splitter.sizes()]
+        self.settings.settings["vertical_splitter"] = list(self.vertical_splitter.sizes())
+        self.settings.settings["horizontal_splitter"] = list(self.horizontal_splitter.sizes())
         self.settings.save_settings()
 
     def restore_splitter_state(self):
