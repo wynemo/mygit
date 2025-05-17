@@ -2,7 +2,6 @@ import os
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
-from PyQt6.QtWidgets import QTabWidget  # 添加 QTabWidget 导入
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -13,6 +12,7 @@ from PyQt6.QtWidgets import (
     QMenu,
     QPushButton,
     QSplitter,
+    QTabWidget,  # 添加 QTabWidget 导入
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -119,13 +119,13 @@ class GitManagerWindow(QMainWindow):
         self.commit_history_view = CommitHistoryView()  # 左侧
         self.file_changes_view = FileChangesView()  # 右侧
 
-        # 添加一个 CompareView，默认隐藏，点击“提交历史”也隐藏
-        # 切换到单个文件历史的标签页时，才显示
-        # 点击标签页里的FileHistoryView的commit时，触发 FileHistoryView.on_commit_clicked 根据拿到的文件路径 commit信息 这个CompareView需要对改动进行显示
+        # 添加一个 CompareView, 默认隐藏, 点击“提交历史”也隐藏
+        # 切换到单个文件历史的标签页时,才显示
+        # 点击标签页里的FileHistoryView的commit时,触发 FileHistoryView.on_commit_clicked 根据拿到的文件路径 commit信息 这个CompareView需要对改动进行显示
         self.compare_view = CompareView()  # 右侧
         self.compare_view.hide()
 
-        # 这个tab 包含提交历史和单个文件历史，文件历史可以有多个标签
+        # 这个tab 包含提交历史和单个文件历史, 文件历史可以有多个标签
         self.tab_widget = QTabWidget()
         self.tab_widget.setTabPosition(QTabWidget.TabPosition.North)
         self.tab_widget.setStyleSheet(
@@ -183,7 +183,7 @@ class GitManagerWindow(QMainWindow):
         # 在窗口关闭时保存分割器状态
         self.destroyed.connect(self.save_splitter_state)
 
-        # 在初始化完成后，尝试打开上次的文件夹
+        # 在初始化完成后,尝试打开上次的文件夹
         last_folder = self.settings.get_last_folder()
         if last_folder and os.path.exists(last_folder):
             self.open_folder(last_folder)
@@ -282,9 +282,9 @@ class GitManagerWindow(QMainWindow):
         self._on_file_selected(file_path, self.current_commit)
 
     def _on_file_selected(self, file_path, current_commit):
-        # 生成一个唯一的标签页标识符，例如 "commit_hash:file_path"
-        # 为简化，我们先用 file_path 作为标题，并检查是否已存在
-        # 更健壮的方式是存储一个映射：tab_key -> tab_index
+        # 生成一个唯一的标签页标识符, 例如 "commit_hash:file_path"
+        # 为简化, 我们先用 file_path 作为标题, 并检查是否已存在
+        # 更健壮的方式是存储一个映射: tab_key -> tab_index
 
         tab_title = os.path.basename(file_path)
         commit_short_hash = current_commit.hexsha[:7]
@@ -325,12 +325,12 @@ class GitManagerWindow(QMainWindow):
                 new_content = ""
 
             # 创建并显示比较对话框
-            # todo 这个要改造，看readme里的todo
+            # todo 这个要改造, 看readme里的todo
             dialog = CompareWithWorkingDialog(f"比较 {file_path}", old_content, new_content, self)
             dialog.exec()
 
         except Exception as e:
-            print(f"比较文件失败: {str(e)}")
+            print(f"比较文件失败: {e!s}")
 
     def save_splitter_state(self):
         """保存所有分割器的状态"""
@@ -360,8 +360,8 @@ class GitManagerWindow(QMainWindow):
             self.vertical_splitter.setSizes([total_height * 6 // 8, total_height * 2 // 8])
         if not self.settings.settings.get("horizontal_splitter"):  # 主水平分割器
             total_width = self.width()  # 这是上半部分的宽度
-            # horizontal_splitter 在 upper_widget 中，其宽度应基于 upper_widget
-            # 不过，在初始化时设置比例通常足够，resizeEvent 更多是窗口整体调整后的事情
+            # horizontal_splitter 在 upper_widget 中, 其宽度应基于 upper_widget
+            # 不过, 在初始化时设置比例通常足够, resizeEvent 更多是窗口整体调整后的事情
             # 我们在 __init__ 中已设置了 horizontal_splitter.setSizes
             # 此处可以保持原样或针对性调整
             pass  # horizontal_splitter 的宽度由其父控件和初始比例决定
@@ -373,7 +373,7 @@ class GitManagerWindow(QMainWindow):
 
     def close_tab(self, index):
         """关闭标签页"""
-        # 不允许关闭提交历史标签页（假设它总是索引0）
+        # 不允许关闭提交历史标签页(假设它总是索引0)
         if index == 0:
             return
 
