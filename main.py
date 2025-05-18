@@ -14,6 +14,8 @@ def main():
 
     window = GitManagerWindow()
     window.show()
+    window.activateWindow()
+    window.raise_()
     sys.exit(app.exec())
 
 
