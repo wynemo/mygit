@@ -224,6 +224,8 @@ class GitManagerWindow(QMainWindow):
     def open_folder_dialog(self):
         """打开文件夹选择对话框"""
         folder_path = QFileDialog.getExistingDirectory(self, "选择Git仓库")
+        # 再有bug 可以考虑用 QFileDialog.Option.DontUseNativeDialog
+        # 就是这个没有保存最近打开的文件夹路径 每次都要重新选
         if folder_path:
             self.open_folder(folder_path)
 
