@@ -6,7 +6,6 @@ from PyQt6.QtWidgets import (
     QMenu,
     QSplitter,
     QTabWidget,
-    QTextEdit,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -42,12 +41,8 @@ class WorkspaceExplorer(QWidget):
         self.tab_widget.dragEnterEvent = self.tab_drag_enter_event
         self.tab_widget.dropEvent = self.tab_drop_event
 
-        self.tab_widget.tabBar().setContextMenuPolicy(
-            Qt.ContextMenuPolicy.CustomContextMenu
-        )
-        self.tab_widget.tabBar().customContextMenuRequested.connect(
-            self.show_tab_context_menu
-        )
+        self.tab_widget.tabBar().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tab_widget.tabBar().customContextMenuRequested.connect(self.show_tab_context_menu)
 
         # 添加组件到分割器
         self.splitter.addWidget(self.file_tree)
@@ -108,9 +103,7 @@ class WorkspaceExplorer(QWidget):
         """刷新文件树"""
         self.file_tree.clear()
         if hasattr(self, "workspace_path"):
-            self._add_directory_items(
-                self.workspace_path, self.file_tree.invisibleRootItem()
-            )
+            self._add_directory_items(self.workspace_path, self.file_tree.invisibleRootItem())
 
     def _add_directory_items(self, path, parent):
         """递归添加目录内容到树形结构"""
@@ -197,9 +190,7 @@ class FileTreeWidget(QTreeWidget):
         if os.path.isfile(file_path):
             # 获取父部件(WorkspaceExplorer)的引用
             workspace_explorer = self.parent()
-            while workspace_explorer and not isinstance(
-                workspace_explorer, WorkspaceExplorer
-            ):
+            while workspace_explorer and not isinstance(workspace_explorer, WorkspaceExplorer):
                 workspace_explorer = workspace_explorer.parent()
 
             if workspace_explorer:
@@ -252,3 +243,5 @@ class FileTreeWidget(QTreeWidget):
         # 添加新标签页
         main_window.tab_widget.addTab(file_history_view, tab_title)
         main_window.tab_widget.setCurrentIndex(main_window.tab_widget.count() - 1)
+
+        main_window.bottom_widget.show()
