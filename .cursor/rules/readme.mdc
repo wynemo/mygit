@@ -4,5 +4,6 @@ globs:
 alwaysApply: true
 ---
 
-1. 不要删除print语句，除非用户明确表明
-2. 生成的代码，请加上“cursor生成”或同等的英文的注释，放在类或者函数的Docstrings里
+1. 不要删除print语句,除非用户明确表明
+2. 生成的代码,请加上“cursor生成”或同等的英文的注释,放在类或者函数的Docstrings里
+3. 不要使用全角符号的标点符号,例如中文的逗号,ruff会报错
