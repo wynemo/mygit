@@ -1,7 +1,7 @@
 import os
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -37,6 +37,7 @@ class GitManagerWindow(QMainWindow):
         self.git_manager = None
         self.current_commit = None
         self.settings = Settings()
+        self.bottom_widget_visible = True  # 添加状态标记
 
         # 创建主窗口部件
         main_widget = QWidget()
@@ -94,6 +95,13 @@ class GitManagerWindow(QMainWindow):
         self.settings_button.clicked.connect(self.show_settings_dialog)
         top_layout.addWidget(self.settings_button)
 
+        # 创建切换底部面板按钮
+        self.toggle_bottom_button = QToolButton()
+        self.toggle_bottom_button.setFixedSize(24, 24)  # 设置固定大小
+        self.update_toggle_button_icon()  # 设置初始图标
+        self.toggle_bottom_button.clicked.connect(self.toggle_bottom_widget)
+        top_layout.addWidget(self.toggle_bottom_button)
+
         # 创建垂直分割器
         vertical_splitter = QSplitter(Qt.Orientation.Vertical)
         vertical_splitter.setChildrenCollapsible(False)
@@ -102,7 +110,7 @@ class GitManagerWindow(QMainWindow):
         main_layout.addWidget(vertical_splitter)
 
         # 下半部分容器
-        bottom_widget = QWidget()
+        self.bottom_widget = bottom_widget = QWidget()
         bottom_widget.setMinimumHeight(100)  # 设置最小高度
         bottom_layout = QHBoxLayout()
         bottom_layout.setContentsMargins(0, 0, 0, 0)
@@ -119,7 +127,7 @@ class GitManagerWindow(QMainWindow):
         self.commit_history_view = CommitHistoryView()  # 左侧
         self.file_changes_view = FileChangesView()  # 右侧
 
-        # 添加一个 CompareView, 默认隐藏, 点击“提交历史”也隐藏
+        # 添加一个 CompareView, 默认隐藏, 点击"提交历史"也隐藏
         # 切换到单个文件历史的标签页时,才显示
         # 点击标签页里的FileHistoryView的commit时,触发 FileHistoryView.on_commit_clicked 根据拿到的文件路径 commit信息 这个CompareView需要对改动进行显示
         self.compare_view = CompareView()  # 右侧
@@ -183,6 +191,11 @@ class GitManagerWindow(QMainWindow):
         # 在窗口关闭时保存分割器状态
         self.destroyed.connect(self.save_splitter_state)
 
+        # 从设置中恢复底部面板状态
+        self.bottom_widget_visible = self.settings.settings.get("bottom_widget_visible", True)
+        self.bottom_widget.setVisible(self.bottom_widget_visible)
+        self.update_toggle_button_icon()
+
         # 在初始化完成后,尝试打开上次的文件夹
         last_folder = self.settings.get_last_folder()
         if last_folder and os.path.exists(last_folder):
@@ -224,7 +237,7 @@ class GitManagerWindow(QMainWindow):
     def open_folder_dialog(self):
         """打开文件夹选择对话框"""
         folder_path = QFileDialog.getExistingDirectory(self, "选择Git仓库")
-        # macos 上 QFileDialog.getExistingDirectory 有时候选择“文件夹对话框” 灰色的 无法打开文件夹
+        # macos 上 QFileDialog.getExistingDirectory 有时候选择"文件夹对话框" 灰色的 无法打开文件夹
         # 再有bug 可以考虑用 QFileDialog.Option.DontUseNativeDialog
         # 就是这个没有保存最近打开的文件夹路径 每次都要重新选
         # 极有可能与输入法有关 error messaging the mach port for IMKCFRunLoopWakeUpReliable
@@ -391,3 +404,33 @@ class GitManagerWindow(QMainWindow):
         else:
             self.compare_view.show()
             self.file_changes_view.hide()
+
+    def update_toggle_button_icon(self):
+        """更新切换按钮的图标"""
+        pixmap = QPixmap(24, 24)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # 绘制方框
+        painter.setPen(QColor(0, 0, 0))
+        painter.drawRect(2, 2, 20, 20)
+
+        # 根据状态填充下半部分
+        if self.bottom_widget_visible:
+            painter.fillRect(2, 12, 20, 10, QColor(0, 0, 0))
+        else:
+            painter.fillRect(2, 12, 20, 10, QColor(255, 255, 255))
+
+        painter.end()
+        self.toggle_bottom_button.setIcon(QIcon(pixmap))
+
+    def toggle_bottom_widget(self):
+        """切换底部面板的显示状态"""
+        self.bottom_widget_visible = not self.bottom_widget_visible
+        self.bottom_widget.setVisible(self.bottom_widget_visible)
+        self.update_toggle_button_icon()
+
+        # 保存状态到设置
+        self.settings.settings["bottom_widget_visible"] = self.bottom_widget_visible
+        self.settings.save_settings()
