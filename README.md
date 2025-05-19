@@ -92,4 +92,5 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 13. ~~把提交历史、文件历史，文件差异的视图，现在是在上方，需要放到下方，并且可以隐藏与显示~~
 14. 工作区的更改，可以在文件编辑器中显示
 15. commit_dialog.py 添加git push
-16. ~~在git commit 以后更新提交历史 CommitDialog.accept() commit_history_view update_history()~~
+16. 在“提交历史”标签右边，增加git push按钮
+17. ~~在git commit 以后更新提交历史 CommitDialog.accept() commit_history_view update_history()~~
