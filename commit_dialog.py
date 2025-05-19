@@ -352,6 +352,9 @@ class CommitDialog(QDialog):
 
             # 执行提交
             self.git_manager.repo.index.commit(commit_message)
+
+            self.parent_window.update_commit_history()
+
             super().accept()
 
         except Exception as e:
