@@ -55,7 +55,7 @@ python main.py
 - `main.py`: 程序入口
 - `git_manager.py`: Git操作核心功能
 - `git_manager_window.py`: 图形界面实现
-- `commit_dialog.py`: 提交对话框
+- `commit_dialog.py`: git commit 提交对话框
 - `commit_graph.py`: 提交图绘制
 - `commit_history_view.py`: 提交历史视图
 - `compare_view.py`: 比较视图
