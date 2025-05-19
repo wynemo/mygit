@@ -219,7 +219,7 @@ class CommitDialog(QDialog):
                 self.git_manager.repo.index.add([file_path])
                 self.refresh_file_status()
             except Exception as e:
-                print(f"无法暂存文件: {str(e)}")
+                print(f"无法暂存文件: {e!s}")
 
     def unstage_selected_file(self):
         """取消暂存选中的文件"""
@@ -231,7 +231,7 @@ class CommitDialog(QDialog):
                 self.git_manager.repo.git.reset("HEAD", file_path)
                 self.refresh_file_status()
             except Exception as e:
-                print(f"无法取消暂存文件: {str(e)}")
+                print(f"无法取消暂存文件: {e!s}")
 
     def generate_commit_message(self):
         """生成提交信息"""
@@ -262,7 +262,7 @@ class CommitDialog(QDialog):
 
         except Exception as e:
             logging.exception("准备提交信息生成失败")
-            QMessageBox.critical(self, "错误", f"准备提交信息生成失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"准备提交信息生成失败: {e!s}")
             self._reset_ai_button()
 
     def _on_message_generated(self, message):
@@ -272,7 +272,7 @@ class CommitDialog(QDialog):
 
     def _on_generation_error(self, error_message):
         """当消息生成出错时调用"""
-        QMessageBox.critical(self, "错误", f"生成提交信息失败: {error_message}")
+        QMessageBox.critical(self, "错误", f"生成提交信息失败: {error_message!s}")
         self._reset_ai_button()
 
     def _reset_ai_button(self):
@@ -304,27 +304,26 @@ class CommitDialog(QDialog):
                     # 如果是新文件，HEAD中没有内容
                     old_content = ""
                 new_content = repo.git.show(f":{file_path}")  # 暂存区内容
+            # 对于未暂存文件，比较暂存区和工作区
+            elif item.text(1) == "Untracked":
+                # 未跟踪文件，显示空内容和当前文件内容
+                old_content = ""
+                try:
+                    with open(f"{repo.working_dir}/{file_path}", "r", encoding="utf-8") as f:
+                        new_content = f.read()
+                except Exception as e:
+                    new_content = f"Error reading file: {e!s}"
             else:
-                # 对于未暂存文件，比较暂存区和工作区
-                if item.text(1) == "Untracked":
-                    # 未跟踪文件，显示空内容和当前文件内容
+                # 已修改文件，比较暂存区和工作区
+                try:
+                    old_content = repo.git.show(f":{file_path}")  # 暂存区内容
+                except:
                     old_content = ""
-                    try:
-                        with open(f"{repo.working_dir}/{file_path}", "r", encoding="utf-8") as f:
-                            new_content = f.read()
-                    except Exception as e:
-                        new_content = f"Error reading file: {str(e)}"
-                else:
-                    # 已修改文件，比较暂存区和工作区
-                    try:
-                        old_content = repo.git.show(f":{file_path}")  # 暂存区内容
-                    except:
-                        old_content = ""
-                    try:
-                        with open(f"{repo.working_dir}/{file_path}", "r", encoding="utf-8") as f:
-                            new_content = f.read()
-                    except Exception as e:
-                        new_content = f"Error reading file: {str(e)}"
+                try:
+                    with open(f"{repo.working_dir}/{file_path}", "r", encoding="utf-8") as f:
+                        new_content = f.read()
+                except Exception as e:
+                    new_content = f"Error reading file: {e!s}"
 
             # 设置差异内容
             diff_viewer.set_texts(old_content, new_content)
@@ -334,7 +333,7 @@ class CommitDialog(QDialog):
 
         except Exception as e:
             logging.exception("显示文件差异失败")
-            QMessageBox.critical(self, "错误", f"显示文件差异失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"显示文件差异失败: {e!s}")
 
     def accept(self):
         """处理确认操作"""
@@ -357,7 +356,7 @@ class CommitDialog(QDialog):
 
         except Exception as e:
             logging.exception("提交失败")
-            QMessageBox.critical(self, "错误", f"提交失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"提交失败: {e!s}")
 
     def commit_and_push(self):
         """执行提交并推送"""
@@ -383,4 +382,4 @@ class CommitDialog(QDialog):
 
         except Exception as e:
             logging.exception("推送失败")
-            QMessageBox.critical(self, "错误", f"推送失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"推送失败: {e!s}")
