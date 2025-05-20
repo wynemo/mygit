@@ -94,4 +94,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 15. commit_dialog.py 添加git push
 16. 在“提交历史”标签右边，增加git push按钮
 17. ~~在git commit 以后更新提交历史 CommitDialog.accept() commit_history_view update_history()~~
-18. 工作区文件按字母顺序排序
+18. ~~工作区文件按字母顺序排序~~

@@ -108,7 +108,8 @@ class WorkspaceExplorer(QWidget):
     def _add_directory_items(self, path, parent):
         """递归添加目录内容到树形结构"""
         try:
-            for item in os.listdir(path):
+            # item 排序 按首字母
+            for item in sorted(os.listdir(path), key=lambda x: x[0]):
                 item_path = os.path.join(path, item)
                 tree_item = QTreeWidgetItem(parent)
                 tree_item.setText(0, item)
