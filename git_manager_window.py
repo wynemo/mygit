@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
     QToolButton,
     QVBoxLayout,
     QWidget,
+    QTabBar
 )
 
 from commit_dialog import CommitDialog
@@ -147,6 +148,10 @@ class GitManagerWindow(QMainWindow):
         self.tab_widget.tabCloseRequested.connect(self.close_tab)
         self.tab_widget.addTab(self.commit_history_view, "提交历史")
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
+
+        # 提交历史标签页，不可关闭
+        self.tab_widget.tabBar().setTabButton(0, QTabBar.ButtonPosition.LeftSide, None)
+
         # 连接信号
         self.commit_history_view.commit_selected.connect(self.on_commit_selected)
         self.file_changes_view.file_selected.connect(self.on_file_selected)
