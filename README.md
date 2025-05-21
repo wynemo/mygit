@@ -96,4 +96,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 17. ~~在git commit 以后更新提交历史 CommitDialog.accept() commit_history_view update_history()~~
 18. ~~工作区文件按字母顺序排序~~
 19. 多行commit信息换行显示，参考jetbrains ide，放在文件变化下面
-20. 接11的改动，在鼠标移动到提交历史上时，完整显示单行提交信息
+20. ~~接11的改动，在鼠标移动到提交历史上时，完整显示单行提交信息~~
