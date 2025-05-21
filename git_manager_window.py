@@ -270,7 +270,16 @@ class GitManagerWindow(QMainWindow):
     def update_branches(self):
         """更新分支列表"""
         self.branch_combo.clear()
+        if not self.git_manager:
+            return
         branches = self.git_manager.get_branches()
+        default_branch = self.git_manager.get_default_branch()
+
+        # 将默认分支移到列表开头
+        if default_branch and default_branch in branches:
+            branches.remove(default_branch)
+            branches.insert(0, default_branch)
+
         self.branch_combo.addItems(branches)
         self.branch_combo.addItems(["all"])
 
