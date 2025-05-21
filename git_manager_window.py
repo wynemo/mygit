@@ -12,11 +12,11 @@ from PyQt6.QtWidgets import (
     QMenu,
     QPushButton,
     QSplitter,
+    QTabBar,
     QTabWidget,  # 添加 QTabWidget 导入
     QToolButton,
     QVBoxLayout,
     QWidget,
-    QTabBar
 )
 
 from commit_dialog import CommitDialog
@@ -99,25 +99,25 @@ class GitManagerWindow(QMainWindow):
 
         # 创建获取/推送/拉取按钮组
         repo_action_layout = QHBoxLayout()
-        repo_action_layout.setSpacing(0) # 减小按钮之间的间距
+        repo_action_layout.setSpacing(0)  # 减小按钮之间的间距
 
         # 获取按钮
         self.fetch_button = QToolButton()
-        self.fetch_button.setIcon(QIcon(":/icons/fetch.svg"))  # 假设图标路径
+        self.fetch_button.setIcon(QIcon("icons/fetch.svg"))  # 假设图标路径
         self.fetch_button.setToolTip("获取")
         # self.fetch_button.clicked.connect(self.fetch_repo) # 连接到相应的槽函数
         repo_action_layout.addWidget(self.fetch_button)
 
         # 拉取按钮 (带有向下箭头)
         self.pull_button = QToolButton()
-        self.pull_button.setIcon(QIcon(":/icons/pull.svg"))  # 假设图标路径
+        self.pull_button.setIcon(QIcon("icons/pull.svg"))  # 假设图标路径
         self.pull_button.setToolTip("拉取")
         # self.pull_button.clicked.connect(self.pull_repo) # 连接到相应的槽函数
         repo_action_layout.addWidget(self.pull_button)
 
         # 推送按钮 (带有向上箭头)
         self.push_button = QToolButton()
-        self.push_button.setIcon(QIcon(":/icons/push.svg"))  # 假设图标路径
+        self.push_button.setIcon(QIcon("icons/push.svg"))  # 假设图标路径
         self.push_button.setToolTip("推送")
         # self.push_button.clicked.connect(self.push_repo) # 连接到相应的槽函数
         repo_action_layout.addWidget(self.push_button)

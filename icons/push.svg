@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="000" height="100">
+
+  <g transform="translate(0, 0)">
+    <circle cx="50" cy="50" r="40" fill="#007acc"/>
+    <path d="M50 70 v-40" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+    <path d="M40 30 l10 -10 l10 10" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+    <text x="50" y="90" font-size="12" fill="#333" text-anchor="middle">推送</text>
+  </g>
+</svg>
