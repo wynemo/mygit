@@ -88,6 +88,7 @@ class GitManagerWindow(QMainWindow):
         # 添加提交按钮
         self.commit_button = QPushButton("提交")
         self.commit_button.clicked.connect(self.show_commit_dialog)
+        self.commit_button.setFixedSize(80, 24) # Set a smaller fixed size
         top_layout.addWidget(self.commit_button)
 
         # 创建设置按钮
