@@ -28,6 +28,7 @@ class CommitHistoryView(QWidget):
 
         # 普通提交历史列表
         self.history_list = CustomTreeWidget()
+        self.history_list.set_hover_reveal_columns({1})  # Enable hover for commit message column
         self.history_list.setHeaderLabels(["提交ID", "提交信息", "作者", "日期"])
         self.history_list.itemClicked.connect(self.on_commit_clicked)
         self.history_list.currentItemChanged.connect(self.on_current_item_changed)

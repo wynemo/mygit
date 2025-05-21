@@ -18,6 +18,14 @@ class CustomTreeWidget(QTreeWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._overlay_label = None
+        self.setMouseTracking(True)
+        self._hovered_item_column = None
+        self.hover_reveal_columns = None  # Initialize hover_reveal_columns
+
+    def set_hover_reveal_columns(self, columns: set[int] | None):
+        """Sets the columns for which hover reveal is active."""
+        self.hover_reveal_columns = columns
+
 
     def _ensure_overlay_label(self):
         if self._overlay_label is None:
@@ -124,6 +132,54 @@ class CustomTreeWidget(QTreeWidget):
     def focusOutEvent(self, event):
         super().focusOutEvent(event)
         self.hide_overlay()
+    
+    def mouseMoveEvent(self, event):
+        super().mouseMoveEvent(event)
+        pos = event.pos()
+        item = self.itemAt(pos)
+        # Ensure columnAt is a valid method or implement it if it's from a newer Qt version or custom.
+        # For standard QTreeWidget, we might need to calculate column based on x position.
+        # Let's assume self.columnAt(pos.x()) is available or implemented elsewhere.
+        # If not, a simplified approach for specific column (e.g., 0) might be needed.
+        # For this example, let's simulate columnAt or assume it works.
+        # A more robust way for QTreeWidget:
+        column = -1
+        if item:
+            # Iterate through columns to find which one the mouse is over
+            # This is a simplification; real column detection can be complex
+            # if headers are movable or sections have different widths.
+            x_pos = pos.x()
+            header = self.header()
+            logical_index = -1
+            current_x = 0
+            for i in range(header.count()):
+                current_x += header.sectionSize(i)
+                if x_pos < current_x:
+                    logical_index = header.logicalIndex(i)
+                    break
+            column = logical_index
+
+        if item and column != -1:
+            # Check if hover reveal is active for this column
+            if self.hover_reveal_columns is None or column in self.hover_reveal_columns:
+                if self._hovered_item_column != (item, column):
+                    self._hovered_item_column = (item, column)
+                    self.show_full_text_for_item(item, column)
+            else:
+                # Hover reveal not active for this column, hide if previously shown
+                if self._hovered_item_column is not None:
+                    self.hide_overlay()
+                    self._hovered_item_column = None
+        else:
+            # No item or invalid column, hide overlay
+            if self._hovered_item_column is not None:
+                self.hide_overlay()
+                self._hovered_item_column = None
+
+    def leaveEvent(self, event):
+        super().leaveEvent(event)
+        self.hide_overlay()
+        self._hovered_item_column = None
 
     # (可选) 点击树的其他地方也隐藏
     # def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
