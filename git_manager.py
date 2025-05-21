@@ -22,6 +22,12 @@ class GitManager:
             return []
         return [branch.name for branch in self.repo.branches]
 
+    def get_default_branch(self) -> Optional[str]:
+        """获取默认分支"""
+        if not self.repo:
+            return None
+        return self.repo.active_branch.name
+
     def get_commit_history(self, branch: str = "master", limit: int = 50, skip: int = 0) -> List[dict]:
         """获取提交历史 (cursor生成)"""
         if not self.repo:
