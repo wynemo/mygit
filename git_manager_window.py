@@ -1,6 +1,6 @@
 import os
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import (
     QComboBox,
@@ -103,7 +103,10 @@ class GitManagerWindow(QMainWindow):
 
         # 获取按钮
         self.fetch_button = QToolButton()
-        self.fetch_button.setIcon(QIcon("icons/fetch.svg"))  # 假设图标路径
+        icon = QIcon("icons/fetch.svg")  # 假设图标路径
+        icon.addPixmap(QPixmap("icons/fetch.svg"), QIcon.Mode.Normal, QIcon.State.On)  # 设置图标
+        self.fetch_button.setIcon(icon)
+        self.fetch_button.setIconSize(QSize(24, 24))  # 设置图标大小
         self.fetch_button.setToolTip("获取")
         # self.fetch_button.clicked.connect(self.fetch_repo) # 连接到相应的槽函数
         repo_action_layout.addWidget(self.fetch_button)
@@ -111,6 +114,7 @@ class GitManagerWindow(QMainWindow):
         # 拉取按钮 (带有向下箭头)
         self.pull_button = QToolButton()
         self.pull_button.setIcon(QIcon("icons/pull.svg"))  # 假设图标路径
+        self.pull_button.setIconSize(QSize(24, 24))  # 设置图标大小
         self.pull_button.setToolTip("拉取")
         # self.pull_button.clicked.connect(self.pull_repo) # 连接到相应的槽函数
         repo_action_layout.addWidget(self.pull_button)
@@ -118,6 +122,7 @@ class GitManagerWindow(QMainWindow):
         # 推送按钮 (带有向上箭头)
         self.push_button = QToolButton()
         self.push_button.setIcon(QIcon("icons/push.svg"))  # 假设图标路径
+        self.push_button.setIconSize(QSize(24, 24))  # 设置图标大小
         self.push_button.setToolTip("推送")
         # self.push_button.clicked.connect(self.push_repo) # 连接到相应的槽函数
         repo_action_layout.addWidget(self.push_button)
