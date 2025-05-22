@@ -6,14 +6,20 @@ from PyQt6.QtWidgets import (
     QMenu,
     QSplitter,
     QTabWidget,
+    QTextEdit,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
+# BlameViewWidget is no longer used directly by _show_context_menu's "Git Blame" action.
+# It might be used elsewhere, or can be removed if this was its only use.
+# For now, let's assume it might be used by other parts, so we won't remove the import line itself,
+# but the _show_git_blame method that used it will be removed.
+from blame_view_widget import BlameViewWidget 
 from file_history_view import FileHistoryView
-from text_edit import SyncedTextEdit
+from text_edit import SyncedTextEdit # Ensure this is present
 from syntax_highlighter import CodeHighlighter
 from utils.language_map import LANGUAGE_MAP
 
@@ -220,8 +226,75 @@ class FileTreeWidget(QTreeWidget):
         history_action = context_menu.addAction("文件历史")
         history_action.triggered.connect(lambda: self._show_file_history(file_path))
 
+        # 添加"Git Blame"菜单项
+        blame_action = context_menu.addAction("Toggle Git Blame Annotations") # Renamed for clarity
+        blame_action.triggered.connect(lambda: self._toggle_blame_annotation_in_editor(file_path))
+
         # 在鼠标位置显示菜单
         context_menu.exec(self.mapToGlobal(position))
+
+    def _toggle_blame_annotation_in_editor(self, file_path: str):
+        """Toggles Git blame annotations in the SyncedTextEdit for the given file_path."""
+        main_window = self.window()
+        if not main_window or not hasattr(main_window, "tab_widget"):
+            print("Main window or tab widget not found.")
+            return
+        
+        tab_widget = main_window.tab_widget
+        target_editor: SyncedTextEdit = None
+
+        # Find the SyncedTextEdit for the given file_path
+        for i in range(tab_widget.count()):
+            widget = tab_widget.widget(i)
+            if isinstance(widget, SyncedTextEdit):
+                # SyncedTextEdit needs a file_path attribute to compare with.
+                # Assuming it's set when the file is opened, e.g., widget.property("file_path")
+                # or a direct attribute self.file_path on SyncedTextEdit.
+                # From previous step, SyncedTextEdit has self.file_path
+                editor_file_path = getattr(widget, 'file_path', None)
+                if editor_file_path == file_path:
+                    target_editor = widget
+                    break
+        
+        if not target_editor:
+            print(f"File '{os.path.basename(file_path)}' is not open in an editor or editor does not support blame.")
+            # Optionally, open the file here if desired, then apply blame.
+            # For now, we do nothing if not found.
+            return
+
+        # Now we have the target_editor
+        if target_editor.showing_blame:
+            target_editor.clear_blame_data()
+            print(f"Blame annotations hidden for {os.path.basename(file_path)}.")
+        else:
+            if not hasattr(main_window, "git_manager") or not main_window.git_manager:
+                print("GitManager not found.")
+                return
+            
+            git_manager = main_window.git_manager
+            if not git_manager.repo:
+                print("Git repository not initialized in GitManager.")
+                return
+
+            try:
+                relative_file_path = os.path.relpath(file_path, git_manager.repo_path)
+            except ValueError:
+                print(f"File path {file_path} is not within the repository path {git_manager.repo_path}")
+                target_editor.clear_blame_data() # Ensure clean state
+                return
+
+            blame_data_list = git_manager.get_blame_data(relative_file_path)
+
+            if blame_data_list:
+                # SyncedTextEdit needs to have its file_path attribute set for context if not already
+                # This is crucial if load_blame_data or other functions inside SyncedTextEdit
+                # depend on its own self.file_path.
+                # We assume SyncedTextEdit's file_path is already correctly set when the tab was opened.
+                target_editor.load_blame_data(blame_data_list)
+                print(f"Blame annotations shown for {os.path.basename(file_path)}.")
+            else:
+                print(f"No blame information available for {os.path.basename(file_path)}.")
+                target_editor.clear_blame_data() # Clear any potential stale data
 
     def _show_file_history(self, file_path):
         """显示文件历史"""
