@@ -92,7 +92,7 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 13. ~~把提交历史、文件历史，文件差异的视图，现在是在上方，需要放到下方，并且可以隐藏与显示~~
 14. 工作区的更改，可以在文件编辑器中显示
 15. commit_dialog.py 添加git push
-16. 在“提交历史”标签右边，增加git push按钮
+16. ~~在“提交历史”标签右边，增加git push按钮~~
 17. ~~在git commit 以后更新提交历史 CommitDialog.accept() commit_history_view update_history()~~
 18. ~~工作区文件按字母顺序排序~~
 19. 多行commit信息换行显示，参考jetbrains ide，放在文件变化下面
@@ -100,3 +100,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 21. ~~“提交历史”标签，不可关闭，那么样式不需要一个“x“的关闭按钮~~
 22. ~~仓库需要优先显示默认分支~~
 23. 工作区的文件，右键菜单，加入git annoation 支持;完成一半了
+24. git push 以后，需要有点提示
