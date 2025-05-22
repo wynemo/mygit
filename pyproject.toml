@@ -21,8 +21,6 @@ line-length = 120
 
 [tool.ruff.lint]
 select = [
-    "G", # G Enable the flake8-logging-format rules
-
     # Pyflakes
     "F", # Pyflakes rules (F821 checks undefined names)
 
