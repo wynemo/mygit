@@ -1,4 +1,5 @@
 import sys
+import logging
 
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
@@ -23,4 +24,6 @@ def main():
 
 
 if __name__ == "__main__":
+    # 配置日志 (Configure logging)
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
     main()

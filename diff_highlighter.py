@@ -112,3 +112,13 @@ class DiffHighlighter(QSyntaxHighlighter):
                     logging.debug("应用格式: %s", format_type)
                     self.setFormat(0, len(text), format)
                     logging.debug("格式已应用")
+
+# -------- 总高亮器 --------
+class MultiHighlighter(QSyntaxHighlighter):
+    def __init__(self, document, modules):
+        super().__init__(document)
+        self.modules = modules
+
+    def highlightBlock(self, text):
+        for module in self.modules:
+            module.highlightBlock(self, text)

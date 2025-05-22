@@ -110,7 +110,7 @@ class SyncedTextEdit(QPlainTextEdit):
         viewport_bottom = viewport_rect.bottom()
 
         # 遍历所有差异块
-        if not self.highlighter:
+        if not self.highlighter or not hasattr(self.highlighter, "diff_chunks"):
             return
         for chunk in self.highlighter.diff_chunks:
             if chunk.type == "delete" and (
