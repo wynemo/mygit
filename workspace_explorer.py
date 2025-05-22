@@ -6,7 +6,6 @@ from PyQt6.QtWidgets import (
     QMenu,
     QSplitter,
     QTabWidget,
-    QTextEdit,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -17,10 +16,9 @@ from PyQt6.QtWidgets import (
 # It might be used elsewhere, or can be removed if this was its only use.
 # For now, let's assume it might be used by other parts, so we won't remove the import line itself,
 # but the _show_git_blame method that used it will be removed.
-from blame_view_widget import BlameViewWidget 
 from file_history_view import FileHistoryView
-from text_edit import SyncedTextEdit # Ensure this is present
 from syntax_highlighter import CodeHighlighter
+from text_edit import SyncedTextEdit  # Ensure this is present
 from utils.language_map import LANGUAGE_MAP
 
 
@@ -227,7 +225,7 @@ class FileTreeWidget(QTreeWidget):
         history_action.triggered.connect(lambda: self._show_file_history(file_path))
 
         # 添加"Git Blame"菜单项
-        blame_action = context_menu.addAction("Toggle Git Blame Annotations") # Renamed for clarity
+        blame_action = context_menu.addAction("Toggle Git Blame Annotations")  # Renamed for clarity
         blame_action.triggered.connect(lambda: self._toggle_blame_annotation_in_editor(file_path))
 
         # 在鼠标位置显示菜单
@@ -235,11 +233,14 @@ class FileTreeWidget(QTreeWidget):
 
     def _toggle_blame_annotation_in_editor(self, file_path: str):
         """Toggles Git blame annotations in the SyncedTextEdit for the given file_path."""
-        main_window = self.window()
-        if not main_window or not hasattr(main_window, "tab_widget"):
-            print("Main window or tab widget not found.")
+        main_window = self.parent()
+        while main_window and not hasattr(main_window, "tab_widget"):
+            main_window = main_window.parent()
+
+        if not main_window:
+            print("Main window not found.")
             return
-        
+
         tab_widget = main_window.tab_widget
         target_editor: SyncedTextEdit = None
 
@@ -251,11 +252,11 @@ class FileTreeWidget(QTreeWidget):
                 # Assuming it's set when the file is opened, e.g., widget.property("file_path")
                 # or a direct attribute self.file_path on SyncedTextEdit.
                 # From previous step, SyncedTextEdit has self.file_path
-                editor_file_path = getattr(widget, 'file_path', None)
+                editor_file_path = widget.property("file_path")
                 if editor_file_path == file_path:
                     target_editor = widget
                     break
-        
+
         if not target_editor:
             print(f"File '{os.path.basename(file_path)}' is not open in an editor or editor does not support blame.")
             # Optionally, open the file here if desired, then apply blame.
@@ -267,10 +268,12 @@ class FileTreeWidget(QTreeWidget):
             target_editor.clear_blame_data()
             print(f"Blame annotations hidden for {os.path.basename(file_path)}.")
         else:
-            if not hasattr(main_window, "git_manager") or not main_window.git_manager:
+            while main_window and not hasattr(main_window, "git_manager"):
+                main_window = main_window.parent()
+            if not main_window or not hasattr(main_window, "git_manager"):
                 print("GitManager not found.")
                 return
-            
+
             git_manager = main_window.git_manager
             if not git_manager.repo:
                 print("Git repository not initialized in GitManager.")
@@ -280,7 +283,7 @@ class FileTreeWidget(QTreeWidget):
                 relative_file_path = os.path.relpath(file_path, git_manager.repo_path)
             except ValueError:
                 print(f"File path {file_path} is not within the repository path {git_manager.repo_path}")
-                target_editor.clear_blame_data() # Ensure clean state
+                target_editor.clear_blame_data()  # Ensure clean state
                 return
 
             blame_data_list = git_manager.get_blame_data(relative_file_path)
@@ -290,11 +293,13 @@ class FileTreeWidget(QTreeWidget):
                 # This is crucial if load_blame_data or other functions inside SyncedTextEdit
                 # depend on its own self.file_path.
                 # We assume SyncedTextEdit's file_path is already correctly set when the tab was opened.
-                target_editor.load_blame_data(blame_data_list)
+                target_editor.blame_annotations_per_line = blame_data_list
+                target_editor.showing_blame = True
+                # target_editor.load_blame_data(blame_data_list)
                 print(f"Blame annotations shown for {os.path.basename(file_path)}.")
             else:
                 print(f"No blame information available for {os.path.basename(file_path)}.")
-                target_editor.clear_blame_data() # Clear any potential stale data
+                target_editor.clear_blame_data()  # Clear any potential stale data
 
     def _show_file_history(self, file_path):
         """显示文件历史"""
