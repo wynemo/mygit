@@ -15,7 +15,7 @@ LANGUAGE_MAP = {
     "tsx": "typescript",
     "vue": "vue",
     "php": "php",
-    "java": "java", 
+    "java": "java",
     "c": "c",
     "cpp": "cpp",
     "c++": "cpp",
@@ -29,6 +29,5 @@ LANGUAGE_MAP = {
     "erlang": "erlang",
     "haskell": "haskell",
     "scala": "scala",
-    "erlang": "erlang",
     "text": "text",
 }
