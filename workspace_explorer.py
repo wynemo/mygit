@@ -47,8 +47,12 @@ class WorkspaceExplorer(QWidget):
         self.tab_widget.dragEnterEvent = self.tab_drag_enter_event
         self.tab_widget.dropEvent = self.tab_drop_event
 
-        self.tab_widget.tabBar().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.tab_widget.tabBar().customContextMenuRequested.connect(self.show_tab_context_menu)
+        self.tab_widget.tabBar().setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu
+        )
+        self.tab_widget.tabBar().customContextMenuRequested.connect(
+            self.show_tab_context_menu
+        )
 
         # 添加组件到分割器
         self.splitter.addWidget(self.file_tree)
@@ -114,7 +118,9 @@ class WorkspaceExplorer(QWidget):
         """刷新文件树"""
         self.file_tree.clear()
         if hasattr(self, "workspace_path"):
-            self._add_directory_items(self.workspace_path, self.file_tree.invisibleRootItem())
+            self._add_directory_items(
+                self.workspace_path, self.file_tree.invisibleRootItem()
+            )
 
     def _add_directory_items(self, path, parent):
         """递归添加目录内容到树形结构"""
@@ -202,7 +208,9 @@ class FileTreeWidget(QTreeWidget):
         if os.path.isfile(file_path):
             # 获取父部件(WorkspaceExplorer)的引用
             workspace_explorer = self.parent()
-            while workspace_explorer and not isinstance(workspace_explorer, WorkspaceExplorer):
+            while workspace_explorer and not isinstance(
+                workspace_explorer, WorkspaceExplorer
+            ):
                 workspace_explorer = workspace_explorer.parent()
 
             if workspace_explorer:
@@ -225,8 +233,12 @@ class FileTreeWidget(QTreeWidget):
         history_action.triggered.connect(lambda: self._show_file_history(file_path))
 
         # 添加"Git Blame"菜单项
-        blame_action = context_menu.addAction("Toggle Git Blame Annotations")  # Renamed for clarity
-        blame_action.triggered.connect(lambda: self._toggle_blame_annotation_in_editor(file_path))
+        blame_action = context_menu.addAction(
+            "Toggle Git Blame Annotations"
+        )  # Renamed for clarity
+        blame_action.triggered.connect(
+            lambda: self._toggle_blame_annotation_in_editor(file_path)
+        )
 
         # 在鼠标位置显示菜单
         context_menu.exec(self.mapToGlobal(position))
@@ -258,7 +270,9 @@ class FileTreeWidget(QTreeWidget):
                     break
 
         if not target_editor:
-            print(f"File '{os.path.basename(file_path)}' is not open in an editor or editor does not support blame.")
+            print(
+                f"File '{os.path.basename(file_path)}' is not open in an editor or editor does not support blame."
+            )
             # Optionally, open the file here if desired, then apply blame.
             # For now, we do nothing if not found.
             return
@@ -282,7 +296,9 @@ class FileTreeWidget(QTreeWidget):
             try:
                 relative_file_path = os.path.relpath(file_path, git_manager.repo_path)
             except ValueError:
-                print(f"File path {file_path} is not within the repository path {git_manager.repo_path}")
+                print(
+                    f"File path {file_path} is not within the repository path {git_manager.repo_path}"
+                )
                 target_editor.clear_blame_data()  # Ensure clean state
                 return
 
@@ -298,7 +314,9 @@ class FileTreeWidget(QTreeWidget):
                 # target_editor.load_blame_data(blame_data_list)
                 print(f"Blame annotations shown for {os.path.basename(file_path)}.")
             else:
-                print(f"No blame information available for {os.path.basename(file_path)}.")
+                print(
+                    f"No blame information available for {os.path.basename(file_path)}."
+                )
                 target_editor.clear_blame_data()  # Clear any potential stale data
 
     def _show_file_history(self, file_path):
