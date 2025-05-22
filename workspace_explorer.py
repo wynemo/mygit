@@ -295,6 +295,7 @@ class FileTreeWidget(QTreeWidget):
                 # We assume SyncedTextEdit's file_path is already correctly set when the tab was opened.
                 target_editor.blame_annotations_per_line = blame_data_list
                 target_editor.showing_blame = True
+                target_editor.update_line_number_area_width()
                 target_editor.repaint()
                 # target_editor.load_blame_data(blame_data_list)
                 print(f"Blame annotations shown for {os.path.basename(file_path)}.")
