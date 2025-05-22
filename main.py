@@ -1,4 +1,5 @@
 import sys
+import logging # 导入日志模块 (Import logging module)
 
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
@@ -7,6 +8,9 @@ from git_manager_window import GitManagerWindow
 
 
 def main():
+    # 配置日志 (Configure logging)
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+
     app = QApplication(sys.argv)
 
     # 设置应用图标

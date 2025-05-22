@@ -359,6 +359,15 @@ class GitManagerWindow(QMainWindow):
         compare_view_instance = CompareView()
         compare_view_instance.show_diff(self.git_manager, current_commit, file_path)
 
+        # --- 测试语法高亮的代码注入 (Test code injection for syntax highlighting) ---
+        python_code_sample = "def hello_world():\n    print(\"Hello, syntax highlighting!\")\n# This is a comment"
+        # 假设 compare_view_instance.left_edit 是一个 SyncedTextEdit 实例 (Assume compare_view_instance.left_edit is a SyncedTextEdit instance)
+        if hasattr(compare_view_instance, 'left_edit'):
+            compare_view_instance.left_edit.setPlainText(python_code_sample)
+            if hasattr(compare_view_instance.left_edit, 'set_language'):
+                compare_view_instance.left_edit.set_language("python")
+        # --- 测试代码结束 (End of test code) ---
+
         new_tab_index = self.compare_tab_widget.addTab(compare_view_instance, unique_tab_title)
         self.compare_tab_widget.setCurrentIndex(new_tab_index)
 
