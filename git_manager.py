@@ -1,5 +1,4 @@
 from typing import List, Optional
-from datetime import datetime
 
 import git
 
@@ -29,9 +28,7 @@ class GitManager:
             return None
         return self.repo.active_branch.name
 
-    def get_commit_history(
-        self, branch: str = "master", limit: int = 50, skip: int = 0
-    ) -> List[dict]:
+    def get_commit_history(self, branch: str = "master", limit: int = 50, skip: int = 0) -> List[dict]:
         """获取提交历史 (cursor生成)"""
         if not self.repo:
             return []
@@ -41,9 +38,7 @@ class GitManager:
                 branch = self.repo.active_branch.name
 
             commits = []
-            for commit in self.repo.iter_commits(
-                branch, max_count=limit, skip=skip
-            ):  # cursor生成
+            for commit in self.repo.iter_commits(branch, max_count=limit, skip=skip):  # cursor生成
                 message = commit.message.strip().split("\n")[0]
                 commits.append(
                     {
@@ -78,34 +73,24 @@ class GitManager:
                 "#0052cc",
                 "#5319e7",
             ]
-            branch_colors = {
-                name: colors[idx % len(colors)] for idx, name in enumerate(branches)
-            }
+            branch_colors = {name: colors[idx % len(colors)] for idx, name in enumerate(branches)}
 
             # 预先获取每个分支的所有提交
             branch_commits = {}
             for branch_name, branch_ref in branches.items():
                 # Rewrite generator as set comprehension
-                branch_commits[branch_name] = {
-                    commit.hexsha for commit in self.repo.iter_commits(branch_ref.name)
-                }
+                branch_commits[branch_name] = {commit.hexsha for commit in self.repo.iter_commits(branch_ref.name)}
 
             commits = []
             # 获取主分支的提交历史
             for commit in self.repo.iter_commits(branch, max_count=limit):
                 # Check which branches this commit belongs to
                 commit_branches = [
-                    branch_name
-                    for branch_name, commit_set in branch_commits.items()
-                    if commit.hexsha in commit_set
+                    branch_name for branch_name, commit_set in branch_commits.items() if commit.hexsha in commit_set
                 ]
 
                 # Decode commit message assuming it might be bytes
-                message = (
-                    commit.message.decode("utf-8", errors="ignore")
-                    .strip()
-                    .split("\n")[0]
-                )
+                message = commit.message.decode("utf-8", errors="ignore").strip().split("\n")[0]
 
                 commits.append(
                     {
@@ -162,9 +147,7 @@ class GitManager:
                             "commit_hash": commit.hexsha,
                             "author_name": commit.author.name,
                             "author_email": commit.author.email,
-                            "committed_date": commit.committed_datetime.strftime(
-                                "%Y-%m-%d"
-                            ),
+                            "committed_date": commit.committed_datetime.strftime("%Y-%m-%d"),
                             # This line_number is the index within the lines for this specific commit's blame entry.
                             # If the requirement is the line number in the *file* at the time of *that commit*,
                             # this is not it. GitPython's blame focuses on *who* last changed *which current lines*.
@@ -178,10 +161,26 @@ class GitManager:
                         }
                     )
             return blame_data
-        except (
-            git.GitCommandError
-        ):  # Catch specific error for file not found or not tracked
+        except git.GitCommandError:  # Catch specific error for file not found or not tracked
             return []
         except Exception as e:
             print(f"获取blame信息失败: {e!s}")
             return []
+
+    def fetch(self):
+        """获取仓库"""
+        if not self.repo:
+            return
+        self.repo.remotes.origin.fetch()
+
+    def pull(self):
+        """拉取仓库"""
+        if not self.repo:
+            return
+        self.repo.remotes.origin.pull()
+
+    def push(self):
+        """推送仓库"""
+        if not self.repo:
+            return
+        self.repo.remotes.origin.push()

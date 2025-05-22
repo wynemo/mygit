@@ -108,7 +108,7 @@ class GitManagerWindow(QMainWindow):
         self.fetch_button.setIcon(icon)
         self.fetch_button.setIconSize(QSize(24, 24))  # 设置图标大小
         self.fetch_button.setToolTip("获取")
-        # self.fetch_button.clicked.connect(self.fetch_repo) # 连接到相应的槽函数
+        self.fetch_button.clicked.connect(self.fetch_repo)  # 连接到相应的槽函数
         repo_action_layout.addWidget(self.fetch_button)
 
         # 拉取按钮 (带有向下箭头)
@@ -116,7 +116,7 @@ class GitManagerWindow(QMainWindow):
         self.pull_button.setIcon(QIcon("icons/pull.svg"))  # 假设图标路径
         self.pull_button.setIconSize(QSize(24, 24))  # 设置图标大小
         self.pull_button.setToolTip("拉取")
-        # self.pull_button.clicked.connect(self.pull_repo) # 连接到相应的槽函数
+        self.pull_button.clicked.connect(self.pull_repo)  # 连接到相应的槽函数
         repo_action_layout.addWidget(self.pull_button)
 
         # 推送按钮 (带有向上箭头)
@@ -124,7 +124,7 @@ class GitManagerWindow(QMainWindow):
         self.push_button.setIcon(QIcon("icons/push.svg"))  # 假设图标路径
         self.push_button.setIconSize(QSize(24, 24))  # 设置图标大小
         self.push_button.setToolTip("推送")
-        # self.push_button.clicked.connect(self.push_repo) # 连接到相应的槽函数
+        self.push_button.clicked.connect(self.push_repo)  # 连接到相应的槽函数
         repo_action_layout.addWidget(self.push_button)
 
         top_layout.addLayout(repo_action_layout)
@@ -481,3 +481,21 @@ class GitManagerWindow(QMainWindow):
         # 保存状态到设置
         self.settings.settings["bottom_widget_visible"] = self.bottom_widget_visible
         self.settings.save_settings()
+
+    def fetch_repo(self):
+        """获取仓库"""
+        if not self.git_manager:
+            return
+        self.git_manager.fetch()
+
+    def pull_repo(self):
+        """拉取仓库"""
+        if not self.git_manager:
+            return
+        self.git_manager.pull()
+
+    def push_repo(self):
+        """推送仓库"""
+        if not self.git_manager:
+            return
+        self.git_manager.push()
