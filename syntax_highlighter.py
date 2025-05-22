@@ -29,7 +29,7 @@ class CodeHighlighter(QSyntaxHighlighter):
         try:
             # 您可以选择一个Pygments样式 (You can choose a Pygments style)
             # 例如 'default', 'monokai', 'emacs', 'friendly' 等 (e.g., 'default', 'monokai', 'emacs', 'friendly', etc.)
-            style = styles.get_style_by_name('default') 
+            style = styles.get_style_by_name('friendly') 
             self.style_formats = {}
             for token_type, style_definition in style:
                 qt_format = QTextCharFormat()
