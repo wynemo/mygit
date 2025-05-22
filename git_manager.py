@@ -50,7 +50,7 @@ class GitManager:
                 )
             return commits
         except Exception as e:
-            print(f"获取提交历史失败: {str(e)}")
+            print(f"获取提交历史失败: {e!s}")
             return []
 
     def get_commit_graph(self, branch: str = "", limit: int = 50) -> dict:
@@ -73,31 +73,29 @@ class GitManager:
                 "#0052cc",
                 "#5319e7",
             ]
-            branch_colors = {
-                name: colors[idx % len(colors)] for idx, name in enumerate(branches)
-            }
+            branch_colors = {name: colors[idx % len(colors)] for idx, name in enumerate(branches)}
 
             # 预先获取每个分支的所有提交
             branch_commits = {}
             for branch_name, branch_ref in branches.items():
-                branch_commits[branch_name] = set(
-                    commit.hexsha for commit in self.repo.iter_commits(branch_ref.name)
-                )
+                # Rewrite generator as set comprehension
+                branch_commits[branch_name] = {commit.hexsha for commit in self.repo.iter_commits(branch_ref.name)}
 
             commits = []
             # 获取主分支的提交历史
             for commit in self.repo.iter_commits(branch, max_count=limit):
-                # 检查提交属于哪些分支
+                # Check which branches this commit belongs to
                 commit_branches = [
-                    branch_name
-                    for branch_name, commit_set in branch_commits.items()
-                    if commit.hexsha in commit_set
+                    branch_name for branch_name, commit_set in branch_commits.items() if commit.hexsha in commit_set
                 ]
+
+                # Decode commit message assuming it might be bytes
+                message = commit.message.decode("utf-8", errors="ignore").strip().split("\n")[0]
 
                 commits.append(
                     {
                         "hash": commit.hexsha,
-                        "message": commit.message.strip().split("\n")[0],
+                        "message": message,
                         "author": commit.author.name,
                         "date": commit.committed_datetime.strftime("%Y-%m-%d %H:%M:%S"),
                         "branches": commit_branches,
@@ -107,5 +105,5 @@ class GitManager:
 
             return {"commits": commits, "branch_colors": branch_colors}
         except Exception as e:
-            print(f"获取提交图失败: {str(e)}")
+            print(f"获取提交图失败: {e!s}")
             return {"commits": [], "branch_colors": {}}
