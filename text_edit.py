@@ -30,6 +30,12 @@ class SyncedTextEdit(QPlainTextEdit):
         logging.debug("\n=== 初始化SyncedTextEdit ===")
         logging.debug("只读模式: %s", self.isReadOnly())
 
+        # Blame data storage
+        self.blame_data_full = []
+        self.blame_annotations_per_line = []
+        self.showing_blame = False
+        self.file_path = None  # Initialize file_path, can be set externally
+
         # 添加行号区域
         self.line_number_area = LineNumberArea(self)
         self.blockCountChanged.connect(self.update_line_number_area_width)
@@ -48,8 +54,30 @@ class SyncedTextEdit(QPlainTextEdit):
 
     def line_number_area_width(self):
         digits = len(str(max(1, self.blockCount())))
-        space = 3 + self.fontMetrics().horizontalAdvance("9") * digits
-        return space
+        base_space = 3 + self.fontMetrics().horizontalAdvance("9") * digits
+
+        if self.showing_blame:
+            # Estimate width for blame annotations. This is a rough estimate.
+            # A more accurate way would be to calculate max width of current annotations.
+            # For now, let's assume an average annotation string length.
+            # Example: "abcdef0 Author 2023-01-01"
+            # This needs to be adjusted based on actual formatting and font.
+            # Let's use a fixed addition or calculate from self.blame_annotations_per_line
+            max_blame_width = 0
+            if self.blame_annotations_per_line:
+                for annotation in self.blame_annotations_per_line:
+                    if annotation:  # Check if annotation is not None or empty
+                        max_blame_width = max(
+                            max_blame_width,
+                            self.fontMetrics().horizontalAdvance(
+                                annotation["committed_date"] + "|" + annotation["author_name"]
+                            ),
+                        )
+            # Add some padding if blame is shown
+            blame_space = max_blame_width + 15 if max_blame_width > 0 else 0
+            base_space += blame_space
+
+        return base_space
 
     def update_line_number_area_width(self):
         self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)
@@ -58,16 +86,12 @@ class SyncedTextEdit(QPlainTextEdit):
         if dy:
             self.line_number_area.scroll(0, dy)
         else:
-            self.line_number_area.update(
-                0, rect.y(), self.line_number_area.width(), rect.height()
-            )
+            self.line_number_area.update(0, rect.y(), self.line_number_area.width(), rect.height())
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         cr = self.contentsRect()
-        self.line_number_area.setGeometry(
-            QRect(cr.left(), cr.top(), self.line_number_area_width(), cr.height())
-        )
+        self.line_number_area.setGeometry(QRect(cr.left(), cr.top(), self.line_number_area_width(), cr.height()))
 
     def line_number_area_paint_event(self, event):
         """绘制行号区域"""
@@ -81,15 +105,29 @@ class SyncedTextEdit(QPlainTextEdit):
 
         while block.isValid() and top <= event.rect().bottom():
             if block.isVisible() and bottom >= event.rect().top():
-                number = str(block_number + 1)
+                display_string = ""
+                if self.showing_blame:
+                    if (
+                        block_number < len(self.blame_annotations_per_line)
+                        and self.blame_annotations_per_line[block_number]
+                    ):
+                        annotation = self.blame_annotations_per_line[block_number]
+                        display_string = annotation["committed_date"] + "|" + annotation["author_name"]
+                    else:
+                        # Fallback if blame data is missing for this line (should ideally not happen for tracked lines)
+                        display_string = " " * 20  # Placeholder for alignment
+                    display_string += " | "  # Separator
+
+                display_string += str(block_number + 1)  # Line number
+
                 painter.setPen(QColor("#808080"))
                 painter.drawText(
                     0,
                     int(top),
-                    self.line_number_area.width() - 2,
+                    self.line_number_area.width() - 5,  # Adjust padding
                     self.fontMetrics().height(),
-                    Qt.AlignmentFlag.AlignRight,
-                    number,
+                    Qt.AlignmentFlag.AlignRight,  # Line numbers still right-aligned after blame info
+                    display_string,
                 )
 
             block = block.next()
@@ -114,20 +152,10 @@ class SyncedTextEdit(QPlainTextEdit):
             return
         for chunk in self.highlighter.diff_chunks:
             if chunk.type == "delete" and (
-                (
-                    chunk.right_start == chunk.right_end
-                    and self.objectName() == "right_edit"
-                )
-                or (
-                    chunk.left_start == chunk.left_end
-                    and self.objectName() == "left_edit"
-                )
+                (chunk.right_start == chunk.right_end and self.objectName() == "right_edit")
+                or (chunk.left_start == chunk.left_end and self.objectName() == "left_edit")
             ):
-                pos = (
-                    chunk.left_start
-                    if chunk.left_start == chunk.left_end
-                    else chunk.right_start
-                ) - 1
+                pos = (chunk.left_start if chunk.left_start == chunk.left_end else chunk.right_start) - 1
                 block = self.document().findBlockByLineNumber(pos)
                 if block.isValid():
                     # 获取这一行的几何信息
