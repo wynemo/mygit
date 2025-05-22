@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
 from file_history_view import FileHistoryView
 from text_edit import SyncedTextEdit
 from syntax_highlighter import CodeHighlighter
+from utils.language_map import LANGUAGE_MAP
 
 
 class WorkspaceExplorer(QWidget):
@@ -84,48 +85,9 @@ class WorkspaceExplorer(QWidget):
             text_edit.setPlainText(content)
 
             text_edit.highlighter = CodeHighlighter(text_edit.document())
-            if file_path.endswith(".py"):
-                text_edit.highlighter.set_language("python")
-            elif file_path.endswith(".md"):
-                text_edit.highlighter.set_language("markdown")
-            elif file_path.endswith(".html"):
-                text_edit.highlighter.set_language("html")
-            elif file_path.endswith(".css"):
-                text_edit.highlighter.set_language("css")
-            elif file_path.endswith(".js"):
-                text_edit.highlighter.set_language("javascript")
-            elif file_path.endswith(".json"):
-                text_edit.highlighter.set_language("json")
-            elif file_path.endswith(".xml"):
-                text_edit.highlighter.set_language("xml")
-            elif file_path.endswith(".yaml"):
-                text_edit.highlighter.set_language("yaml")
-            elif file_path.endswith(".sh"):
-                text_edit.highlighter.set_language("shell")
-            elif file_path.endswith(".bat"):
-                text_edit.highlighter.set_language("batch")
-            elif file_path.endswith(".cmd"):
-                text_edit.highlighter.set_language("cmd")
-            elif file_path.endswith(".txt"):
-                text_edit.highlighter.set_language("text")
-            elif file_path.endswith(".ts"):
-                text_edit.highlighter.set_language("typescript")
-            elif file_path.endswith(".tsx"):
-                text_edit.highlighter.set_language("typescript")
-            elif file_path.endswith(".vue"):
-                text_edit.highlighter.set_language("vue")
-            elif file_path.endswith(".jsx"):
-                text_edit.highlighter.set_language("javascript")
-            elif file_path.endswith(".tsx"):
-                text_edit.highlighter.set_language("typescript")
-            elif file_path.endswith(".php"):
-                text_edit.highlighter.set_language("php")
-            elif file_path.endswith(".java"):
-                text_edit.highlighter.set_language("java")
-            elif file_path.endswith(".c"):
-                text_edit.highlighter.set_language("c")
-            else:
-                text_edit.highlighter.set_language("text")
+            language = LANGUAGE_MAP.get(file_path.split(".")[-1], "text")
+            print("language is", language, file_path)
+            text_edit.highlighter.set_language(language)
 
             # 添加新标签页
             file_name = os.path.basename(file_path)
