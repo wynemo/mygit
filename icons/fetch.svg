@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
   <style>
     .btn-circle {
@@ -9,6 +10,7 @@
       stroke-width: 5;
       fill: none;
       stroke-linecap: round;
+      stroke-dasharray: 5,5;  /* 添加虚线效果 */
     }
     .btn-text {
       fill: #333333;
@@ -24,11 +26,11 @@
   </style>
 
   <!-- 圆形按钮背景 -->
-  <circle class="btn-circle" cx="50" cy="45" r="35"/>
+  <circle class="btn-circle" cx="50" cy="50" r="35"/>
 
-  <!-- 向下箭头（获取） -->
-  <line class="btn-arrow" x1="50" y1="30" x2="50" y2="60"/>
-  <polyline class="btn-arrow" points="40,50 50,60 60,50"/>
+  <!-- 向下箭头（获取）- 使用虚线样式 -->
+  <line class="btn-arrow" x1="50" y1="35" x2="50" y2="65"/>
+  <polyline class="btn-arrow" points="40,55 50,65 60,55"/>
 
   <!-- 按钮文字 -->
   <text class="btn-text" x="50" y="90">获取</text>
