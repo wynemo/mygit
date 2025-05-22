@@ -32,6 +32,4 @@
   <line class="btn-arrow" x1="50" y1="35" x2="50" y2="65"/>
   <polyline class="btn-arrow" points="40,55 50,65 60,55"/>
 
-  <!-- 按钮文字 -->
-  <text class="btn-text" x="50" y="90">获取</text>
 </svg>
