@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
 
 from commit_dialog import CommitDialog
 from commit_history_view import CommitHistoryView
+from commit_detail_view import CommitDetailView
 from compare_view import CompareView
 from compare_with_working_dialog import CompareWithWorkingDialog
 from file_changes_view import FileChangesView
@@ -160,6 +161,7 @@ class GitManagerWindow(QMainWindow):
         # 创建主要视图组件
         self.commit_history_view = CommitHistoryView()  # 左侧
         self.file_changes_view = FileChangesView()  # 右侧
+        self.commit_detail_view = CommitDetailView()  # commit详细信息视图
 
         # 添加一个 CompareView, 默认隐藏, 点击"提交历史"也隐藏
         # 切换到单个文件历史的标签页时,才显示
@@ -190,9 +192,15 @@ class GitManagerWindow(QMainWindow):
         self.file_changes_view.file_selected.connect(self.on_file_selected)
         self.file_changes_view.compare_with_working_requested.connect(self.show_compare_with_working_dialog)
 
+        # 创建右侧垂直分割器，用于放置文件变化视图和commit详细信息视图
+        right_splitter = QSplitter(Qt.Orientation.Vertical)
+        right_splitter.addWidget(self.file_changes_view)
+        right_splitter.addWidget(self.commit_detail_view)
+        right_splitter.setSizes([300, 200])  # 设置初始比例
+
         # 添加到布局
         horizontal_splitter.addWidget(self.tab_widget)
-        horizontal_splitter.addWidget(self.file_changes_view)
+        horizontal_splitter.addWidget(right_splitter)
         horizontal_splitter.addWidget(self.compare_view)
 
         # 添加工作区浏览器
@@ -338,6 +346,8 @@ class GitManagerWindow(QMainWindow):
             return
         self.current_commit = self.git_manager.repo.commit(commit_hash)
         self.file_changes_view.update_changes(self.git_manager, self.current_commit)
+        # cursor生成 - 同时更新commit详细信息视图
+        self.commit_detail_view.update_commit_detail(self.git_manager, self.current_commit)
 
     def on_file_selected(self, file_path):
         """当选择文件时，在TabWidget中显示比较视图"""
@@ -447,10 +457,14 @@ class GitManagerWindow(QMainWindow):
         """当标签页改变时"""
         if index == 0:
             self.compare_view.hide()
-            self.file_changes_view.show()
+            # cursor生成 - 显示右侧分割器（包含文件变化视图和commit详细信息视图）
+            right_splitter = self.horizontal_splitter.widget(1)
+            right_splitter.show()
         else:
             self.compare_view.show()
-            self.file_changes_view.hide()
+            # cursor生成 - 隐藏右侧分割器
+            right_splitter = self.horizontal_splitter.widget(1)
+            right_splitter.hide()
 
     def update_toggle_button_icon(self):
         """更新切换按钮的图标"""
