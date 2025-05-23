@@ -1,8 +1,8 @@
 import logging
 import os
 
-from PyQt6.QtCore import QRect, QSize, Qt
-from PyQt6.QtGui import QColor, QFont, QPainter, QPen
+from PyQt6.QtCore import QRect, QSize, Qt, pyqtSignal
+from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QMouseEvent
 from PyQt6.QtWidgets import QMenu, QPlainTextEdit, QWidget
 
 from diff_highlighter import DiffHighlighter
@@ -20,8 +20,38 @@ class LineNumberArea(QWidget):
     def paintEvent(self, event):
         self.editor.line_number_area_paint_event(event)
 
+    def mousePressEvent(self, event: QMouseEvent):
+        if self.editor.showing_blame and self.editor.blame_annotations_per_line:
+            y_pos = event.pos().y()
+            block = self.editor.firstVisibleBlock()
+            block_number = block.blockNumber()
+            block_top = self.editor.blockBoundingGeometry(block).translated(self.editor.contentOffset()).top()
+            block_height = self.editor.blockBoundingRect(block).height()
+
+            if block_height == 0: # Avoid division by zero if block height is zero
+                super().mousePressEvent(event)
+                return
+
+            line_index = block_number + int((y_pos - block_top) / block_height)
+
+            if 0 <= line_index < len(self.editor.blame_annotations_per_line):
+                annotation = self.editor.blame_annotations_per_line[line_index]
+                if annotation and "commit_hash" in annotation:
+                    # Check if the click is within the blame annotation area
+                    # This is a simplified check, assuming blame text starts from PADDING_LEFT_OF_BLAME
+                    # and extends up to max_blame_display_width
+                    blame_area_width = self.editor.PADDING_LEFT_OF_BLAME + getattr(self.editor, 'max_blame_display_width', 0)
+                    if event.pos().x() < blame_area_width:
+                        full_hash = annotation.get("commit_hash", "")
+                        if full_hash:
+                            self.editor.blame_annotation_clicked.emit(full_hash)
+                            return # Event handled
+
+        super().mousePressEvent(event)
+
 
 class SyncedTextEdit(QPlainTextEdit):
+    blame_annotation_clicked = pyqtSignal(str)
     # Padding constants
     PADDING_LEFT_OF_BLAME = 5
     PADDING_AFTER_BLAME = 10
@@ -37,8 +67,9 @@ class SyncedTextEdit(QPlainTextEdit):
         logging.debug("只读模式: %s", self.isReadOnly())
 
         # Blame data storage
-        self.blame_data_full = []
-        self.blame_annotations_per_line = []
+        # self.blame_data_full will store the original dicts with full hashes
+        self.blame_data_full = [] 
+        self.blame_annotations_per_line = [] # Will store annotations with _display_string for painting
         self.showing_blame = False
         self.file_path = None  # Initialize file_path, can be set externally
 
@@ -64,30 +95,40 @@ class SyncedTextEdit(QPlainTextEdit):
 
     def set_blame_data(self, blame_data_list: list):
         self.max_blame_display_width = 0
-        processed_blame_data = []
-
+        # Store the full data separately, ensuring original commit_hash is preserved.
+        self.blame_data_full = list(blame_data_list) # Make a copy to avoid modifying the original list if it's passed by reference
+        
+        processed_for_display = []
         if blame_data_list:
-            for annotation in blame_data_list:
-                if annotation:  # Ensure annotation is not None
-                    commit_hash = annotation.get("commit_hash", "")
-                    author_name = annotation.get("author_name", "Unknown Author")
-                    committed_date = annotation.get("committed_date", "Unknown Date")
+            for original_annotation in self.blame_data_full:
+                if original_annotation:  # Ensure annotation is not None
+                    # Create a copy for display purposes to avoid altering blame_data_full's dicts
+                    display_annotation = dict(original_annotation)
+                    
+                    commit_hash_full = display_annotation.get("commit_hash", "")
+                    author_name = display_annotation.get("author_name", "Unknown Author")
+                    committed_date = display_annotation.get("committed_date", "Unknown Date")
 
-                    display_string = f"{commit_hash[:7]} {author_name} {committed_date}"
-                    annotation["_display_string"] = display_string
+                    # Use short hash for display string
+                    display_string = f"{commit_hash_full[:7]} {author_name} {committed_date}"
+                    display_annotation["_display_string"] = display_string
                     
                     calculated_width = self.fontMetrics().horizontalAdvance(display_string)
                     self.max_blame_display_width = max(self.max_blame_display_width, calculated_width)
-                
-                processed_blame_data.append(annotation)
+                    
+                    processed_for_display.append(display_annotation)
+                else:
+                    # Handle cases where an annotation might be None in the list
+                    processed_for_display.append(None) 
         
-        self.blame_annotations_per_line = processed_blame_data
+        self.blame_annotations_per_line = processed_for_display # This list is for display and click handling
         self.showing_blame = True
         self.update_line_number_area_width()
         self.viewport().update()
 
     def clear_blame_data(self):
         self.blame_annotations_per_line = []
+        self.blame_data_full = [] # Also clear the full data
         self.max_blame_display_width = 0  # Reset max width when clearing blame
         self.showing_blame = False
         self.update_line_number_area_width()

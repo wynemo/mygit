@@ -1,13 +1,18 @@
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
+import logging
 
 from diff_calculator import GitDiffCalculator
 from text_diff_viewer import DiffViewer, MergeDiffViewer
-
+# SyncedTextEdit is used within DiffViewer and MergeDiffViewer,
+# its blame_annotation_clicked signal will be connected from instances of these viewers.
 
 class CompareView(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setup_ui()
+
+    # _on_blame_annotation_clicked method is removed as its functionality is now centralized
+    # in GitManagerWindow.handle_blame_click_from_editor
 
     def setup_ui(self):
         layout = QVBoxLayout()
@@ -20,6 +25,17 @@ class CompareView(QWidget):
 
         layout.addWidget(self.diff_viewer)
         layout.addWidget(self.merge_diff_viewer)
+
+        # Signal connections for blame_annotation_clicked from SyncedTextEdit instances
+        # are removed from here. The connection is now established in WorkspaceExplorer.open_file_in_tab
+        # directly to GitManagerWindow.handle_blame_click_from_editor when SyncedTextEdit
+        # instances are created for files opened via WorkspaceExplorer.
+        # For SyncedTextEdit instances within DiffViewer/MergeDiffViewer (part of CompareView),
+        # if they are also opened via a mechanism that uses WorkspaceExplorer.open_file_in_tab,
+        # they would be covered. If they are created and managed solely by CompareView/DiffViewer
+        # without going through WorkspaceExplorer's file opening logic, their blame clicks
+        # would not be handled by the new centralized handler unless explicitly connected.
+        # The current task is to remove the CompareView-specific handler and its connections.
 
     def show_diff(self, git_manager, commit, file_path):
         """显示文件差异"""
