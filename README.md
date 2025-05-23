@@ -90,7 +90,7 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 11. ~~提交信息太长，或者有换行时，界面上显示不出来~~
 12. ~~标签页，增加关闭其他标签页的功能~~
 13. ~~把提交历史、文件历史，文件差异的视图，现在是在上方，需要放到下方，并且可以隐藏与显示~~
-14. 工作区的更改，可以在文件编辑器中显示
+14. 工作区的更改，可以在文件编辑器中显示，比如删除了一行，修改了几行，都需要显示出来
 15. commit_dialog.py 添加git push
 16. ~~在“提交历史”标签右边，增加git push按钮~~
 17. ~~在git commit 以后更新提交历史 CommitDialog.accept() commit_history_view update_history()~~
