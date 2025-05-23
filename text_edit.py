@@ -1,8 +1,9 @@
 import logging
+import os
 
 from PyQt6.QtCore import QRect, QSize, Qt
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen
-from PyQt6.QtWidgets import QPlainTextEdit, QWidget
+from PyQt6.QtWidgets import QMenu, QPlainTextEdit, QWidget
 
 from diff_highlighter import DiffHighlighter
 from settings import Settings
@@ -44,6 +45,40 @@ class SyncedTextEdit(QPlainTextEdit):
 
         # 初始化差异信息
         self.highlighter = None
+
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._show_context_menu)
+
+    def _show_context_menu(self, position):
+        menu = QMenu(self)
+        blame_action = menu.addAction("Show Blame")
+        blame_action.triggered.connect(self.show_blame)
+        menu.exec(self.mapToGlobal(position))
+
+    def show_blame(self):
+        main_window = self.parent()
+        while main_window and not hasattr(main_window, "git_manager"):
+            main_window = main_window.parent()
+
+        git_manager = main_window.git_manager
+        if not git_manager.repo:
+            logging.error("Git repository not initialized in GitManager.")
+            return
+
+        file_path = self.property("file_path")
+
+        if file_path:
+            relative_file_path = os.path.relpath(file_path, git_manager.repo_path)
+            blame_data = git_manager.get_blame_data(relative_file_path)
+            if not blame_data:
+                logging.error("No blame data found for %s", file_path)
+                return
+            self.blame_annotations_per_line = blame_data
+            self.showing_blame = True
+            self.update_line_number_area_width()
+            self.repaint()
+        else:
+            logging.error("file_path is not set")
 
     def setObjectName(self, name: str) -> None:
         super().setObjectName(name)
