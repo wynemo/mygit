@@ -53,7 +53,21 @@ class SyncedTextEdit(QPlainTextEdit):
         menu = QMenu(self)
         blame_action = menu.addAction("Show Blame")
         blame_action.triggered.connect(self.show_blame)
+        clear_blame_action = menu.addAction("Clear Blame")
+        clear_blame_action.triggered.connect(self.clear_blame_data)
         menu.exec(self.mapToGlobal(position))
+
+    def set_blame_data(self, blame_data_list: list):
+        self.blame_annotations_per_line = blame_data_list
+        self.showing_blame = True
+        self.update_line_number_area_width()
+        self.repaint()
+
+    def clear_blame_data(self):
+        self.blame_annotations_per_line = []
+        self.showing_blame = False
+        self.update_line_number_area_width()
+        self.repaint()
 
     def show_blame(self):
         main_window = self.parent()
@@ -70,13 +84,12 @@ class SyncedTextEdit(QPlainTextEdit):
         if file_path:
             relative_file_path = os.path.relpath(file_path, git_manager.repo_path)
             blame_data = git_manager.get_blame_data(relative_file_path)
-            if not blame_data:
+            if blame_data:
+                self.set_blame_data(blame_data)
+            else:
                 logging.error("No blame data found for %s", file_path)
-                return
-            self.blame_annotations_per_line = blame_data
-            self.showing_blame = True
-            self.update_line_number_area_width()
-            self.repaint()
+                # Optionally, clear existing blame data if new data fetch fails
+                # self.clear_blame_data() 
         else:
             logging.error("file_path is not set")
 

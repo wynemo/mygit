@@ -264,13 +264,17 @@ class FileTreeWidget(QTreeWidget):
             target_editor.clear_blame_data()
             print(f"Blame annotations hidden for {os.path.basename(file_path)}.")
         else:
-            while main_window and not hasattr(main_window, "git_manager"):
-                main_window = main_window.parent()
-            if not main_window or not hasattr(main_window, "git_manager"):
+            # Attempt to find GitManager instance by traversing up from main_window
+            # This part remains similar as it's about context/service location
+            git_manager_owner = main_window
+            while git_manager_owner and not hasattr(git_manager_owner, "git_manager"):
+                git_manager_owner = git_manager_owner.parent()
+            
+            if not git_manager_owner or not hasattr(git_manager_owner, "git_manager"):
                 print("GitManager not found.")
                 return
 
-            git_manager = main_window.git_manager
+            git_manager = git_manager_owner.git_manager
             if not git_manager.repo:
                 print("Git repository not initialized in GitManager.")
                 return
@@ -285,15 +289,7 @@ class FileTreeWidget(QTreeWidget):
             blame_data_list = git_manager.get_blame_data(relative_file_path)
 
             if blame_data_list:
-                # SyncedTextEdit needs to have its file_path attribute set for context if not already
-                # This is crucial if load_blame_data or other functions inside SyncedTextEdit
-                # depend on its own self.file_path.
-                # We assume SyncedTextEdit's file_path is already correctly set when the tab was opened.
-                target_editor.blame_annotations_per_line = blame_data_list
-                target_editor.showing_blame = True
-                target_editor.update_line_number_area_width()
-                target_editor.repaint()
-                # target_editor.load_blame_data(blame_data_list)
+                target_editor.set_blame_data(blame_data_list)
                 print(f"Blame annotations shown for {os.path.basename(file_path)}.")
             else:
                 print(f"No blame information available for {os.path.basename(file_path)}.")
