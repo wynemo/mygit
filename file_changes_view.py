@@ -58,7 +58,7 @@ class FileChangesView(QWidget):
 
         except Exception as e:
             error_item = QTreeWidgetItem(self.changes_tree)
-            error_item.setText(0, f"获取文件变化失败: {str(e)}")
+            error_item.setText(0, f"获取文件变化失败: {e!s}")
 
     def add_file_to_tree(self, path_parts, status, parent=None):
         """递归添加文件到树形结构"""
@@ -112,10 +112,6 @@ class FileChangesView(QWidget):
         if item and item.childCount() == 0:
             menu = QMenu()
             compare_action = QAction("与工作区比较", self)
-            compare_action.triggered.connect(
-                lambda: self.compare_with_working_requested.emit(
-                    self.get_full_path(item)
-                )
-            )
+            compare_action.triggered.connect(lambda: self.compare_with_working_requested.emit(self.get_full_path(item)))
             menu.addAction(compare_action)
             menu.exec(self.changes_tree.viewport().mapToGlobal(position))
