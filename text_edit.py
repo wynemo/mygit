@@ -22,6 +22,11 @@ class LineNumberArea(QWidget):
 
 
 class SyncedTextEdit(QPlainTextEdit):
+    # Padding constants
+    PADDING_LEFT_OF_BLAME = 5
+    PADDING_AFTER_BLAME = 10
+    PADDING_RIGHT_OF_LINENUM = 5
+
     def __init__(self, parent=None):
         super().__init__(parent)
         settings = Settings()
@@ -58,16 +63,35 @@ class SyncedTextEdit(QPlainTextEdit):
         menu.exec(self.mapToGlobal(position))
 
     def set_blame_data(self, blame_data_list: list):
-        self.blame_annotations_per_line = blame_data_list
+        self.max_blame_display_width = 0
+        processed_blame_data = []
+
+        if blame_data_list:
+            for annotation in blame_data_list:
+                if annotation:  # Ensure annotation is not None
+                    commit_hash = annotation.get("commit_hash", "")
+                    author_name = annotation.get("author_name", "Unknown Author")
+                    committed_date = annotation.get("committed_date", "Unknown Date")
+
+                    display_string = f"{commit_hash[:7]} {author_name} {committed_date}"
+                    annotation["_display_string"] = display_string
+                    
+                    calculated_width = self.fontMetrics().horizontalAdvance(display_string)
+                    self.max_blame_display_width = max(self.max_blame_display_width, calculated_width)
+                
+                processed_blame_data.append(annotation)
+        
+        self.blame_annotations_per_line = processed_blame_data
         self.showing_blame = True
         self.update_line_number_area_width()
-        self.repaint()
+        self.viewport().update()
 
     def clear_blame_data(self):
         self.blame_annotations_per_line = []
+        self.max_blame_display_width = 0  # Reset max width when clearing blame
         self.showing_blame = False
         self.update_line_number_area_width()
-        self.repaint()
+        self.viewport().update()
 
     def show_blame(self):
         main_window = self.parent()
@@ -101,31 +125,26 @@ class SyncedTextEdit(QPlainTextEdit):
             logging.debug("创建高亮器，类型: %s", name)
 
     def line_number_area_width(self):
-        digits = len(str(max(1, self.blockCount())))
-        base_space = 3 + self.fontMetrics().horizontalAdvance("9") * digits
+        line_digits = len(str(max(1, self.blockCount())))
+        line_num_text_width = self.fontMetrics().horizontalAdvance("9" * line_digits)
+        total_line_number_component_width = line_num_text_width + self.PADDING_RIGHT_OF_LINENUM
 
-        if self.showing_blame:
-            # Estimate width for blame annotations. This is a rough estimate.
-            # A more accurate way would be to calculate max width of current annotations.
-            # For now, let's assume an average annotation string length.
-            # Example: "abcdef0 Author 2023-01-01"
-            # This needs to be adjusted based on actual formatting and font.
-            # Let's use a fixed addition or calculate from self.blame_annotations_per_line
-            max_blame_width = 0
-            if self.blame_annotations_per_line:
-                for annotation in self.blame_annotations_per_line:
-                    if annotation:  # Check if annotation is not None or empty
-                        max_blame_width = max(
-                            max_blame_width,
-                            self.fontMetrics().horizontalAdvance(
-                                annotation["committed_date"] + "|" + annotation["author_name"]
-                            ),
-                        )
-            # Add some padding if blame is shown
-            blame_space = max_blame_width + 15 if max_blame_width > 0 else 0
-            base_space += blame_space
-
-        return base_space
+        if self.showing_blame and self.blame_annotations_per_line:
+            # Ensure max_blame_display_width is available and is a number
+            current_max_blame_width = getattr(self, 'max_blame_display_width', 0)
+            if not isinstance(current_max_blame_width, (int, float)):
+                current_max_blame_width = 0
+                
+            width = (
+                self.PADDING_LEFT_OF_BLAME
+                + current_max_blame_width
+                + self.PADDING_AFTER_BLAME
+                + total_line_number_component_width
+            )
+        else:
+            width = self.PADDING_LEFT_OF_BLAME + total_line_number_component_width
+        
+        return int(width)
 
     def update_line_number_area_width(self):
         self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)
@@ -144,7 +163,10 @@ class SyncedTextEdit(QPlainTextEdit):
     def line_number_area_paint_event(self, event):
         """绘制行号区域"""
         painter = QPainter(self.line_number_area)
-        painter.fillRect(event.rect(), QColor("#f0f0f0"))
+        painter.fillRect(event.rect(), QColor("#f0f0f0")) # Paint background
+
+        line_digits = len(str(max(1, self.blockCount())))
+        line_num_text_width = self.fontMetrics().horizontalAdvance("9" * line_digits)
 
         block = self.firstVisibleBlock()
         block_number = block.blockNumber()
@@ -153,30 +175,34 @@ class SyncedTextEdit(QPlainTextEdit):
 
         while block.isValid() and top <= event.rect().bottom():
             if block.isVisible() and bottom >= event.rect().top():
-                display_string = ""
+                current_block_height = self.blockBoundingRect(block).height()
+
+                # Line Number Drawing
+                line_number_string = str(block_number + 1)
+                x_start_for_linenum = self.line_number_area.width() - self.PADDING_RIGHT_OF_LINENUM - line_num_text_width
+                line_num_rect = QRect(int(x_start_for_linenum), int(top), int(line_num_text_width), int(current_block_height))
+                painter.setPen(QColor("#808080")) # Color for line numbers
+                painter.drawText(line_num_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, line_number_string)
+
+                # Blame Annotation Drawing
                 if self.showing_blame:
+                    annotation_display_string = ""
                     if (
                         block_number < len(self.blame_annotations_per_line)
                         and self.blame_annotations_per_line[block_number]
+                        and "_display_string" in self.blame_annotations_per_line[block_number]
                     ):
-                        annotation = self.blame_annotations_per_line[block_number]
-                        display_string = annotation["committed_date"] + "|" + annotation["author_name"]
-                    else:
-                        # Fallback if blame data is missing for this line (should ideally not happen for tracked lines)
-                        display_string = " " * 20  # Placeholder for alignment
-                    display_string += " | "  # Separator
+                        annotation_display_string = self.blame_annotations_per_line[block_number]['_display_string']
+                    
+                    if annotation_display_string: # Only draw if there's something to show
+                        max_width_for_blame_area = getattr(self, 'max_blame_display_width', 0)
+                        # Ensure max_width_for_blame_area is a number, otherwise default to 0
+                        if not isinstance(max_width_for_blame_area, (int, float)):
+                            max_width_for_blame_area = 0
 
-                display_string += str(block_number + 1)  # Line number
-
-                painter.setPen(QColor("#808080"))
-                painter.drawText(
-                    0,
-                    int(top),
-                    self.line_number_area.width() - 5,  # Adjust padding
-                    self.fontMetrics().height(),
-                    Qt.AlignmentFlag.AlignRight,  # Line numbers still right-aligned after blame info
-                    display_string,
-                )
+                        blame_rect = QRect(int(self.PADDING_LEFT_OF_BLAME), int(top), int(max_width_for_blame_area), int(current_block_height))
+                        painter.setPen(QColor("#333333")) # Color for blame text
+                        painter.drawText(blame_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, annotation_display_string)
 
             block = block.next()
             top = bottom
