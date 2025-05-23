@@ -102,3 +102,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 23. 工作区的文件，右键菜单，加入git annoation 支持;完成一半了
 24. git push 以后，需要有点提示；或者说界面上有点不同；同时增加推送中的交互
 25. 区别remote与local
+26. 点击git blame以后，又显示差异，参考jetbrains
