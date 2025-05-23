@@ -95,7 +95,7 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 16. ~~在“提交历史”标签右边，增加git push按钮~~
 17. ~~在git commit 以后更新提交历史 CommitDialog.accept() commit_history_view update_history()~~
 18. ~~工作区文件按字母顺序排序~~
-19. 多行commit信息换行显示，参考jetbrains ide，放在文件变化下面
+19. ~~多行commit信息换行显示，参考jetbrains ide，放在文件变化下面~~
 20. ~~接11的改动，在鼠标移动到提交历史上时，完整显示单行提交信息~~
 21. ~~“提交历史”标签，不可关闭，那么样式不需要一个“x“的关闭按钮~~
 22. ~~仓库需要优先显示默认分支~~
