@@ -103,4 +103,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 24. git push 以后，需要有点提示；或者说界面上有点不同；同时增加推送中的交互
 25. 区别remote与local
 26. 点击git blame以后，又显示差异，参考jetbrains
-27. git annoation 宽度不一致
+27. git annoation 宽度不一致 希望能计算出最宽的宽度 然后合理的显示
