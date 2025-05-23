@@ -12,10 +12,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-# BlameViewWidget is no longer used directly by _show_context_menu's "Git Blame" action.
-# It might be used elsewhere, or can be removed if this was its only use.
-# For now, let's assume it might be used by other parts, so we won't remove the import line itself,
-# but the _show_git_blame method that used it will be removed.
 from file_history_view import FileHistoryView
 from syntax_highlighter import CodeHighlighter
 from text_edit import SyncedTextEdit  # Ensure this is present
