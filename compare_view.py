@@ -1,8 +1,12 @@
+import contextlib
+
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from text_diff_viewer import DiffViewer, MergeDiffViewer
+
 # SyncedTextEdit is used within DiffViewer and MergeDiffViewer,
 # its blame_annotation_clicked signal will be connected from instances of these viewers.
+
 
 class CompareView(QWidget):
     def __init__(self, parent=None):
@@ -42,53 +46,43 @@ class CompareView(QWidget):
 
             # 获取当前提交的文件内容
             try:
-                current_content = (
-                    commit.tree[file_path]
-                    .data_stream.read()
-                    .decode("utf-8", errors="replace")
-                )
+                current_content = commit.tree[file_path].data_stream.read().decode("utf-8", errors="replace")
             except KeyError:
                 current_content = ""
 
             # 获取父提交的文件内容
             parent_content = ""
             if parents:
-                try:
-                    parent_content = (
-                        parents[0]
-                        .tree[file_path]
-                        .data_stream.read()
-                        .decode("utf-8", errors="replace")
-                    )
-                except KeyError:
-                    pass
+                with contextlib.suppress(KeyError):
+                    parent_content = parents[0].tree[file_path].data_stream.read().decode("utf-8", errors="replace")
 
             # 根据父提交数量选择显示模式
             if len(parents) <= 1:
                 self.diff_viewer.show()
                 self.merge_diff_viewer.hide()
                 parent_commit_hash = parents[0].hexsha if parents else None
-                self.diff_viewer.set_texts(parent_content, current_content, file_path, parent_commit_hash, commit.hexsha)
+                self.diff_viewer.set_texts(
+                    parent_content, current_content, file_path, parent_commit_hash, commit.hexsha
+                )
             else:
                 self.diff_viewer.hide()
                 self.merge_diff_viewer.show()
 
                 # 获取第二个父提交的内容
                 parent2_content = ""
-                try:
-                    parent2_content = (
-                        parents[1]
-                        .tree[file_path]
-                        .data_stream.read()
-                        .decode("utf-8", errors="replace")
-                    )
-                except KeyError:
-                    pass
+                with contextlib.suppress(KeyError):
+                    parent2_content = parents[1].tree[file_path].data_stream.read().decode("utf-8", errors="replace")
 
-                parent1_commit_hash = parents[0].hexsha # Assuming parents[0] exists for merge
-                parent2_commit_hash = parents[1].hexsha # Assuming parents[1] exists for merge
+                parent1_commit_hash = parents[0].hexsha  # Assuming parents[0] exists for merge
+                parent2_commit_hash = parents[1].hexsha  # Assuming parents[1] exists for merge
                 self.merge_diff_viewer.set_texts(
-                    parent_content, current_content, parent2_content, file_path, parent1_commit_hash, commit.hexsha, parent2_commit_hash
+                    parent_content,
+                    current_content,
+                    parent2_content,
+                    file_path,
+                    parent1_commit_hash,
+                    commit.hexsha,
+                    parent2_commit_hash,
                 )
 
         except Exception as e:
