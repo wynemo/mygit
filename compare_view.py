@@ -69,7 +69,8 @@ class CompareView(QWidget):
             if len(parents) <= 1:
                 self.diff_viewer.show()
                 self.merge_diff_viewer.hide()
-                self.diff_viewer.set_texts(parent_content, current_content)
+                parent_commit_hash = parents[0].hexsha if parents else None
+                self.diff_viewer.set_texts(parent_content, current_content, file_path, parent_commit_hash, commit.hexsha)
             else:
                 self.diff_viewer.hide()
                 self.merge_diff_viewer.show()
@@ -85,9 +86,11 @@ class CompareView(QWidget):
                     )
                 except KeyError:
                     pass
-
+                
+                parent1_commit_hash = parents[0].hexsha # Assuming parents[0] exists for merge
+                parent2_commit_hash = parents[1].hexsha # Assuming parents[1] exists for merge
                 self.merge_diff_viewer.set_texts(
-                    parent_content, current_content, parent2_content
+                    parent_content, current_content, parent2_content, file_path, parent1_commit_hash, commit.hexsha, parent2_commit_hash
                 )
 
         except Exception as e:

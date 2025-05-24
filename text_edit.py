@@ -72,6 +72,7 @@ class SyncedTextEdit(QPlainTextEdit):
         self.blame_annotations_per_line = [] # Will store annotations with _display_string for painting
         self.showing_blame = False
         self.file_path = None  # Initialize file_path, can be set externally
+        self.current_commit_hash: Optional[str] = None
 
         # 添加行号区域
         self.line_number_area = LineNumberArea(self)
@@ -139,24 +140,33 @@ class SyncedTextEdit(QPlainTextEdit):
         while main_window and not hasattr(main_window, "git_manager"):
             main_window = main_window.parent()
 
+        if not main_window or not hasattr(main_window, "git_manager") or not main_window.git_manager:
+            logging.error("Git manager not found or accessible from SyncedTextEdit.")
+            return
+
         git_manager = main_window.git_manager
         if not git_manager.repo:
             logging.error("Git repository not initialized in GitManager.")
             return
 
-        file_path = self.property("file_path")
+        file_path = self.file_path # Changed from self.property("file_path")
 
-        if file_path:
-            relative_file_path = os.path.relpath(file_path, git_manager.repo_path)
-            blame_data = git_manager.get_blame_data(relative_file_path)
-            if blame_data:
-                self.set_blame_data(blame_data)
-            else:
-                logging.error("No blame data found for %s", file_path)
-                # Optionally, clear existing blame data if new data fetch fails
-                # self.clear_blame_data() 
+        if not file_path: # Check if file_path is None or empty
+            logging.error("File path is not set in SyncedTextEdit. Cannot show blame.")
+            return
+
+        # Now that file_path is confirmed to be valid, proceed
+        relative_file_path = os.path.relpath(file_path, git_manager.repo_path)
+        commit_to_blame = self.current_commit_hash if self.current_commit_hash else "HEAD"
+        
+        blame_data = git_manager.get_blame_data(relative_file_path, commit_to_blame)
+        if blame_data:
+            self.set_blame_data(blame_data)
         else:
-            logging.error("file_path is not set")
+            # Log specific to no blame data, file_path is known to be set here
+            logging.error("No blame data found for %s at commit %s", relative_file_path, commit_to_blame)
+            # Optionally, clear existing blame data if new data fetch fails or to indicate no data
+            # self.clear_blame_data() 
 
     def setObjectName(self, name: str) -> None:
         super().setObjectName(name)
