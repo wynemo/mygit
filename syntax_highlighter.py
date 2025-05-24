@@ -30,9 +30,7 @@ class CodeHighlighter(QSyntaxHighlighter):
             self.lexer = lexers.get_lexer_by_name(language_name)
             logging.info(f"词法分析器已设置为: {language_name}")
         except ClassNotFound:
-            logging.warning(
-                f"未找到语言 '{language_name}' 的词法分析器，将使用纯文本模式。(Lexer for language '{language_name}' not found, using plain text mode.)"
-            )
+            logging.warning(f"未找到语言 '{language_name}' 的词法分析器，将使用纯文本模式。")
             self.lexer = lexers.get_lexer_by_name("text")  # Fallback to plain text
 
         try:
