@@ -1,7 +1,5 @@
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
-import logging
 
-from diff_calculator import GitDiffCalculator
 from text_diff_viewer import DiffViewer, MergeDiffViewer
 # SyncedTextEdit is used within DiffViewer and MergeDiffViewer,
 # its blame_annotation_clicked signal will be connected from instances of these viewers.
@@ -86,7 +84,7 @@ class CompareView(QWidget):
                     )
                 except KeyError:
                     pass
-                
+
                 parent1_commit_hash = parents[0].hexsha # Assuming parents[0] exists for merge
                 parent2_commit_hash = parents[1].hexsha # Assuming parents[1] exists for merge
                 self.merge_diff_viewer.set_texts(

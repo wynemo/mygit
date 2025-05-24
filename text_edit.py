@@ -2,7 +2,7 @@ import logging
 import os
 
 from PyQt6.QtCore import QRect, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QMouseEvent
+from PyQt6.QtGui import QColor, QFont, QMouseEvent, QPainter, QPen
 from PyQt6.QtWidgets import QMenu, QPlainTextEdit, QWidget
 
 from diff_highlighter import DiffHighlighter
@@ -28,7 +28,7 @@ class LineNumberArea(QWidget):
             block_top = self.editor.blockBoundingGeometry(block).translated(self.editor.contentOffset()).top()
             block_height = self.editor.blockBoundingRect(block).height()
 
-            if block_height == 0: # Avoid division by zero if block height is zero
+            if block_height == 0:  # Avoid division by zero if block height is zero
                 super().mousePressEvent(event)
                 return
 
@@ -40,12 +40,14 @@ class LineNumberArea(QWidget):
                     # Check if the click is within the blame annotation area
                     # This is a simplified check, assuming blame text starts from PADDING_LEFT_OF_BLAME
                     # and extends up to max_blame_display_width
-                    blame_area_width = self.editor.PADDING_LEFT_OF_BLAME + getattr(self.editor, 'max_blame_display_width', 0)
+                    blame_area_width = self.editor.PADDING_LEFT_OF_BLAME + getattr(
+                        self.editor, "max_blame_display_width", 0
+                    )
                     if event.pos().x() < blame_area_width:
                         full_hash = annotation.get("commit_hash", "")
                         if full_hash:
                             self.editor.blame_annotation_clicked.emit(full_hash)
-                            return # Event handled
+                            return  # Event handled
 
         super().mousePressEvent(event)
 
@@ -68,8 +70,8 @@ class SyncedTextEdit(QPlainTextEdit):
 
         # Blame data storage
         # self.blame_data_full will store the original dicts with full hashes
-        self.blame_data_full = [] 
-        self.blame_annotations_per_line = [] # Will store annotations with _display_string for painting
+        self.blame_data_full = []
+        self.blame_annotations_per_line = []  # Will store annotations with _display_string for painting
         self.showing_blame = False
         self.file_path = None  # Initialize file_path, can be set externally
         self.current_commit_hash: Optional[str] = None
@@ -97,15 +99,17 @@ class SyncedTextEdit(QPlainTextEdit):
     def set_blame_data(self, blame_data_list: list):
         self.max_blame_display_width = 0
         # Store the full data separately, ensuring original commit_hash is preserved.
-        self.blame_data_full = list(blame_data_list) # Make a copy to avoid modifying the original list if it's passed by reference
-        
+        self.blame_data_full = list(
+            blame_data_list
+        )  # Make a copy to avoid modifying the original list if it's passed by reference
+
         processed_for_display = []
         if blame_data_list:
             for original_annotation in self.blame_data_full:
                 if original_annotation:  # Ensure annotation is not None
                     # Create a copy for display purposes to avoid altering blame_data_full's dicts
                     display_annotation = dict(original_annotation)
-                    
+
                     commit_hash_full = display_annotation.get("commit_hash", "")
                     author_name = display_annotation.get("author_name", "Unknown Author")
                     committed_date = display_annotation.get("committed_date", "Unknown Date")
@@ -113,23 +117,23 @@ class SyncedTextEdit(QPlainTextEdit):
                     # Use short hash for display string
                     display_string = f"{commit_hash_full[:7]} {author_name} {committed_date}"
                     display_annotation["_display_string"] = display_string
-                    
+
                     calculated_width = self.fontMetrics().horizontalAdvance(display_string)
                     self.max_blame_display_width = max(self.max_blame_display_width, calculated_width)
-                    
+
                     processed_for_display.append(display_annotation)
                 else:
                     # Handle cases where an annotation might be None in the list
-                    processed_for_display.append(None) 
-        
-        self.blame_annotations_per_line = processed_for_display # This list is for display and click handling
+                    processed_for_display.append(None)
+
+        self.blame_annotations_per_line = processed_for_display  # This list is for display and click handling
         self.showing_blame = True
         self.update_line_number_area_width()
         self.viewport().update()
 
     def clear_blame_data(self):
         self.blame_annotations_per_line = []
-        self.blame_data_full = [] # Also clear the full data
+        self.blame_data_full = []  # Also clear the full data
         self.max_blame_display_width = 0  # Reset max width when clearing blame
         self.showing_blame = False
         self.update_line_number_area_width()
@@ -149,16 +153,16 @@ class SyncedTextEdit(QPlainTextEdit):
             logging.error("Git repository not initialized in GitManager.")
             return
 
-        file_path = self.file_path # Changed from self.property("file_path")
+        file_path = self.file_path  # Changed from self.property("file_path")
 
-        if not file_path: # Check if file_path is None or empty
+        if not file_path:  # Check if file_path is None or empty
             logging.error("File path is not set in SyncedTextEdit. Cannot show blame.")
             return
 
         # Now that file_path is confirmed to be valid, proceed
         relative_file_path = os.path.relpath(file_path, git_manager.repo_path)
         commit_to_blame = self.current_commit_hash if self.current_commit_hash else "HEAD"
-        
+
         blame_data = git_manager.get_blame_data(relative_file_path, commit_to_blame)
         if blame_data:
             self.set_blame_data(blame_data)
@@ -166,7 +170,7 @@ class SyncedTextEdit(QPlainTextEdit):
             # Log specific to no blame data, file_path is known to be set here
             logging.error("No blame data found for %s at commit %s", relative_file_path, commit_to_blame)
             # Optionally, clear existing blame data if new data fetch fails or to indicate no data
-            # self.clear_blame_data() 
+            # self.clear_blame_data()
 
     def setObjectName(self, name: str) -> None:
         super().setObjectName(name)
@@ -182,10 +186,10 @@ class SyncedTextEdit(QPlainTextEdit):
 
         if self.showing_blame and self.blame_annotations_per_line:
             # Ensure max_blame_display_width is available and is a number
-            current_max_blame_width = getattr(self, 'max_blame_display_width', 0)
+            current_max_blame_width = getattr(self, "max_blame_display_width", 0)
             if not isinstance(current_max_blame_width, (int, float)):
                 current_max_blame_width = 0
-                
+
             width = (
                 self.PADDING_LEFT_OF_BLAME
                 + current_max_blame_width
@@ -194,7 +198,7 @@ class SyncedTextEdit(QPlainTextEdit):
             )
         else:
             width = self.PADDING_LEFT_OF_BLAME + total_line_number_component_width
-        
+
         return int(width)
 
     def update_line_number_area_width(self):
@@ -214,7 +218,7 @@ class SyncedTextEdit(QPlainTextEdit):
     def line_number_area_paint_event(self, event):
         """绘制行号区域"""
         painter = QPainter(self.line_number_area)
-        painter.fillRect(event.rect(), QColor("#f0f0f0")) # Paint background
+        painter.fillRect(event.rect(), QColor("#f0f0f0"))  # Paint background
 
         line_digits = len(str(max(1, self.blockCount())))
         line_num_text_width = self.fontMetrics().horizontalAdvance("9" * line_digits)
@@ -230,10 +234,16 @@ class SyncedTextEdit(QPlainTextEdit):
 
                 # Line Number Drawing
                 line_number_string = str(block_number + 1)
-                x_start_for_linenum = self.line_number_area.width() - self.PADDING_RIGHT_OF_LINENUM - line_num_text_width
-                line_num_rect = QRect(int(x_start_for_linenum), int(top), int(line_num_text_width), int(current_block_height))
-                painter.setPen(QColor("#808080")) # Color for line numbers
-                painter.drawText(line_num_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, line_number_string)
+                x_start_for_linenum = (
+                    self.line_number_area.width() - self.PADDING_RIGHT_OF_LINENUM - line_num_text_width
+                )
+                line_num_rect = QRect(
+                    int(x_start_for_linenum), int(top), int(line_num_text_width), int(current_block_height)
+                )
+                painter.setPen(QColor("#808080"))  # Color for line numbers
+                painter.drawText(
+                    line_num_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, line_number_string
+                )
 
                 # Blame Annotation Drawing
                 if self.showing_blame:
@@ -243,17 +253,26 @@ class SyncedTextEdit(QPlainTextEdit):
                         and self.blame_annotations_per_line[block_number]
                         and "_display_string" in self.blame_annotations_per_line[block_number]
                     ):
-                        annotation_display_string = self.blame_annotations_per_line[block_number]['_display_string']
-                    
-                    if annotation_display_string: # Only draw if there's something to show
-                        max_width_for_blame_area = getattr(self, 'max_blame_display_width', 0)
+                        annotation_display_string = self.blame_annotations_per_line[block_number]["_display_string"]
+
+                    if annotation_display_string:  # Only draw if there's something to show
+                        max_width_for_blame_area = getattr(self, "max_blame_display_width", 0)
                         # Ensure max_width_for_blame_area is a number, otherwise default to 0
                         if not isinstance(max_width_for_blame_area, (int, float)):
                             max_width_for_blame_area = 0
 
-                        blame_rect = QRect(int(self.PADDING_LEFT_OF_BLAME), int(top), int(max_width_for_blame_area), int(current_block_height))
-                        painter.setPen(QColor("#333333")) # Color for blame text
-                        painter.drawText(blame_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, annotation_display_string)
+                        blame_rect = QRect(
+                            int(self.PADDING_LEFT_OF_BLAME),
+                            int(top),
+                            int(max_width_for_blame_area),
+                            int(current_block_height),
+                        )
+                        painter.setPen(QColor("#333333"))  # Color for blame text
+                        painter.drawText(
+                            blame_rect,
+                            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                            annotation_display_string,
+                        )
 
             block = block.next()
             top = bottom
