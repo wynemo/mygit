@@ -55,9 +55,7 @@ class CodeHighlighter(QSyntaxHighlighter):
                 if style_definition["underline"]:
                     qt_format.setFontUnderline(True)
                 self.style_formats[token_type] = qt_format
-            # logging.debug(f"语法高亮样式已从 '{style.name}' 加载。(Syntax highlighting style loaded from '{style.name}'.)")
         except ClassNotFound:
-            # logging.error(f"未找到Pygments样式。(Pygments style not found.)")
             self.style_formats = {}  # 出错时清空样式 (Clear styles on error)
 
     def set_language(self, language_name):
@@ -73,7 +71,6 @@ class CodeHighlighter(QSyntaxHighlighter):
         self.setFormat(0, len(text), self.default_text_format)
 
         if self.lexer:
-            # logging.debug(f"Pygments 语法高亮: 应用于文本 '{text[:30]}...' (Pygments syntax highlighting: Applying to text '{text[:30]}...')")
             try:
                 for index, token_type, token_text in self.lexer.get_tokens_unprocessed(text):
                     if token_type in self.style_formats:
@@ -81,7 +78,6 @@ class CodeHighlighter(QSyntaxHighlighter):
                         syntax_format = self.style_formats[token_type]
                         # 应用格式 (Apply format)
                         self.setFormat(index, len(token_text), syntax_format)
-            except Exception as e:
-                # logging.error(f"Pygments 词法分析时出错 (Error during Pygments tokenization): {e}")
+            except Exception:
                 # Fallback: 确保在出错时至少应用默认格式 (Fallback: ensure default format is applied if error)
                 self.setFormat(0, len(text), self.default_text_format)
