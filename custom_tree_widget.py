@@ -26,7 +26,6 @@ class CustomTreeWidget(QTreeWidget):
         """Sets the columns for which hover reveal is active."""
         self.hover_reveal_columns = columns
 
-
     def _ensure_overlay_label(self):
         if self._overlay_label is None:
             # 父对象设置为viewport，这样它的坐标和滚动能与树内容同步
@@ -132,7 +131,7 @@ class CustomTreeWidget(QTreeWidget):
     def focusOutEvent(self, event):
         super().focusOutEvent(event)
         self.hide_overlay()
-    
+
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
         pos = event.pos()
