@@ -532,36 +532,52 @@ class GitManagerWindow(QMainWindow):
         short_hash_to_find = commit_hash[:7]
         found_item = None
 
+        # Initial search
         for i in range(history_list.topLevelItemCount()):
             item = history_list.topLevelItem(i)
             if item and item.text(0) == short_hash_to_find:
                 found_item = item
                 break
 
+        # If not found and not all commits are loaded, try loading more
+        if not found_item and not self.commit_history_view._all_loaded:
+            logging.info(
+                f"GitManagerWindow: Commit {short_hash_to_find} not found initially, attempting to load more commits."
+            )
+            while not found_item and not self.commit_history_view._all_loaded:
+                self.commit_history_view.load_more_commits()
+                # Re-search after loading more
+                for i in range(history_list.topLevelItemCount()):
+                    item = history_list.topLevelItem(i)
+                    if item and item.text(0) == short_hash_to_find:
+                        found_item = item
+                        break
+                if found_item:
+                    logging.info(f"GitManagerWindow: Found commit {short_hash_to_find} after loading more.")
+                    break
+                if self.commit_history_view._all_loaded:
+                    logging.info(
+                        f"GitManagerWindow: All commits loaded, but commit {short_hash_to_find} still not found."
+                    )
+                    break
+
         if found_item:
             history_list.setCurrentItem(found_item)
-            # Using integer value 2 for QAbstractItemView.ScrollHint.PositionAtCenter
             history_list.scrollToItem(found_item, QAbstractItemView.ScrollHint.PositionAtCenter)
 
             if hasattr(self.commit_history_view, "on_commit_clicked"):
-                # Assuming on_commit_clicked in CommitHistoryView expects (item, column)
-                # as it's typically connected to itemClicked.
-                # However, previous instruction was on_commit_clicked(item).
-                # For consistency with prior implementation in CompareView and task description:
                 self.commit_history_view.on_commit_clicked(found_item)
-                # If it needs (item, column): self.commit_history_view.on_commit_clicked(found_item, 0)
             else:
                 logging.error("GitManagerWindow: on_commit_clicked method not found in commit_history_view.")
-                # Not returning here, as tab switch might still be useful.
 
             if hasattr(self, "tab_widget") and self.tab_widget:
-                # Assuming "提交历史" (Commit History) tab is at index 0
-                self.tab_widget.setCurrentIndex(0)
+                self.tab_widget.setCurrentIndex(0)  # Switch to "提交历史" tab
                 logging.info(f"GitManagerWindow: Switched to '提交历史' tab and selected commit {short_hash_to_find}.")
             else:
                 logging.warning("GitManagerWindow: tab_widget not found, cannot switch tabs.")
-            return
-
-        logging.warning(
-            f"GitManagerWindow: Commit {short_hash_to_find} (full: {commit_hash}) not found in history_list."
-        )
+        else:
+            # This 'else' corresponds to the 'if found_item:' after the loop or initial find.
+            # It should be at the same indentation level.
+            logging.warning(
+                f"GitManagerWindow: Commit {short_hash_to_find} (full: {commit_hash}) not found in history_list even after attempting to load all."
+            )

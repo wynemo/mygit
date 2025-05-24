@@ -1,149 +1,217 @@
 import unittest
-from unittest.mock import MagicMock, patch, mock_open
-import sys
-import os
+from unittest.mock import MagicMock, patch
+from PyQt6.QtWidgets import QApplication, QTreeWidget, QComboBox, QWidget
 
-from PyQt6.QtWidgets import QApplication, QTreeWidgetItem
-from PyQt6.QtCore import QPoint, Qt, QEvent
-from PyQt6.QtGui import QMouseEvent
+# Application imports
+from git_manager_window import GitManagerWindow
+# CommitHistoryView is used by GitManagerWindow, but we directly interact with window.commit_history_view
+# from commit_history_view import CommitHistoryView 
+from git_manager import GitManager
 
-# Add project root to sys.path to allow importing project modules
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+class TestBlameAnnotationClick(unittest.TestCase):
 
-from main_window import GitManagerWindow
-# CompareView is no longer the primary target for this test's SyncedTextEdit
-# from compare_view import CompareView 
-from commit_history_view import CommitHistoryView
-from text_edit import SyncedTextEdit, LineNumberArea
-from workspace_explorer import WorkspaceExplorer
+    app = None
 
-
-# Ensure a QApplication instance exists for testing PyQt widgets
-app = QApplication.instance()
-if app is None:
-    app = QApplication(sys.argv)
-
-class TestBlameAnnotationClickWorkspace(unittest.TestCase): # Renamed for clarity
     @classmethod
     def setUpClass(cls):
-        cls.git_manager_patcher = patch('git_manager.GitManager')
-        cls.MockGitManager = cls.git_manager_patcher.start()
-        
-        cls.mock_git_manager_instance = cls.MockGitManager.return_value
-        cls.mock_git_manager_instance.repo_path = "/tmp/mockrepo"
-        # Default blame data for get_blame_data, will be overridden in setUp
-        cls.mock_git_manager_instance.get_blame_data.return_value = [] 
+        # Ensure a QApplication instance exists for testing Qt widgets
+        cls.app = QApplication.instance()
+        if cls.app is None:
+            cls.app = QApplication([])
+            # Store a flag if we created it, to clean up if necessary
+            cls._created_qapplication = True
+
 
     @classmethod
     def tearDownClass(cls):
-        cls.git_manager_patcher.stop()
+        # Clean up QApplication if it was created by this test class
+        if hasattr(cls, '_created_qapplication') and cls._created_qapplication:
+            if QApplication.instance() is not None: # Check if it still exists
+                QApplication.instance().quit() 
+        cls.app = None
 
-    def setUp(self):
-        """Set up the test environment before each test method."""
-        self.main_window = GitManagerWindow(testing_mode=True)
-        self.workspace_explorer = self.main_window.workspace_explorer
-        self.commit_history_view = self.main_window.commit_history_view
 
-        self.commit_history_view.history_list.clear()
+    def generate_mock_commits(self, count):
+        commits = []
+        # Generate hashes where the first 7 characters are unique
+        base_alphabet = "abcdef0123456789"
+        for i in range(count):
+            # Create a unique 7-char prefix, then fill the rest
+            unique_prefix = f"{i:07d}" # e.g., "0000000", "0000001"
+            remaining_chars = "".join(base_alphabet[(i + j) % len(base_alphabet)] for j in range(40 - 7))
+            full_hash = unique_prefix + remaining_chars
+            commits.append({
+                "hash": full_hash,
+                "message": f"Commit message {i}",
+                "author": "Test Author",
+                "date": "2023-01-01 10:00:00"
+            })
+        return commits
+
+    def test_blame_click_loads_older_commit(self):
+        # 1. Mock GitManager
+        mock_git_manager = MagicMock(spec=GitManager)
+        total_commits = 15 
+        mock_commits_data = self.generate_mock_commits(total_commits)
         
-        self.commit_hashes = {
-            "abcdef0": "abcdef0123456789abcdef0123456789abcdef0",
-            "1234567": "1234567890123456789012345678901234567890",
-            "fedcba9": "fedcba9876543210fedcba9876543210fedcba9"
-        }
-        for short_hash in self.commit_hashes.keys():
-            item = QTreeWidgetItem([short_hash, "Test Author", "Test Date", "Test Message"])
-            self.commit_history_view.history_list.addTopLevelItem(item)
+        def mock_get_commit_history(branch, limit, skip):
+            return mock_commits_data[skip : skip + limit]
 
-        self.sample_blame_data = [
-            {'commit_hash': self.commit_hashes["abcdef0"], 'author_name': 'Author A', 'committed_date': '2023-01-01', 'line_no': 1}, # _display_string is added by set_blame_data
-            {'commit_hash': self.commit_hashes["1234567"], 'author_name': 'Author B', 'committed_date': '2023-01-02', 'line_no': 2},
-            {'commit_hash': self.commit_hashes["fedcba9"], 'author_name': 'Author C', 'committed_date': '2023-01-03', 'line_no': 3},
-        ]
+        mock_git_manager.get_commit_history.side_effect = mock_get_commit_history
         
-        # Patch GitManager's get_blame_data to return our sample data for the show_blame call
-        self.mock_git_manager_instance.get_blame_data.return_value = self.sample_blame_data
+        mock_git_manager.repo = MagicMock()
+        mocked_commit_obj_for_selection = MagicMock() 
+        mock_git_manager.repo.commit = MagicMock(return_value=mocked_commit_obj_for_selection)
+        mock_git_manager.get_branches = MagicMock(return_value=["main", "test_branch"])
+        mock_git_manager.get_default_branch = MagicMock(return_value="main")
+        mock_git_manager.initialize = MagicMock(return_value=True) 
 
-        self.mock_file_path = os.path.join(self.mock_git_manager_instance.repo_path, "test_file.py")
+
+        # 2. Instantiate GitManagerWindow
+        with patch('git_manager_window.Settings', MagicMock()) as mock_settings_constructor:
+            mock_settings_instance = mock_settings_constructor.return_value
+            mock_settings_instance.get_last_folder.return_value = None 
+            mock_settings_instance.settings = {} 
+
+            window = GitManagerWindow()
+
+        # 3. Configure CommitHistoryView
+        initial_load_batch_size = 5
+        window.commit_history_view.load_batch_size = initial_load_batch_size
         
-        # Mock builtins.open for workspace_explorer.open_file_in_tab
-        mock_file_content = "Line 1 content\nLine 2 content\nLine 3 content\nLine 4 content"
-        with patch('builtins.open', new_callable=mock_open, read_data=mock_file_content):
-            self.workspace_explorer.open_file_in_tab(self.mock_file_path)
+        window.git_manager = mock_git_manager
         
-        self.synced_text_edit = self.workspace_explorer.tab_widget.currentWidget()
-        self.assertIsInstance(self.synced_text_edit, SyncedTextEdit, "WorkspaceExplorer did not open SyncedTextEdit.")
+        if hasattr(window.branch_combo, 'currentTextChanged') and window.branch_combo.currentTextChanged is not None:
+            try:
+                window.branch_combo.currentTextChanged.disconnect()
+            except TypeError: 
+                pass 
         
-        # Call show_blame() on the SyncedTextEdit instance.
-        # show_blame() internally calls git_manager.get_blame_data and then set_blame_data().
-        # The SyncedTextEdit needs its file_path property set, which open_file_in_tab should do.
-        self.assertEqual(self.synced_text_edit.property("file_path"), self.mock_file_path)
-        self.synced_text_edit.show_blame() # This will use the patched get_blame_data
+        window.update_branches() 
+        window.branch_combo.setCurrentText("test_branch") 
+        window.update_commit_history() 
 
-        # Ensure blame data is actually loaded for the test to be valid
-        self.assertTrue(self.synced_text_edit.showing_blame, "Blame data not showing in SyncedTextEdit after show_blame().")
-        self.assertEqual(len(self.synced_text_edit.blame_annotations_per_line), len(self.sample_blame_data))
+        self.assertEqual(window.commit_history_view.history_list.topLevelItemCount(), initial_load_batch_size, "Initial load incorrect")
+        self.assertFalse(window.commit_history_view._all_loaded, "Should not be all loaded initially")
 
-        # Patch GitManagerWindow.handle_blame_click_from_editor
-        self.main_window.handle_blame_click_from_editor = MagicMock(
-            wraps=self.main_window.handle_blame_click_from_editor
-        )
+        # 4. Target Commit
+        target_commit_index = 7 
+        self.assertTrue(target_commit_index >= initial_load_batch_size, "Target commit should be outside initial load")
+        target_commit_hash = mock_commits_data[target_commit_index]["hash"]
+        short_target_hash = target_commit_hash[:7] 
         
-        # Mock the on_commit_clicked method of CommitHistoryView
-        self.commit_history_view.on_commit_clicked = MagicMock(
-            wraps=self.commit_history_view.on_commit_clicked
-        )
+        mocked_commit_obj_for_selection.hexsha = target_commit_hash 
+        mock_git_manager.repo.commit = MagicMock(return_value=mocked_commit_obj_for_selection)
 
-    def test_blame_click_handled_by_gitmanagerwindow(self):
-        """Test blame click in WorkspaceExplorer's editor is handled by GitManagerWindow."""
-        target_line_index = 1 # Corresponds to sample_blame_data[1], short hash "1234567"
-        target_commit_short_hash = "1234567"
-        expected_full_hash = self.commit_hashes[target_commit_short_hash]
+        found_before_click = False
+        for i in range(window.commit_history_view.history_list.topLevelItemCount()):
+            item_short_hash = window.commit_history_view.history_list.topLevelItem(i).text(0)
+            if item_short_hash == short_target_hash:
+                found_before_click = True
+                break
+        self.assertFalse(found_before_click, f"Target commit {short_target_hash} should not be loaded yet. Loaded items: {[window.commit_history_view.history_list.topLevelItem(i).text(0) for i in range(window.commit_history_view.history_list.topLevelItemCount())]}")
 
-        line_number_area = self.synced_text_edit.line_number_area
+        # 5. Simulate Blame Click
+        window.handle_blame_click_from_editor(target_commit_hash)
 
-        block = self.synced_text_edit.document().findBlockByNumber(target_line_index)
-        if not block.isValid():
-            self.fail(f"Block for line index {target_line_index} is not valid.")
-
-        block_top = self.synced_text_edit.blockBoundingGeometry(block).translated(self.synced_text_edit.contentOffset()).top()
-        block_height = self.synced_text_edit.blockBoundingRect(block).height()
-        click_y = int(block_top + block_height / 2)
-        click_x = self.synced_text_edit.PADDING_LEFT_OF_BLAME + 5 
-
-        mouse_event = QMouseEvent(
-            QEvent.Type.MouseButtonPress, QPoint(click_x, click_y),
-            Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier
-        )
-
-        line_number_area.mousePressEvent(mouse_event)
-        QApplication.processEvents()
-
-        # Assert that GitManagerWindow.handle_blame_click_from_editor was called
-        self.main_window.handle_blame_click_from_editor.assert_called_once_with(expected_full_hash)
-
-        # Assert UI updates triggered by handle_blame_click_from_editor
-        current_history_item = self.commit_history_view.history_list.currentItem()
-        self.assertIsNotNone(current_history_item, "No item selected in commit history.")
-        self.assertEqual(current_history_item.text(0), target_commit_short_hash, "Incorrect commit selected.")
-
-        # Assert that CommitHistoryView.on_commit_clicked was called by the handler
-        # The handler calls it with just the item.
-        self.commit_history_view.on_commit_clicked.assert_called_once_with(current_history_item)
-
-        self.assertEqual(self.main_window.tab_widget.currentIndex(), 0, "Commit history tab not selected.")
-
-    def tearDown(self):
-        """Clean up after each test method."""
-        # Close any tabs opened in workspace_explorer
-        if self.workspace_explorer and self.workspace_explorer.tab_widget:
-            while self.workspace_explorer.tab_widget.count() > 0:
-                self.workspace_explorer.tab_widget.removeTab(0)
+        # 6. Verify Commit Selection
+        current_item = window.commit_history_view.history_list.currentItem()
+        self.assertIsNotNone(current_item, "No item selected after blame click")
+        self.assertEqual(current_item.text(0), short_target_hash, "Incorrect commit selected")
         
-        self.main_window.close()
-        # QApplication.processEvents() # Process events from closing, if necessary
+        expected_loaded_count = initial_load_batch_size * 2 
+        self.assertEqual(window.commit_history_view.history_list.topLevelItemCount(), expected_loaded_count, "More commits should have been loaded")
+        self.assertEqual(window.commit_history_view.loaded_count, expected_loaded_count, "loaded_count property incorrect")
 
-if __name__ == "__main__":
+        # 7. Verify Tab Switch
+        self.assertEqual(window.tab_widget.currentIndex(), 0, "'提交历史' tab not selected")
+
+        if expected_loaded_count >= total_commits : 
+            self.assertTrue(window.commit_history_view._all_loaded, "_all_loaded should be true if all commits are now loaded")
+        else:
+            self.assertFalse(window.commit_history_view._all_loaded, "_all_loaded should be false if not all commits are loaded")
+
+    def test_blame_click_loads_commit_when_all_commits_needed(self):
+        # 1. Mock GitManager
+        mock_git_manager = MagicMock(spec=GitManager)
+        total_commits = 8  # e.g. 3 batches: 0-2, 3-5, 6-7
+        mock_commits_data = self.generate_mock_commits(total_commits)
+        
+        def mock_get_commit_history(branch, limit, skip):
+            return mock_commits_data[skip : skip + limit]
+
+        mock_git_manager.get_commit_history.side_effect = mock_get_commit_history
+        
+        mock_git_manager.repo = MagicMock()
+        mocked_commit_obj_for_selection = MagicMock() 
+        mock_git_manager.repo.commit = MagicMock(return_value=mocked_commit_obj_for_selection)
+        mock_git_manager.get_branches = MagicMock(return_value=["main", "test_branch"])
+        mock_git_manager.get_default_branch = MagicMock(return_value="main")
+        mock_git_manager.initialize = MagicMock(return_value=True) 
+
+        # 2. Instantiate GitManagerWindow
+        with patch('git_manager_window.Settings', MagicMock()) as mock_settings_constructor:
+            mock_settings_instance = mock_settings_constructor.return_value
+            mock_settings_instance.get_last_folder.return_value = None 
+            mock_settings_instance.settings = {}
+
+            window = GitManagerWindow()
+
+        # 3. Configure CommitHistoryView
+        initial_load_batch_size = 3 # Small batch size
+        window.commit_history_view.load_batch_size = initial_load_batch_size
+        
+        window.git_manager = mock_git_manager
+        
+        if hasattr(window.branch_combo, 'currentTextChanged') and window.branch_combo.currentTextChanged is not None:
+            try:
+                window.branch_combo.currentTextChanged.disconnect()
+            except TypeError: 
+                pass 
+        
+        window.update_branches() 
+        window.branch_combo.setCurrentText("test_branch") 
+        window.update_commit_history() 
+
+        self.assertEqual(window.commit_history_view.history_list.topLevelItemCount(), initial_load_batch_size, "Initial load incorrect")
+        self.assertFalse(window.commit_history_view._all_loaded, "Should not be all loaded initially after first batch")
+
+        # 4. Target Commit - e.g., the second to last commit (index 6 for total_commits=8)
+        # This should force loading all batches.
+        target_commit_index = total_commits - 2 # Commit index 6
+        self.assertTrue(target_commit_index >= initial_load_batch_size, "Target commit should be outside initial load")
+        target_commit_hash = mock_commits_data[target_commit_index]["hash"]
+        short_target_hash = target_commit_hash[:7]
+        
+        mocked_commit_obj_for_selection.hexsha = target_commit_hash 
+        mock_git_manager.repo.commit = MagicMock(return_value=mocked_commit_obj_for_selection)
+
+        found_before_click = False
+        for i in range(window.commit_history_view.history_list.topLevelItemCount()):
+            item_short_hash = window.commit_history_view.history_list.topLevelItem(i).text(0)
+            if item_short_hash == short_target_hash:
+                found_before_click = True
+                break
+        self.assertFalse(found_before_click, f"Target commit {short_target_hash} should not be loaded yet.")
+
+        # 5. Simulate Blame Click
+        window.handle_blame_click_from_editor(target_commit_hash)
+
+        # 6. Verify Commit Selection
+        current_item = window.commit_history_view.history_list.currentItem()
+        self.assertIsNotNone(current_item, "No item selected after blame click")
+        self.assertEqual(current_item.text(0), short_target_hash, "Incorrect commit selected")
+        
+        # All commits should now be loaded
+        self.assertEqual(window.commit_history_view.history_list.topLevelItemCount(), total_commits, "All commits should have been loaded")
+        self.assertEqual(window.commit_history_view.loaded_count, total_commits, "loaded_count should be total_commits")
+
+        # 7. Verify Tab Switch
+        self.assertEqual(window.tab_widget.currentIndex(), 0, "'提交历史' tab not selected")
+
+        # 8. Verify All Commits Loaded state
+        self.assertTrue(window.commit_history_view._all_loaded, "_all_loaded should be true as target forces loading all batches")
+
+
+if __name__ == '__main__':
     unittest.main()
