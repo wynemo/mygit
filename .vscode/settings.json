@@ -3,6 +3,8 @@
     "files.autoSave": "onFocusChange",
     "editor.formatOnSave": true,
     //python & ruff
+    //python
+    "python.venvPath": ".venv",
     "[python]": {
         "diffEditor.ignoreTrimWhitespace": false,
         "editor.codeActionsOnSave": {
