@@ -1,5 +1,5 @@
-import os
 import logging
+import os
 
 from PyQt6.QtCore import QMimeData, QPoint, Qt
 from PyQt6.QtGui import QAction, QDrag, QDragEnterEvent, QDropEvent
@@ -82,8 +82,8 @@ class WorkspaceExplorer(QWidget):
 
             # 创建新的文本编辑器
             text_edit = SyncedTextEdit()
-            text_edit.setProperty("file_path", file_path) # Keep for any existing logic relying on property
-            text_edit.file_path = file_path # Add this for consistency with show_blame
+            text_edit.setProperty("file_path", file_path)  # Keep for any existing logic relying on property
+            text_edit.file_path = file_path  # Add this for consistency with show_blame
             text_edit.setPlainText(content)
 
             text_edit.highlighter = CodeHighlighter(text_edit.document())
@@ -98,27 +98,31 @@ class WorkspaceExplorer(QWidget):
 
             # Connect blame_annotation_clicked signal to GitManagerWindow handler
             main_git_window = self.parent()
-            handler_name = 'handle_blame_click_from_editor'
+            handler_name = "handle_blame_click_from_editor"
             while main_git_window:
                 if hasattr(main_git_window, handler_name):
-                    break # Found GitManagerWindow with the handler
-                if not hasattr(main_git_window, 'parent'): # Should always exist for QWidget until top
+                    break  # Found GitManagerWindow with the handler
+                if not hasattr(main_git_window, "parent"):  # Should always exist for QWidget until top
                     main_git_window = None
                     break
                 parent_candidate = main_git_window.parent()
-                if parent_candidate == main_git_window: # Should not happen in typical Qt parentage
+                if parent_candidate == main_git_window:  # Should not happen in typical Qt parentage
                     main_git_window = None
                     break
                 main_git_window = parent_candidate
-            
+
             if main_git_window and hasattr(main_git_window, handler_name):
                 try:
                     text_edit.blame_annotation_clicked.connect(getattr(main_git_window, handler_name))
-                    logging.info(f"Connected blame_annotation_clicked from editor for '{file_path}' to {handler_name} in GitManagerWindow.")
+                    logging.info(
+                        f"Connected blame_annotation_clicked from editor for '{file_path}' to {handler_name} in GitManagerWindow."
+                    )
                 except Exception as e_connect:
                     logging.error(f"Failed to connect blame_annotation_clicked for '{file_path}': {e_connect}")
             else:
-                logging.warning(f"Could not find GitManagerWindow with handler '{handler_name}' for editor '{file_path}'. Blame click will not be handled globally.")
+                logging.warning(
+                    f"Could not find GitManagerWindow with handler '{handler_name}' for editor '{file_path}'. Blame click will not be handled globally."
+                )
 
         except Exception as e:
             print(f"Error opening file: {e}")
@@ -295,7 +299,7 @@ class FileTreeWidget(QTreeWidget):
             git_manager_owner = main_window
             while git_manager_owner and not hasattr(git_manager_owner, "git_manager"):
                 git_manager_owner = git_manager_owner.parent()
-            
+
             if not git_manager_owner or not hasattr(git_manager_owner, "git_manager"):
                 print("GitManager not found.")
                 return
