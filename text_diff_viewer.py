@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 from PyQt6.QtCore import QPoint
 from PyQt6.QtWidgets import QHBoxLayout, QWidget
@@ -57,12 +58,18 @@ class DiffViewer(QWidget):
         layout.addWidget(self.right_edit)
         self.setLayout(layout)
 
-    def set_texts(self, left_text: str, right_text: str):
+    def set_texts(self, left_text: str, right_text: str, file_path: str, left_commit_hash: Optional[str], right_commit_hash: Optional[str]):
         """设置要比较的文本"""
         logging.debug("\n=== 设置新的文本进行比较 ===")
         # 先设置文本
         self.left_edit.setPlainText(left_text)
         self.right_edit.setPlainText(right_text)
+
+        # Set file_path and commit_hash for blame functionality
+        self.left_edit.file_path = file_path
+        self.left_edit.current_commit_hash = left_commit_hash
+        self.right_edit.file_path = file_path
+        self.right_edit.current_commit_hash = right_commit_hash
 
         # 计算差异
         self._compute_diff(left_text, right_text)
@@ -275,13 +282,21 @@ class MergeDiffViewer(DiffViewer):
         layout.addWidget(self.parent2_edit)
         self.setLayout(layout)
 
-    def set_texts(self, parent1_text: str, result_text: str, parent2_text: str):
+    def set_texts(self, parent1_text: str, result_text: str, parent2_text: str, file_path: str, parent1_commit_hash: Optional[str], result_commit_hash: Optional[str], parent2_commit_hash: Optional[str]):
         """设置要比较的三个文本"""
         logging.debug("\n=== 设置新的三向文本进行比较 ===")
         # 设置文本
         self.parent1_edit.setPlainText(parent1_text)
         self.result_edit.setPlainText(result_text)
         self.parent2_edit.setPlainText(parent2_text)
+
+        # Set file_path and commit_hash for blame functionality
+        self.parent1_edit.file_path = file_path
+        self.parent1_edit.current_commit_hash = parent1_commit_hash
+        self.result_edit.file_path = file_path
+        self.result_edit.current_commit_hash = result_commit_hash
+        self.parent2_edit.file_path = file_path
+        self.parent2_edit.current_commit_hash = parent2_commit_hash
 
         # 计算差异
         self._compute_diffs(parent1_text, result_text, parent2_text)

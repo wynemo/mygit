@@ -108,14 +108,15 @@ class GitManager:
             print(f"获取提交图失败: {e!s}")
             return {"commits": [], "branch_colors": {}}
 
-    def get_blame_data(self, file_path: str) -> List[dict]:
+    def get_blame_data(self, file_path: str, commit_hash: str = "HEAD") -> List[dict]:
         """获取文件的blame信息"""
         if not self.repo:
             return []
 
         try:
+            blame_target = commit_hash if commit_hash else "HEAD"
             blame_data = []
-            for commit, lines in self.repo.blame("HEAD", file_path):
+            for commit, lines in self.repo.blame(blame_target, file_path):
                 for line_num_in_commit, line_content in enumerate(lines):
                     # line_num_in_commit is 0-indexed within the lines from this commit
                     # We need to find the actual line number in the file

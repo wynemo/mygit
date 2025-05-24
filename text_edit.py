@@ -72,6 +72,7 @@ class SyncedTextEdit(QPlainTextEdit):
         self.blame_annotations_per_line = [] # Will store annotations with _display_string for painting
         self.showing_blame = False
         self.file_path = None  # Initialize file_path, can be set externally
+        self.current_commit_hash: Optional[str] = None
 
         # 添加行号区域
         self.line_number_area = LineNumberArea(self)
@@ -148,7 +149,10 @@ class SyncedTextEdit(QPlainTextEdit):
 
         if file_path:
             relative_file_path = os.path.relpath(file_path, git_manager.repo_path)
-            blame_data = git_manager.get_blame_data(relative_file_path)
+            commit_to_blame = "HEAD"
+            if self.current_commit_hash: # Check if it's not None and not empty
+                commit_to_blame = self.current_commit_hash
+            blame_data = git_manager.get_blame_data(relative_file_path, commit_to_blame)
             if blame_data:
                 self.set_blame_data(blame_data)
             else:
