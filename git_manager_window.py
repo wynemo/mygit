@@ -521,7 +521,7 @@ class GitManagerWindow(QMainWindow):
         Handles a blame annotation click from a SyncedTextEdit instance opened in the workspace.
         Selects the commit in CommitHistoryView and switches to the history tab.
         """
-        logging.info(f"GitManagerWindow: Received blame click from editor for commit: {commit_hash}")
+        logging.info("GitManagerWindow: Received blame click from editor for commit: %s", commit_hash)
 
         if not hasattr(self, "commit_history_view") or not self.commit_history_view:
             logging.error("GitManagerWindow: commit_history_view is not available.")
@@ -542,7 +542,8 @@ class GitManagerWindow(QMainWindow):
         # If not found and not all commits are loaded, try loading more
         if not found_item and not self.commit_history_view._all_loaded:
             logging.info(
-                f"GitManagerWindow: Commit {short_hash_to_find} not found initially, attempting to load more commits."
+                "GitManagerWindow: Commit %s not found initially, attempting to load more commits.",
+                short_hash_to_find,
             )
             while not found_item and not self.commit_history_view._all_loaded:
                 self.commit_history_view.load_more_commits()
@@ -553,11 +554,12 @@ class GitManagerWindow(QMainWindow):
                         found_item = item
                         break
                 if found_item:
-                    logging.info(f"GitManagerWindow: Found commit {short_hash_to_find} after loading more.")
+                    logging.info("GitManagerWindow: Found commit %s after loading more.", short_hash_to_find)
                     break
                 if self.commit_history_view._all_loaded:
                     logging.info(
-                        f"GitManagerWindow: All commits loaded, but commit {short_hash_to_find} still not found."
+                        "GitManagerWindow: All commits loaded, but commit %s still not found.",
+                        short_hash_to_find,
                     )
                     break
 
@@ -572,12 +574,14 @@ class GitManagerWindow(QMainWindow):
 
             if hasattr(self, "tab_widget") and self.tab_widget:
                 self.tab_widget.setCurrentIndex(0)  # Switch to "提交历史" tab
-                logging.info(f"GitManagerWindow: Switched to '提交历史' tab and selected commit {short_hash_to_find}.")
+                logging.info("GitManagerWindow: Switched to '提交历史' tab and selected commit %s.", short_hash_to_find)
             else:
                 logging.warning("GitManagerWindow: tab_widget not found, cannot switch tabs.")
         else:
             # This 'else' corresponds to the 'if found_item:' after the loop or initial find.
             # It should be at the same indentation level.
             logging.warning(
-                f"GitManagerWindow: Commit {short_hash_to_find} (full: {commit_hash}) not found in history_list even after attempting to load all."
+                "GitManagerWindow: Commit %s (full: %s) not found in history_list even after attempting to load all.",
+                short_hash_to_find,
+                commit_hash,
             )
