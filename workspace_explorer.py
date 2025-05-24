@@ -82,7 +82,8 @@ class WorkspaceExplorer(QWidget):
 
             # 创建新的文本编辑器
             text_edit = SyncedTextEdit()
-            text_edit.setProperty("file_path", file_path)
+            text_edit.setProperty("file_path", file_path) # Keep for any existing logic relying on property
+            text_edit.file_path = file_path # Add this for consistency with show_blame
             text_edit.setPlainText(content)
 
             text_edit.highlighter = CodeHighlighter(text_edit.document())
