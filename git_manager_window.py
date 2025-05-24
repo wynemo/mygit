@@ -1,8 +1,10 @@
+import logging
 import os
 
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import (
+    QAbstractItemView,
     QComboBox,
     QDialog,
     QFileDialog,
@@ -19,9 +21,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from commit_detail_view import CommitDetailView
 from commit_dialog import CommitDialog
 from commit_history_view import CommitHistoryView
-from commit_detail_view import CommitDetailView
 from compare_view import CompareView
 from compare_with_working_dialog import CompareWithWorkingDialog
 from file_changes_view import FileChangesView
@@ -513,3 +515,53 @@ class GitManagerWindow(QMainWindow):
         if not self.git_manager:
             return
         self.git_manager.push()
+
+    def handle_blame_click_from_editor(self, commit_hash: str):
+        """
+        Handles a blame annotation click from a SyncedTextEdit instance opened in the workspace.
+        Selects the commit in CommitHistoryView and switches to the history tab.
+        """
+        logging.info(f"GitManagerWindow: Received blame click from editor for commit: {commit_hash}")
+
+        if not hasattr(self, "commit_history_view") or not self.commit_history_view:
+            logging.error("GitManagerWindow: commit_history_view is not available.")
+            return
+
+        history_list = self.commit_history_view.history_list
+
+        short_hash_to_find = commit_hash[:7]
+        found_item = None
+
+        for i in range(history_list.topLevelItemCount()):
+            item = history_list.topLevelItem(i)
+            if item and item.text(0) == short_hash_to_find:
+                found_item = item
+                break
+
+        if found_item:
+            history_list.setCurrentItem(found_item)
+            # Using integer value 2 for QAbstractItemView.ScrollHint.PositionAtCenter
+            history_list.scrollToItem(found_item, QAbstractItemView.ScrollHint.PositionAtCenter)
+
+            if hasattr(self.commit_history_view, "on_commit_clicked"):
+                # Assuming on_commit_clicked in CommitHistoryView expects (item, column)
+                # as it's typically connected to itemClicked.
+                # However, previous instruction was on_commit_clicked(item).
+                # For consistency with prior implementation in CompareView and task description:
+                self.commit_history_view.on_commit_clicked(found_item)
+                # If it needs (item, column): self.commit_history_view.on_commit_clicked(found_item, 0)
+            else:
+                logging.error("GitManagerWindow: on_commit_clicked method not found in commit_history_view.")
+                # Not returning here, as tab switch might still be useful.
+
+            if hasattr(self, "tab_widget") and self.tab_widget:
+                # Assuming "提交历史" (Commit History) tab is at index 0
+                self.tab_widget.setCurrentIndex(0)
+                logging.info(f"GitManagerWindow: Switched to '提交历史' tab and selected commit {short_hash_to_find}.")
+            else:
+                logging.warning("GitManagerWindow: tab_widget not found, cannot switch tabs.")
+            return
+
+        logging.warning(
+            f"GitManagerWindow: Commit {short_hash_to_find} (full: {commit_hash}) not found in history_list."
+        )
