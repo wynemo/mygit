@@ -45,7 +45,7 @@ select = [
     # Security
     "S", # flake8-bandit (security)
 ]
-extend-select = ["I"]
+extend-select = ["I"] # isort
 
 # Logger objects that should be checked
 logger-objects = ["app.logger", "logger"]
