@@ -1,6 +1,6 @@
 from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtGui import QColor, QPainter, QPen
-from PyQt6.QtWidgets import QTreeWidget, QTreeWidgetItem
+from PyQt6.QtWidgets import QTreeWidget
 
 
 class CommitGraphView(QTreeWidget):
