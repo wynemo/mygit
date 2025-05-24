@@ -3,7 +3,6 @@ import contextlib
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from text_diff_viewer import DiffViewer, MergeDiffViewer
-from git_manager_window import GitManagerWindow
 
 # SyncedTextEdit is used within DiffViewer and MergeDiffViewer,
 # its blame_annotation_clicked signal will be connected from instances of these viewers.
@@ -18,6 +17,8 @@ class CompareView(QWidget):
     # in GitManagerWindow.handle_blame_click_from_editor
 
     def setup_ui(self):
+        from git_manager_window import GitManagerWindow
+
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)

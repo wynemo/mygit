@@ -168,7 +168,7 @@ class GitManagerWindow(QMainWindow):
         # 添加一个 CompareView, 默认隐藏, 点击"提交历史"也隐藏
         # 切换到单个文件历史的标签页时,才显示
         # 点击标签页里的FileHistoryView的commit时,触发 FileHistoryView.on_commit_clicked 根据拿到的文件路径 commit信息 这个CompareView需要对改动进行显示
-        self.compare_view = CompareView()  # 右侧
+        self.compare_view = CompareView(self)  # 右侧
         self.compare_view.hide()
 
         # 这个tab 包含提交历史和单个文件历史, 文件历史可以有多个标签
@@ -373,7 +373,7 @@ class GitManagerWindow(QMainWindow):
                 return
 
         # 如果不存在，创建新的CompareView实例并添加
-        compare_view_instance = CompareView()
+        compare_view_instance = CompareView(self)
         compare_view_instance.show_diff(self.git_manager, current_commit, file_path)
 
         new_tab_index = self.compare_tab_widget.addTab(compare_view_instance, unique_tab_title)
