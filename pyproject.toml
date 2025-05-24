@@ -17,8 +17,6 @@ dev = [
     "isort>=6.0.1",
     "python-lsp-black>=2.0.0",
     "python-lsp-isort>=0.2.1",
-    "python-lsp-ruff>=2.2.2",
-    "ruff>=0.11.4",
 ]
 
 [tool.ruff]
