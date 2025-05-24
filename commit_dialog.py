@@ -59,14 +59,13 @@ class AIGeneratorThread(QThread):
 
         data = {"model": model_name, "messages": messages}
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(api_url, headers=headers, json=data) as response:
-                if response.status == 200:
-                    result = await response.json()
-                    return result["choices"][0]["message"]["content"]
-                else:
-                    error_text = await response.text()
-                    raise Exception(f"API调用失败: {response.status} - {error_text}")
+        async with aiohttp.ClientSession() as session, session.post(api_url, headers=headers, json=data) as response:
+            if response.status == 200:
+                result = await response.json()
+                return result["choices"][0]["message"]["content"]
+            else:
+                error_text = await response.text()
+                raise Exception(f"API调用失败: {response.status} - {error_text}")
 
 
 class CommitDialog(QDialog):
