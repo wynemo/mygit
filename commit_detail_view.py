@@ -1,12 +1,12 @@
 from datetime import datetime
-from PyQt6.QtCore import Qt
+
 from PyQt6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
     QLabel,
     QTextEdit,
     QVBoxLayout,
     QWidget,
-    QFrame,
-    QHBoxLayout,
 )
 
 
@@ -15,7 +15,7 @@ class CommitDetailView(QWidget):
     Commit详细信息视图
     cursor生成 - 显示选中commit的详细信息，包括提交信息、作者、时间、分支等
     """
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setup_ui()
@@ -41,7 +41,7 @@ class CommitDetailView(QWidget):
         self.message_label = QLabel("提交信息:")
         self.message_label.setStyleSheet("font-weight: bold;")
         layout.addWidget(self.message_label)
-        
+
         self.message_text = QTextEdit()
         self.message_text.setMaximumHeight(80)
         self.message_text.setReadOnly(True)
@@ -107,7 +107,9 @@ class CommitDetailView(QWidget):
             self.message_text.setPlainText(commit.message.strip())
 
             # 提交哈希
-            self.hash_value.setText(f"{commit.hexsha[:8]} {commit.author.name} <{commit.author.email}> on {datetime.fromtimestamp(commit.committed_date).strftime('%Y/%m/%d at %H:%M')}")
+            self.hash_value.setText(
+                f"{commit.hexsha[:8]} {commit.author.name} <{commit.author.email}> on {datetime.fromtimestamp(commit.committed_date).strftime('%Y/%m/%d at %H:%M')}"
+            )
 
             # 作者信息
             self.author_value.setText(f"{commit.author.name} <{commit.author.email}>")
@@ -128,14 +130,14 @@ class CommitDetailView(QWidget):
 
         except Exception as e:
             self.clear_detail()
-            self.message_text.setPlainText(f"获取commit详细信息失败: {str(e)}")
+            self.message_text.setPlainText(f"获取commit详细信息失败: {e!s}")
 
     def get_commit_branches(self, git_manager, commit):
         """获取包含此commit的分支列表"""
         try:
             # cursor生成 - 简化分支获取逻辑，避免复杂的远程分支检查
             branches = []
-            
+
             # 获取本地分支
             for branch in git_manager.repo.branches:
                 try:
@@ -144,7 +146,7 @@ class CommitDetailView(QWidget):
                 except Exception:
                     # 如果检查失败，跳过这个分支
                     continue
-            
+
             # 如果没有找到分支，添加一些默认值
             if not branches:
                 # 检查是否是HEAD
@@ -153,11 +155,11 @@ class CommitDetailView(QWidget):
                         branches.append("HEAD")
                 except Exception:
                     pass
-                
+
                 # 添加默认分支
                 if not branches:
                     branches.extend(["main", "HEAD"])
-            
+
             return branches
         except Exception:
             # cursor生成 - 如果所有操作都失败，返回默认分支
@@ -169,4 +171,4 @@ class CommitDetailView(QWidget):
         self.hash_value.clear()
         self.author_value.clear()
         self.date_value.clear()
-        self.branch_value.clear() 
+        self.branch_value.clear()
