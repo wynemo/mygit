@@ -9,3 +9,5 @@ alwaysApply: true
 3. 不要使用全角符号的标点符号,例如中文的逗号,ruff会报错
 4. 这是用pyqt6的工程
 5. 专注于当前的功能，不要修改无关的代码
+6. logging 不要出现 flake8-logging-format 的情况;logging.exception不需要记录异常, 多余的
+
