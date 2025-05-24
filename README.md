@@ -105,4 +105,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 26. ~~点击git annoation 单行的区域时，根据commit 信息，需要选中commit_history_view history_list的相应的item，然后 on_commit_clicked 触发~~
 27. ~~git annoation 宽度不一致 希望能计算出最宽的宽度 然后合理的显示~~
 28. 接26的改动，点击git annoation 单行的区域时，现在commit_history_view histroy_list如果没有相应的item 就触发不了on_commit_clicked 这是因为histroy_list还没有加载，因为是滚动触发的，所以需要加载更多，这需要合理的处理
-29. CompareView 比较的时候支持 git annotation 的显示
+29. CompareView, 也就是比较的时候也支持 git annotation 的显示
