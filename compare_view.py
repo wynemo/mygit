@@ -3,6 +3,7 @@ import contextlib
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from text_diff_viewer import DiffViewer, MergeDiffViewer
+from git_manager_window import GitManagerWindow
 
 # SyncedTextEdit is used within DiffViewer and MergeDiffViewer,
 # its blame_annotation_clicked signal will be connected from instances of these viewers.
@@ -27,6 +28,38 @@ class CompareView(QWidget):
 
         layout.addWidget(self.diff_viewer)
         layout.addWidget(self.merge_diff_viewer)
+
+        # Find GitManagerWindow instance to connect the signal
+        parent_widget = self.parent()
+        git_manager_window_instance = None
+        while parent_widget:
+            if isinstance(parent_widget, GitManagerWindow):
+                git_manager_window_instance = parent_widget
+                break
+            parent_widget = parent_widget.parent()
+
+        if git_manager_window_instance:
+            # Connect signals for DiffViewer
+            self.diff_viewer.left_edit.blame_annotation_clicked.connect(
+                git_manager_window_instance.handle_blame_click_from_editor
+            )
+            self.diff_viewer.right_edit.blame_annotation_clicked.connect(
+                git_manager_window_instance.handle_blame_click_from_editor
+            )
+
+            # Connect signals for MergeDiffViewer
+            self.merge_diff_viewer.parent1_edit.blame_annotation_clicked.connect(
+                git_manager_window_instance.handle_blame_click_from_editor
+            )
+            self.merge_diff_viewer.result_edit.blame_annotation_clicked.connect(
+                git_manager_window_instance.handle_blame_click_from_editor
+            )
+            self.merge_diff_viewer.parent2_edit.blame_annotation_clicked.connect(
+                git_manager_window_instance.handle_blame_click_from_editor
+            )
+        else:
+            # Optionally, log a warning if the main window instance isn't found
+            print("Warning: GitManagerWindow instance not found for CompareView signal connections.")
 
         # Signal connections for blame_annotation_clicked from SyncedTextEdit instances
         # are removed from here. The connection is now established in WorkspaceExplorer.open_file_in_tab
