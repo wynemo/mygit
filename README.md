@@ -50,6 +50,8 @@ pip install -r requirements.txt
 python main.py
 ```
 
+在windows以及mac下都测试过，linux没有测试过
+
 ## 项目结构
 
 - `main.py`: 程序入口
