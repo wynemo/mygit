@@ -25,5 +25,5 @@ def main():
 
 if __name__ == "__main__":
     # 配置日志 (Configure logging)
-    logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
     main()

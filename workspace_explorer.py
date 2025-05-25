@@ -2,9 +2,10 @@ import logging
 import os
 
 from PyQt6.QtCore import QMimeData, QPoint, Qt
-from PyQt6.QtGui import QAction, QDrag, QDragEnterEvent, QDropEvent
+from PyQt6.QtGui import QAction, QColor, QDrag, QDragEnterEvent, QDropEvent
 from PyQt6.QtWidgets import (
     QMenu,
+    QPushButton,  # Added QPushButton
     QSplitter,
     QTabWidget,
     QTreeWidget,
@@ -20,8 +21,11 @@ from utils.language_map import LANGUAGE_MAP
 
 
 class WorkspaceExplorer(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, git_manager=None):
         super().__init__(parent)
+        self.git_manager = git_manager
+        # Initialize all_file_statuses
+        self.all_file_statuses = {"modified": set(), "staged": set(), "untracked": set()}
         self.setup_ui()
 
     def setup_ui(self):
@@ -29,11 +33,16 @@ class WorkspaceExplorer(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
+        # 创建刷新按钮
+        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button.clicked.connect(self.refresh_file_tree)
+        layout.addWidget(self.refresh_button) # Add button to layout
+
         # 创建水平分割器
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # 创建文件树
-        self.file_tree = FileTreeWidget(self)  # 传入self作为父部件
+        self.file_tree = FileTreeWidget(self, git_manager=self.git_manager)  # 传入self作为父部件和git_manager
         self.file_tree.setHeaderLabels(["工作区文件"])
 
         # 创建标签页组件
@@ -138,6 +147,11 @@ class WorkspaceExplorer(QWidget):
 
     def refresh_file_tree(self):
         """刷新文件树"""
+        if self.git_manager and self.git_manager.repo and hasattr(self, "workspace_path"):
+            self.all_file_statuses = self.git_manager.get_all_file_statuses()
+        else:
+            self.all_file_statuses = {"modified": set(), "staged": set(), "untracked": set()}
+        
         self.file_tree.clear()
         if hasattr(self, "workspace_path"):
             self._add_directory_items(self.workspace_path, self.file_tree.invisibleRootItem())
@@ -152,6 +166,32 @@ class WorkspaceExplorer(QWidget):
                 tree_item.setText(0, item)
                 tree_item.setData(0, Qt.ItemDataRole.UserRole, item_path)
 
+                if os.path.isfile(item_path) and hasattr(self, "workspace_path"):
+                    try:
+                        # Ensure workspace_path is not None and is an absolute path
+                        if not self.workspace_path or not os.path.isabs(self.workspace_path):
+                             # Fallback or error logging if workspace_path isn't suitable
+                            pass # Or log an error: logging.error("Workspace path is not set or not absolute.")
+                        else:
+                            relative_path = os.path.relpath(item_path, self.workspace_path)
+                            # Normalize path separators for comparison, as GitPython uses '/'
+                            relative_path = relative_path.replace(os.sep, '/')
+
+                            if relative_path in self.all_file_statuses.get("modified", set()):
+                                tree_item.setForeground(0, QColor(165, 42, 42))  # Brown color
+                            # Example for other statuses (optional, based on future requirements)
+                            # elif relative_path in self.all_file_statuses.get("staged", set()):
+                            #     tree_item.setForeground(0, QColor(0, 128, 0))  # Green for staged
+                            # elif relative_path in self.all_file_statuses.get("untracked", set()):
+                            #     tree_item.setForeground(0, QColor(128, 128, 128)) # Gray for untracked
+                    except ValueError as ve:
+                        # This can happen if item_path is not under self.workspace_path
+                        # For example, if self.workspace_path is relative and item_path is absolute
+                        # or they are on different drives on Windows.
+                        logging.warning(f"Could not determine relative path for {item_path} against {self.workspace_path}: {ve}")
+                    except Exception as e_status:
+                        logging.error(f"Error processing file status for {item_path}: {e_status}")
+                
                 if os.path.isdir(item_path):
                     self._add_directory_items(item_path, tree_item)
 
@@ -178,8 +218,9 @@ class WorkspaceExplorer(QWidget):
 
 
 class FileTreeWidget(QTreeWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, git_manager=None):
         super().__init__(parent)
+        self.git_manager = git_manager
         self.setDragEnabled(True)
         self.itemDoubleClicked.connect(self._handle_double_click)
         self.drag_start_pos = None
