@@ -119,4 +119,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 38. bug：点击“show blame” - 弹出的菜单与鼠标右键点击的地方隔太远了
 39. bug: 文件差异的换行没有显示
 40. impovement: 2025-05-25 22:30:04,384 - ERROR - root - 拉取仓库时发生错误 -  出现git pull异常时要提示
-41. feature: 在synced_text_edit 上添加查找功能 ctrl/command + f 可以触发
+41. ~~feature: 在synced_text_edit 上添加查找功能 ctrl/command + f 可以触发~~
