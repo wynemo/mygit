@@ -2,7 +2,7 @@ import logging
 import os
 
 from PyQt6.QtCore import QRect, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QMouseEvent, QPainter, QPen
+from PyQt6.QtGui import QColor, QFont, QMouseEvent, QPainter, QPen, QTextCursor
 from PyQt6.QtWidgets import QMenu, QPlainTextEdit, QWidget
 
 from diff_highlighter import DiffHighlighter
@@ -86,15 +86,33 @@ class SyncedTextEdit(QPlainTextEdit):
         self.highlighter = None
 
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.customContextMenuRequested.connect(self._show_context_menu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
 
-    def _show_context_menu(self, position):
+    def scroll_to_line(self, line_number: int):
+        """Scrolls the text edit to the specified line number (0-indexed)."""
+        document = self.document()
+        if 0 <= line_number < document.blockCount():
+            block = document.findBlockByNumber(line_number)
+            if block.isValid():
+                cursor = QTextCursor(block)
+                self.setTextCursor(cursor)
+                self.ensureCursorVisible()
+                logging.info(f"Scrolled {self.objectName()} to line {line_number + 1} (0-indexed: {line_number})")
+            else:
+                logging.warning(f"Block for line {line_number} (0-indexed) not found in {self.objectName()}.")
+        else:
+            logging.warning(f"Invalid line number {line_number} (0-indexed) for {self.objectName()}. Total lines: {document.blockCount()}")
+
+    def show_context_menu(self, position):
         menu = QMenu(self)
         blame_action = menu.addAction("Show Blame")
         blame_action.triggered.connect(self.show_blame)
         clear_blame_action = menu.addAction("Clear Blame")
         clear_blame_action.triggered.connect(self.clear_blame_data)
         menu.exec(self.mapToGlobal(position))
+
+    # Renamed from _show_context_menu to show_context_menu for consistency
+    # No other change in this method, just ensuring the diff picks up the rename if any confusion.
 
     def set_blame_data(self, blame_data_list: list):
         self.max_blame_display_width = 0
