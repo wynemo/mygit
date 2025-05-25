@@ -72,7 +72,7 @@ class FileHistoryView(QWidget):
                 self.history_list.addTopLevelItem(item)
         except Exception as e:
             item = QTreeWidgetItem()
-            item.setText(0, f"获取历史失败: {str(e)}")
+            item.setText(0, f"获取历史失败: {e!s}")
             self.history_list.addTopLevelItem(item)
 
     def on_commit_clicked(self, item):
