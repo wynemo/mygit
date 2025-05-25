@@ -2,7 +2,7 @@ import logging
 from typing import Optional
 
 from PyQt6.QtCore import QPoint
-from PyQt6.QtWidgets import QHBoxLayout, QWidget
+from PyQt6.QtWidgets import QHBoxLayout, QWidget, QPushButton, QVBoxLayout
 
 from diff_calculator import DiffCalculator, DiffChunk, DifflibCalculator
 from diff_highlighter import DiffHighlighter
@@ -12,6 +12,8 @@ from text_edit import SyncedTextEdit
 class DiffViewer(QWidget):
     def __init__(self, diff_calculator: DiffCalculator = None):
         super().__init__()
+        self.actual_diff_chunks = []
+        self.current_diff_index = -1
         self.setup_ui()
         self._sync_vscroll_lock = False
         self._sync_hscroll_lock = False
@@ -19,10 +21,83 @@ class DiffViewer(QWidget):
         # 设置差异计算器，默认为 DifflibCalculator
         self.diff_calculator = diff_calculator or DifflibCalculator()
 
+    def _scroll_to_current_diff(self):
+        if 0 <= self.current_diff_index < len(self.actual_diff_chunks):
+            chunk = self.actual_diff_chunks[self.current_diff_index]
+            logging.info(
+                f"Scrolling to diff chunk index {self.current_diff_index}: "
+                f"Type: {chunk.type}, "
+                f"Left: {chunk.left_start}-{chunk.left_end}, "
+                f"Right: {chunk.right_start}-{chunk.right_end}"
+            )
+
+            # Scroll left editor to the start of the diff chunk
+            # We assume chunk line numbers are 0-indexed as per typical difflib usage
+            # and findBlockByNumber expectation.
+            # If a chunk indicates no lines on one side (e.g., pure insertion/deletion),
+            # we scroll to the line *before* where the change is indicated, or line 0.
+            
+            left_target_line = chunk.left_start
+            if chunk.left_start == chunk.left_end and chunk.type == "insert": # Insertion in right, so left has a "gap"
+                 # Try to scroll to the line before the insertion point on the left
+                left_target_line = max(0, chunk.left_start -1) if chunk.left_start > 0 else 0
+
+
+            right_target_line = chunk.right_start
+            if chunk.right_start == chunk.right_end and chunk.type == "delete": # Deletion in right, so right has a "gap"
+                # Try to scroll to the line before the deletion point on the right
+                right_target_line = max(0, chunk.right_start -1) if chunk.right_start > 0 else 0
+            
+            # For "modify" or "equal" (though "equal" is filtered out for actual_diff_chunks),
+            # left_start and right_start are the lines to go to.
+            # For "delete" (text removed from left, shown as gap in right), scroll left_edit to left_start, right_edit to right_start (which is the line before deletion).
+            # For "insert" (text added to right, shown as gap in left), scroll left_edit to left_start (line before insertion), right_edit to right_start.
+
+            self.left_edit.scroll_to_line(left_target_line)
+            self.right_edit.scroll_to_line(right_target_line)
+            
+            logging.info(f"Called scroll_to_line for left editor to line {left_target_line}, right editor to line {right_target_line}")
+        else:
+            logging.warning(f"Skipping scroll: current_diff_index={self.current_diff_index}, num_actual_diffs={len(self.actual_diff_chunks)}")
+
+
+    def _update_button_states(self):
+        num_actual_diffs = len(self.actual_diff_chunks)
+        prev_enabled = self.current_diff_index > 0
+        next_enabled = self.current_diff_index < num_actual_diffs - 1
+
+        # Special case for initial load when diffs exist, current_diff_index is -1
+        if self.current_diff_index == -1 and num_actual_diffs > 0:
+            next_enabled = True # Allow "Next" to reach the first diff
+
+        self.prev_diff_button.setEnabled(prev_enabled)
+        self.next_diff_button.setEnabled(next_enabled)
+
+        logging.info(
+            f"Updating button states: num_actual_diffs={num_actual_diffs}, current_diff_index={self.current_diff_index} -> "
+            f"Prev button enabled: {prev_enabled}, Next button enabled: {next_enabled}"
+        )
+        # Log the special handling for the next button if current_diff_index is -1 and diffs exist
+        if self.current_diff_index == -1 and num_actual_diffs > 0 and not next_enabled: # This case should not happen due to logic above, but good to log
+             logging.info(f"Initial state with diffs: Next button forced to enabled to reach first diff.")
+
+
     def setup_ui(self):
-        layout = QHBoxLayout()
-        layout.setSpacing(0)
-        layout.setContentsMargins(0, 0, 0, 0)
+        # Button layout
+        button_layout = QHBoxLayout()
+        self.prev_diff_button = QPushButton("Previous Change")
+        self.next_diff_button = QPushButton("Next Change")
+        self.prev_diff_button.setEnabled(False)
+        self.next_diff_button.setEnabled(False)
+        self.prev_diff_button.clicked.connect(self.navigate_to_previous_diff)
+        self.next_diff_button.clicked.connect(self.navigate_to_next_diff)
+        button_layout.addWidget(self.prev_diff_button)
+        button_layout.addWidget(self.next_diff_button)
+
+        # Text editor layout
+        editor_layout = QHBoxLayout()
+        editor_layout.setSpacing(0)
+        editor_layout.setContentsMargins(0, 0, 0, 0)
 
         # 左侧文本编辑器
         self.left_edit = SyncedTextEdit()
@@ -54,9 +129,14 @@ class DiffViewer(QWidget):
         )
 
         # 添加到布局
-        layout.addWidget(self.left_edit)
-        layout.addWidget(self.right_edit)
-        self.setLayout(layout)
+        editor_layout.addWidget(self.left_edit)
+        editor_layout.addWidget(self.right_edit)
+
+        # Main layout
+        main_layout = QVBoxLayout()
+        main_layout.addLayout(button_layout)
+        main_layout.addLayout(editor_layout)
+        self.setLayout(main_layout)
 
     def set_texts(self, left_text: str, right_text: str, file_path: str, left_commit_hash: Optional[str], right_commit_hash: Optional[str]):
         """设置要比较的文本"""
@@ -79,6 +159,56 @@ class DiffViewer(QWidget):
 
         self.left_edit.highlighter.set_diff_chunks(self.diff_chunks)
         self.right_edit.highlighter.set_diff_chunks(self.diff_chunks)
+
+        logging.info(f"Total diff chunks from algorithm: {len(self.diff_chunks)}")
+        self.actual_diff_chunks = [chunk for chunk in self.diff_chunks if chunk.type != "equal"]
+        logging.info(f"Number of actual (non-equal) diff chunks: {len(self.actual_diff_chunks)}")
+        self.current_diff_index = -1  # Start before the first diff
+        self._update_button_states()   # Initial state for buttons
+        # Special handling for enabling "Next" is now within _update_button_states
+
+
+    def navigate_to_previous_diff(self):
+        logging.info(f"Attempting to navigate to previous diff. Current index: {self.current_diff_index}")
+        if not self.actual_diff_chunks:
+            logging.info("No actual diffs to navigate.")
+            return
+        if self.current_diff_index > 0:
+            self.current_diff_index -= 1
+            logging.info(f"Navigating to previous diff. New index: {self.current_diff_index}")
+            self._scroll_to_current_diff()
+            # Log chunk details after scroll
+            if 0 <= self.current_diff_index < len(self.actual_diff_chunks):
+                chunk = self.actual_diff_chunks[self.current_diff_index]
+                logging.info(
+                    f"Navigated to chunk: Type: {chunk.type}, "
+                    f"Left: {chunk.left_start}-{chunk.left_end}, "
+                    f"Right: {chunk.right_start}-{chunk.right_end}"
+                )
+        else:
+            logging.info("Already at the first diff or no diffs to navigate back to.")
+        self._update_button_states()
+
+    def navigate_to_next_diff(self):
+        logging.info(f"Attempting to navigate to next diff. Current index: {self.current_diff_index}")
+        if not self.actual_diff_chunks:
+            logging.info("No actual diffs to navigate.")
+            return
+        if self.current_diff_index < len(self.actual_diff_chunks) - 1:
+            self.current_diff_index += 1
+            logging.info(f"Navigating to next diff. New index: {self.current_diff_index}")
+            self._scroll_to_current_diff()
+            # Log chunk details after scroll
+            if 0 <= self.current_diff_index < len(self.actual_diff_chunks):
+                chunk = self.actual_diff_chunks[self.current_diff_index]
+                logging.info(
+                    f"Navigated to chunk: Type: {chunk.type}, "
+                    f"Left: {chunk.left_start}-{chunk.left_end}, "
+                    f"Right: {chunk.right_start}-{chunk.right_end}"
+                )
+        else:
+            logging.info("Already at the last diff or no diffs to navigate forward to.")
+        self._update_button_states()
 
     def _calculate_target_line(
         self, current_line: int, diff_chunks: list, is_left_scroll: bool
