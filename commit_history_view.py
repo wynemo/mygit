@@ -38,7 +38,7 @@ class CommitHistoryView(QWidget):
         self.history_list.setColumnWidth(3, 150)  # Date
         layout.addWidget(self.history_list)
 
-        # 滚动到底部自动加载更多 (cursor生成)
+        # 滚动到底部自动加载更多, cursor生成
         self.history_list.verticalScrollBar().valueChanged.connect(self._on_scroll)
 
         # 图形化提交历史
@@ -82,10 +82,10 @@ class CommitHistoryView(QWidget):
         self._loading = False
 
     def _on_scroll(self, value):
-        # 滚动到底部时自动加载更多 (cursor生成)
+        # 滚动到底部时自动加载更多 cursor生成
         scroll_bar = self.history_list.verticalScrollBar()
         if value == scroll_bar.maximum() and not self._all_loaded:
-            print("滚动到底部，自动加载更多...")  # cursor生成
+            print("滚动到底部, 自动加载更多...")  # cursor生成
             self.load_more_commits()
 
     def on_commit_clicked(self, item):
@@ -94,8 +94,6 @@ class CommitHistoryView(QWidget):
         self.commit_selected.emit(commit_hash)
 
     def on_current_item_changed(self, current: QTreeWidgetItem, previous: QTreeWidgetItem):
-        if previous:  # 隐藏之前可能显示的浮层（如果逻辑放在这里）
-            pass
         if current:
             print(current.text(1))
             self.history_list.show_full_text_for_item(current, 1)

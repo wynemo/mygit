@@ -300,12 +300,12 @@ class CommitDialog(QDialog):
                 try:
                     old_content = repo.git.show(f"HEAD:{file_path}")
                 except:
-                    # 如果是新文件，HEAD中没有内容
+                    # 如果是新文件, HEAD中没有内容
                     old_content = ""
                 new_content = repo.git.show(f":{file_path}")  # 暂存区内容
-            # 对于未暂存文件，比较暂存区和工作区
+            # 对于未暂存文件, 比较暂存区和工作区
             elif item.text(1) == "Untracked":
-                # 未跟踪文件，显示空内容和当前文件内容
+                # 未跟踪文件, 显示空内容和当前文件内容
                 old_content = ""
                 try:
                     with open(f"{repo.working_dir}/{file_path}", "r", encoding="utf-8") as f:
@@ -313,7 +313,7 @@ class CommitDialog(QDialog):
                 except Exception as e:
                     new_content = f"Error reading file: {e!s}"
             else:
-                # 已修改文件，比较暂存区和工作区
+                # 已修改文件, 比较暂存区和工作区
                 try:
                     old_content = repo.git.show(f":{file_path}")  # 暂存区内容
                 except:
