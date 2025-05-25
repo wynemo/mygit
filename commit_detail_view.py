@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QSizePolicy,  # Added QSizePolicy
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -44,9 +45,10 @@ class CommitDetailView(QWidget):
         layout.addWidget(self.message_label)
 
         self.message_text = QTextEdit()
-        self.message_text.setMaximumHeight(80)
         self.message_text.setReadOnly(True)
         self.message_text.setStyleSheet("background-color: #f5f5f5; border: 1px solid #ddd;")
+        self.message_text.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.MinimumExpanding)
+        self.message_text.document().documentLayoutChanged.connect(self.adjust_message_text_height)
         layout.addWidget(self.message_text)
 
         # 提交哈希
@@ -173,3 +175,22 @@ class CommitDetailView(QWidget):
         self.author_value.clear()
         self.date_value.clear()
         self.branch_value.clear()
+
+    def adjust_message_text_height(self):
+        doc_height = self.message_text.document().size().height()
+        margins = self.message_text.contentsMargins()
+        # Add some padding if necessary, or use a minimum height
+        min_height = 50  # Example minimum height for one or two lines
+        # Ensure a sensible maximum height to prevent extremely long messages from taking over the UI
+        # This maximum could be a fixed value or a fraction of the parent widget's height
+        max_height_limit = 300  # Example, adjust as needed
+
+        # Calculate desired height
+        desired_height = doc_height + margins.top() + margins.bottom()
+
+        # Apply constraints
+        final_height = max(min_height, min(desired_height, max_height_limit))
+
+        self.message_text.setFixedHeight(int(final_height))
+        # You might need to trigger a layout update on the parent if it doesn't resize automatically
+        # self.layout().activate() # or self.updateGeometry() on CommitDetailView or its parent

@@ -2,7 +2,7 @@ import logging
 import os
 
 from PyQt6.QtCore import QEvent, QSize, Qt  # Added QEvent
-from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
+from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap, QGuiApplication
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -37,7 +37,19 @@ class GitManagerWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Git Manager")
-        self.setGeometry(100, 100, 1200, 800)
+
+        # Get screen geometry and set window size
+        screen = QGuiApplication.primaryScreen()
+        if screen:
+            geometry = screen.availableGeometry()
+            self.setGeometry(geometry.x() + int(geometry.width() * 0.1),
+                             geometry.y() + int(geometry.height() * 0.1),
+                             int(geometry.width() * 0.8),
+                             int(geometry.height() * 0.8))
+        else:
+            # Fallback if screen info is not available
+            self.resize(1024, 768)
+
         self.git_manager = None
         self.current_commit = None
         self.settings = Settings()
