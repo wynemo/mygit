@@ -519,7 +519,11 @@ class GitManagerWindow(QMainWindow):
         """获取仓库"""
         if not self.git_manager:
             return
-        self.git_manager.fetch()
+        try:
+            self.git_manager.fetch()
+        except:
+            QMessageBox.critical(self, "错误", "获取仓库时发生错误")
+            logging.exception("获取仓库时发生错误")
 
     def pull_repo(self):
         """拉取仓库"""
@@ -537,7 +541,11 @@ class GitManagerWindow(QMainWindow):
         """推送仓库"""
         if not self.git_manager:
             return
-        self.git_manager.push()
+        try:
+            self.git_manager.push()
+        except:
+            QMessageBox.critical(self, "错误", "推送仓库时发生错误")
+            logging.exception("推送仓库时发生错误")
 
     def handle_blame_click_from_editor(self, commit_hash: str):
         """
