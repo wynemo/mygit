@@ -253,3 +253,76 @@ class GitManager:
         except Exception as e:
             print(f"Error getting file status for {file_path}: {e!s}")
             return "unknown"
+
+    def get_all_file_statuses(self) -> dict[str, set[str]]:
+        """
+        Gets all file statuses (modified, staged, untracked) in the repository.
+        Returns a dictionary where keys are status types and values are sets of relative file paths.
+        """
+        statuses = {"modified": set(), "staged": set(), "untracked": set()}
+
+        if not self.repo:
+            if not self.initialize():
+                # Initialization failed, return empty sets
+                return statuses
+        
+        # This check is important to ensure self.repo is not None after potential initialization
+        if not self.repo:
+            return statuses
+
+        try:
+            # Get Untracked Files
+            # self.repo.untracked_files is a list of relative paths
+            statuses["untracked"] = set(self.repo.untracked_files)
+
+            # Get Modified (Unstaged) Files
+            # self.repo.index.diff(None) compares the working directory with the index
+            # diff_item.a_path is the path in the index
+            # diff_item.b_path is the path in the working directory (for new/renamed files)
+            # For simple modifications, a_path and b_path are often the same.
+            # For deleted files in working dir, a_path is the path, b_path is None.
+            # For new files in working dir (should be caught by untracked_files if not added),
+            # this diff won't typically show them unless they were part of complex staging.
+            for diff_item in self.repo.index.diff(None):
+                # If a file is renamed, a_path is old, b_path is new.
+                # If a file is modified, a_path and b_path are usually the same.
+                # If a file is deleted from workdir (but still in index), b_path is None.
+                # We are interested in paths that are currently modified in the working tree.
+                if diff_item.a_path: # Path in index
+                    statuses["modified"].add(diff_item.a_path)
+                if diff_item.b_path and diff_item.b_path != diff_item.a_path : # Path in working dir, if different and exists
+                     statuses["modified"].add(diff_item.b_path)
+
+
+            # Get Staged Files
+            # self.repo.index.diff("HEAD") compares the index with the HEAD commit
+            # diff_item.a_path is the path in HEAD
+            # diff_item.b_path is the path in the index
+            # For new files added to index, a_path is None.
+            # For files deleted from index, b_path is None.
+            for diff_item in self.repo.index.diff("HEAD"):
+                # If a file is newly staged, a_path is None, b_path is the file.
+                # If a file is staged for deletion, b_path is None, a_path is the file.
+                # If a file is modified and staged, a_path and b_path are usually the same.
+                if diff_item.b_path: # Path in index (staged)
+                    statuses["staged"].add(diff_item.b_path)
+                elif diff_item.a_path: # Path in HEAD (implies deletion staged if b_path is None)
+                    statuses["staged"].add(diff_item.a_path)
+            
+            # Handle files that are both staged and then modified again in the working directory.
+            # Such files will appear in `statuses["modified"]` (workdir vs index)
+            # and `statuses["staged"]` (index vs HEAD).
+            # The current logic is fine. If a file is in `statuses["modified"]`, it means
+            # there are changes in the working directory not yet staged.
+            # If it's also in `statuses["staged"]`, it means the staged version is different from HEAD.
+            # This is consistent with how `git status` reports such states.
+
+        except git.GitCommandError as e:
+            print(f"Git command error while getting all file statuses: {e!s}")
+            # Return whatever statuses were collected, or empty if error was early
+            return statuses # Or re-initialize to empty: {"modified": set(), "staged": set(), "untracked": set()}
+        except Exception as e:
+            print(f"Error getting all file statuses: {e!s}")
+            return statuses # Or re-initialize to empty
+
+        return statuses

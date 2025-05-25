@@ -24,6 +24,8 @@ class WorkspaceExplorer(QWidget):
     def __init__(self, parent=None, git_manager=None):
         super().__init__(parent)
         self.git_manager = git_manager
+        # Initialize all_file_statuses
+        self.all_file_statuses = {"modified": set(), "staged": set(), "untracked": set()}
         self.setup_ui()
 
     def setup_ui(self):
@@ -145,6 +147,11 @@ class WorkspaceExplorer(QWidget):
 
     def refresh_file_tree(self):
         """刷新文件树"""
+        if self.git_manager and self.git_manager.repo and hasattr(self, "workspace_path"):
+            self.all_file_statuses = self.git_manager.get_all_file_statuses()
+        else:
+            self.all_file_statuses = {"modified": set(), "staged": set(), "untracked": set()}
+        
         self.file_tree.clear()
         if hasattr(self, "workspace_path"):
             self._add_directory_items(self.workspace_path, self.file_tree.invisibleRootItem())
@@ -159,17 +166,32 @@ class WorkspaceExplorer(QWidget):
                 tree_item.setText(0, item)
                 tree_item.setData(0, Qt.ItemDataRole.UserRole, item_path)
 
-                if os.path.isfile(item_path) and self.git_manager and self.git_manager.repo:
-                    status = self.git_manager.get_file_status(item_path)
-                    if status == "modified":
-                        tree_item.setForeground(0, QColor(165, 42, 42))  # Brown color
-                    # Add other statuses here if needed, e.g., "untracked", "staged"
-                    # elif status == "untracked":
-                    #     tree_item.setForeground(0, QColor("gray"))
-                    # elif status == "staged":
-                    #     tree_item.setForeground(0, QColor("green"))
+                if os.path.isfile(item_path) and hasattr(self, "workspace_path"):
+                    try:
+                        # Ensure workspace_path is not None and is an absolute path
+                        if not self.workspace_path or not os.path.isabs(self.workspace_path):
+                             # Fallback or error logging if workspace_path isn't suitable
+                            pass # Or log an error: logging.error("Workspace path is not set or not absolute.")
+                        else:
+                            relative_path = os.path.relpath(item_path, self.workspace_path)
+                            # Normalize path separators for comparison, as GitPython uses '/'
+                            relative_path = relative_path.replace(os.sep, '/')
 
-
+                            if relative_path in self.all_file_statuses.get("modified", set()):
+                                tree_item.setForeground(0, QColor(165, 42, 42))  # Brown color
+                            # Example for other statuses (optional, based on future requirements)
+                            # elif relative_path in self.all_file_statuses.get("staged", set()):
+                            #     tree_item.setForeground(0, QColor(0, 128, 0))  # Green for staged
+                            # elif relative_path in self.all_file_statuses.get("untracked", set()):
+                            #     tree_item.setForeground(0, QColor(128, 128, 128)) # Gray for untracked
+                    except ValueError as ve:
+                        # This can happen if item_path is not under self.workspace_path
+                        # For example, if self.workspace_path is relative and item_path is absolute
+                        # or they are on different drives on Windows.
+                        logging.warning(f"Could not determine relative path for {item_path} against {self.workspace_path}: {ve}")
+                    except Exception as e_status:
+                        logging.error(f"Error processing file status for {item_path}: {e_status}")
+                
                 if os.path.isdir(item_path):
                     self._add_directory_items(item_path, tree_item)
 

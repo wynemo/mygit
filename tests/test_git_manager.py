@@ -156,6 +156,98 @@ class TestGitManagerFileStatus(unittest.TestCase):
         status_untracked = self.git_manager.get_file_status(untracked_subdir_file_abs)
         self.assertEqual(status_untracked, "untracked")
 
+    def test_get_all_statuses_initial_repo(self):
+        """Test get_all_file_statuses on a clean repository."""
+        # In the setUp, an initial_file.txt is created and committed.
+        # So, the repo is clean with one file.
+        statuses = self.git_manager.get_all_file_statuses()
+        
+        self.assertEqual(len(statuses["modified"]), 0, "Modified set should be empty")
+        self.assertEqual(len(statuses["staged"]), 0, "Staged set should be empty")
+        self.assertEqual(len(statuses["untracked"]), 0, "Untracked set should be empty")
+
+    def test_get_all_statuses_with_changes(self):
+        # Normal file (already committed in setUp as initial_file.txt)
+        normal_file_rel = self.initial_file_rel # "initial_file.txt"
+
+        # Modified file
+        modified_file_rel = "modified_file.txt"
+        modified_file_abs = os.path.join(self.repo_path, modified_file_rel)
+        with open(modified_file_abs, "w") as f: f.write("content")
+        self.repo.index.add([modified_file_abs])
+        self.repo.index.commit("add modified_file")
+        with open(modified_file_abs, "w") as f: f.write("new content") # Modified
+
+        # Staged file
+        staged_file_rel = "staged_file.txt"
+        staged_file_abs = os.path.join(self.repo_path, staged_file_rel)
+        with open(staged_file_abs, "w") as f: f.write("content to be staged")
+        self.repo.index.add([staged_file_abs]) # Staged
+
+        # Untracked file
+        untracked_file_rel = "untracked_file.txt"
+        # untracked_file_abs = os.path.join(self.repo_path, untracked_file_rel) # Not needed for untracked
+        with open(os.path.join(self.repo_path, untracked_file_rel), "w") as f: f.write("untracked content")
+
+        # Staged then modified file
+        staged_mod_file_rel = "staged_mod_file.txt"
+        staged_mod_file_abs = os.path.join(self.repo_path, staged_mod_file_rel)
+        with open(staged_mod_file_abs, "w") as f: f.write("content")
+        self.repo.index.add([staged_mod_file_abs]) # Staged
+        with open(staged_mod_file_abs, "w") as f: f.write("modified after stage") # Then modified
+
+        statuses = self.git_manager.get_all_file_statuses()
+
+        # GitPython paths are usually with forward slashes, ensure consistency if needed
+        # For these simple filenames, it should be fine.
+        self.assertIn(modified_file_rel, statuses["modified"])
+        self.assertIn(staged_file_rel, statuses["staged"])
+        self.assertIn(untracked_file_rel, statuses["untracked"])
+        
+        self.assertIn(staged_mod_file_rel, statuses["modified"]) # Has unstaged changes
+        self.assertIn(staged_mod_file_rel, statuses["staged"])   # Also has staged changes against HEAD
+
+        self.assertNotIn(normal_file_rel, statuses["modified"])
+        self.assertNotIn(normal_file_rel, statuses["staged"])
+        self.assertNotIn(normal_file_rel, statuses["untracked"])
+
+        # Ensure no overlaps where not expected (e.g. untracked should not be in modified/staged)
+        self.assertNotIn(untracked_file_rel, statuses["modified"])
+        self.assertNotIn(untracked_file_rel, statuses["staged"])
+
+    def test_get_all_statuses_with_subdirectories(self):
+        subdir_name = "mysubdir"
+        os.makedirs(os.path.join(self.repo_path, subdir_name), exist_ok=True)
+
+        # Modified file in subdir
+        mod_subdir_rel = os.path.join(subdir_name, "mod_in_sub.txt").replace(os.sep, '/')
+        mod_subdir_abs = os.path.join(self.repo_path, mod_subdir_rel)
+        with open(mod_subdir_abs, "w") as f: f.write("content")
+        self.repo.index.add([mod_subdir_rel])
+        self.repo.index.commit(f"add {mod_subdir_rel}")
+        with open(mod_subdir_abs, "w") as f: f.write("new content in subdir") # Modified
+
+        # Staged file in subdir
+        staged_subdir_rel = os.path.join(subdir_name, "staged_in_sub.txt").replace(os.sep, '/')
+        staged_subdir_abs = os.path.join(self.repo_path, staged_subdir_rel)
+        with open(staged_subdir_abs, "w") as f: f.write("content to be staged in subdir")
+        self.repo.index.add([staged_subdir_rel]) # Staged
+
+        # Untracked file in subdir
+        untracked_subdir_rel = os.path.join(subdir_name, "untracked_in_sub.txt").replace(os.sep, '/')
+        with open(os.path.join(self.repo_path, untracked_subdir_rel), "w") as f: f.write("untracked in subdir")
+
+        statuses = self.git_manager.get_all_file_statuses()
+
+        self.assertIn(mod_subdir_rel, statuses["modified"])
+        self.assertIn(staged_subdir_rel, statuses["staged"])
+        self.assertIn(untracked_subdir_rel, statuses["untracked"])
+        
+        # Check initial file is still normal
+        self.assertNotIn(self.initial_file_rel, statuses["modified"])
+        self.assertNotIn(self.initial_file_rel, statuses["staged"])
+        self.assertNotIn(self.initial_file_rel, statuses["untracked"])
+
 
 if __name__ == "__main__":
     unittest.main()
