@@ -107,3 +107,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 28. ~~接26的改动，点击git annoation 单行的区域时，现在commit_history_view histroy_list如果没有相应的item 就触发不了on_commit_clicked 这是因为histroy_list还没有加载，因为是滚动触发的，所以需要加载更多，这需要合理的处理~~
 29. ~~CompareView, 也就是比较的时候也支持 git annotation 的显示~~
 30. ~~接29的改动，也像26说的那样触发on_commit_clicked~~
+31. 工作区文件有修改，左边树形列表（FileTreeWidget）相应的文件显示有变化，颜色可变为棕色， 表示修改了次文件
