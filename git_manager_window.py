@@ -2,7 +2,7 @@ import logging
 import os
 
 from PyQt6.QtCore import QEvent, QSize, Qt  # Added QEvent
-from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap, QGuiApplication
+from PyQt6.QtGui import QAction, QColor, QGuiApplication, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -42,10 +42,12 @@ class GitManagerWindow(QMainWindow):
         screen = QGuiApplication.primaryScreen()
         if screen:
             geometry = screen.availableGeometry()
-            self.setGeometry(geometry.x() + int(geometry.width() * 0.1),
-                             geometry.y() + int(geometry.height() * 0.1),
-                             int(geometry.width() * 0.8),
-                             int(geometry.height() * 0.8))
+            self.setGeometry(
+                geometry.x() + int(geometry.width() * 0.1),
+                geometry.y() + int(geometry.height() * 0.1),
+                int(geometry.width() * 0.8),
+                int(geometry.height() * 0.8),
+            )
         else:
             # Fallback if screen info is not available
             self.resize(1024, 768)
@@ -522,7 +524,11 @@ class GitManagerWindow(QMainWindow):
         """拉取仓库"""
         if not self.git_manager:
             return
-        self.git_manager.pull()
+        # 出异常了需要处理, 不然程序会崩溃
+        try:
+            self.git_manager.pull()
+        except:
+            logging.exception("拉取仓库时发生错误")
 
     def push_repo(self):
         """推送仓库"""
