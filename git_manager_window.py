@@ -306,6 +306,8 @@ class GitManagerWindow(QMainWindow):
 
             # 更新工作区浏览器
             self.workspace_explorer.set_workspace_path(folder_path)
+            self.workspace_explorer.git_manager = self.git_manager
+            self.workspace_explorer.refresh_file_tree()
         else:
             self.commit_history_view.history_list.clear()
             self.commit_history_view.history_list.addItem("所选文件夹不是有效的Git仓库")
@@ -591,6 +593,6 @@ class GitManagerWindow(QMainWindow):
         if event.type() == QEvent.Type.ActivationChange:
             if self.isActiveWindow():
                 # print("Window activated, refreshing file tree...") # Optional: for debugging
-                if hasattr(self, 'workspace_explorer') and self.workspace_explorer:
-                    if self.git_manager and self.git_manager.repo: # Ensure git repo is loaded
+                if hasattr(self, "workspace_explorer") and self.workspace_explorer:
+                    if self.git_manager and self.git_manager.repo:  # Ensure git repo is loaded
                         self.workspace_explorer.refresh_file_tree()
