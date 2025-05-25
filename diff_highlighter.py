@@ -65,7 +65,7 @@ class DiffHighlighter(QSyntaxHighlighter):
                     logging.debug("找到右侧差异块: %s", chunk.type)
                     break
             elif self.editor_type == "result_edit":
-                # 对于三向合并中的结果编辑器，需要同时检查与两个父版本的差异
+                # 对于三向合并中的结果编辑器, 需要同时检查与两个父版本的差异
                 parent1_chunk = None
                 parent2_chunk = None
 
@@ -87,9 +87,7 @@ class DiffHighlighter(QSyntaxHighlighter):
                     if parent1_chunk.type != "equal" and parent2_chunk.type != "equal":
                         current_chunk = parent1_chunk
                         # 使用特殊的冲突颜色
-                        conflict_format = self.create_format(
-                            "#ffccff", "#cc00cc"
-                        )  # 紫色
+                        conflict_format = self.create_format("#ffccff", "#cc00cc")  # 紫色
                         self.setFormat(0, len(text), conflict_format)
                         return
                     elif parent1_chunk.type != "equal":
@@ -101,7 +99,7 @@ class DiffHighlighter(QSyntaxHighlighter):
                 elif parent2_chunk:
                     current_chunk = parent2_chunk
 
-        # 如果找到差异块，应用相应的格式
+        # 如果找到差异块, 应用相应的格式
         if current_chunk and current_chunk.type != "equal":
             logging.debug("应用差异块格式: %s", current_chunk.type)
             format_type = current_chunk.type
@@ -112,6 +110,7 @@ class DiffHighlighter(QSyntaxHighlighter):
                     logging.debug("应用格式: %s", format_type)
                     self.setFormat(0, len(text), format)
                     logging.debug("格式已应用")
+
 
 # -------- 总高亮器 --------
 class MultiHighlighter(QSyntaxHighlighter):
