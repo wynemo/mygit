@@ -57,7 +57,7 @@ class FileHistoryView(QWidget):
             # 添加到历史列表
             for commit in commits:
                 item = QTreeWidgetItem()
-                # 提交ID (短哈希)
+                # 提交ID, 短哈希
                 item.setText(0, commit.hexsha[:7])
                 # 提交信息
                 item.setText(1, commit.summary)
