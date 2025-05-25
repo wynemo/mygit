@@ -325,7 +325,7 @@ class CommitDialog(QDialog):
                     new_content = f"Error reading file: {e!s}"
 
             # 设置差异内容
-            diff_viewer.set_texts(old_content, new_content)
+            diff_viewer.set_texts(old_content, new_content, file_path, None, None)
 
             # 显示对话框
             diff_dialog.exec()
