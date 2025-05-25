@@ -118,3 +118,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 37. 重构：GitManagerWindow top_widget top_layout 的东西能否抽离出去
 38. bug：点击“show blame” - 弹出的菜单与鼠标右键点击的地方隔太远了
 39. bug: 文件差异的换行没有显示
+40. impovement: 2025-05-25 22:30:04,384 - ERROR - root - 拉取仓库时发生错误 -  出现git pull异常时要提示
