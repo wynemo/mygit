@@ -1,7 +1,7 @@
 import logging
 import os
 
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import QEvent, QSize, Qt  # Added QEvent
 from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -585,3 +585,12 @@ class GitManagerWindow(QMainWindow):
                 short_hash_to_find,
                 commit_hash,
             )
+
+    def changeEvent(self, event: QEvent):
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.ActivationChange:
+            if self.isActiveWindow():
+                # print("Window activated, refreshing file tree...") # Optional: for debugging
+                if hasattr(self, 'workspace_explorer') and self.workspace_explorer:
+                    if self.git_manager and self.git_manager.repo: # Ensure git repo is loaded
+                        self.workspace_explorer.refresh_file_tree()

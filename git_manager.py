@@ -1,3 +1,4 @@
+import os
 from typing import List, Optional
 
 import git
@@ -185,3 +186,70 @@ class GitManager:
         if not self.repo:
             return
         self.repo.remotes.origin.push()
+
+    def get_file_status(self, file_path: str) -> str:
+        """获取文件的Git状态"""
+        if not self.repo:
+            if not self.initialize():
+                return "unknown"
+        
+        # This check is important to ensure self.repo is not None
+        if not self.repo:
+            return "unknown"
+
+        try:
+            # Ensure file_path is absolute for consistent comparison
+            abs_file_path = os.path.abspath(file_path)
+            repo_root_path = os.path.abspath(self.repo_path)
+
+            # Check if the file is within the repository path
+            if not abs_file_path.startswith(repo_root_path):
+                # This case might be treated as an error or a specific status.
+                # For now, returning "untracked" as per one interpretation of the requirement.
+                return "untracked" 
+
+            relative_file_path = os.path.relpath(abs_file_path, repo_root_path)
+
+            # 1. Check if the file is untracked
+            if relative_file_path in self.repo.untracked_files:
+                return "untracked"
+
+            # 2. Check if the file is modified (unstaged changes)
+            # diff(None) compares the working directory with the index
+            for diff_item in self.repo.index.diff(None):
+                if diff_item.a_path == relative_file_path or diff_item.b_path == relative_file_path:
+                    return "modified"
+
+            # 3. Check if the file is staged (changes added to index but not committed)
+            # diff("HEAD") compares the index with the HEAD commit
+            for diff_item in self.repo.index.diff("HEAD"):
+                if diff_item.a_path == relative_file_path or diff_item.b_path == relative_file_path:
+                    return "staged"
+            
+            # 4. If none of the above, the file is considered "normal" (tracked and not modified)
+            # This check is implicitly handled if the file is tracked and not in previous conditions.
+            # However, we need to ensure the file is actually tracked.
+            # If it's not untracked, not modified, not staged, it must be tracked and unchanged.
+            # We can verify if the file is known to Git by checking if it appears in the tree of the current HEAD.
+            try:
+                self.repo.head.commit.tree[relative_file_path]
+                return "normal"
+            except KeyError:
+                # This case should ideally be caught by untracked_files,
+                # but as a fallback if it's not in untracked_files but also not in HEAD,
+                # it might indicate a complex state or a file that was just deleted and staged for deletion.
+                # For simplicity, if it's not caught by other checks and not in HEAD,
+                # it could be a new file that is staged (added), which is covered by repo.index.diff("HEAD")
+                # if it's a new file. If it's a deleted file that's staged, diff("HEAD") should also show it.
+                # This 'normal' check can be tricky. Let's assume if it's not in the other states, it's normal.
+                # The prompt implies if it's not untracked, modified, or staged, it's normal.
+                # This means it is tracked and has no pending changes.
+                # A file that is tracked and unchanged will not appear in diffs or untracked_files.
+                return "normal" # If not in untracked, modified, or staged, assume normal.
+
+        except git.GitCommandError as e:
+            print(f"Git command error while getting file status for {file_path}: {e!s}")
+            return "unknown"
+        except Exception as e:
+            print(f"Error getting file status for {file_path}: {e!s}")
+            return "unknown"

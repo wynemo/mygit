@@ -2,9 +2,10 @@ import logging
 import os
 
 from PyQt6.QtCore import QMimeData, QPoint, Qt
-from PyQt6.QtGui import QAction, QDrag, QDragEnterEvent, QDropEvent
+from PyQt6.QtGui import QAction, QColor, QDrag, QDragEnterEvent, QDropEvent
 from PyQt6.QtWidgets import (
     QMenu,
+    QPushButton,  # Added QPushButton
     QSplitter,
     QTabWidget,
     QTreeWidget,
@@ -20,8 +21,9 @@ from utils.language_map import LANGUAGE_MAP
 
 
 class WorkspaceExplorer(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, git_manager=None):
         super().__init__(parent)
+        self.git_manager = git_manager
         self.setup_ui()
 
     def setup_ui(self):
@@ -29,11 +31,16 @@ class WorkspaceExplorer(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
+        # 创建刷新按钮
+        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button.clicked.connect(self.refresh_file_tree)
+        layout.addWidget(self.refresh_button) # Add button to layout
+
         # 创建水平分割器
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # 创建文件树
-        self.file_tree = FileTreeWidget(self)  # 传入self作为父部件
+        self.file_tree = FileTreeWidget(self, git_manager=self.git_manager)  # 传入self作为父部件和git_manager
         self.file_tree.setHeaderLabels(["工作区文件"])
 
         # 创建标签页组件
@@ -152,6 +159,17 @@ class WorkspaceExplorer(QWidget):
                 tree_item.setText(0, item)
                 tree_item.setData(0, Qt.ItemDataRole.UserRole, item_path)
 
+                if os.path.isfile(item_path) and self.git_manager and self.git_manager.repo:
+                    status = self.git_manager.get_file_status(item_path)
+                    if status == "modified":
+                        tree_item.setForeground(0, QColor(165, 42, 42))  # Brown color
+                    # Add other statuses here if needed, e.g., "untracked", "staged"
+                    # elif status == "untracked":
+                    #     tree_item.setForeground(0, QColor("gray"))
+                    # elif status == "staged":
+                    #     tree_item.setForeground(0, QColor("green"))
+
+
                 if os.path.isdir(item_path):
                     self._add_directory_items(item_path, tree_item)
 
@@ -178,8 +196,9 @@ class WorkspaceExplorer(QWidget):
 
 
 class FileTreeWidget(QTreeWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, git_manager=None):
         super().__init__(parent)
+        self.git_manager = git_manager
         self.setDragEnabled(True)
         self.itemDoubleClicked.connect(self._handle_double_click)
         self.drag_start_pos = None
