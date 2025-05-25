@@ -164,16 +164,14 @@ class CustomTreeWidget(QTreeWidget):
                 if self._hovered_item_column != (item, column):
                     self._hovered_item_column = (item, column)
                     self.show_full_text_for_item(item, column)
-            else:
-                # Hover reveal not active for this column, hide if previously shown
-                if self._hovered_item_column is not None:
-                    self.hide_overlay()
-                    self._hovered_item_column = None
-        else:
-            # No item or invalid column, hide overlay
-            if self._hovered_item_column is not None:
+            # Hover reveal not active for this column, hide if previously shown
+            elif self._hovered_item_column is not None:
                 self.hide_overlay()
                 self._hovered_item_column = None
+        # No item or invalid column, hide overlay
+        elif self._hovered_item_column is not None:
+            self.hide_overlay()
+            self._hovered_item_column = None
 
     def leaveEvent(self, event):
         super().leaveEvent(event)
