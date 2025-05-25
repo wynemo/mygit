@@ -144,8 +144,8 @@ class CommitDetailView(QWidget):
                 try:
                     if git_manager.repo.is_ancestor(commit, branch.commit):
                         branches.append(branch.name)
-                except Exception as e:
-                    logging.error("检查分支失败: %s", e)
+                except Exception:
+                    logging.exception("检查分支失败")
                     continue
 
             # 如果没有找到分支，添加一些默认值
@@ -155,7 +155,7 @@ class CommitDetailView(QWidget):
                     if commit == git_manager.repo.head.commit:
                         branches.append("HEAD")
                 except Exception:
-                    pass
+                    logging.exception("检查分支失败")
 
                 # 添加默认分支
                 if not branches:
