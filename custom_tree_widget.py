@@ -1,9 +1,12 @@
+from functools import partial
+
 from PyQt6.QtCore import QRect, Qt
 from PyQt6.QtGui import QPalette
 from PyQt6.QtWidgets import (
     QApplication,
     QLabel,
     QMainWindow,
+    QMenu,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -20,6 +23,24 @@ class CustomTreeWidget(QTreeWidget):
         self.setMouseTracking(True)
         self._hovered_item_column = None
         self.hover_reveal_columns = None  # Initialize hover_reveal_columns
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
+
+    def show_context_menu(self, position):
+        item = self.itemAt(position)
+        if not item:
+            return
+        menu = QMenu(self)
+        copy_commit_action = menu.addAction("copy commit")
+        copy_commit_action.triggered.connect(partial(self.copy_commit_to_clipboard, item))
+        menu.exec(self.mapToGlobal(position))
+
+    def copy_commit_to_clipboard(self, item):
+        if item:
+            print("commit is", item.text(0))
+            QApplication.clipboard().setText(item.text(0))
+        else:
+            print("item is None")
 
     def set_hover_reveal_columns(self, columns: set[int] | None):
         """Sets the columns for which hover reveal is active."""
