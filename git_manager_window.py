@@ -404,7 +404,7 @@ class GitManagerWindow(QMainWindow):
 
             # 创建并显示比较对话框
             # todo 这个要改造, 看readme里的todo
-            dialog = CompareWithWorkingDialog(f"比较 {file_path}", old_content, new_content, self)
+            dialog = CompareWithWorkingDialog(f"比较 {file_path}", old_content, new_content, file_path, self)
             dialog.exec()
 
         except Exception as e:
