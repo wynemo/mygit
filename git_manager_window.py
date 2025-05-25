@@ -232,8 +232,8 @@ class GitManagerWindow(QMainWindow):
         total_height = self.height()
         vertical_splitter.setSizes(
             [
-                total_height * 6 // 8,  # 提交历史和文件变化区域
-                total_height * 2 // 8,  # 工作区和比较视图区域
+                total_height * 5 // 8,  # Top section (workspace explorer)
+                total_height * 3 // 8,  # Bottom section (commit history, changes, details)
             ]
         )
 
@@ -446,8 +446,8 @@ class GitManagerWindow(QMainWindow):
         # 如果没有保存的分割器状态,则使用默认比例
         if not self.settings.settings.get("vertical_splitter"):
             total_height = self.height()
-            # 调整垂直分割器的默认比例 (例如: 2:6)
-            self.vertical_splitter.setSizes([total_height * 6 // 8, total_height * 2 // 8])
+            # 调整垂直分割器的默认比例
+            self.vertical_splitter.setSizes([total_height * 5 // 8, total_height * 3 // 8])
         if not self.settings.settings.get("horizontal_splitter"):  # 主水平分割器
             total_width = self.width()  # 这是上半部分的宽度
             # horizontal_splitter 在 upper_widget 中, 其宽度应基于 upper_widget
