@@ -2,7 +2,7 @@ import logging
 import os
 
 from PyQt6.QtCore import QEvent, QSize, Qt  # Added QEvent
-from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
+from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap, QGuiApplication
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -37,7 +37,19 @@ class GitManagerWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Git Manager")
-        self.setGeometry(100, 100, 1200, 800)
+
+        # Get screen geometry and set window size
+        screen = QGuiApplication.primaryScreen()
+        if screen:
+            geometry = screen.availableGeometry()
+            self.setGeometry(geometry.x() + int(geometry.width() * 0.1),
+                             geometry.y() + int(geometry.height() * 0.1),
+                             int(geometry.width() * 0.8),
+                             int(geometry.height() * 0.8))
+        else:
+            # Fallback if screen info is not available
+            self.resize(1024, 768)
+
         self.git_manager = None
         self.current_commit = None
         self.settings = Settings()
@@ -220,8 +232,8 @@ class GitManagerWindow(QMainWindow):
         total_height = self.height()
         vertical_splitter.setSizes(
             [
-                total_height * 6 // 8,  # 提交历史和文件变化区域
-                total_height * 2 // 8,  # 工作区和比较视图区域
+                total_height * 5 // 8,  # Top section (workspace explorer)
+                total_height * 3 // 8,  # Bottom section (commit history, changes, details)
             ]
         )
 
@@ -434,8 +446,8 @@ class GitManagerWindow(QMainWindow):
         # 如果没有保存的分割器状态,则使用默认比例
         if not self.settings.settings.get("vertical_splitter"):
             total_height = self.height()
-            # 调整垂直分割器的默认比例 (例如: 2:6)
-            self.vertical_splitter.setSizes([total_height * 6 // 8, total_height * 2 // 8])
+            # 调整垂直分割器的默认比例
+            self.vertical_splitter.setSizes([total_height * 5 // 8, total_height * 3 // 8])
         if not self.settings.settings.get("horizontal_splitter"):  # 主水平分割器
             total_width = self.width()  # 这是上半部分的宽度
             # horizontal_splitter 在 upper_widget 中, 其宽度应基于 upper_widget
