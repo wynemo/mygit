@@ -81,10 +81,7 @@ class FileChangesView(QWidget):
                     break
 
         if found_item is None:
-            if parent is None:
-                found_item = QTreeWidgetItem(self.changes_tree)
-            else:
-                found_item = QTreeWidgetItem(parent)
+            found_item = QTreeWidgetItem(self.changes_tree) if parent is None else QTreeWidgetItem(parent)
             found_item.setText(0, current_part)
 
             if len(path_parts) == 1:
