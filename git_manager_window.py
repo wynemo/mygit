@@ -527,6 +527,7 @@ class GitManagerWindow(QMainWindow):
         # 出异常了需要处理, 不然程序会崩溃
         try:
             self.git_manager.pull()
+            self.update_commit_history()
         except:
             logging.exception("拉取仓库时发生错误")
 
