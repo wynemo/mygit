@@ -45,7 +45,7 @@ class AIGeneratorThread(QThread):
         api_url = self.settings.get("api_url", "").rstrip("/") + "/chat/completions"
         api_secret = self.settings.get("api_secret", "")
         model_name = self.settings.get("model_name", "")
-        prompt = self.settings.get("prompt", "请根据以下Git变更生成一个简洁的提交信息：")
+        prompt = self.settings.get("prompt", "请根据以下Git变更生成一个简洁的提交信息:")
 
         headers = {
             "Content-Type": "application/json",
@@ -84,7 +84,7 @@ class CommitDialog(QDialog):
         splitter = QSplitter(Qt.Orientation.Vertical)
         layout.addWidget(splitter)
 
-        # 上半部分：文件列表
+        # 上半部分 文件列表
         files_widget = QWidget()
         files_layout = QVBoxLayout(files_widget)
 
@@ -130,7 +130,7 @@ class CommitDialog(QDialog):
 
         splitter.addWidget(files_widget)
 
-        # 下半部分：提交信息
+        # 下半部分, 提交信息
         commit_widget = QWidget()
         commit_layout = QVBoxLayout(commit_widget)
 
@@ -250,7 +250,7 @@ class CommitDialog(QDialog):
                 QMessageBox.warning(self, "警告", "没有已暂存的文件变更")
                 return
 
-            # 禁用AI按钮，显示正在生成中
+            # 禁用AI按钮, 显示正在生成中
             self.ai_button.setEnabled(False)
             self.ai_button.setText("⏳")
 
@@ -296,7 +296,7 @@ class CommitDialog(QDialog):
 
             # 获取文件内容
             if is_staged:
-                # 对于暂存区文件，比较 HEAD 和暂存区
+                # 对于暂存区文件, 比较 HEAD 和暂存区
                 try:
                     old_content = repo.git.show(f"HEAD:{file_path}")
                 except:
@@ -366,7 +366,7 @@ class CommitDialog(QDialog):
             # 先执行提交
             self.accept()
             if self.result() != QDialog.DialogCode.Accepted:
-                # 如果提交失败，直接返回
+                # 如果提交失败, 直接返回
                 return
 
             # 获取当前分支
