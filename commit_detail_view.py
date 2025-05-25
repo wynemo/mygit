@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 from PyQt6.QtWidgets import (
@@ -143,8 +144,8 @@ class CommitDetailView(QWidget):
                 try:
                     if git_manager.repo.is_ancestor(commit, branch.commit):
                         branches.append(branch.name)
-                except Exception:
-                    # 如果检查失败，跳过这个分支
+                except Exception as e:
+                    logging.error("检查分支失败: %s", e)
                     continue
 
             # 如果没有找到分支，添加一些默认值
