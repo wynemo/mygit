@@ -1,8 +1,6 @@
-from functools import partial
-
 from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtGui import QColor, QPainter, QPen
-from PyQt6.QtWidgets import QMenu, QTreeWidget
+from PyQt6.QtWidgets import QTreeWidget
 
 
 class CommitGraphView(QTreeWidget):
