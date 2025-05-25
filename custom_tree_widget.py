@@ -1,4 +1,4 @@
-from PyQt6.QtCore import QRect, Qt, pyqtSignal
+from PyQt6.QtCore import QRect, Qt
 from PyQt6.QtGui import QPalette
 from PyQt6.QtWidgets import (
     QApplication,
@@ -13,7 +13,6 @@ from PyQt6.QtWidgets import (
 
 class CustomTreeWidget(QTreeWidget):
     # 定义一个信号,当需要隐藏浮动标签时发射
-    hideOverlayRequested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -113,7 +112,6 @@ class CustomTreeWidget(QTreeWidget):
     def hide_overlay(self):
         if self._overlay_label:
             self._overlay_label.hide()
-        self.hideOverlayRequested.emit()  # 发射信号
 
     # 如果树本身滚动，我们也需要更新浮动标签的位置或隐藏它
     def scrollContentsBy(self, dx, dy):
