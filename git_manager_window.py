@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMainWindow,
     QMenu,
+    QMessageBox,
     QPushButton,
     QSplitter,
     QTabBar,
@@ -529,6 +530,7 @@ class GitManagerWindow(QMainWindow):
             self.git_manager.pull()
             self.update_commit_history()
         except:
+            QMessageBox.critical(self, "错误", "拉取仓库时发生错误")
             logging.exception("拉取仓库时发生错误")
 
     def push_repo(self):
