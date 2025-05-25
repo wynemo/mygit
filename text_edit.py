@@ -1,9 +1,31 @@
 import logging
 import os
+from typing import Optional
 
 from PyQt6.QtCore import QRect, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QMouseEvent, QPainter, QPen, QTextCursor
-from PyQt6.QtWidgets import QMenu, QPlainTextEdit, QWidget
+from PyQt6.QtGui import (
+    QColor,
+    QFont,
+    QKeyEvent,  # Added QKeyEvent
+    QMouseEvent,
+    QPainter,
+    QPen,
+    QTextCursor,
+    QTextDocument,
+)
+from PyQt6.QtWidgets import (
+    QApplication,  # Added for future use if needed, good practice for dialogs
+    QCheckBox,  # Added
+    QDialog,  # Added
+    QHBoxLayout,  # Added
+    QLabel, # Added for completeness, though not strictly in initial req
+    QLineEdit,  # Added
+    QMenu,
+    QPlainTextEdit,
+    QPushButton,  # Added
+    QVBoxLayout,  # Added
+    QWidget,
+)
 
 from diff_highlighter import DiffHighlighter
 from settings import Settings
@@ -74,7 +96,7 @@ class SyncedTextEdit(QPlainTextEdit):
         self.blame_annotations_per_line = []  # Will store annotations with _display_string for painting
         self.showing_blame = False
         self.file_path = None  # Initialize file_path, can be set externally
-        self.current_commit_hash: Optional[str] = None
+        self.current_commit_hash: Optional[str] = None # Ensured Optional[str]
 
         # 添加行号区域
         self.line_number_area = LineNumberArea(self)
@@ -87,6 +109,57 @@ class SyncedTextEdit(QPlainTextEdit):
 
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
+        self.find_dialog_instance = None # Initialize find_dialog_instance
+
+    def open_find_dialog(self):
+        if self.find_dialog_instance is None or not self.find_dialog_instance.isVisible():
+            self.find_dialog_instance = FindDialog(parent_editor=self)
+            self.find_dialog_instance.show()
+        else:
+            self.find_dialog_instance.raise_()
+            self.find_dialog_instance.activateWindow()
+            if hasattr(self.find_dialog_instance, 'search_input'): # Check if search_input exists
+                 self.find_dialog_instance.search_input.setFocus()
+
+
+    def keyPressEvent(self, event: QKeyEvent):
+        # Check for Ctrl+F (Windows/Linux) or Cmd+F (macOS)
+        if event.key() == Qt.Key.Key_F and \
+           (event.modifiers() == Qt.KeyboardModifier.ControlModifier or \
+            event.modifiers() == Qt.KeyboardModifier.MetaModifier):
+            self.open_find_dialog()
+            event.accept()  # Indicate that the event has been handled
+        else:
+            super().keyPressEvent(event) # Call base class implementation for other keys
+
+    def find_text(self, search_text: str, direction: str = "next", case_sensitive: bool = False) -> bool:
+        """Finds text in the editor and highlights it if found."""
+        flags = QTextDocument.FindFlag()
+        if direction == "previous":
+            flags |= QTextDocument.FindFlag.FindBackward
+        if case_sensitive:
+            flags |= QTextDocument.FindFlag.FindCaseSensitively
+
+        # Call QPlainTextEdit's find method
+        found = super().find(search_text, flags)
+
+        if found:
+            logging.info(f"Found '{search_text}' in {self.objectName()}")
+            self.ensureCursorVisible()  # Make sure the found text is visible
+        else:
+            logging.info(f"'{search_text}' not found in {self.objectName()}")
+            # If not found while searching forward, move cursor to the beginning.
+            # This allows the next search to start from the top.
+            if direction == "next":
+                cursor = self.textCursor()
+                cursor.movePosition(QTextCursor.MoveOperation.Start)
+                self.setTextCursor(cursor)
+            # Optional: If searching backward and not found, could move to the end.
+            # else: # direction == "previous"
+            #     cursor = self.textCursor()
+            #     cursor.movePosition(QTextCursor.MoveOperation.End)
+            #     self.setTextCursor(cursor)
+        return found
 
     def scroll_to_line(self, line_number: int):
         """Scrolls the text edit to the specified line number (0-indexed)."""
@@ -189,6 +262,73 @@ class SyncedTextEdit(QPlainTextEdit):
             logging.error("No blame data found for %s at commit %s", relative_file_path, commit_to_blame)
             # Optionally, clear existing blame data if new data fetch fails or to indicate no data
             # self.clear_blame_data()
+
+class FindDialog(QDialog):
+    def __init__(self, parent_editor: 'SyncedTextEdit'):
+        super().__init__(parent_editor) # Set SyncedTextEdit as parent for context
+        self.editor = parent_editor
+        self.setWindowTitle("Find")
+
+        # UI Elements
+        self.search_input = QLineEdit(self)
+        self.search_input.setPlaceholderText("Enter text to find...")
+        self.case_sensitive_checkbox = QCheckBox("Case sensitive", self)
+        self.find_next_button = QPushButton("Find Next", self)
+        self.find_previous_button = QPushButton("Find Previous", self)
+        self.close_button = QPushButton("Close", self)
+
+        # Connections
+        self.find_next_button.clicked.connect(self.on_find_next)
+        self.find_previous_button.clicked.connect(self.on_find_previous)
+        self.close_button.clicked.connect(self.accept) # QDialog.accept() closes the dialog
+
+        # Layout
+        main_layout = QVBoxLayout(self)
+        
+        input_layout = QHBoxLayout()
+        input_layout.addWidget(QLabel("Find:", self)) # Optional label
+        input_layout.addWidget(self.search_input)
+        main_layout.addLayout(input_layout)
+        
+        options_layout = QHBoxLayout()
+        options_layout.addWidget(self.case_sensitive_checkbox)
+        options_layout.addStretch() # Pushes checkbox to the left
+        main_layout.addLayout(options_layout)
+
+        buttons_layout = QHBoxLayout()
+        buttons_layout.addStretch() # Push buttons to the right
+        buttons_layout.addWidget(self.find_previous_button)
+        buttons_layout.addWidget(self.find_next_button)
+        buttons_layout.addStretch() # Spacer
+        buttons_layout.addWidget(self.close_button)
+        main_layout.addLayout(buttons_layout)
+
+        self.setLayout(main_layout)
+        self.setMinimumWidth(300) # Adjust as needed
+
+    def on_find_next(self):
+        search_text = self.search_input.text()
+        if not search_text:
+            return
+        case_sensitive = self.case_sensitive_checkbox.isChecked()
+        self.editor.find_text(search_text, direction="next", case_sensitive=case_sensitive)
+
+    def on_find_previous(self):
+        search_text = self.search_input.text()
+        if not search_text:
+            return
+        case_sensitive = self.case_sensitive_checkbox.isChecked()
+        self.editor.find_text(search_text, direction="previous", case_sensitive=case_sensitive)
+
+    def closeEvent(self, event):
+        # Ensure the editor knows the dialog is closed so a new one can be made
+        self.editor.find_dialog_instance = None
+        super().closeEvent(event)
+
+    def reject(self): # Called on Esc
+        self.editor.find_dialog_instance = None
+        super().reject()
+
 
     def setObjectName(self, name: str) -> None:
         super().setObjectName(name)
