@@ -12,7 +12,6 @@ from PyQt6.QtGui import (
     QPen,
     QTextCursor,
     QTextDocument,
-    QTextEdit,  # Added QTextEdit
 )
 from PyQt6.QtWidgets import (
     QCheckBox,  # Added
@@ -25,6 +24,7 @@ from PyQt6.QtWidgets import (
     QPushButton,  # Added
     QVBoxLayout,  # Added
     QWidget,
+    QTextEdit,  # Added QTextEdit
 )
 
 from diff_highlighter import DiffHighlighter
