@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
     QPushButton,  # Added
     QVBoxLayout,  # Added
     QWidget,
+    QTextEdit,  # Added QTextEdit
 )
 
 from diff_highlighter import DiffHighlighter
@@ -109,12 +110,25 @@ class SyncedTextEdit(QPlainTextEdit):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
         self.find_dialog_instance = None  # Initialize find_dialog_instance
+        self.search_highlights = []  # Initialize search_highlights
 
     def open_find_dialog(self):
+        cursor = self.textCursor()
+        selected_text = cursor.selectedText()
+
         if self.find_dialog_instance is None or not self.find_dialog_instance.isVisible():
-            self.find_dialog_instance = FindDialog(parent_editor=self)
+            # Pass selected_text to the FindDialog constructor
+            self.find_dialog_instance = FindDialog(parent_editor=self, initial_search_text=selected_text)
             self.find_dialog_instance.show()
         else:
+            # If dialog exists, maybe update its search text if new selected text is different?
+            # For now, just raise and activate. Consider updating text in a future step if needed.
+            if selected_text and hasattr(self.find_dialog_instance, 'search_input'):
+                # Optionally, update the existing dialog's search input
+                # self.find_dialog_instance.search_input.setText(selected_text)
+                # self.find_dialog_instance.search_input.selectAll() # удобства ради
+                pass # Decide on update strategy later if necessary
+
             self.find_dialog_instance.raise_()
             self.find_dialog_instance.activateWindow()
             if hasattr(self.find_dialog_instance, "search_input"):  # Check if search_input exists
@@ -133,6 +147,10 @@ class SyncedTextEdit(QPlainTextEdit):
 
     def find_text(self, search_text: str, direction: str = "next", case_sensitive: bool = False) -> bool:
         """Finds text in the editor and highlights it if found."""
+        # Clear previous highlights
+        self.search_highlights.clear()
+        self.setExtraSelections([])
+
         flags = QTextDocument.FindFlag(0)
         if direction == "previous":
             flags |= QTextDocument.FindFlag.FindBackward
@@ -145,8 +163,16 @@ class SyncedTextEdit(QPlainTextEdit):
         if found:
             logging.info(f"Found '{search_text}' in {self.objectName()}")
             self.ensureCursorVisible()  # Make sure the found text is visible
+
+            # Create and apply highlight for the found text
+            selection = QTextEdit.ExtraSelection()
+            selection.cursor = self.textCursor()  # Cursor is already at the found selection
+            selection.format.setBackground(QColor("#ADD8E6"))  # Light blue
+            self.search_highlights.append(selection)
+            self.setExtraSelections(self.search_highlights)
         else:
             logging.info(f"'{search_text}' not found in {self.objectName()}")
+            # Highlights are already cleared at the beginning of the method.
             # If not found while searching forward, move cursor to the beginning.
             # This allows the next search to start from the top.
             if direction == "next":
@@ -159,6 +185,12 @@ class SyncedTextEdit(QPlainTextEdit):
             #     cursor.movePosition(QTextCursor.MoveOperation.End)
             #     self.setTextCursor(cursor)
         return found
+
+    def clear_search_highlights(self):
+        """Clears all search-related highlights from the editor."""
+        self.search_highlights.clear()
+        self.setExtraSelections([])
+        logging.debug(f"Search highlights cleared for {self.objectName()}")
 
     def scroll_to_line(self, line_number: int):
         """Scrolls the text edit to the specified line number (0-indexed)."""
@@ -418,14 +450,18 @@ class SyncedTextEdit(QPlainTextEdit):
 
 
 class FindDialog(QDialog):
-    def __init__(self, parent_editor: "SyncedTextEdit"):
+    def __init__(self, parent_editor: "SyncedTextEdit", initial_search_text: Optional[str] = None):
         super().__init__(parent_editor)  # Set SyncedTextEdit as parent for context
         self.editor = parent_editor
         self.setWindowTitle("Find")
 
         # UI Elements
         self.search_input = QLineEdit(self)
-        self.search_input.setPlaceholderText("Enter text to find...")
+        if initial_search_text:
+            self.search_input.setText(initial_search_text)
+            self.search_input.selectAll() # Select the text for easy replacement or confirmation
+        else:
+            self.search_input.setPlaceholderText("Enter text to find...")
         self.case_sensitive_checkbox = QCheckBox("Case sensitive", self)
         self.find_next_button = QPushButton("Find Next", self)
         self.find_previous_button = QPushButton("Find Previous", self)
@@ -476,9 +512,11 @@ class FindDialog(QDialog):
 
     def closeEvent(self, event):
         # Ensure the editor knows the dialog is closed so a new one can be made
+        self.editor.clear_search_highlights()  # Clear highlights
         self.editor.find_dialog_instance = None
         super().closeEvent(event)
 
     def reject(self):  # Called on Esc
+        self.editor.clear_search_highlights()  # Clear highlights
         self.editor.find_dialog_instance = None
         super().reject()
