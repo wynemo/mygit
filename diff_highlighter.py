@@ -2,12 +2,14 @@ import logging
 
 from PyQt6.QtGui import QColor, QSyntaxHighlighter, QTextCharFormat
 
+from diff_calculator import DiffChunk
+
 
 class DiffHighlighter(QSyntaxHighlighter):
     def __init__(self, parent=None, editor_type=""):
         super().__init__(parent)
         self.editor_type = editor_type
-        self.diff_chunks = []
+        self.diff_chunks: list[DiffChunk] = []
         logging.debug("\n=== 初始化DiffHighlighter ===")
         logging.debug("编辑器类型: %s", editor_type)
 
