@@ -137,7 +137,7 @@ class SyncedTextEdit(QPlainTextEdit):
             self.find_dialog_instance.move(dialog_x, dialog_y)
             
             self.find_dialog_instance.show()
-            self.setFocus() # Ensure this SyncedTextEdit instance retains focus
+            self.find_dialog_instance.search_input.setFocus()
         else:
             # If dialog exists, maybe update its search text if new selected text is different?
             # For now, just raise and activate. Consider updating text in a future step if needed.
@@ -149,8 +149,7 @@ class SyncedTextEdit(QPlainTextEdit):
 
             self.find_dialog_instance.raise_()
             self.find_dialog_instance.activateWindow()
-            # self.find_dialog_instance.search_input.setFocus() # Don't set focus to dialog
-            self.setFocus() # Ensure this SyncedTextEdit instance retains focus
+            self.find_dialog_instance.search_input.setFocus() # Don't set focus to dialog
 
 
     def keyPressEvent(self, event: QKeyEvent):
@@ -186,7 +185,7 @@ class SyncedTextEdit(QPlainTextEdit):
             # Create and apply highlight for the found text
             selection = QTextEdit.ExtraSelection()
             selection.cursor = self.textCursor()  # Cursor is already at the found selection
-            selection.format.setBackground(QColor("#ADD8E6"))  # Light blue
+            selection.format.setBackground(QColor("yellow"))
             self.search_highlights.append(selection)
             self.setExtraSelections(self.search_highlights)
         else:
@@ -482,6 +481,7 @@ class FindDialog(QWidget): # Changed from QDialog to QWidget
             self.search_input.selectAll() # Select the text for easy replacement or confirmation
         else:
             self.search_input.setPlaceholderText("Enter text to find...")
+        self.search_input.setFocus()
         self.case_sensitive_checkbox = QCheckBox("Case sensitive", self)
         self.find_next_button = QPushButton("Find Next", self)
         self.find_previous_button = QPushButton("Find Previous", self)
