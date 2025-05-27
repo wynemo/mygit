@@ -471,7 +471,9 @@ class FindDialog(QWidget):  # Changed from QDialog to QWidget
         super().__init__(parent_editor)  # Set SyncedTextEdit as parent for context
         self.editor = parent_editor
         self.setWindowTitle("Find")
-        self.setWindowFlags(Qt.WindowType.Tool)  # Make it a floating tool window
+        self.setWindowFlags(
+            Qt.WindowType.Tool | Qt.WindowType.WindowDoesNotAcceptFocus
+        )  # Make it a floating tool window
 
         # UI Elements
         self.search_input = QLineEdit(self)
