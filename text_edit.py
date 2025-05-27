@@ -15,6 +15,7 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import (
     QCheckBox,  # Added
+    QFrame,
     QHBoxLayout,  # Added
     QLabel,  # Added for completeness, though not strictly in initial req
     QLineEdit,  # Added
@@ -116,38 +117,25 @@ class SyncedTextEdit(QPlainTextEdit):
         selected_text = cursor.selectedText()
 
         if self.find_dialog_instance is None or not self.find_dialog_instance.isVisible():
-            # Pass selected_text to the FindDialog constructor
             self.find_dialog_instance = FindDialog(parent_editor=self, initial_search_text=selected_text)
 
-            # Position the dialog at the top-right of the editor
-            PADDING = 10
-            editor_global_pos = self.mapToGlobal(self.rect().topLeft())
-            editor_width = self.width()
+            editor_global_pos = self.rect().topRight()
 
-            # Use sizeHint for dialog width as it's generally more reliable before show()
-            # The dialog also has a minimumWidth set, which will apply if hint is smaller.
             dialog_width = self.find_dialog_instance.sizeHint().width()
             if dialog_width <= 0 and hasattr(self.find_dialog_instance, "minimumWidth"):
                 dialog_width = self.find_dialog_instance.minimumWidth()  # Fallback to minimumWidth
 
-            dialog_x = editor_global_pos.x() + editor_width - dialog_width - PADDING
-            dialog_y = editor_global_pos.y() + PADDING
+            dialog_x = editor_global_pos.x() - dialog_width - 100
+            dialog_y = editor_global_pos.y() + 50
 
             self.find_dialog_instance.move(dialog_x, dialog_y)
 
             self.find_dialog_instance.show()
         else:
-            # If dialog exists, maybe update its search text if new selected text is different?
-            # For now, just raise and activate. Consider updating text in a future step if needed.
             if selected_text and hasattr(self.find_dialog_instance, "search_input"):
-                # Optionally, update the existing dialog's search input
                 self.find_dialog_instance.search_input.setText(selected_text)
-                # self.find_dialog_instance.search_input.selectAll() # удобства ради
-                pass  # Decide on update strategy later if necessary
-
-            self.find_dialog_instance.raise_()
-            self.find_dialog_instance.activateWindow()
-            # self.find_dialog_instance.search_input.setFocus() # Don't set focus to dialog
+            self.find_dialog_instance.show()
+            print("show again")
 
     def keyPressEvent(self, event: QKeyEvent):
         # Check for Ctrl+F (Windows/Linux) or Cmd+F (macOS)
@@ -464,14 +452,18 @@ class SyncedTextEdit(QPlainTextEdit):
                         )
 
 
-class FindDialog(QWidget):  # Changed from QDialog to QWidget
+class FindDialog(QFrame):  # Changed from QDialog to QWidget
     def __init__(self, parent_editor: "SyncedTextEdit", initial_search_text: Optional[str] = None):
         super().__init__(parent_editor)  # Set SyncedTextEdit as parent for context
         self.editor = parent_editor
         self.setWindowTitle("Find")
-        self.setWindowFlags(
-            Qt.WindowType.Tool | Qt.WindowType.WindowDoesNotAcceptFocus
-        )  # Make it a floating tool window
+        self.setStyleSheet("""
+            background-color: #f8f8f8;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        """)
+        self._drag_active = False
+        self._drag_position = None
 
         # UI Elements
         self.search_input = QLineEdit(self)
@@ -539,8 +531,19 @@ class FindDialog(QWidget):  # Changed from QDialog to QWidget
         self.custom_close()  # Call our custom close logic
         super().closeEvent(event)
 
-    # Note: reject() is specific to QDialog for handling Esc key.
-    # For QWidget, if Esc key needs to close the dialog,
-    # it might need to be handled differently, e.g., by overriding keyPressEvent in FindDialog.
-    # For now, assuming the "Close" button or window's 'X' is sufficient.
-    # If Esc key is crucial, this would be a further refinement.
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_active = True
+            self._drag_position = event.position().toPoint()
+            event.accept()
+
+    def mouseMoveEvent(self, event):
+        if self._drag_active and event.buttons() & Qt.MouseButton.LeftButton:
+            offset = event.position().toPoint() - self._drag_position
+            self.move(self.pos() + offset)
+            event.accept()
+
+    def mouseReleaseEvent(self, event):
+        self._drag_active = False
+        self._drag_position = None
+        event.accept()
