@@ -186,8 +186,11 @@ class SyncedTextEdit(QPlainTextEdit):
             selection = QTextEdit.ExtraSelection()
             selection.cursor = self.textCursor()  # Cursor is already at the found selection
             selection.format.setBackground(QColor("yellow"))
+            selection.format.setForeground(QColor("black"))
+            selection.format.setFontWeight(QFont.Weight.Bold)
             self.search_highlights.append(selection)
             self.setExtraSelections(self.search_highlights)
+            logging.debug(f"Applying {len(self.search_highlights)} search highlights to {self.objectName()}. First cursor position: {selection.cursor.position() if self.search_highlights else 'N/A'}")
         else:
             logging.info(f"'{search_text}' not found in {self.objectName()}")
             # Highlights are already cleared at the beginning of the method.
@@ -422,6 +425,7 @@ class SyncedTextEdit(QPlainTextEdit):
             block_number += 1
 
     def paintEvent(self, event):
+        logging.debug(f"SyncedTextEdit.paintEvent called for {self.objectName()}")
         super().paintEvent(event)
         painter = QPainter(self.viewport())
         pen = QPen(QColor("#666666"))

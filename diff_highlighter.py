@@ -26,7 +26,9 @@ class DiffHighlighter(QSyntaxHighlighter):
         """创建高亮格式，包含文字颜色和背景颜色"""
         logging.debug("\n创建格式 - 背景: %s, 文字: %s", background_color, text_color)
         fmt = QTextCharFormat()
-        fmt.setBackground(QColor(background_color))
+        color = QColor(background_color)
+        color.setAlpha(128)  # Set 50% transparency
+        fmt.setBackground(color)
         fmt.setForeground(QColor(text_color))
         return fmt
 
