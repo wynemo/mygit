@@ -457,6 +457,9 @@ class FindDialog(QFrame):  # Changed from QDialog to QWidget
         super().__init__(parent_editor)  # Set SyncedTextEdit as parent for context
         self.editor = parent_editor
         self.setWindowTitle("Find")
+        # check if on windows
+        if os.name == "nt":
+            self.setWindowFlags(Qt.WindowType.WindowDoesNotAcceptFocus | Qt.WindowType.Tool)
         self.setStyleSheet("""
             background-color: #f8f8f8;
             border: 1px solid #ccc;
@@ -510,6 +513,9 @@ class FindDialog(QFrame):  # Changed from QDialog to QWidget
         search_text = self.search_input.text()
         if not search_text:
             return
+        if os.name == "nt":
+            self.editor.activateWindow()
+            self.editor.setFocus()
         case_sensitive = self.case_sensitive_checkbox.isChecked()
         self.editor.find_text(search_text, direction="next", case_sensitive=case_sensitive)
 
@@ -517,6 +523,9 @@ class FindDialog(QFrame):  # Changed from QDialog to QWidget
         search_text = self.search_input.text()
         if not search_text:
             return
+        if os.name == "nt":
+            self.editor.activateWindow()
+            self.editor.setFocus()
         case_sensitive = self.case_sensitive_checkbox.isChecked()
         self.editor.find_text(search_text, direction="previous", case_sensitive=case_sensitive)
 
