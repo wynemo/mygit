@@ -136,7 +136,6 @@ class SyncedTextEdit(QPlainTextEdit):
             self.find_dialog_instance.move(dialog_x, dialog_y)
 
             self.find_dialog_instance.show()
-            self.setFocus()  # Ensure this SyncedTextEdit instance retains focus
         else:
             # If dialog exists, maybe update its search text if new selected text is different?
             # For now, just raise and activate. Consider updating text in a future step if needed.
@@ -149,7 +148,6 @@ class SyncedTextEdit(QPlainTextEdit):
             self.find_dialog_instance.raise_()
             self.find_dialog_instance.activateWindow()
             # self.find_dialog_instance.search_input.setFocus() # Don't set focus to dialog
-            self.setFocus()  # Ensure this SyncedTextEdit instance retains focus
 
     def keyPressEvent(self, event: QKeyEvent):
         # Check for Ctrl+F (Windows/Linux) or Cmd+F (macOS)
@@ -522,7 +520,6 @@ class FindDialog(QWidget):  # Changed from QDialog to QWidget
             return
         case_sensitive = self.case_sensitive_checkbox.isChecked()
         self.editor.find_text(search_text, direction="next", case_sensitive=case_sensitive)
-        self.editor.setFocus()  # Ensure editor retains focus
 
     def on_find_previous(self):
         search_text = self.search_input.text()
@@ -530,7 +527,6 @@ class FindDialog(QWidget):  # Changed from QDialog to QWidget
             return
         case_sensitive = self.case_sensitive_checkbox.isChecked()
         self.editor.find_text(search_text, direction="previous", case_sensitive=case_sensitive)
-        self.editor.setFocus()  # Ensure editor retains focus
 
     def custom_close(self):
         """Handles the logic for closing the dialog."""
