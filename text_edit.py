@@ -142,7 +142,7 @@ class SyncedTextEdit(QPlainTextEdit):
             # For now, just raise and activate. Consider updating text in a future step if needed.
             if selected_text and hasattr(self.find_dialog_instance, "search_input"):
                 # Optionally, update the existing dialog's search input
-                # self.find_dialog_instance.search_input.setText(selected_text)
+                self.find_dialog_instance.search_input.setText(selected_text)
                 # self.find_dialog_instance.search_input.selectAll() # удобства ради
                 pass  # Decide on update strategy later if necessary
 
