@@ -15,16 +15,15 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import (
     QCheckBox,  # Added
-    QDialog,  # Added
     QHBoxLayout,  # Added
     QLabel,  # Added for completeness, though not strictly in initial req
     QLineEdit,  # Added
     QMenu,
     QPlainTextEdit,
     QPushButton,  # Added
+    QTextEdit,  # Added QTextEdit
     QVBoxLayout,  # Added
     QWidget,
-    QTextEdit,  # Added QTextEdit
 )
 
 from diff_highlighter import DiffHighlighter
@@ -124,33 +123,30 @@ class SyncedTextEdit(QPlainTextEdit):
             PADDING = 10
             editor_global_pos = self.mapToGlobal(self.rect().topLeft())
             editor_width = self.width()
-            
+
             # Use sizeHint for dialog width as it's generally more reliable before show()
             # The dialog also has a minimumWidth set, which will apply if hint is smaller.
             dialog_width = self.find_dialog_instance.sizeHint().width()
-            if dialog_width <= 0 and hasattr(self.find_dialog_instance, 'minimumWidth'):
-                 dialog_width = self.find_dialog_instance.minimumWidth() # Fallback to minimumWidth
+            if dialog_width <= 0 and hasattr(self.find_dialog_instance, "minimumWidth"):
+                dialog_width = self.find_dialog_instance.minimumWidth()  # Fallback to minimumWidth
 
             dialog_x = editor_global_pos.x() + editor_width - dialog_width - PADDING
             dialog_y = editor_global_pos.y() + PADDING
-            
+
             self.find_dialog_instance.move(dialog_x, dialog_y)
-            
+
             self.find_dialog_instance.show()
-            self.find_dialog_instance.search_input.setFocus()
         else:
             # If dialog exists, maybe update its search text if new selected text is different?
             # For now, just raise and activate. Consider updating text in a future step if needed.
-            if selected_text and hasattr(self.find_dialog_instance, 'search_input'):
+            if selected_text and hasattr(self.find_dialog_instance, "search_input"):
                 # Optionally, update the existing dialog's search input
                 # self.find_dialog_instance.search_input.setText(selected_text)
                 # self.find_dialog_instance.search_input.selectAll() # удобства ради
-                pass # Decide on update strategy later if necessary
+                pass  # Decide on update strategy later if necessary
 
             self.find_dialog_instance.raise_()
             self.find_dialog_instance.activateWindow()
-            self.find_dialog_instance.search_input.setFocus() # Don't set focus to dialog
-
 
     def keyPressEvent(self, event: QKeyEvent):
         # Check for Ctrl+F (Windows/Linux) or Cmd+F (macOS)
@@ -190,7 +186,9 @@ class SyncedTextEdit(QPlainTextEdit):
             selection.format.setFontWeight(QFont.Weight.Bold)
             self.search_highlights.append(selection)
             self.setExtraSelections(self.search_highlights)
-            logging.debug(f"Applying {len(self.search_highlights)} search highlights to {self.objectName()}. First cursor position: {selection.cursor.position() if self.search_highlights else 'N/A'}")
+            logging.debug(
+                f"Applying {len(self.search_highlights)} search highlights to {self.objectName()}. First cursor position: {selection.cursor.position() if self.search_highlights else 'N/A'}"
+            )
         else:
             logging.info(f"'{search_text}' not found in {self.objectName()}")
             # Highlights are already cleared at the beginning of the method.
@@ -471,21 +469,21 @@ class SyncedTextEdit(QPlainTextEdit):
                         )
 
 
-class FindDialog(QWidget): # Changed from QDialog to QWidget
+class FindDialog(QWidget):  # Changed from QDialog to QWidget
     def __init__(self, parent_editor: "SyncedTextEdit", initial_search_text: Optional[str] = None):
         super().__init__(parent_editor)  # Set SyncedTextEdit as parent for context
         self.editor = parent_editor
         self.setWindowTitle("Find")
-        self.setWindowFlags(Qt.WindowType.Tool) # Make it a floating tool window
+        self.setWindowFlags(Qt.WindowType.Tool | Qt.WindowType.WindowDoesNotAcceptFocus)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
 
         # UI Elements
         self.search_input = QLineEdit(self)
         if initial_search_text:
             self.search_input.setText(initial_search_text)
-            self.search_input.selectAll() # Select the text for easy replacement or confirmation
+            self.search_input.selectAll()  # Select the text for easy replacement or confirmation
         else:
             self.search_input.setPlaceholderText("Enter text to find...")
-        self.search_input.setFocus()
         self.case_sensitive_checkbox = QCheckBox("Case sensitive", self)
         self.find_next_button = QPushButton("Find Next", self)
         self.find_previous_button = QPushButton("Find Previous", self)
@@ -494,7 +492,7 @@ class FindDialog(QWidget): # Changed from QDialog to QWidget
         # Connections
         self.find_next_button.clicked.connect(self.on_find_next)
         self.find_previous_button.clicked.connect(self.on_find_previous)
-        self.close_button.clicked.connect(self.custom_close) # Changed from self.accept
+        self.close_button.clicked.connect(self.custom_close)  # Changed from self.accept
 
         # Layout
         main_layout = QVBoxLayout(self)
@@ -526,7 +524,6 @@ class FindDialog(QWidget): # Changed from QDialog to QWidget
             return
         case_sensitive = self.case_sensitive_checkbox.isChecked()
         self.editor.find_text(search_text, direction="next", case_sensitive=case_sensitive)
-        self.editor.setFocus() # Ensure editor retains focus
 
     def on_find_previous(self):
         search_text = self.search_input.text()
@@ -534,17 +531,16 @@ class FindDialog(QWidget): # Changed from QDialog to QWidget
             return
         case_sensitive = self.case_sensitive_checkbox.isChecked()
         self.editor.find_text(search_text, direction="previous", case_sensitive=case_sensitive)
-        self.editor.setFocus() # Ensure editor retains focus
 
     def custom_close(self):
         """Handles the logic for closing the dialog."""
         self.editor.clear_search_highlights()
         self.editor.find_dialog_instance = None
-        self.close() # QWidget.close()
+        self.close()  # QWidget.close()
 
     def closeEvent(self, event):
         """Ensures cleanup when the dialog is closed via window controls."""
-        self.custom_close() # Call our custom close logic
+        self.custom_close()  # Call our custom close logic
         super().closeEvent(event)
 
     # Note: reject() is specific to QDialog for handling Esc key.
