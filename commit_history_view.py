@@ -68,6 +68,14 @@ class CommitHistoryView(QWidget):
         if not self.git_manager or not self.branch:
             self._loading = False
             return
+
+        remote_names = []
+        if self.git_manager and self.git_manager.repo:
+            remote_names = [remote.name for remote in self.git_manager.repo.remotes]
+        else:
+            # Fallback if git_manager or repo isn't fully initialized here, though it should be.
+            remote_names = ['origin']
+
         commits = self.git_manager.get_commit_history(
             self.branch, self.load_batch_size, self.loaded_count
         )  # cursor生成
@@ -79,9 +87,13 @@ class CommitHistoryView(QWidget):
             decorations = commit.get("decorations", [])
             processed_decorations = []
             for ref_name in decorations:
-                # Assuming remote refs contain '/' (e.g., "origin/master")
-                # and local refs do not (e.g., "master")
-                if "/" in ref_name: 
+                is_remote = False
+                for r_name in remote_names:
+                    if ref_name.startswith(f"{r_name}/"):
+                        is_remote = True
+                        break
+                
+                if is_remote:
                     processed_decorations.append(f"☁️ {ref_name}")
                 else:
                     processed_decorations.append(ref_name)
