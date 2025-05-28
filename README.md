@@ -120,5 +120,5 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 39. bug: 文件差异的换行没有显示
 40. impovement: 2025-05-25 22:30:04,384 - ERROR - root - 拉取仓库时发生错误 -  出现git pull异常时要提示
 41. ~~feature: 在synced_text_edit 上添加查找功能 ctrl/command + f 可以触发~~
-42. ~~接41的改动，ctrl + f，如果有选中的文字，那么查找的文字就是选中的文字；~~ 此外，高亮的效果太差了，需要弄成蓝色背景
+42. ~~接41的改动，ctrl + f，如果有选中的文字，那么查找的文字就是选中的文字；此外，高亮的效果太差了，需要弄成蓝色背景~~
 43. ~~text_edit.py/FindDialog 换成浮动的widget, 查找的过程浮动在 SyncedTextEdit 之上，然后SyncedTextEdit不会失焦~~
