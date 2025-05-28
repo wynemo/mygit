@@ -288,7 +288,7 @@ class SyncedTextEdit(QPlainTextEdit):
 
         # Now that file_path is confirmed to be valid, proceed
         relative_file_path = os.path.relpath(file_path, git_manager.repo_path)
-        commit_to_blame = self.current_commit_hash if self.current_commit_hash else "HEAD"
+        commit_to_blame = self.current_commit_hash if self.current_commit_hash else None
 
         blame_data = git_manager.get_blame_data(relative_file_path, commit_to_blame)
         if blame_data:
