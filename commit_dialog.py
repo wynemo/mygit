@@ -379,6 +379,7 @@ class CommitDialog(QDialog):
             # 检查推送结果
             if push_info[0].flags & push_info[0].ERROR:
                 raise Exception("Push failed")
+            self.parent_window.update_commit_history()
 
             QMessageBox.information(self, "成功", "推送成功")
 
