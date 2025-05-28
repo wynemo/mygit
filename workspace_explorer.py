@@ -34,7 +34,8 @@ class WorkspaceExplorer(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         # 创建刷新按钮
-        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button = QPushButton("🔄")
+        self.refresh_button.setFixedSize(30, 30)
         self.refresh_button.clicked.connect(self.refresh_file_tree)
         layout.addWidget(self.refresh_button) # Add button to layout
 
