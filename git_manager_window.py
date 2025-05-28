@@ -544,6 +544,7 @@ class GitManagerWindow(QMainWindow):
             return
         try:
             self.git_manager.push()
+            self.update_commit_history()
         except:
             QMessageBox.critical(self, "错误", "推送仓库时发生错误")
             logging.exception("推送仓库时发生错误")
