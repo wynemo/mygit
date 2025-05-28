@@ -29,13 +29,14 @@ class CommitHistoryView(QWidget):
         # 普通提交历史列表
         self.history_list = CustomTreeWidget()
         self.history_list.set_hover_reveal_columns({1})  # Enable hover for commit message column
-        self.history_list.setHeaderLabels(["提交ID", "提交信息", "作者", "日期"])
+        self.history_list.setHeaderLabels(["提交ID", "提交信息", "Branches", "作者", "日期"])
         self.history_list.itemClicked.connect(self.on_commit_clicked)
         self.history_list.currentItemChanged.connect(self.on_current_item_changed)
         self.history_list.setColumnWidth(0, 80)  # Hash
         self.history_list.setColumnWidth(1, 200)  # Message
-        self.history_list.setColumnWidth(2, 100)  # Author
-        self.history_list.setColumnWidth(3, 150)  # Date
+        self.history_list.setColumnWidth(2, 150) # Branches
+        self.history_list.setColumnWidth(3, 100) # Author
+        self.history_list.setColumnWidth(4, 150) # Date
         layout.addWidget(self.history_list)
 
         # 滚动到底部自动加载更多, cursor生成
@@ -72,10 +73,23 @@ class CommitHistoryView(QWidget):
         )  # cursor生成
         for commit in commits:
             item = QTreeWidgetItem(self.history_list)
-            item.setText(0, commit["hash"][:7])
-            item.setText(1, commit["message"])
-            item.setText(2, commit["author"])
-            item.setText(3, commit["date"])
+            item.setText(0, commit["hash"][:7])       # Commit ID
+            item.setText(1, commit["message"])    # Commit Message
+
+            decorations = commit.get("decorations", [])
+            processed_decorations = []
+            for ref_name in decorations:
+                # Assuming remote refs contain '/' (e.g., "origin/master")
+                # and local refs do not (e.g., "master")
+                if "/" in ref_name: 
+                    processed_decorations.append(f"☁️ {ref_name}")
+                else:
+                    processed_decorations.append(ref_name)
+            decoration_text = ", ".join(processed_decorations)
+            item.setText(2, decoration_text) # Branches (new column)
+
+            item.setText(3, commit["author"])     # Author (index shifted)
+            item.setText(4, commit["date"])       # Date (index shifted)
         self.loaded_count += len(commits)  # cursor生成
         if len(commits) < self.load_batch_size:  # 没有更多了
             self._all_loaded = True  # cursor生成
