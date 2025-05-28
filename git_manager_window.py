@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QSplitter,
     QTabBar,
-    QTabWidget,  # 添加 QTabWidget 导入
+    QTabWidget,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -29,6 +29,7 @@ from compare_view import CompareView
 from compare_with_working_dialog import CompareWithWorkingDialog
 from file_changes_view import FileChangesView
 from git_manager import GitManager
+import git.exc  # Import for specific git exceptions
 from settings import Settings
 from settings_dialog import SettingsDialog
 from workspace_explorer import WorkspaceExplorer
@@ -362,11 +363,33 @@ class GitManagerWindow(QMainWindow):
 
     def on_commit_selected(self, commit_hash):
         """当选择提交时更新文件变化视图"""
-        if not self.git_manager:
+        if not self.git_manager or not self.git_manager.repo:
+            logging.error("GitManager or repository not initialized.")
             return
-        self.current_commit = self.git_manager.repo.commit(commit_hash)
+
+        try:
+            self.current_commit = self.git_manager.repo.commit(commit_hash)
+            if not self.current_commit or not hasattr(self.current_commit, 'hexsha') or not self.current_commit.hexsha:
+                logging.error(f"Failed to retrieve a valid commit object with hexsha for hash: {commit_hash}")
+                # Optionally, clear views or show an error to the user
+                self.file_changes_view.clear_changes() # Assuming such a method exists or can be added
+                self.commit_detail_view.clear_details() # Assuming such a method exists or can be added
+                return
+        except git.exc.BadName as e:
+            logging.error(f"Error: Commit hash '{commit_hash}' not found or invalid. Details: {e}")
+            # Optionally, clear views or show an error to the user
+            self.file_changes_view.clear_changes()
+            self.commit_detail_view.clear_details()
+            return
+        except Exception as e:
+            logging.error(f"An unexpected error occurred when fetching commit '{commit_hash}': {e}")
+            # Optionally, clear views or show an error to the user
+            self.file_changes_view.clear_changes()
+            self.commit_detail_view.clear_details()
+            return
+
+        # Proceed only if self.current_commit is valid
         self.file_changes_view.update_changes(self.git_manager, self.current_commit)
-        # cursor生成 - 同时更新commit详细信息视图
         self.commit_detail_view.update_commit_detail(self.git_manager, self.current_commit)
 
     def on_file_selected(self, file_path):
@@ -420,8 +443,12 @@ class GitManagerWindow(QMainWindow):
 
             # 创建并显示比较对话框
             # todo 这个要改造, 看readme里的todo
-            dialog = CompareWithWorkingDialog(f"比较 {file_path}", old_content, new_content, file_path, self)
-            dialog.exec()
+            if self.current_commit and self.current_commit.hexsha:
+                dialog = CompareWithWorkingDialog(f"比较 {file_path}", old_content, new_content, file_path, self.current_commit.hexsha, self)
+                dialog.exec()
+            else:
+                logging.error("Cannot show compare with working dialog: current_commit is not valid.")
+                QMessageBox.warning(self, "错误", "无法比较：当前提交无效。")
 
         except Exception as e:
             print(f"比较文件失败: {e!s}")

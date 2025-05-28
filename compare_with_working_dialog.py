@@ -6,13 +6,14 @@ from text_diff_viewer import DiffViewer
 
 
 class CompareWithWorkingDialog(QDialog):
-    def __init__(self, title, old_content, new_content, file_path, parent=None):
+    def __init__(self, title, old_content, new_content, file_path, left_commit_hash_for_old_content: str, parent=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.resize(800, 600)
+        self.left_commit_hash = left_commit_hash_for_old_content
 
         layout = QVBoxLayout(self)
         self.diff_viewer = DiffViewer()
         layout.addWidget(self.diff_viewer)
 
-        self.diff_viewer.set_texts(old_content, new_content, file_path, None, None)
+        self.diff_viewer.set_texts(old_content, new_content, file_path, self.left_commit_hash, None)
