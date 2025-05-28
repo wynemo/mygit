@@ -39,14 +39,27 @@ class GitManager:
                 branch = self.repo.active_branch.name
 
             commits = []
+            decorations_map = {}
+
+            # Populate decorations_map with local branches
+            for head in self.repo.heads:
+                decorations_map.setdefault(head.commit.hexsha, []).append(head.name)
+
+            # Populate decorations_map with remote references
+            for remote in self.repo.remotes:
+                for ref in remote.refs:
+                    decorations_map.setdefault(ref.commit.hexsha, []).append(ref.name)
+
             for commit in self.repo.iter_commits(branch, max_count=limit, skip=skip):  # cursor生成
                 message = commit.message.strip().split("\n")[0]
+                decorations = decorations_map.get(commit.hexsha, [])
                 commits.append(
                     {
                         "hash": commit.hexsha,
                         "message": message,
                         "author": commit.author.name,
                         "date": commit.committed_datetime.strftime("%Y-%m-%d %H:%M:%S"),
+                        "decorations": decorations,
                     }
                 )
             return commits
