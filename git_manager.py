@@ -192,7 +192,7 @@ class GitManager:
         if not self.repo:
             if not self.initialize():
                 return "unknown"
-        
+
         # This check is important to ensure self.repo is not None
         if not self.repo:
             return "unknown"
@@ -206,7 +206,7 @@ class GitManager:
             if not abs_file_path.startswith(repo_root_path):
                 # This case might be treated as an error or a specific status.
                 # For now, returning "untracked" as per one interpretation of the requirement.
-                return "untracked" 
+                return "untracked"
 
             relative_file_path = os.path.relpath(abs_file_path, repo_root_path)
 
@@ -225,7 +225,7 @@ class GitManager:
             for diff_item in self.repo.index.diff("HEAD"):
                 if diff_item.a_path == relative_file_path or diff_item.b_path == relative_file_path:
                     return "staged"
-            
+
             # 4. If none of the above, the file is considered "normal" (tracked and not modified)
             # This check is implicitly handled if the file is tracked and not in previous conditions.
             # However, we need to ensure the file is actually tracked.
@@ -245,7 +245,7 @@ class GitManager:
                 # The prompt implies if it's not untracked, modified, or staged, it's normal.
                 # This means it is tracked and has no pending changes.
                 # A file that is tracked and unchanged will not appear in diffs or untracked_files.
-                return "normal" # If not in untracked, modified, or staged, assume normal.
+                return "normal"  # If not in untracked, modified, or staged, assume normal.
 
         except git.GitCommandError as e:
             print(f"Git command error while getting file status for {file_path}: {e!s}")
@@ -265,7 +265,7 @@ class GitManager:
             if not self.initialize():
                 # Initialization failed, return empty sets
                 return statuses
-        
+
         # This check is important to ensure self.repo is not None after potential initialization
         if not self.repo:
             return statuses
@@ -288,11 +288,12 @@ class GitManager:
                 # If a file is modified, a_path and b_path are usually the same.
                 # If a file is deleted from workdir (but still in index), b_path is None.
                 # We are interested in paths that are currently modified in the working tree.
-                if diff_item.a_path: # Path in index
+                if diff_item.a_path:  # Path in index
                     statuses["modified"].add(diff_item.a_path)
-                if diff_item.b_path and diff_item.b_path != diff_item.a_path : # Path in working dir, if different and exists
-                     statuses["modified"].add(diff_item.b_path)
-
+                if (
+                    diff_item.b_path and diff_item.b_path != diff_item.a_path
+                ):  # Path in working dir, if different and exists
+                    statuses["modified"].add(diff_item.b_path)
 
             # Get Staged Files
             # self.repo.index.diff("HEAD") compares the index with the HEAD commit
@@ -304,11 +305,11 @@ class GitManager:
                 # If a file is newly staged, a_path is None, b_path is the file.
                 # If a file is staged for deletion, b_path is None, a_path is the file.
                 # If a file is modified and staged, a_path and b_path are usually the same.
-                if diff_item.b_path: # Path in index (staged)
+                if diff_item.b_path:  # Path in index (staged)
                     statuses["staged"].add(diff_item.b_path)
-                elif diff_item.a_path: # Path in HEAD (implies deletion staged if b_path is None)
+                elif diff_item.a_path:  # Path in HEAD (implies deletion staged if b_path is None)
                     statuses["staged"].add(diff_item.a_path)
-            
+
             # Handle files that are both staged and then modified again in the working directory.
             # Such files will appear in `statuses["modified"]` (workdir vs index)
             # and `statuses["staged"]` (index vs HEAD).
@@ -320,9 +321,15 @@ class GitManager:
         except git.GitCommandError as e:
             print(f"Git command error while getting all file statuses: {e!s}")
             # Return whatever statuses were collected, or empty if error was early
-            return statuses # Or re-initialize to empty: {"modified": set(), "staged": set(), "untracked": set()}
+            return statuses  # Or re-initialize to empty: {"modified": set(), "staged": set(), "untracked": set()}
         except Exception as e:
             print(f"Error getting all file statuses: {e!s}")
-            return statuses # Or re-initialize to empty
+            return statuses  # Or re-initialize to empty
 
         return statuses
+
+    def revert(self, file_path: str):
+        """还原文件"""
+        if not self.repo:
+            return
+        self.repo.git.checkout(file_path)

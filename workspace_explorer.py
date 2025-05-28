@@ -37,7 +37,7 @@ class WorkspaceExplorer(QWidget):
         self.refresh_button = QPushButton("🔄")
         self.refresh_button.setFixedSize(30, 30)
         self.refresh_button.clicked.connect(self.refresh_file_tree)
-        layout.addWidget(self.refresh_button) # Add button to layout
+        layout.addWidget(self.refresh_button)  # Add button to layout
 
         # 创建水平分割器
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -152,7 +152,7 @@ class WorkspaceExplorer(QWidget):
             self.all_file_statuses = self.git_manager.get_all_file_statuses()
         else:
             self.all_file_statuses = {"modified": set(), "staged": set(), "untracked": set()}
-        
+
         self.file_tree.clear()
         if hasattr(self, "workspace_path"):
             self._add_directory_items(self.workspace_path, self.file_tree.invisibleRootItem())
@@ -171,12 +171,12 @@ class WorkspaceExplorer(QWidget):
                     try:
                         # Ensure workspace_path is not None and is an absolute path
                         if not self.workspace_path or not os.path.isabs(self.workspace_path):
-                             # Fallback or error logging if workspace_path isn't suitable
-                            pass # Or log an error: logging.error("Workspace path is not set or not absolute.")
+                            # Fallback or error logging if workspace_path isn't suitable
+                            pass  # Or log an error: logging.error("Workspace path is not set or not absolute.")
                         else:
                             relative_path = os.path.relpath(item_path, self.workspace_path)
                             # Normalize path separators for comparison, as GitPython uses '/'
-                            relative_path = relative_path.replace(os.sep, '/')
+                            relative_path = relative_path.replace(os.sep, "/")
 
                             if relative_path in self.all_file_statuses.get("modified", set()):
                                 tree_item.setForeground(0, QColor(165, 42, 42))  # Brown color
@@ -189,10 +189,12 @@ class WorkspaceExplorer(QWidget):
                         # This can happen if item_path is not under self.workspace_path
                         # For example, if self.workspace_path is relative and item_path is absolute
                         # or they are on different drives on Windows.
-                        logging.warning(f"Could not determine relative path for {item_path} against {self.workspace_path}: {ve}")
+                        logging.warning(
+                            f"Could not determine relative path for {item_path} against {self.workspace_path}: {ve}"
+                        )
                     except Exception as e_status:
                         logging.error(f"Error processing file status for {item_path}: {e_status}")
-                
+
                 if os.path.isdir(item_path):
                     self._add_directory_items(item_path, tree_item)
 
@@ -296,6 +298,10 @@ class FileTreeWidget(QTreeWidget):
         blame_action = context_menu.addAction("Toggle Git Blame Annotations")  # Renamed for clarity
         blame_action.triggered.connect(lambda: self._toggle_blame_annotation_in_editor(file_path))
 
+        # 添加"Revert"菜单项
+        revert_action = context_menu.addAction("Revert")
+        revert_action.triggered.connect(lambda: self.revert_file(file_path))
+
         # 在鼠标位置显示菜单
         context_menu.exec(self.mapToGlobal(position))
 
@@ -397,3 +403,15 @@ class FileTreeWidget(QTreeWidget):
         main_window.tab_widget.setCurrentIndex(main_window.tab_widget.count() - 1)
 
         main_window.bottom_widget.show()
+
+    def revert_file(self, file_path: str):
+        """还原文件"""
+        if self.git_manager and self.git_manager.repo:
+            self.git_manager.revert(file_path)
+            workspace_explorer = self.parent()
+            while workspace_explorer and not isinstance(workspace_explorer, WorkspaceExplorer):
+                workspace_explorer = workspace_explorer.parent()
+            if workspace_explorer:
+                workspace_explorer.refresh_file_tree()
+        else:
+            print("Git repository not initialized in GitManager.")

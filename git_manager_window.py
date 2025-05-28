@@ -322,6 +322,7 @@ class GitManagerWindow(QMainWindow):
             # 更新工作区浏览器
             self.workspace_explorer.set_workspace_path(folder_path)
             self.workspace_explorer.git_manager = self.git_manager
+            self.workspace_explorer.file_tree.git_manager = self.git_manager
             self.workspace_explorer.refresh_file_tree()
         else:
             self.commit_history_view.history_list.clear()
