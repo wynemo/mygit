@@ -112,7 +112,7 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 31. ~~工作区文件有修改，左边树形列表（FileTreeWidget）相应的文件显示有变化，颜色可变为棕色， 表示修改了次文件~~
 32. ~~GitManagerWindow中的元素 窗口布局的大小，需要根据屏幕大小，自动调整，现在是固定大小; 比如 CommitDetailView 提交详情这个页面，需要根据内容大小，自动调整高度，现在完全挤在一起了~~
 33. 接31的改动，文件视图，需要显示修改的地方
-34. set_texts 有的地方参数不对，git 短 hash的，现在设置的为None
+34. ~~set_texts 有的地方参数不对，git 短 hash的，现在设置的为None~~
 35. ~~SyncedTextEdit 上添加上、下两个按钮，快速定位到上一个差异，下一个差异~~ 还有些问题，滚动不够灵敏，然后当前差异的处的行号应该不同，要不然以为点击上一个下一个没有反应
 36. ~~Refresh 按钮占用太大空间了 另外想一个图标~~
 37. 重构：GitManagerWindow top_widget top_layout 的东西能否抽离出去
