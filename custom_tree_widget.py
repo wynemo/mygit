@@ -15,8 +15,6 @@ from PyQt6.QtWidgets import (
 
 
 class CustomTreeWidget(QTreeWidget):
-    # 定义一个信号,当需要隐藏浮动标签时发射
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self._overlay_label = None
