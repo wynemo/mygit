@@ -102,7 +102,7 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 21. ~~“提交历史”标签，不可关闭，那么样式不需要一个“x“的关闭按钮~~
 22. ~~仓库需要优先显示默认分支~~
 23. ~~工作区的文件，右键菜单，加入git annoation 支持;完成一半了~~
-24. git push 以后，需要有点提示；或者说界面上有点不同；同时增加推送中的交互
+24. git push 以后，需要有点提示；~~或者说界面上有点不同；~~同时增加推送中的交互
 25. ~~CommitHistoryView 的 history_list (CustomTreeWidget) 需要显示remote与local，现在只显示了local, remote可加emoji ☁️~~
 26. ~~点击git annoation 单行的区域时，根据commit 信息，需要选中commit_history_view history_list的相应的item，然后 on_commit_clicked 触发~~
 27. ~~git annoation 宽度不一致 希望能计算出最宽的宽度 然后合理的显示~~
@@ -122,4 +122,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 41. ~~feature: 在synced_text_edit 上添加查找功能 ctrl/command + f 可以触发~~
 42. ~~接41的改动，ctrl + f，如果有选中的文字，那么查找的文字就是选中的文字；此外，高亮的效果太差了，需要弄成蓝色背景~~
 43. ~~text_edit.py/FindDialog 换成浮动的widget, 查找的过程浮动在 SyncedTextEdit 之上，然后SyncedTextEdit不会失焦~~
-44. git push以后，需要更新分支的remote提示
+44. ~~git push以后，需要更新分支的remote提示~~
