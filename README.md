@@ -115,7 +115,7 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 34. ~~set_texts 有的地方参数不对，git 短 hash的，现在设置的为None~~
 35. ~~SyncedTextEdit 上添加上、下两个按钮，快速定位到上一个差异，下一个差异~~ 还有些问题，滚动不够灵敏，然后当前差异的处的行号显示应该不同，要不然以为点击上一个下一个没有反应
 36. ~~Refresh 按钮占用太大空间了 另外想一个图标~~
-37. 重构：GitManagerWindow top_widget top_layout 的东西能否抽离出去
+37. ~~重构：GitManagerWindow top_widget top_layout 的东西能否抽离出去~~
 38. ~~bug：点击“show blame” - 弹出的菜单与鼠标右键点击的地方隔太远了~~
 39. bug: 文件差异的换行没有显示
 40. ~~impovement: 2025-05-25 22:30:04,384 - ERROR - root - 拉取仓库时发生错误 -  出现git pull异常时要提示~~
