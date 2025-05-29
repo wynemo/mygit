@@ -550,11 +550,11 @@ class ModifiedTextEdit(SyncedTextEdit):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.line_modifications = []  # 存储每行的修改状态
+        self.line_modifications = {}  # 存储每行的修改状态
         # 确保行号区域宽度计算包含修改标记
         self.update_line_number_area_width()
 
-    def set_line_modifications(self, modifications: list):
+    def set_line_modifications(self, modifications: dict):
         """设置每行的修改状态
 
         Args:
@@ -613,18 +613,17 @@ class ModifiedTextEdit(SyncedTextEdit):
                 )
 
                 # 2. 绘制修改状态标记
-                if block_number < len(self.line_modifications):
-                    mod_status = self.line_modifications[block_number]
-                    if mod_status and mod_status in self.LINE_STATUS_COLORS:
-                        color = self.LINE_STATUS_COLORS[mod_status]
-                        painter.setBrush(color)
-                        painter.setPen(color)
+                mod_status = self.line_modifications.get(block_number + 1)
+                if mod_status:
+                    print("mod_status is", mod_status)
+                if mod_status and mod_status in self.LINE_STATUS_COLORS:
+                    color = self.LINE_STATUS_COLORS[mod_status]
+                    painter.setBrush(color)
+                    painter.setPen(color)
 
-                        # 在行号左侧绘制彩色圆点表示修改状态
-                        mark_rect = QRect(
-                            int(modification_mark_start) + 2, int(top + (current_block_height - 6) / 2), 6, 6
-                        )
-                        painter.drawEllipse(mark_rect)
+                    # 在行号左侧绘制彩色圆点表示修改状态
+                    mark_rect = QRect(int(modification_mark_start) + 2, int(top + (current_block_height - 6) / 2), 6, 6)
+                    painter.drawEllipse(mark_rect)
 
                 # 3. 绘制blame注释（从父类保留的功能）
                 if self.showing_blame:

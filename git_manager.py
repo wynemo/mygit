@@ -226,16 +226,6 @@ class GitManager:
                 self.repo.head.commit.tree[relative_file_path]
                 return "normal"
             except KeyError:
-                # This case should ideally be caught by untracked_files,
-                # but as a fallback if it's not in untracked_files but also not in HEAD,
-                # it might indicate a complex state or a file that was just deleted and staged for deletion.
-                # For simplicity, if it's not caught by other checks and not in HEAD,
-                # it could be a new file that is staged (added), which is covered by repo.index.diff("HEAD")
-                # if it's a new file. If it's a deleted file that's staged, diff("HEAD") should also show it.
-                # This 'normal' check can be tricky. Let's assume if it's not in the other states, it's normal.
-                # The prompt implies if it's not untracked, modified, or staged, it's normal.
-                # This means it is tracked and has no pending changes.
-                # A file that is tracked and unchanged will not appear in diffs or untracked_files.
                 return "normal"  # If not in untracked, modified, or staged, assume normal.
 
         except git.GitCommandError as e:
@@ -324,3 +314,55 @@ class GitManager:
         if not self.repo:
             return
         self.repo.git.checkout(file_path)
+
+    def get_diff(self, file_path: str) -> dict:
+        """
+        获取文件差异
+        "added" - 新增行
+        "modified" - 修改行
+        "deleted" - 删除行
+        """
+
+        d = {}
+        if not self.repo:
+            return {}
+        source_line = 0
+        target_line = 0
+        diffs = self.repo.index.diff(None, create_patch=True)
+        for diff in diffs:
+            if file_path != diff.a_path:
+                continue
+            # print(f"\n📄 文件: {diff.a_path}")
+
+            diff_text = diff.diff.decode()
+            # print(f"🔸 {diff_text}")
+            lines = diff_text.splitlines()
+
+            source_line = 0
+            target_line = 0
+
+            for line in lines:
+                print(line)
+                if line.startswith("@@"):
+                    # 解析 @@ -10,7 +10,8 @@ 这样的 Hunk 行
+                    import re
+
+                    m = re.match(r"^@@ -(\d+)(?:,\d+)? \+(\d+)", line)
+                    if m:
+                        source_line = int(m.group(1))
+                        target_line = int(m.group(2))
+                    print(f"\n  🔸 {line}")
+                elif line.startswith("-") and not line.startswith("---"):
+                    print(f"  ➖ 删除行 {source_line}: {line[1:].strip()}")
+                    d[source_line] = "deleted"
+                    source_line += 1
+                elif line.startswith("+") and not line.startswith("+++"):
+                    print(f"  ➕ 新增行 {target_line}: {line[1:].strip()}")
+                    d[target_line] = "added"
+                    target_line += 1
+                else:
+                    # 上下文行
+                    source_line += 1
+                    target_line += 1
+        print("d is", d)
+        return d

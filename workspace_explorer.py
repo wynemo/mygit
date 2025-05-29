@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
 
 from file_history_view import FileHistoryView
 from syntax_highlighter import CodeHighlighter
-from text_edit import SyncedTextEdit  # Ensure this is present
+from text_edit import ModifiedTextEdit, SyncedTextEdit  # Ensure this is present
 from utils.language_map import LANGUAGE_MAP
 
 
@@ -91,7 +91,7 @@ class WorkspaceExplorer(QWidget):
                 content = f.read()
 
             # 创建新的文本编辑器
-            text_edit = SyncedTextEdit()
+            text_edit = ModifiedTextEdit()
             text_edit.setProperty("file_path", file_path)  # Keep for any existing logic relying on property
             text_edit.file_path = file_path  # Add this for consistency with show_blame
             text_edit.setPlainText(content)
@@ -121,6 +121,10 @@ class WorkspaceExplorer(QWidget):
                     break
                 main_git_window = parent_candidate
 
+            # todo, get file_name in repo
+            diffs = main_git_window.git_manager.get_diff(file_name)
+            text_edit.set_line_modifications(diffs)
+
             if main_git_window and hasattr(main_git_window, handler_name):
                 try:
                     text_edit.blame_annotation_clicked.connect(getattr(main_git_window, handler_name))
@@ -135,6 +139,7 @@ class WorkspaceExplorer(QWidget):
                 )
 
         except Exception as e:
+            logging.exception("Error opening file")
             print(f"Error opening file: {e}")
 
     def close_tab(self, index: int):
