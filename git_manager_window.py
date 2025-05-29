@@ -561,6 +561,7 @@ class GitManagerWindow(QMainWindow):
             return
 
         history_list = self.commit_history_view.history_list
+        self.commit_history_view.clear_search()
 
         short_hash_to_find = commit_hash[:7]
         found_item = None
