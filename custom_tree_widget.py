@@ -31,12 +31,21 @@ class CustomTreeWidget(QTreeWidget):
         menu = QMenu(self)
         copy_commit_action = menu.addAction("copy commit")
         copy_commit_action.triggered.connect(partial(self.copy_commit_to_clipboard, item))
+        copy_commit_message_action = menu.addAction("copy commit message")
+        copy_commit_message_action.triggered.connect(partial(self.copy_commmit_message_to_clipboard, item))
         menu.exec(self.mapToGlobal(position))
 
     def copy_commit_to_clipboard(self, item):
         if item:
             print("commit is", item.text(0))
             QApplication.clipboard().setText(item.text(0))
+        else:
+            print("item is None")
+
+    def copy_commmit_message_to_clipboard(self, item):
+        if item:
+            print("commit is", item.text(0))
+            QApplication.clipboard().setText(item.text(1))
         else:
             print("item is None")
 
