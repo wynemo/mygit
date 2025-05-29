@@ -18,7 +18,26 @@ class CommitHistoryView(QWidget):
         self._loading = False  # cursor生成
         self._all_loaded = False  # cursor生成
         self.filter_text = ""
+        # self.show_graph = True # Default to showing graph view -- REMOVED
         self.setup_ui()
+
+    # def show_graph_view(self, show_graph): -- REMOVED
+    #     """切换列表视图和图形视图"""
+    #     self.show_graph = show_graph
+    #     # Potentially call update_history here if the view should refresh immediately
+    #     # For now, let's assume update_history will be called separately when branch changes etc.
+    #     # Or, more directly:
+    #     if self.git_manager and self.branch:
+    #         self.update_history(self.git_manager, self.branch)
+    #     else:
+    #         # Fallback: just toggle visibility if data isn't ready for full update
+    #         if self.show_graph:
+    #             self.history_list.hide()
+    #             self.history_graph_list.show()
+    #         else:
+    #             self.history_graph_list.hide()
+    #             self.history_list.show()
+
 
     def setup_ui(self):
         layout = QVBoxLayout()
@@ -64,19 +83,22 @@ class CommitHistoryView(QWidget):
         # 图形化提交历史
         self.history_graph_list = CommitGraphView()
         self.history_graph_list.setHeaderLabels(["提交图", "提交ID", "提交信息", "作者", "日期"])
+        # Connect signals for history_graph_list
         self.history_graph_list.itemClicked.connect(self.on_commit_clicked)
+        self.history_graph_list.currentItemChanged.connect(self.on_current_item_changed)
         layout.addWidget(self.history_graph_list)
 
-        self.history_graph_list.hide()  # 默认隐藏
+        self.history_graph_list.hide()  # 默认隐藏, update_history will manage it
 
     def update_history(self, git_manager, branch):
-        """更新提交历史"""
-        self.git_manager = git_manager  # cursor生成
-        self.branch = branch  # cursor生成
-        self.loaded_count = 0  # cursor生成
-        self._all_loaded = False  # cursor生成
+        """更新提交历史 (for list view only)"""
+        self.git_manager = git_manager
+        self.branch = branch
+        self.loaded_count = 0
+        self._all_loaded = False
         self.history_list.clear()
-        self.load_more_commits()  # cursor生成
+        # Any other specific list view reset if necessary
+        self.load_more_commits() 
 
     def load_more_commits(self):
         """加载更多提交历史 (cursor生成)"""
@@ -136,17 +158,44 @@ class CommitHistoryView(QWidget):
             print("滚动到底部, 自动加载更多...")  # cursor生成
             self.load_more_commits()
 
-    def on_commit_clicked(self, item):
+    def on_commit_clicked(self, item: QTreeWidgetItem):
         """当点击提交时发出信号"""
-        commit_hash = item.text(0) or item.text(1)
-        self.commit_selected.emit(commit_hash)
+        sender = self.sender()
+        commit_hash_short = ""
+        if sender is self.history_graph_list:
+            # Graph: Column 0 is graph, Column 1 is short hash
+            commit_hash_short = item.text(1) 
+        elif sender is self.history_list:
+            # List: Column 0 is short hash
+            commit_hash_short = item.text(0)
+        
+        if commit_hash_short:
+            # Assuming the commit_selected signal expects the short hash,
+            # or that the receiver can resolve it.
+            self.commit_selected.emit(commit_hash_short) 
 
     def on_current_item_changed(self, current: QTreeWidgetItem, previous: QTreeWidgetItem):
-        if current:
-            print(current.text(1))
-            self.history_list.show_full_text_for_item(current, 1)
-        else:
+        # Hide overlay for history_list if it was visible, regardless of current selection state
+        # This handles cases like selection clearing or moving to the other widget.
+        if self.history_list.overlay_label.isVisible():
             self.history_list.hide_overlay()
+
+        if current:
+            sender = self.sender()
+            message_column_idx = -1
+            if sender is self.history_graph_list:
+                message_column_idx = 2 # Message in graph view
+                # No hover effect for graph view as it's not a CustomTreeWidget
+            elif sender is self.history_list:
+                message_column_idx = 1 # Message in list view
+                self.history_list.show_full_text_for_item(current, message_column_idx)
+            
+            # Optional: print selected item's message for debugging
+            if message_column_idx != -1:
+                print(f"Selected item in {'Graph' if sender is self.history_graph_list else 'List'}: {current.text(message_column_idx)}")
+
+        # No explicit else needed for hiding overlay if current is None,
+        # as it's handled at the beginning of the function now.
             
     def filter_history(self, text):
         """根据输入文本过滤提交历史"""

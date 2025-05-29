@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QTabBar,
     QTabWidget,  # 添加 QTabWidget 导入
     QToolButton,
+    QTreeWidgetItem, # Added QTreeWidgetItem
     QVBoxLayout,
     QWidget,
 )
@@ -57,6 +58,7 @@ class GitManagerWindow(QMainWindow):
         self.current_commit = None
         self.settings = Settings()
         self.bottom_widget_visible = True  # 添加状态标记
+        self.display_commit_history_as_graph = True # Added state for view mode
 
         # 创建主窗口部件
         main_widget = QWidget()
@@ -349,11 +351,72 @@ class GitManagerWindow(QMainWindow):
         if not self.git_manager:
             return
 
-        current_branch = self.branch_combo.currentText()
-        if current_branch == "all":
-            self.commit_history_view.update_history(self.git_manager, "main")
+        if self.display_commit_history_as_graph:
+            self.commit_history_view.history_graph_list.show()
+            self.commit_history_view.history_list.hide()
+            self.commit_history_view.history_graph_list.clear()
+
+            current_branch_selection = self.branch_combo.currentText()
+            if not current_branch_selection: # Should not happen if populated
+                return
+            
+            branch_to_load_for_graph = ""
+            if current_branch_selection == "all":
+                if hasattr(self.git_manager, 'get_default_branch'):
+                    branch_to_load_for_graph = self.git_manager.get_default_branch() 
+                
+                if not branch_to_load_for_graph: # Fallback if no default branch or method doesn't exist
+                    try:
+                        if self.git_manager.repo: # Ensure repo exists
+                            branch_to_load_for_graph = self.git_manager.repo.head.ref.name
+                    except Exception as e:
+                         print(f"Could not determine default/HEAD branch for graph 'all' view: {e}")
+                         # Optionally, clear view or show error message in UI
+                         self.commit_history_view.history_graph_list.set_commit_data({"commits": [], "branch_colors": {}})
+                         return 
+            else:
+                branch_to_load_for_graph = current_branch_selection
+            
+            if not branch_to_load_for_graph: # Final check
+                 print(f"No valid branch found for graph view from selection: {current_branch_selection}")
+                 self.commit_history_view.history_graph_list.set_commit_data({"commits": [], "branch_colors": {}})
+                 return
+
+            graph_data = self.git_manager.get_commit_graph(branch_to_load_for_graph)
+            self.commit_history_view.history_graph_list.set_commit_data(graph_data)
+
+            for commit in graph_data.get("commits", []):
+                item = QTreeWidgetItem(self.commit_history_view.history_graph_list)
+                # Column 0 is for the graph itself.
+                item.setText(1, commit["hash"][:7])  # Short Hash
+                item.setText(2, commit["message"])   # Message
+                item.setText(3, commit["author"])    # Author
+                item.setText(4, commit["date"])      # Date
         else:
-            self.commit_history_view.update_history(self.git_manager, current_branch)
+            self.commit_history_view.history_list.show()
+            self.commit_history_view.history_graph_list.hide()
+            
+            current_branch_selection = self.branch_combo.currentText()
+            if not current_branch_selection:
+                return
+
+            branch_to_load_for_list = ""
+            if current_branch_selection == "all":
+                # CommitHistoryView's update_history might also need a default/main for "all"
+                # Using get_default_branch if available, else "main"
+                if hasattr(self.git_manager, 'get_default_branch'):
+                    branch_to_load_for_list = self.git_manager.get_default_branch()
+                if not branch_to_load_for_list: # Fallback
+                    branch_to_load_for_list = "main" 
+            else:
+                branch_to_load_for_list = current_branch_selection
+            
+            if not branch_to_load_for_list: # Final check
+                 print(f"No valid branch found for list view from selection: {current_branch_selection}")
+                 self.commit_history_view.history_list.clear() # Clear the list view
+                 return
+
+            self.commit_history_view.update_history(self.git_manager, branch_to_load_for_list)
 
     def on_branch_changed(self, branch):
         """当分支改变时更新提交历史"""
