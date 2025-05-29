@@ -15,11 +15,13 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import (
     QCheckBox,  # Added
+    QFileDialog,  # Added for save dialog
     QFrame,
     QHBoxLayout,  # Added
     QLabel,  # Added for completeness, though not strictly in initial req
     QLineEdit,  # Added
     QMenu,
+    QMessageBox,  # Added for save confirmation
     QPlainTextEdit,
     QPushButton,  # Added
     QTextEdit,  # Added QTextEdit
@@ -80,15 +82,18 @@ class SyncedTextEdit(QPlainTextEdit):
     PADDING_LEFT_OF_BLAME = 5
     PADDING_AFTER_BLAME = 10
     PADDING_RIGHT_OF_LINENUM = 5
+    # 编辑状态
+    edit_cancel_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         settings = Settings()
         self.setFont(QFont(settings.get_font_family(), 10))
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
-        self.setReadOnly(True)  # 设置为只读
+        self.setReadOnly(True)  # 默认设置为只读
+        self.original_content = ""  # 保存原始内容，用于取消编辑时恢复
         logging.debug("\n=== 初始化SyncedTextEdit ===")
-        logging.debug("只读模式: %s", self.isReadOnly())
+        logging.debug("默认只读模式: %s", self.isReadOnly())
 
         # Blame data storage
         # self.blame_data_full will store the original dicts with full hashes
@@ -98,12 +103,16 @@ class SyncedTextEdit(QPlainTextEdit):
         self.file_path = None  # Initialize file_path, can be set externally
         self.current_commit_hash: Optional[str] = None  # Ensured Optional[str]
 
+        # 编辑状态变量
+        self.edit_mode = False
         # 添加行号区域
         self.line_number_area = LineNumberArea(self)
         self.blockCountChanged.connect(self.update_line_number_area_width)
         self.updateRequest.connect(self.update_line_number_area)
         self.update_line_number_area_width()
-
+        
+        # 连接编辑取消信号
+        self.edit_cancel_requested.connect(self.cancel_edit)
         # 初始化差异信息
         self.highlighter = None
 
@@ -138,8 +147,15 @@ class SyncedTextEdit(QPlainTextEdit):
             print("show again")
 
     def keyPressEvent(self, event: QKeyEvent):
-        # Check for Ctrl+F (Windows/Linux) or Cmd+F (macOS)
-        if event.key() == Qt.Key.Key_F and (
+        # 保存快捷键 (Ctrl+S 或 Cmd+S)
+        if not self.isReadOnly() and event.key() == Qt.Key.Key_S and (
+            event.modifiers() == Qt.KeyboardModifier.ControlModifier
+            or event.modifiers() == Qt.KeyboardModifier.MetaModifier
+        ):
+            self.save_content()
+            event.accept()
+        # 查找快捷键 (Ctrl+F 或 Cmd+F)
+        elif event.key() == Qt.Key.Key_F and (
             event.modifiers() == Qt.KeyboardModifier.ControlModifier
             or event.modifiers() == Qt.KeyboardModifier.MetaModifier
         ):
@@ -214,21 +230,97 @@ class SyncedTextEdit(QPlainTextEdit):
 
     def show_context_menu(self, position):
         menu = QMenu(self)
-        blame_action = menu.addAction("Show Blame")
-        blame_action.triggered.connect(self.show_blame)
-        clear_blame_action = menu.addAction("Clear Blame")
-        clear_blame_action.triggered.connect(self.clear_blame_data)
+        if self.isReadOnly():
+            edit_action = menu.addAction("编辑内容")
+            edit_action.triggered.connect(self.set_editable)
+        else:
+            save_action = menu.addAction("保存更改")
+            save_action.triggered.connect(self.save_content)
+            cancel_edit_action = menu.addAction("取消编辑")
+            cancel_edit_action.triggered.connect(self.cancel_edit)
+        
+        # 只在只读状态下显示blame相关菜单
+        if self.isReadOnly() or not self.blame_annotations_per_line:
+            blame_action = menu.addAction("Show Blame")
+            blame_action.triggered.connect(self.show_blame)
+            clear_blame_action = menu.addAction("Clear Blame")
+            clear_blame_action.triggered.connect(self.clear_blame_data)
         menu.exec(self.mapToGlobal(position))
 
     # Renamed from _show_context_menu to show_context_menu for consistency
     # No other change in this method, just ensuring the diff picks up the rename if any confusion.
 
+    def set_editable(self):
+        """将文本编辑设置为可编辑模式并保存原始内容"""
+        if self.isReadOnly():
+            self.edit_mode = True
+            # 保存原始内容
+            self.original_content = self.toPlainText()
+            self.setReadOnly(False)
+            logging.info("进入编辑模式，文件路径: %s", self.file_path)
+            self.viewport().setCursor(Qt.CursorShape.IBeamCursor)  # 显示可编辑光标
+    
+    def save_content(self):
+        """保存更改到文件"""
+        if self.isReadOnly() or not self.file_path:
+            return
+        
+        try:
+            current_content = self.toPlainText()
+            # 显示保存确认对话框
+            reply = QMessageBox.question(
+                self, "确认保存", 
+                f"确定保存更改到文件 '{os.path.basename(self.file_path)}'?",
+                QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Save
+            )
+            
+            if reply == QMessageBox.StandardButton.Save:
+                with open(self.file_path, "w", encoding="utf-8") as f:
+                    f.write(current_content)
+                
+                logging.info("文件保存成功: %s", self.file_path)
+                self.original_content = current_content
+                
+                # 保存后自动切换回只读模式
+                self.setReadOnly(True)
+                self.edit_mode = False
+                self.viewport().setCursor(Qt.CursorShape.ArrowCursor)  # 恢复箭头光标
+                
+                # 显示保存成功信息
+                QMessageBox.information(
+                    self, 
+                    "保存成功", 
+                    f"文件 '{os.path.basename(self.file_path)}' 已成功保存",
+                    QMessageBox.StandardButton.Ok
+                )
+        except Exception as e:
+            logging.error("文件保存失败: %s", str(e))
+            QMessageBox.critical(
+                self, 
+                "保存错误", 
+                f"无法保存文件: {str(e)}", 
+                QMessageBox.StandardButton.Ok
+            )
+    
+    def cancel_edit(self):
+        """取消编辑并恢复原始内容"""
+        if not self.isReadOnly() and self.edit_mode:
+            self.setPlainText(self.original_content)
+            self.setReadOnly(True)
+            self.edit_mode = False
+            logging.info("已取消编辑并恢复原始内容")
+            self.viewport().setCursor(Qt.CursorShape.ArrowCursor)  # 恢复箭头光标
+
     def set_blame_data(self, blame_data_list: list):
+        # 如果在编辑模式下，无法显示blame信息
+        if not self.isReadOnly():
+            logging.warning("当前处于编辑模式，无法显示blame信息")
+            return
+            
         self.max_blame_display_width = 0
         # Store the full data separately, ensuring original commit_hash is preserved.
-        self.blame_data_full = list(
-            blame_data_list
-        )  # Make a copy to avoid modifying the original list if it's passed by reference
+        self.blame_data_full = list(blame_data_list)  # Make a copy
 
         processed_for_display = []
         if blame_data_list:
