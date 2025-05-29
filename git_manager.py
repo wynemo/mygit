@@ -138,7 +138,7 @@ class GitManager:
                     # print("line_content is", line_content)
                     # print("commit is", commit)
                     uncommited_yet = False
-                    if "0000000000000000000000000000000000000000" == commit.hexsha:
+                    if commit.hexsha == "0000000000000000000000000000000000000000":
                         uncommited_yet = True
                     blame_data.append(
                         {
