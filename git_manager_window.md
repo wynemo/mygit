@@ -37,7 +37,7 @@
 │           │
 │           ├── [左侧] tab_widget (QTabWidget 主标签页容器)
 │           │   ├── 固定页0: commit_history_view (CommitHistoryView 提交历史)
-│           │   └── 动态页: 文件历史视图 (按需生成，可关闭)
+│           │   └── 动态页: file_history_view 文件历史视图 (按需生成，可关闭)
 │           │
 │           ├── [中部] right_splitter (QSplitter 垂直分割器)
 │           │   ├── file_changes_view (FileChangesView 文件变更列表)
