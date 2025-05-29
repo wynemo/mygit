@@ -136,7 +136,7 @@ class GitManager:
                 for line_num_in_commit, line_content in enumerate(lines):
                     # print("line_num_in_commit is", line_num_in_commit)
                     # print("line_content is", line_content)
-                    print("commit is", commit)
+                    # print("commit is", commit)
                     uncommited_yet = False
                     if "0000000000000000000000000000000000000000" == commit.hexsha:
                         uncommited_yet = True
