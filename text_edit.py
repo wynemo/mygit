@@ -547,6 +547,7 @@ class ModifiedTextEdit(SyncedTextEdit):
         "deleted": QColor("#F44336"),  # 红色表示删除
     }
     MODIFICATION_MARK_WIDTH = 10  # 修改标记的宽度
+    MODIFICATION_MARK_SIZE = 6  # 标记直径大小
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -574,21 +575,28 @@ class ModifiedTextEdit(SyncedTextEdit):
         return base_width + self.MODIFICATION_MARK_WIDTH
 
     def line_number_area_paint_event(self, event):
-        """重写行号区域绘制事件，显示修改标记"""
-        painter = QPainter(self.line_number_area)
-        painter.fillRect(event.rect(), QColor("#f0f0f0"))
+        """重写行号区域绘制事件，新增修改标记处理"""
+        # 首先调用父类绘制基础的背景、行号和blame注释
+        super().line_number_area_paint_event(event)
 
+        # 如果没有修改标记，直接返回
+        if not self.line_modifications:
+            return
+
+        painter = QPainter(self.line_number_area)
+
+        # 计算修改标记的位置 (在行号的左侧)
         line_digits = len(str(max(1, self.blockCount())))
         line_num_text_width = self.fontMetrics().horizontalAdvance("9" * line_digits)
-
-        # 新增：计算修改标记的位置
-        modification_mark_start = (
+        modification_mark_x = int(
             self.line_number_area.width()
             - line_num_text_width
             - self.PADDING_RIGHT_OF_LINENUM
             - self.MODIFICATION_MARK_WIDTH
+            + 2  # 左边距
         )
 
+        # 遍历所有可见块绘制修改标记
         block = self.firstVisibleBlock()
         block_number = block.blockNumber()
         top = self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
@@ -597,58 +605,23 @@ class ModifiedTextEdit(SyncedTextEdit):
         while block.isValid() and top <= event.rect().bottom():
             if block.isVisible() and bottom >= event.rect().top():
                 current_block_height = self.blockBoundingRect(block).height()
+                block_line_number = block_number + 1
 
-                # 1. 绘制行号
-                line_number_string = str(block_number + 1)
-                x_start_for_linenum = (
-                    self.line_number_area.width() - self.PADDING_RIGHT_OF_LINENUM - line_num_text_width
-                )
-
-                line_num_rect = QRect(
-                    int(x_start_for_linenum), int(top), int(line_num_text_width), int(current_block_height)
-                )
-                painter.setPen(QColor("#808080"))
-                painter.drawText(
-                    line_num_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, line_number_string
-                )
-
-                # 2. 绘制修改状态标记
-                mod_status = self.line_modifications.get(block_number + 1)
-                if mod_status:
-                    print("mod_status is", mod_status)
+                # 绘制修改状态标记
+                mod_status = self.line_modifications.get(block_line_number)
                 if mod_status and mod_status in self.LINE_STATUS_COLORS:
                     color = self.LINE_STATUS_COLORS[mod_status]
                     painter.setBrush(color)
-                    painter.setPen(color)
+                    painter.setPen(Qt.PenStyle.NoPen)
 
-                    # 在行号左侧绘制彩色圆点表示修改状态
-                    mark_rect = QRect(int(modification_mark_start) + 2, int(top + (current_block_height - 6) / 2), 6, 6)
+                    # 计算标记的垂直中心位置
+                    mark_y = int(top + (current_block_height - self.MODIFICATION_MARK_SIZE) / 2)
+
+                    # 绘制圆点表示修改状态
+                    mark_rect = QRect(
+                        modification_mark_x, mark_y, self.MODIFICATION_MARK_SIZE, self.MODIFICATION_MARK_SIZE
+                    )
                     painter.drawEllipse(mark_rect)
-
-                # 3. 绘制blame注释（从父类保留的功能）
-                if self.showing_blame:
-                    annotation_display_string = ""
-                    if (
-                        block_number < len(self.blame_annotations_per_line)
-                        and self.blame_annotations_per_line[block_number]
-                        and "_display_string" in self.blame_annotations_per_line[block_number]
-                    ):
-                        annotation_display_string = self.blame_annotations_per_line[block_number]["_display_string"]
-
-                    if annotation_display_string:
-                        max_width_for_blame_area = getattr(self, "max_blame_display_width", 0)
-                        blame_rect = QRect(
-                            int(self.PADDING_LEFT_OF_BLAME),
-                            int(top),
-                            int(max_width_for_blame_area),
-                            int(current_block_height),
-                        )
-                        painter.setPen(QColor("#333333"))
-                        painter.drawText(
-                            blame_rect,
-                            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-                            annotation_display_string,
-                        )
 
             block = block.next()
             top = bottom
