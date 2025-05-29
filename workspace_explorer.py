@@ -180,11 +180,10 @@ class WorkspaceExplorer(QWidget):
 
                             if relative_path in self.all_file_statuses.get("modified", set()):
                                 tree_item.setForeground(0, QColor(165, 42, 42))  # Brown color
-                            # Example for other statuses (optional, based on future requirements)
-                            # elif relative_path in self.all_file_statuses.get("staged", set()):
-                            #     tree_item.setForeground(0, QColor(0, 128, 0))  # Green for staged
-                            # elif relative_path in self.all_file_statuses.get("untracked", set()):
-                            #     tree_item.setForeground(0, QColor(128, 128, 128)) # Gray for untracked
+                            elif relative_path in self.all_file_statuses.get("staged", set()):
+                                tree_item.setForeground(0, QColor(210, 180, 140))  # Light brown color
+                            elif relative_path in self.all_file_statuses.get("untracked", set()):
+                                tree_item.setForeground(0, QColor(0, 128, 0))
                     except ValueError as ve:
                         # This can happen if item_path is not under self.workspace_path
                         # For example, if self.workspace_path is relative and item_path is absolute
