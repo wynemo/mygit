@@ -68,59 +68,102 @@ class GitManager:
             print(f"获取提交历史失败: {e!s}")
             return []
 
-    def get_commit_graph(self, branch: str = "", limit: int = 50) -> dict:
-        """获取提交图数据"""
+    def get_commit_graph(self, branch_specifier: str = "", limit: int = 500) -> dict: # Increased default limit
         if not self.repo:
             return {"commits": [], "branch_colors": {}}
 
         try:
-            if not branch:
-                branch = self.repo.active_branch.name
+            # Determine the revisions to iterate based on branch_specifier
+            revs_to_iterate = []
+            if branch_specifier == "__all__":
+                revs_to_iterate = [b.name for b in self.repo.branches]
+                # Consider adding --all flag or equivalent if iter_commits supports it directly for graph
+                # For now, listing all branch heads is a good approach.
+            elif not branch_specifier: # Empty specifier means active branch
+                revs_to_iterate = self.repo.active_branch.name
+            else: # Specific branch name
+                revs_to_iterate = branch_specifier
 
-            # 获取所有分支名称和颜色映射
-            branches = {b.name: b for b in self.repo.branches}
+            # Branch colors: based on all actual branches in the repo
+            all_repo_branches = {b.name: b for b in self.repo.branches}
             colors = [
-                "#e11d21",
-                "#fbca04",
-                "#009800",
-                "#006b75",
-                "#207de5",
-                "#0052cc",
-                "#5319e7",
-            ]
-            branch_colors = {name: colors[idx % len(colors)] for idx, name in enumerate(branches)}
+                "#e11d21", "#fbca04", "#009800", "#006b75", "#207de5",
+                "#0052cc", "#5319e7", "#f781c6", "#8c8c8c", "#000000" 
+            ] # Added more colors
+            
+            # Sort branch names for consistent color assignment
+            sorted_branch_names_for_colors = sorted(all_repo_branches.keys())
+            branch_colors = {
+                name: colors[idx % len(colors)] for idx, name in enumerate(sorted_branch_names_for_colors)
+            }
 
-            # 预先获取每个分支的所有提交
-            branch_commits = {}
-            for branch_name, branch_ref in branches.items():
-                # Rewrite generator as set comprehension
-                branch_commits[branch_name] = {commit.hexsha for commit in self.repo.iter_commits(branch_ref.name)}
+            # Pre-fetch all commits for each branch to determine which branches a commit belongs to
+            # This helps in populating the 'branches' field for each commit object
+            branch_commits_sets = {}
+            for name, branch_ref_obj in all_repo_branches.items():
+                try: # Add try-except for iter_commits per branch, in case of empty/weird branches
+                    branch_commits_sets[name] = {c.hexsha for c in self.repo.iter_commits(branch_ref_obj.name)}
+                except Exception:
+                    branch_commits_sets[name] = set()
 
-            commits = []
-            # 获取主分支的提交历史
-            for commit in self.repo.iter_commits(branch, max_count=limit):
-                # Check which branches this commit belongs to
-                commit_branches = [
-                    branch_name for branch_name, commit_set in branch_commits.items() if commit.hexsha in commit_set
+
+            commits_data = []
+            # Use topo_order for better graph layout if possible, may affect performance slightly
+            # GitPython's iter_commits takes a single rev or a list of revs.
+            # If revs_to_iterate is a list, it iterates commits reachable from any of them.
+            # The default order is reverse chronological per branch, then intermingled.
+            # Adding topo_order=True might give a more "graph-like" sequence.
+            # Note: iter_commits with multiple revs might not strictly follow 'limit' per branch,
+            # but rather total commits.
+            
+            # We need a way to get a globally sorted list of commits for the graph view.
+            # self.repo.iter_commits(revs_to_iterate, max_count=limit, topo_order=True) is good.
+            # However, to ensure commits are unique if multiple branches point to them:
+            processed_commits = set()
+            raw_commits_list = []
+
+            # Fetch commits using the determined revisions
+            # For multiple revs, iter_commits explores history from all of them.
+            # `topo_order=True` is good for graph structures.
+            # `reverse=True` makes it chronological (older first), default is reverse-chrono (newer first)
+            # CommitGraphView expects reverse-chronological (newer first).
+            for commit_obj in self.repo.iter_commits(revs_to_iterate, max_count=limit, topo_order=True):
+                if commit_obj.hexsha not in processed_commits:
+                    raw_commits_list.append(commit_obj)
+                    processed_commits.add(commit_obj.hexsha)
+            
+            # The list from iter_commits with multiple heads and topo_order=True is already good.
+            # No need for further complex sorting if CommitGraphView handles display order via list index.
+
+            for commit in raw_commits_list: # Iterate the globally collected and unique commits
+                commit_member_of_branches = [
+                    name for name, hc_set in branch_commits_sets.items() if commit.hexsha in hc_set
                 ]
+                # Sort for deterministic 'branches' field
+                commit_member_of_branches.sort()
 
-                # Decode commit message assuming it might be bytes
+
                 message = commit.message.strip().split("\n")[0]
+                # Ensure author and date are handled, even for unusual commits
+                author_name = commit.author.name if commit.author else "Unknown Author"
+                try:
+                    committed_date_str = commit.committed_datetime.strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    committed_date_str = "Unknown Date"
 
-                commits.append(
-                    {
-                        "hash": commit.hexsha,
-                        "message": message,
-                        "author": commit.author.name,
-                        "date": commit.committed_datetime.strftime("%Y-%m-%d %H:%M:%S"),
-                        "branches": commit_branches,
-                        "parents": [parent.hexsha for parent in commit.parents],
-                    }
-                )
 
-            return {"commits": commits, "branch_colors": branch_colors}
+                commits_data.append({
+                    "hash": commit.hexsha,
+                    "message": message,
+                    "author": author_name,
+                    "date": committed_date_str,
+                    "branches": commit_member_of_branches, 
+                    "parents": [p.hexsha for p in commit.parents],
+                })
+            
+            return {"commits": commits_data, "branch_colors": branch_colors}
         except Exception as e:
-            print(f"获取提交图失败: {e!s}")
+            logging.error(f"Error in get_commit_graph: {e!s}", exc_info=True) # Log with stack trace
             return {"commits": [], "branch_colors": {}}
 
     def get_blame_data(self, file_path: str, commit_hash: str = "HEAD") -> List[dict]:

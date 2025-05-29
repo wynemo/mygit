@@ -308,36 +308,43 @@ class GitManagerWindow(QMainWindow):
         if not self.git_manager:
             return
 
-        current_branch = "" 
+        current_branch_name = "" 
         if hasattr(self, 'top_bar') and self.top_bar:
-            current_branch = self.top_bar.get_current_branch()
-        else: # Should not happen if top_bar is initialized correctly
+            current_branch_name = self.top_bar.get_current_branch() # Use consistent naming
+        else:
             logging.warning("TopBar not available in update_commit_history")
             return
 
-
-        if current_branch == "all": # "all" might be a special value not directly from git branches
-            # Decide what "all" means, e.g., show history for the default branch or all branches if supported
-            # For now, using 'main' as a placeholder if 'all' is selected,
-            # this might need more sophisticated handling in GitManager or CommitHistoryView
-            self.commit_history_view.update_history(self.git_manager, "main") # Assuming "main" for "all"
+        if current_branch_name == "all":
             self.commit_history_view.history_graph_list.show()
             self.commit_history_view.history_list.hide()
+            
+            # Use the "__all__" specifier for get_commit_graph
+            # The limit is now defaulted in get_commit_graph, but can be overridden if needed
+            graph_data = self.git_manager.get_commit_graph(branch_specifier="__all__", limit=500) 
 
-            graph_data = self.git_manager.get_commit_graph("main", 500)
-
-            # 设置提交图数据
             self.commit_history_view.history_graph_list.set_commit_data(graph_data)
-
-            # 添加提交信息到列表
-            for commit in graph_data["commits"]:
-                item = QTreeWidgetItem(self.commit_history_view.history_graph_list)
-                item.setText(1, commit["hash"][:7])
-                item.setText(2, commit["message"])
-                item.setText(3, commit["author"])
-                item.setText(4, commit["date"])
+            # Clear previous items before adding new ones for the graph view
+            self.commit_history_view.history_graph_list.clear()
+            # The set_commit_data method in CommitGraphView should handle populating
+            # the visual graph. The QTreeWidgetItem population below might be
+            # redundant if CommitGraphView itself is a QTreeWidget and manages its items.
+            # If CommitGraphView is just a drawing canvas, then populating a separate
+            # QTreeWidget (like history_graph_list if it's a QTreeWidget) might be needed,
+            # but the task description implies CommitGraphView handles its own data.
+            # For now, assuming set_commit_data is sufficient for the graph part.
+            # If history_graph_list is indeed the CommitGraphView widget, it might not need this loop.
+            # Let's comment out this loop for now, as CommitGraphView.set_commit_data should trigger painting.
+            # If text details are still needed in a list format *alongside* the graph, this might be revisited.
+            # for commit in graph_data["commits"]:
+            #     item = QTreeWidgetItem(self.commit_history_view.history_graph_list)
+            #     item.setText(1, commit["hash"][:7]) # Assuming column 0 is for graph
+            #     item.setText(2, commit["message"])
+            #     item.setText(3, commit["author"])
+            #     item.setText(4, commit["date"])
         else:
-            self.commit_history_view.update_history(self.git_manager, current_branch)
+            # Logic for specific branch (text list view)
+            self.commit_history_view.update_history(self.git_manager, current_branch_name)
             self.commit_history_view.history_graph_list.hide()
             self.commit_history_view.history_list.show()
 
