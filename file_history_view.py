@@ -1,7 +1,9 @@
 import os
 from datetime import datetime
+from functools import partial
 
-from PyQt6.QtWidgets import QLabel, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication, QLabel, QMenu, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget
 
 
 class FileHistoryView(QWidget):
@@ -37,6 +39,9 @@ class FileHistoryView(QWidget):
         self.history_list.setColumnWidth(2, 100)  # Author
         self.history_list.setColumnWidth(3, 150)  # Date
         layout.addWidget(self.history_list)
+
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
 
     def update_history(self):
         """更新文件的提交历史"""
@@ -90,3 +95,28 @@ class FileHistoryView(QWidget):
 
                 current_commit = main_window.git_manager.repo.commit(commit_hash)
                 main_window.compare_view.show_diff(main_window.git_manager, current_commit, relative_path)
+
+    def show_context_menu(self, position):
+        item = self.history_list.itemAt(position)
+        if not item:
+            return
+        menu = QMenu(self)
+        copy_commit_action = menu.addAction("copy commit")
+        copy_commit_action.triggered.connect(partial(self.copy_commit_to_clipboard, item))
+        copy_commit_message_action = menu.addAction("copy commit message")
+        copy_commit_message_action.triggered.connect(partial(self.copy_commmit_message_to_clipboard, item))
+        menu.exec(self.mapToGlobal(position))
+
+    def copy_commit_to_clipboard(self, item):
+        if item:
+            print("commit is", item.text(0))
+            QApplication.clipboard().setText(item.text(0))
+        else:
+            print("item is None")
+
+    def copy_commmit_message_to_clipboard(self, item):
+        if item:
+            print("commit is", item.text(0))
+            QApplication.clipboard().setText(item.text(1))
+        else:
+            print("item is None")
