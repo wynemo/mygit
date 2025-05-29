@@ -1,5 +1,6 @@
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QLabel, QTreeWidgetItem, QVBoxLayout, QWidget
+from PyQt6.QtCore import pyqtSignal, Qt
+from PyQt6.QtWidgets import (QLabel, QTreeWidgetItem, QVBoxLayout, QWidget, 
+                             QLineEdit, QHBoxLayout, QPushButton)
 
 from commit_graph import CommitGraphView
 from custom_tree_widget import CustomTreeWidget
@@ -16,12 +17,27 @@ class CommitHistoryView(QWidget):
         self.branch = None  # cursor生成
         self._loading = False  # cursor生成
         self._all_loaded = False  # cursor生成
+        self.filter_text = ""
         self.setup_ui()
 
     def setup_ui(self):
         layout = QVBoxLayout()
         layout.setContentsMargins(5, 5, 5, 5)
         self.setLayout(layout)
+        
+        # 添加搜索框
+        search_layout = QHBoxLayout()
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText("搜索提交历史...")
+        self.search_edit.textChanged.connect(self.filter_history)
+        search_layout.addWidget(self.search_edit)
+        
+        # 添加清除按钮
+        self.clear_button = QPushButton("清除")
+        self.clear_button.clicked.connect(self.clear_search)
+        self.clear_button.setMaximumWidth(60)
+        search_layout.addWidget(self.clear_button)
+        layout.addLayout(search_layout)
 
         self.history_label = QLabel("提交历史:")
         layout.addWidget(self.history_label)
@@ -41,6 +57,9 @@ class CommitHistoryView(QWidget):
 
         # 滚动到底部自动加载更多, cursor生成
         self.history_list.verticalScrollBar().valueChanged.connect(self._on_scroll)
+        
+        # 默认隐藏清除按钮
+        self.clear_button.setVisible(False)
 
         # 图形化提交历史
         self.history_graph_list = CommitGraphView()
@@ -106,6 +125,9 @@ class CommitHistoryView(QWidget):
         if len(commits) < self.load_batch_size:  # 没有更多了
             self._all_loaded = True  # cursor生成
         self._loading = False
+        
+        # 加载后自动应用当前过滤
+        self._apply_filter()
 
     def _on_scroll(self, value):
         # 滚动到底部时自动加载更多 cursor生成
@@ -125,3 +147,36 @@ class CommitHistoryView(QWidget):
             self.history_list.show_full_text_for_item(current, 1)
         else:
             self.history_list.hide_overlay()
+            
+    def filter_history(self, text):
+        """根据输入文本过滤提交历史"""
+        self.filter_text = text.strip().lower()
+        self.clear_button.setVisible(bool(self.filter_text))
+        self._apply_filter()
+        
+    def clear_search(self):
+        """清除搜索框并恢复所有项目"""
+        self.search_edit.clear()
+        self.filter_text = ""
+        self.clear_button.setVisible(False)
+        self._apply_filter()
+        
+    def _apply_filter(self):
+        """应用过滤逻辑到所有项目"""
+        # 遍历所有项目
+        for i in range(self.history_list.topLevelItemCount()):
+            item = self.history_list.topLevelItem(i)
+            # 如果没有过滤文本，显示所有项目
+            if not self.filter_text:
+                item.setHidden(False)
+                continue
+                
+            # 检查各列的匹配情况 (0: id, 1: message, 3: author, 4: date)
+            show_item = False
+            for col in (0, 1, 3, 4):
+                item_text = item.text(col).lower()
+                if self.filter_text in item_text:
+                    show_item = True
+                    break
+                    
+            item.setHidden(not show_item)
