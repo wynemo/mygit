@@ -5,24 +5,25 @@ from PyQt6.QtCore import QEvent, QSize, Qt  # Added QEvent
 from PyQt6.QtGui import QAction, QColor, QGuiApplication, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import (
     QAbstractItemView,
-    QComboBox,
+    QComboBox, # Keep QComboBox if other parts of the window use it, remove if only for branch_combo
     QDialog,
     QFileDialog,
     QHBoxLayout,
-    QLabel,
+    QLabel, # Keep QLabel if other parts of the window use it, remove if only for branch_label
     QMainWindow,
-    QMenu,
+    QMenu, # Keep QMenu if other parts of the window use it, remove if only for recent_menu
     QMessageBox,
-    QPushButton,
+    QPushButton, # Keep QPushButton if other parts of the window use it, remove if only for open_button, commit_button
     QSplitter,
     QTabBar,
     QTabWidget,  # 添加 QTabWidget 导入
-    QToolButton,
+    QToolButton, # Keep QToolButton if other parts of the window use it, remove if only for top bar buttons
     QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
+from top_bar_widget import TopBarWidget # Import TopBarWidget
 from commit_detail_view import CommitDetailView
 from commit_dialog import CommitDialog
 from commit_history_view import CommitHistoryView
@@ -69,91 +70,25 @@ class GitManagerWindow(QMainWindow):
         main_layout.setSpacing(0)
         main_widget.setLayout(main_layout)
 
-        # 创建顶部控制区域
-        top_widget = QWidget()
-        top_widget.setFixedHeight(100)  # 固定顶部高度
-        top_layout = QHBoxLayout()
-        top_widget.setLayout(top_layout)
-        main_layout.addWidget(top_widget)
+        # Instantiate TopBarWidget
+        self.top_bar = TopBarWidget(self)
+        main_layout.addWidget(self.top_bar)
 
-        # 创建打开文件夹按钮和最近文件夹按钮的容器
-        folder_layout = QHBoxLayout()
+        # Connect signals from TopBarWidget to GitManagerWindow methods
+        self.top_bar.open_folder_requested.connect(self.open_folder_dialog)
+        self.top_bar.recent_folder_selected.connect(self.open_folder)
+        self.top_bar.clear_recent_folders_requested.connect(self.clear_recent_folders)
+        self.top_bar.branch_changed.connect(self.on_branch_changed)
+        self.top_bar.commit_requested.connect(self.show_commit_dialog)
+        self.top_bar.settings_requested.connect(self.show_settings_dialog)
+        self.top_bar.fetch_requested.connect(self.fetch_repo)
+        self.top_bar.pull_requested.connect(self.pull_repo)
+        self.top_bar.push_requested.connect(self.push_repo)
+        self.top_bar.toggle_bottom_panel_requested.connect(self.toggle_bottom_widget)
 
-        # 创建打开文件夹按钮
-        self.open_button = QPushButton("打开文件夹")
-        self.open_button.clicked.connect(self.open_folder_dialog)
-        folder_layout.addWidget(self.open_button)
-
-        # 创建最近文件夹按钮
-        self.recent_button = QToolButton()
-        self.recent_button.setText("最近")
-        self.recent_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-
-        # 创建最近文件夹菜单
-        self.recent_menu = QMenu(self)
-        self.recent_button.setMenu(self.recent_menu)
-        self.update_recent_menu()
-
-        folder_layout.addWidget(self.recent_button)
-        top_layout.addLayout(folder_layout)
-
-        # 创建分支选择下拉框
-        self.branch_label = QLabel("当前分支:")
-        self.branch_combo = QComboBox()
-        self.branch_combo.currentTextChanged.connect(self.on_branch_changed)
-        top_layout.addWidget(self.branch_label)
-        top_layout.addWidget(self.branch_combo)
-
-        # 添加提交按钮
-        self.commit_button = QPushButton("提交")
-        self.commit_button.clicked.connect(self.show_commit_dialog)
-        self.commit_button.setFixedSize(80, 24)  # Set a smaller fixed size
-        top_layout.addWidget(self.commit_button)
-
-        # 创建设置按钮
-        self.settings_button = QToolButton()
-        self.settings_button.setText("⚙")  # 使用齿轮符号
-        self.settings_button.clicked.connect(self.show_settings_dialog)
-        top_layout.addWidget(self.settings_button)
-
-        # 创建获取/推送/拉取按钮组
-        repo_action_layout = QHBoxLayout()
-        repo_action_layout.setSpacing(0)  # 减小按钮之间的间距
-
-        # 获取按钮
-        self.fetch_button = QToolButton()
-        icon = QIcon("icons/fetch.svg")  # 假设图标路径
-        icon.addPixmap(QPixmap("icons/fetch.svg"), QIcon.Mode.Normal, QIcon.State.On)  # 设置图标
-        self.fetch_button.setIcon(icon)
-        self.fetch_button.setIconSize(QSize(24, 24))  # 设置图标大小
-        self.fetch_button.setToolTip("获取")
-        self.fetch_button.clicked.connect(self.fetch_repo)  # 连接到相应的槽函数
-        repo_action_layout.addWidget(self.fetch_button)
-
-        # 拉取按钮 (带有向下箭头)
-        self.pull_button = QToolButton()
-        self.pull_button.setIcon(QIcon("icons/pull.svg"))  # 假设图标路径
-        self.pull_button.setIconSize(QSize(24, 24))  # 设置图标大小
-        self.pull_button.setToolTip("拉取")
-        self.pull_button.clicked.connect(self.pull_repo)  # 连接到相应的槽函数
-        repo_action_layout.addWidget(self.pull_button)
-
-        # 推送按钮 (带有向上箭头)
-        self.push_button = QToolButton()
-        self.push_button.setIcon(QIcon("icons/push.svg"))  # 假设图标路径
-        self.push_button.setIconSize(QSize(24, 24))  # 设置图标大小
-        self.push_button.setToolTip("推送")
-        self.push_button.clicked.connect(self.push_repo)  # 连接到相应的槽函数
-        repo_action_layout.addWidget(self.push_button)
-
-        top_layout.addLayout(repo_action_layout)
-
-        # 创建切换底部面板按钮
-        self.toggle_bottom_button = QToolButton()
-        self.toggle_bottom_button.setFixedSize(24, 24)  # 设置固定大小
-        self.update_toggle_button_icon()  # 设置初始图标
-        self.toggle_bottom_button.clicked.connect(self.toggle_bottom_widget)
-        top_layout.addWidget(self.toggle_bottom_button)
+        # Initial population of TopBarWidget UI elements
+        # self.update_recent_menu_on_top_bar() # Called later in __init__
+        # self.update_branches_on_top_bar() # Called later in __init__
 
         # 创建垂直分割器
         vertical_splitter = QSplitter(Qt.Orientation.Vertical)
@@ -258,12 +193,23 @@ class GitManagerWindow(QMainWindow):
         # 从设置中恢复底部面板状态
         self.bottom_widget_visible = self.settings.settings.get("bottom_widget_visible", True)
         self.bottom_widget.setVisible(self.bottom_widget_visible)
-        self.update_toggle_button_icon()
+        if hasattr(self, 'top_bar'): # Ensure top_bar exists before calling its methods
+            self.top_bar.update_toggle_button_icon(self.bottom_widget_visible)
 
-        # 在初始化完成后,尝试打开上次的文件夹
+        # 在初始化完成后,尝试打开上次的文件夹 (this will call update_branches_on_top_bar and update_recent_menu_on_top_bar)
         last_folder = self.settings.get_last_folder()
         if last_folder and os.path.exists(last_folder):
             self.open_folder(last_folder)
+        else:
+            # If no last folder, still update top_bar for initial state (e.g. disabled buttons)
+            self.update_branches_on_top_bar() 
+            self.update_recent_menu_on_top_bar()
+
+        # Final updates for initial state if not covered by open_folder
+        self.update_recent_menu_on_top_bar()
+        self.update_branches_on_top_bar()
+        if hasattr(self, 'top_bar'):
+             self.top_bar.update_toggle_button_icon(self.bottom_widget_visible)
 
     def show_commit_dialog(self):
         """显示提交对话框"""
@@ -274,29 +220,28 @@ class GitManagerWindow(QMainWindow):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             pass
 
-    def update_recent_menu(self):
-        """更新最近文件夹菜单"""
-        self.recent_menu.clear()
-        recent_folders = self.settings.get_recent_folders()
+    # def update_recent_menu(self): # Removed, logic moved to TopBarWidget or adapted
+    #     """更新最近文件夹菜单 - This method is now in TopBarWidget"""
+    #     # This method will now call self.top_bar.update_recent_menu()
+    #     # with self.settings.get_recent_folders()
+    #     pass 
 
-        for folder in recent_folders:
-            if os.path.exists(folder):  # 只显示仍然存在的文件夹
-                action = QAction(folder, self)
-                action.triggered.connect(lambda checked, f=folder: self.open_folder(f))
-                self.recent_menu.addAction(action)
-
-        if recent_folders:
-            self.recent_menu.addSeparator()
-            clear_action = QAction("清除最近记录", self)
-            clear_action.triggered.connect(self.clear_recent_folders)
-            self.recent_menu.addAction(clear_action)
+    def update_recent_menu_on_top_bar(self):
+        """Helper to update recent folders on TopBarWidget."""
+        if hasattr(self, 'top_bar'):
+            recent_folders = self.settings.get_recent_folders()
+            # Filter out non-existent folders before passing to top_bar
+            valid_recent_folders = [f for f in recent_folders if os.path.exists(f)]
+            self.top_bar.update_recent_menu(valid_recent_folders)
 
     def clear_recent_folders(self):
         """清除最近文件夹记录"""
         self.settings.settings["recent_folders"] = []
         self.settings.settings["last_folder"] = None
         self.settings.save_settings()
-        self.update_recent_menu()
+        # self.update_recent_menu() # Now call the TopBarWidget's method
+        self.update_recent_menu_on_top_bar()
+
 
     def open_folder_dialog(self):
         """打开文件夹选择对话框"""
@@ -314,11 +259,13 @@ class GitManagerWindow(QMainWindow):
         if self.git_manager.initialize():
             # 添加到最近文件夹列表
             self.settings.add_recent_folder(folder_path)
-            self.update_recent_menu()
+            # self.update_recent_menu() # Now call the TopBarWidget's method
+            self.update_recent_menu_on_top_bar()
 
             # 更新UI
-            self.update_branches()
-            self.update_commit_history()
+            # self.update_branches() # Now call the TopBarWidget's method
+            self.update_branches_on_top_bar()
+            self.update_commit_history() # This updates the history view, not branches in top bar
 
             # 更新工作区浏览器
             self.workspace_explorer.set_workspace_path(folder_path)
@@ -328,31 +275,52 @@ class GitManagerWindow(QMainWindow):
         else:
             self.commit_history_view.history_list.clear()
             self.commit_history_view.history_list.addItem("所选文件夹不是有效的Git仓库")
+            if hasattr(self, 'top_bar'):
+                self.top_bar.set_buttons_enabled(False) # Disable buttons if repo init fails
 
-    def update_branches(self):
-        """更新分支列表"""
-        self.branch_combo.clear()
-        if not self.git_manager:
-            return
-        branches = self.git_manager.get_branches()
-        default_branch = self.git_manager.get_default_branch()
+    # def update_branches(self): # Partially removed/adapted
+    #     """更新分支列表 - This method will now primarily fetch data and call TopBarWidget's update"""
+    #     # The part that updates self.branch_combo is removed.
+    #     # Data fetching remains.
+    #     pass
 
-        # 将默认分支移到列表开头
-        if default_branch and default_branch in branches:
-            branches.remove(default_branch)
-            branches.insert(0, default_branch)
+    def update_branches_on_top_bar(self):
+        """Fetches branch data and updates the TopBarWidget."""
+        if hasattr(self, 'top_bar'): # Ensure top_bar exists
+            if not self.git_manager or not self.git_manager.repo: # Check if git_manager and its repo are valid
+                self.top_bar.update_branches([], None)
+                self.top_bar.set_buttons_enabled(False)
+                return
 
-        self.branch_combo.addItems(branches)
-        self.branch_combo.addItems(["all"])
+            branches = self.git_manager.get_branches()
+            default_branch = self.git_manager.get_default_branch()
+            
+            # Add "all" option. TopBarWidget's update_branches should handle its placement.
+            # Ensure "all" is handled gracefully if it's not a real branch.
+            branches_for_combo = branches + ["all"] 
+            
+            self.top_bar.update_branches(branches_for_combo, default_branch)
+            self.top_bar.set_buttons_enabled(True)
+
 
     def update_commit_history(self):
         """更新提交历史"""
         if not self.git_manager:
             return
 
-        current_branch = self.branch_combo.currentText()
-        if current_branch == "all":
-            self.commit_history_view.update_history(self.git_manager, "main")
+        current_branch = "" 
+        if hasattr(self, 'top_bar') and self.top_bar:
+            current_branch = self.top_bar.get_current_branch()
+        else: # Should not happen if top_bar is initialized correctly
+            logging.warning("TopBar not available in update_commit_history")
+            return
+
+
+        if current_branch == "all": # "all" might be a special value not directly from git branches
+            # Decide what "all" means, e.g., show history for the default branch or all branches if supported
+            # For now, using 'main' as a placeholder if 'all' is selected,
+            # this might need more sophisticated handling in GitManager or CommitHistoryView
+            self.commit_history_view.update_history(self.git_manager, "main") # Assuming "main" for "all"
             self.commit_history_view.history_graph_list.show()
             self.commit_history_view.history_list.hide()
 
@@ -504,31 +472,16 @@ class GitManagerWindow(QMainWindow):
             right_splitter = self.horizontal_splitter.widget(1)
             right_splitter.hide()
 
-    def update_toggle_button_icon(self):
-        """更新切换按钮的图标"""
-        pixmap = QPixmap(24, 24)
-        pixmap.fill(Qt.GlobalColor.transparent)
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        # 绘制方框
-        painter.setPen(QColor(0, 0, 0))
-        painter.drawRect(2, 2, 20, 20)
-
-        # 根据状态填充下半部分
-        if self.bottom_widget_visible:
-            painter.fillRect(2, 12, 20, 10, QColor(0, 0, 0))
-        else:
-            painter.fillRect(2, 12, 20, 10, QColor(255, 255, 255))
-
-        painter.end()
-        self.toggle_bottom_button.setIcon(QIcon(pixmap))
+    # def update_toggle_button_icon(self): # Removed, logic moved to TopBarWidget
+    #     """更新切换按钮的图标 - This method is now in TopBarWidget"""
+    #     pass
 
     def toggle_bottom_widget(self):
         """切换底部面板的显示状态"""
         self.bottom_widget_visible = not self.bottom_widget_visible
         self.bottom_widget.setVisible(self.bottom_widget_visible)
-        self.update_toggle_button_icon()
+        if hasattr(self, 'top_bar'):
+            self.top_bar.update_toggle_button_icon(self.bottom_widget_visible)
 
         # 保存状态到设置
         self.settings.settings["bottom_widget_visible"] = self.bottom_widget_visible
@@ -559,10 +512,11 @@ class GitManagerWindow(QMainWindow):
     def push_repo(self):
         """推送仓库"""
         if not self.git_manager:
+            # Consider disabling push button via top_bar if no git_manager
             return
         try:
             self.git_manager.push()
-            self.update_commit_history()
+            self.update_commit_history() # This updates the history view
         except:
             QMessageBox.critical(self, "错误", "推送仓库时发生错误")
             logging.exception("推送仓库时发生错误")
