@@ -123,4 +123,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 42. ~~接41的改动，ctrl + f，如果有选中的文字，那么查找的文字就是选中的文字；此外，高亮的效果太差了，需要弄成蓝色背景~~
 43. ~~text_edit.py/FindDialog 换成浮动的widget, 查找的过程浮动在 SyncedTextEdit 之上，然后SyncedTextEdit不会失焦~~
 44. ~~git push以后，需要更新分支的remote提示~~
-45. SyncedTextEdit 字体大小是硬编码的
+45. ~~SyncedTextEdit 字体大小是硬编码的~~

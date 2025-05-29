@@ -81,7 +81,7 @@ class SyncedTextEdit(QPlainTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
         settings = Settings()
-        self.setFont(QFont(settings.get_font_family(), 10))
+        self.setFont(QFont(settings.get_font_family(), settings.get_font_size()))
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self.setReadOnly(True)  # 默认设置为只读
         self.original_content = ""  # 保存原始内容，用于取消编辑时恢复
@@ -187,9 +187,9 @@ class SyncedTextEdit(QPlainTextEdit):
             self.search_highlights.append(selection)
             self.setExtraSelections(self.search_highlights)
             return True
-        
+
         logging.info(f"'{search_text}' not found in {self.objectName()} at initial position. Attempting wrap-around.")
-        
+
         # 未找到匹配项，尝试换行查找
         cursor = self.textCursor()
         if direction == "next":
@@ -198,7 +198,7 @@ class SyncedTextEdit(QPlainTextEdit):
         else:  # direction == "previous"
             # 如果向上查找未找到，移动到结尾再次查找
             cursor.movePosition(QTextCursor.MoveOperation.End)
-        
+
         self.setTextCursor(cursor)
         found_after_wrap = super().find(search_text, flags)
 
@@ -211,7 +211,7 @@ class SyncedTextEdit(QPlainTextEdit):
             self.search_highlights.append(selection)
             self.setExtraSelections(self.search_highlights)
             return True
-        
+
         # 完全未找到
         logging.info(f"'{search_text}' not found anywhere in {self.objectName()}.")
         return False
@@ -256,7 +256,7 @@ class SyncedTextEdit(QPlainTextEdit):
             blame_action.triggered.connect(self.show_blame)
             clear_blame_action = menu.addAction("Clear Blame")
             clear_blame_action.triggered.connect(self.clear_blame_data)
-        
+
         # Fix for menu position when blame info is shown
         # Convert position from viewport coordinates to global coordinates
         global_pos = self.viewport().mapToGlobal(position)
