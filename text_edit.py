@@ -256,7 +256,11 @@ class SyncedTextEdit(QPlainTextEdit):
             blame_action.triggered.connect(self.show_blame)
             clear_blame_action = menu.addAction("Clear Blame")
             clear_blame_action.triggered.connect(self.clear_blame_data)
-        menu.exec(self.mapToGlobal(position))
+        
+        # Fix for menu position when blame info is shown
+        # Convert position from viewport coordinates to global coordinates
+        global_pos = self.viewport().mapToGlobal(position)
+        menu.exec(global_pos)
 
     # Renamed from _show_context_menu to show_context_menu for consistency
     # No other change in this method, just ensuring the diff picks up the rename if any confusion.
