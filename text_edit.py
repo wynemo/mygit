@@ -162,7 +162,7 @@ class SyncedTextEdit(QPlainTextEdit):
             super().keyPressEvent(event)  # Call base class implementation for other keys
 
     def find_text(self, search_text: str, direction: str = "next", case_sensitive: bool = False) -> bool:
-        """Finds text in the editor and highlights it if found."""
+        """Finds text in the editor and highlights it if found, with wrap-around functionality."""
         # Clear previous highlights
         self.search_highlights.clear()
         self.setExtraSelections([])
@@ -173,7 +173,7 @@ class SyncedTextEdit(QPlainTextEdit):
         if case_sensitive:
             flags |= QTextDocument.FindFlag.FindCaseSensitively
 
-        # Call QPlainTextEdit's find method
+        # 第一次查找
         found = super().find(search_text, flags)
 
         if found:
@@ -186,21 +186,35 @@ class SyncedTextEdit(QPlainTextEdit):
             selection.format.setBackground(QColor("#ADD8E6"))  # Light blue
             self.search_highlights.append(selection)
             self.setExtraSelections(self.search_highlights)
-        else:
-            logging.info(f"'{search_text}' not found in {self.objectName()}")
-            # Highlights are already cleared at the beginning of the method.
-            # If not found while searching forward, move cursor to the beginning.
-            # This allows the next search to start from the top.
-            if direction == "next":
-                cursor = self.textCursor()
-                cursor.movePosition(QTextCursor.MoveOperation.Start)
-                self.setTextCursor(cursor)
-            # Optional: If searching backward and not found, could move to the end.
-            # else: # direction == "previous"
-            #     cursor = self.textCursor()
-            #     cursor.movePosition(QTextCursor.MoveOperation.End)
-            #     self.setTextCursor(cursor)
-        return found
+            return True
+        
+        logging.info(f"'{search_text}' not found in {self.objectName()} at initial position. Attempting wrap-around.")
+        
+        # 未找到匹配项，尝试换行查找
+        cursor = self.textCursor()
+        if direction == "next":
+            # 如果向下查找未找到，移动到开头再次查找
+            cursor.movePosition(QTextCursor.MoveOperation.Start)
+        else:  # direction == "previous"
+            # 如果向上查找未找到，移动到结尾再次查找
+            cursor.movePosition(QTextCursor.MoveOperation.End)
+        
+        self.setTextCursor(cursor)
+        found_after_wrap = super().find(search_text, flags)
+
+        if found_after_wrap:
+            logging.info(f"Found '{search_text}' after wrap-around in {self.objectName()}")
+            self.ensureCursorVisible()
+            selection = QTextEdit.ExtraSelection()
+            selection.cursor = self.textCursor()
+            selection.format.setBackground(QColor("#ADD8E6"))
+            self.search_highlights.append(selection)
+            self.setExtraSelections(self.search_highlights)
+            return True
+        
+        # 完全未找到
+        logging.info(f"'{search_text}' not found anywhere in {self.objectName()}.")
+        return False
 
     def clear_search_highlights(self):
         """Clears all search-related highlights from the editor."""
