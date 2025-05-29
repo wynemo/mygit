@@ -538,6 +538,7 @@ class SyncedTextEdit(QPlainTextEdit):
 
 
 # <new_class>
+# 还不是特别完善，特别是针对修改的行
 class ModifiedTextEdit(SyncedTextEdit):
     """继承自SyncedTextEdit，支持在行号旁显示行修改状态"""
 
