@@ -1,5 +1,5 @@
 import os
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -11,6 +11,9 @@ from PyQt6.QtWidgets import (
     QPushButton,  # Added
     QVBoxLayout,  # Added
 )
+
+if TYPE_CHECKING:
+    from text_edit import SyncedTextEdit  # 仅在类型检查时导入
 
 
 class FindDialog(QFrame):  # Changed from QDialog to QWidget
