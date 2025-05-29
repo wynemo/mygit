@@ -18,6 +18,11 @@ class SettingsDialog(QDialog):
         self.font_edit.setText(self.settings.get_font_family())
         layout.addRow("字体:", self.font_edit)
 
+        # 创建字体大小输入框
+        self.font_size_edit = QLineEdit()
+        self.font_size_edit.setText(str(self.settings.get_font_size()))
+        layout.addRow("字体大小:", self.font_size_edit)
+
         # 创建API设置输入框
         self.api_url_edit = QLineEdit()
         self.api_url_edit.setText(self.settings.settings.get("api_url", ""))
@@ -34,7 +39,7 @@ class SettingsDialog(QDialog):
 
         self.prompt = QLineEdit()
         self.prompt.setText(
-            self.settings.settings.get("prompt", "帮我生成commit 信息，用中文")
+            self.settings.settings.get("prompt", "帮我生成commit 信息, 用中文")
         )
         layout.addRow("Prompt:", self.prompt)
 
@@ -50,6 +55,13 @@ class SettingsDialog(QDialog):
         """当点击确定按钮时保存设置"""
         # 保存字体设置
         self.settings.set_font_family(self.font_edit.text())
+        # 保存字体大小设置
+        try:
+            font_size = int(self.font_size_edit.text())
+            self.settings.set_font_size(font_size)
+        except ValueError:
+            # 如果输入无效，保持原大小
+            pass
 
         # 保存API相关设置
         self.settings.settings["api_url"] = self.api_url_edit.text()

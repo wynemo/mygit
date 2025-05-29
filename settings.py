@@ -21,6 +21,7 @@ class Settings:
             "last_folder": None,  # 上次打开的文件夹
             "max_recent": 10,  # 最大记录数
             "font_family": "Courier New",  # 默认字体
+            "font_size": 12,  # 默认字体大小
         }
 
         # 加载已有设置
@@ -80,4 +81,13 @@ class Settings:
     def set_font_family(self, font_family):
         """设置字体"""
         self.settings["font_family"] = font_family
+        self.save_settings()
+
+    def get_font_size(self):
+        """获取字体大小设置"""
+        return self.settings.get("font_size", 12)
+
+    def set_font_size(self, font_size):
+        """设置字体大小"""
+        self.settings["font_size"] = font_size
         self.save_settings()
