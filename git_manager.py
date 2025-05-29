@@ -105,7 +105,7 @@ class GitManager:
                 ]
 
                 # Decode commit message assuming it might be bytes
-                message = commit.message.decode("utf-8", errors="ignore").strip().split("\n")[0]
+                message = commit.message.strip().split("\n")[0]
 
                 commits.append(
                     {

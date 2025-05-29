@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QTabBar,
     QTabWidget,  # 添加 QTabWidget 导入
     QToolButton,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -352,8 +353,25 @@ class GitManagerWindow(QMainWindow):
         current_branch = self.branch_combo.currentText()
         if current_branch == "all":
             self.commit_history_view.update_history(self.git_manager, "main")
+            self.commit_history_view.history_graph_list.show()
+            self.commit_history_view.history_list.hide()
+
+            graph_data = self.git_manager.get_commit_graph("main", 500)
+
+            # 设置提交图数据
+            self.commit_history_view.history_graph_list.set_commit_data(graph_data)
+
+            # 添加提交信息到列表
+            for commit in graph_data["commits"]:
+                item = QTreeWidgetItem(self.commit_history_view.history_graph_list)
+                item.setText(1, commit["hash"][:7])
+                item.setText(2, commit["message"])
+                item.setText(3, commit["author"])
+                item.setText(4, commit["date"])
         else:
             self.commit_history_view.update_history(self.git_manager, current_branch)
+            self.commit_history_view.history_graph_list.hide()
+            self.commit_history_view.history_list.show()
 
     def on_branch_changed(self, branch):
         """当分支改变时更新提交历史"""
