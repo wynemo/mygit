@@ -1,7 +1,7 @@
-from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtCore import QPoint, Qt, QRect # QRect was added previously
 from PyQt6.QtGui import QColor, QPainter, QPen
-from PyQt6.QtWidgets import QTreeWidget
-from typing import List, Optional, Any, Dict # Added Any and Dict for commit data
+from PyQt6.QtWidgets import QTreeWidget, QTreeWidgetItem # Added QTreeWidgetItem
+from typing import List, Optional, Any, Dict 
 
 
 # --- Data Structures for Graph Elements ---
@@ -39,8 +39,11 @@ class TagInfo(RefInfo):
 
 class NodeDescriptor:
     """Base class for all nodes in the visual tree of the commit graph."""
+    q_tree_widget_item: Optional['QTreeWidgetItem'] = None # Class attribute for type hinting
+
     def __init__(self, display_name: str):
         self.display_name: str = display_name
+        self.q_tree_widget_item: Optional['QTreeWidgetItem'] = None # Instance attribute
         self.children: List['NodeDescriptor'] = [] # Forward reference for type hint
 
     def add_child(self, child: 'NodeDescriptor'):
@@ -489,25 +492,46 @@ class CommitGraphView(QTreeWidget):
 
             if owning_branch_name:
                 owning_branch_node = self.branch_name_to_node_map.get(owning_branch_name)
-                if owning_branch_node and owning_branch_node.q_tree_widget_item:
-                    q_item = owning_branch_node.q_tree_widget_item
-                    # Ensure item is expanded to get valid rect (might need a full expandAll first)
-                    # Or, if item is not visible, visualItemRect is empty.
-                    item_rect = self.visualItemRect(q_item)
-                    if item_rect.isValid() and not (item_rect.width()==0 and item_rect.height()==0): # Check if rect is valid
-                        y_pos = item_rect.top() + item_rect.height() // 2
-                        # X is relative to graph area, which starts after tree labels
+                if owning_branch_node:
+                    if not hasattr(owning_branch_node, 'q_tree_widget_item'):
+                        print(f"CRITICAL_DEBUG: BranchNode {owning_branch_node.display_name} ({owning_branch_node.branch_info.name}) LACKS q_tree_widget_item attribute!")
+                        # y_pos remains topo_level based (already set)
+                        # X can use lane if available, else default
                         assigned_x = base_x_for_graph + self.branch_x_lanes.get(owning_branch_name, self.COLUMN_WIDTH)
-                    else: # Fallback if item_rect is not valid (e.g. item is not visible)
-                        assigned_x = base_x_for_graph + self.branch_x_lanes.get(owning_branch_name, self.COLUMN_WIDTH)
+                    elif owning_branch_node.q_tree_widget_item is None:
+                        print(f"CRITICAL_DEBUG: BranchNode {owning_branch_node.display_name} ({owning_branch_node.branch_info.name}) has q_tree_widget_item=None!")
                         # y_pos remains topo_level based
-                elif owning_branch_name in self.branch_x_lanes: # Node or qitem missing, but lane exists
-                     assigned_x = base_x_for_graph + self.branch_x_lanes[owning_branch_name]
+                        assigned_x = base_x_for_graph + self.branch_x_lanes.get(owning_branch_name, self.COLUMN_WIDTH)
+                    else: # Attribute exists and is not None
+                        q_item = owning_branch_node.q_tree_widget_item
+                        item_rect = self.visualItemRect(q_item)
+                        # Check if item_rect is valid (not empty, not (0,0,0,0) if that's an invalid state)
+                        if item_rect and item_rect.isValid() and not (item_rect.width() == 0 and item_rect.height() == 0 and item_rect.x() == 0 and item_rect.y() == 0) :
+                            y_pos = item_rect.top() + item_rect.height() // 2
+                            assigned_x = base_x_for_graph + self.branch_x_lanes.get(owning_branch_name, self.COLUMN_WIDTH)
+                        else: # visualItemRect not valid, use fallback for Y
+                            if item_rect is not None:
+                                print(f"DEBUG: visualItemRect for {owning_branch_node.display_name} is invalid/empty: x={item_rect.x()},y={item_rect.y()},w={item_rect.width()},h={item_rect.height()}")
+                            else: # visualItemRect may have returned None
+                                print(f"DEBUG: visualItemRect for {owning_branch_node.display_name} returned None")
+                            # y_pos remains topo_level based
+                            assigned_x = base_x_for_graph + self.branch_x_lanes.get(owning_branch_name, self.COLUMN_WIDTH)
+                elif owning_branch_name in self.branch_x_lanes: # Owning branch node not found in map, but lane exists
+                    print(f"DEBUG: Owning branch node for {owning_branch_name} not in branch_name_to_node_map, but lane exists.")
+                    assigned_x = base_x_for_graph + self.branch_x_lanes[owning_branch_name]
+                    # y_pos remains topo_level based
+                else: # Owning branch completely unknown for X
+                    print(f"DEBUG: Owning branch {owning_branch_name} has no node or lane.")
+                    # y_pos remains topo_level based, assigned_x remains default graph area X + COLUMN_WIDTH
             elif commit_branch_keys: # Fallback if no specific owning_branch_name, use first known branch
                 for bn_key in commit_branch_keys:
                     if bn_key in self.branch_x_lanes:
                         assigned_x = base_x_for_graph + self.branch_x_lanes[bn_key]
                         break
+                # y_pos remains topo_level based
+            else: # No owning branch and no associated branches with lanes
+                print(f"DEBUG: Commit {commit_hash} has no owning branch or known branch lanes.")
+                # y_pos remains topo_level based, assigned_x remains default
             
             self.commit_positions[commit_hash] = QPoint(assigned_x, y_pos)
             # No need to update self.node_positions for CommitNodes if paintEvent uses commit_positions

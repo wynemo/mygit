@@ -1,5 +1,7 @@
 import unittest
-from PyQt6.QtCore import QPoint
+from unittest.mock import patch, MagicMock
+from PyQt6.QtCore import QPoint, QRect
+from PyQt6.QtWidgets import QApplication, QTreeWidgetItem # Added QApplication, QTreeWidgetItem
 
 # Assuming CommitGraphView and its Node types are in app.commit_graph
 # Adjust this import path based on your project structure.
@@ -13,8 +15,10 @@ from commit_graph import (
     GroupNode,
     RemoteNode,
     BranchInfo,
-    TagInfo
+    TagInfo,
+    # Optional needed for type hint if NodeDescriptor.q_tree_widget_item type hinted
 )
+from typing import Optional # Added for Optional type hint
 
 # Helper to find a node in the tree via a path of display names
 def find_node_by_path(start_node: NodeDescriptor, path: list[str]) -> Optional[NodeDescriptor]:
@@ -204,92 +208,196 @@ class TestCommitGraphView(unittest.TestCase):
         self.assertEqual(login_issue_node.branch_info.name, "bugfix/login-issue")
 
 
+    @classmethod
+    def setUpClass(cls):
+        # QApplication is needed for QWidget-based tests, even if not showing UI
+        from PyQt6.QtWidgets import QApplication
+        cls.app = QApplication.instance() or QApplication([])
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.app = None
+
     # --- Tests for calculate_positions ---
 
     def test_positions_linear(self):
         graph_data = self.get_scenario_linear_data()
-        self.view.set_commit_data(graph_data) # calculate_positions is called inside
-
-        # Commit positions (Y based on topological sort: c1 is root, then c2, then c3)
-        # ROW_HEIGHT = 20, COLUMN_WIDTH = 15
-        # Level 0: c1, Level 1: c2, Level 2: c3
-        self.assertEqual(self.view.commit_positions["c1"].y(), 20 // 2 + 0 * 20) # y = 10
-        self.assertEqual(self.view.commit_positions["c2"].y(), 20 // 2 + 1 * 20) # y = 30
-        self.assertEqual(self.view.commit_positions["c3"].y(), 20 // 2 + 2 * 20) # y = 50
-
-        # All commits on 'main' should have same X from branch_x_lanes
-        # In this linear case, 'main' is the only branch, c3 is its tip.
-        # c1, c2, c3 should all take main's lane due to current X assignment logic.
-        main_lane_x = self.view.branch_x_lanes.get("main")
-        self.assertIsNotNone(main_lane_x)
-        self.assertEqual(self.view.commit_positions["c3"].x(), main_lane_x)
-        # c1 and c2 are not directly on main branch tip, their X might be default or based on 'main' if no other branch.
-        # The current logic for X assignment in calculate_positions gives them main_lane_x
-        # because 'main' is the only branch and it's the current branch.
-        self.assertEqual(self.view.commit_positions["c2"].x(), main_lane_x)
-        self.assertEqual(self.view.commit_positions["c1"].x(), main_lane_x)
-
-
-        # Node positions (labels)
-        local_branches_node = find_node_by_path(self.view.root_node, ["Local Branches"])
-        main_branch_node = find_node_by_path(local_branches_node, ["main"])
-        tags_node = find_node_by_path(self.view.root_node, ["Tags"])
-        tag_v1_node = find_node_by_path(tags_node, ["v1.0"])
-
-        self.assertIn(local_branches_node, self.view.node_positions)
-        self.assertIn(main_branch_node, self.view.node_positions)
-        self.assertIn(tags_node, self.view.node_positions)
-        self.assertIn(tag_v1_node, self.view.node_positions)
-
-        # Check Y order for labels (approximated)
-        self.assertTrue(self.view.node_positions[local_branches_node].y() < self.view.node_positions[main_branch_node].y())
-        self.assertTrue(self.view.node_positions[main_branch_node].y() < self.view.node_positions[tags_node].y())
-        self.assertTrue(self.view.node_positions[tags_node].y() < self.view.node_positions[tag_v1_node].y())
         
-        # Check X indentation for labels
-        # COLUMN_WIDTH = 15
-        self.assertEqual(self.view.node_positions[local_branches_node].x(), 15) # Level 0
-        # main_branch_node label X should be its lane's X.
-        self.assertEqual(self.view.node_positions[main_branch_node].x(), main_lane_x) 
-        self.assertEqual(self.view.node_positions[tags_node].x(), 15) # Level 0
-        # TagNode label X is currently indented by level, not aligned with commit.
-        self.assertEqual(self.view.node_positions[tag_v1_node].x(), 15 + 15) # Level 1
+        # Mocking visualItemRect and header properties
+        mock_item_height = self.view.ROW_HEIGHT # Or any desired mock height
+        mock_main_branch_item_y = 30 # Arbitrary Y for the main branch item in the tree
+        
+        # These mocks need to be active when set_commit_data -> calculate_positions is called
+        # And when we access branch_name_to_node_map later.
+        # So, call set_commit_data first to build the node structure and qitems
+        self.view.set_commit_data(graph_data)
+
+        main_branch_node = self.view.branch_name_to_node_map.get("main")
+        self.assertIsNotNone(main_branch_node)
+        self.assertIsNotNone(main_branch_node.q_tree_widget_item)
+
+        mock_rects = {
+            main_branch_node.q_tree_widget_item: QRect(0, mock_main_branch_item_y, 100, mock_item_height)
+        }
+        
+        mock_header_size = 120
+
+        def side_effect_visualItemRect(item):
+            return mock_rects.get(item, QRect()) 
+
+        # Patching before re-running calculate_positions (or make sure set_commit_data is within patch)
+        # For simplicity, we can re-run calculate_positions after mocks are set if needed,
+        # but set_commit_data already calls it. So, we need to patch before set_commit_data.
+        # Let's re-structure: patch, then set_commit_data.
+
+        with patch.object(self.view, 'visualItemRect', side_effect=side_effect_visualItemRect), \
+             patch.object(self.view.header(), 'sectionSize', return_value=mock_header_size), \
+             patch.object(self.view.header(), 'isVisible', return_value=True):
+            
+            # Re-call set_commit_data to ensure calculate_positions runs with mocks
+            self.view.set_commit_data(graph_data) 
+
+            # Y-coordinates for commits on 'main' should align with main_branch_node's item center
+            expected_y_main = mock_main_branch_item_y + mock_item_height // 2
+            
+            # c3 is tip of main, should use main_qitem's Y
+            self.assertEqual(self.view.commit_positions["c3"].y(), expected_y_main)
+            # c1 and c2 are also on main by current logic, should also align if main is owning branch.
+            # The owning branch logic will pick 'main' for c1, c2, c3.
+            self.assertEqual(self.view.commit_positions["c2"].y(), expected_y_main)
+            self.assertEqual(self.view.commit_positions["c1"].y(), expected_y_main)
+
+
+            # X-coordinates
+            expected_base_x = mock_header_size + self.view.GRAPH_X_OFFSET
+            main_lane_x_offset = self.view.branch_x_lanes.get("main")
+            self.assertIsNotNone(main_lane_x_offset)
+            expected_x_main_commits = expected_base_x + main_lane_x_offset
+
+            self.assertEqual(self.view.commit_positions["c3"].x(), expected_x_main_commits)
+            self.assertEqual(self.view.commit_positions["c2"].x(), expected_x_main_commits)
+            self.assertEqual(self.view.commit_positions["c1"].x(), expected_x_main_commits)
+
+
+        # Assertions for self.view.node_positions for labels are removed as QTreeWidget handles them.
+
+    def test_positions_linear_fallback_y(self):
+        graph_data = self.get_scenario_linear_data()
+        
+        # Mock visualItemRect to return invalid QRect for main branch item
+        # to test fallback Y logic (topo-level based)
+        mock_header_size = 120
+
+        with patch.object(self.view, 'visualItemRect', return_value=QRect()), \
+             patch.object(self.view.header(), 'sectionSize', return_value=mock_header_size), \
+             patch.object(self.view.header(), 'isVisible', return_value=True):
+            
+            self.view.set_commit_data(graph_data)
+
+            # Y-coordinates should now use fallback (topo_level * ROW_HEIGHT + ROW_HEIGHT // 2)
+            # c1: level 0, c2: level 1, c3: level 2 (based on current topo sort)
+            # ROW_HEIGHT is 20
+            self.assertEqual(self.view.commit_positions["c1"].y(), 0 * 20 + 20 // 2) # 10
+            self.assertEqual(self.view.commit_positions["c2"].y(), 1 * 20 + 20 // 2) # 30
+            self.assertEqual(self.view.commit_positions["c3"].y(), 2 * 20 + 20 // 2) # 50
+
+            # X-coordinates should still be based on lanes
+            expected_base_x = mock_header_size + self.view.GRAPH_X_OFFSET
+            main_lane_x_offset = self.view.branch_x_lanes.get("main")
+            self.assertIsNotNone(main_lane_x_offset)
+            expected_x_main_commits = expected_base_x + main_lane_x_offset
+            
+            self.assertEqual(self.view.commit_positions["c3"].x(), expected_x_main_commits)
+            self.assertEqual(self.view.commit_positions["c2"].x(), expected_x_main_commits)
+            self.assertEqual(self.view.commit_positions["c1"].x(), expected_x_main_commits)
+
 
     def test_positions_fork(self):
         graph_data = self.get_scenario_fork_data()
+
+        mock_item_height = self.view.ROW_HEIGHT
+        mock_main_item_y = 30
+        mock_develop_item_y = 50 
+        mock_header_size = 120
+
+        # Call set_commit_data once to build nodes and allow q_tree_widget_item access
+        self.view.set_commit_data(graph_data) 
+        
+        main_branch_node = self.view.branch_name_to_node_map.get("main")
+        develop_branch_node = self.view.branch_name_to_node_map.get("develop")
+        self.assertIsNotNone(main_branch_node)
+        self.assertIsNotNone(develop_branch_node)
+        self.assertIsNotNone(main_branch_node.q_tree_widget_item)
+        self.assertIsNotNone(develop_branch_node.q_tree_widget_item)
+
+        mock_rects = {
+            main_branch_node.q_tree_widget_item: QRect(0, mock_main_item_y, 100, mock_item_height),
+            develop_branch_node.q_tree_widget_item: QRect(0, mock_develop_item_y, 100, mock_item_height)
+        }
+        def side_effect_visualItemRect(item):
+            return mock_rects.get(item, QRect())
+
+        with patch.object(self.view, 'visualItemRect', side_effect=side_effect_visualItemRect), \
+             patch.object(self.view.header(), 'sectionSize', return_value=mock_header_size), \
+             patch.object(self.view.header(), 'isVisible', return_value=True):
+            
+            # Re-run set_commit_data to apply mocks during calculate_positions
+            self.view.set_commit_data(graph_data)
+
+            expected_base_x = mock_header_size + self.view.GRAPH_X_OFFSET
+            develop_lane_x_offset = self.view.branch_x_lanes.get("develop")
+            main_lane_x_offset = self.view.branch_x_lanes.get("main")
+            self.assertIsNotNone(develop_lane_x_offset)
+            self.assertIsNotNone(main_lane_x_offset)
+            self.assertNotEqual(develop_lane_x_offset, main_lane_x_offset)
+
+            expected_x_develop = expected_base_x + develop_lane_x_offset
+            expected_x_main = expected_base_x + main_lane_x_offset
+
+            # Y-coordinates
+            # c4 (develop tip) & c3 (main tip) should align with their respective mocked item centers
+            self.assertEqual(self.view.commit_positions["c4"].y(), mock_develop_item_y + mock_item_height // 2)
+            self.assertEqual(self.view.commit_positions["c3"].y(), mock_main_item_y + mock_item_height // 2)
+
+            # X-coordinates
+            self.assertEqual(self.view.commit_positions["c4"].x(), expected_x_develop)
+            self.assertEqual(self.view.commit_positions["c3"].x(), expected_x_main)
+            
+            # c2 (common ancestor) - owning branch is 'develop' (current HEAD)
+            self.assertEqual(self.view.commit_positions["c2"].x(), expected_x_develop)
+            # Y for c2: 'develop' is owning branch.
+            self.assertEqual(self.view.commit_positions["c2"].y(), mock_develop_item_y + mock_item_height // 2)
+
+            # c1 (oldest) - owning branch is 'develop' (current HEAD, as c1 is ancestor of develop)
+            self.assertEqual(self.view.commit_positions["c1"].x(), expected_x_develop)
+             # Y for c1: 'develop' is owning branch.
+            self.assertEqual(self.view.commit_positions["c1"].y(), mock_develop_item_y + mock_item_height // 2)
+
+    def test_qtree_item_population_and_styling(self):
+        graph_data = self.get_scenario_linear_data() # main is current
         self.view.set_commit_data(graph_data)
 
-        develop_lane_x = self.view.branch_x_lanes.get("develop")
-        main_lane_x = self.view.branch_x_lanes.get("main")
-        self.assertIsNotNone(develop_lane_x)
-        self.assertIsNotNone(main_lane_x)
-        self.assertNotEqual(develop_lane_x, main_lane_x)
-
-        self.assertEqual(self.view.commit_positions["c4"].x(), develop_lane_x) # on develop
-        self.assertEqual(self.view.commit_positions["c3"].x(), main_lane_x)    # on main
+        # Check main branch
+        main_node = self.view.branch_name_to_node_map.get("main")
+        self.assertIsNotNone(main_node)
+        self.assertIsNotNone(main_node.q_tree_widget_item)
+        self.assertIsInstance(main_node.q_tree_widget_item, QTreeWidgetItem)
+        self.assertEqual(main_node.q_tree_widget_item.text(0), main_node.display_name)
+        self.assertTrue(main_node.q_tree_widget_item.font(0).bold()) # main is current
         
-        # c2 is parent of both, should be on current branch (develop) lane due to fallback logic
-        # or based on how it's associated. Current logic: head_ref is develop.
-        # commit_branches for c2 is empty. Falls back to 'master' or default.
-        # This highlights a need for better X for commits not on a current branch tip.
-        # For now, let's assume it might get a default or the 'develop' lane if it's current.
-        # The current logic for commit X position:
-        # c2 has no branches. head_ref is "refs/heads/develop" (simple "develop").
-        # "develop" is not in c2's branches. No local branches. No remote.
-        # Fallback: self.branch_x_lanes.get("master", self.COLUMN_WIDTH)
-        # Let's make "master" a default lane for testing this, or ensure "develop" is chosen if it's HEAD
-        # The current code will use `self.branch_x_lanes.get("master", self.COLUMN_WIDTH)`
-        # This could be improved in calculate_positions, but for now, test current behavior.
-        # To make it predictable, if "master" is not in branch_x_lanes, it gets self.COLUMN_WIDTH.
-        expected_c2_x = self.view.branch_x_lanes.get("master", self.view.COLUMN_WIDTH)
-        if "develop" in self.view.branch_x_lanes and not graph_data["commits"][2].get("branches"): # If c2 has no branches
-             # And develop is current HEAD, current logic might try to assign to develop's lane if it's the only context
-             # However, the code explicitly checks if current_commit_branch_name in commit_branches.
-             # So it will go to fallback.
-             pass
+        expected_color_main = self.view._get_branch_color("main")
+        self.assertEqual(main_node.q_tree_widget_item.foreground(0).color(), expected_color_main)
 
-        self.assertEqual(self.view.commit_positions["c2"].x(), expected_c2_x)
-
+        # Check a tag
+        tags_root_node = find_node_by_path(self.view.root_node, ["Tags"])
+        tag_v1_node = find_node_by_path(tags_root_node, ["v1.0"]) # display_name is "v1.0"
+        self.assertIsNotNone(tag_v1_node)
+        self.assertIsInstance(tag_v1_node, TagNode)
+        self.assertIsNotNone(tag_v1_node.q_tree_widget_item)
+        self.assertIsInstance(tag_v1_node.q_tree_widget_item, QTreeWidgetItem)
+        self.assertEqual(tag_v1_node.q_tree_widget_item.text(0), tag_v1_node.display_name)
+        # Tags are not currently bolded unless they are also current branch (not possible for tags)
+        # Tags don't have branch_colors, _populate_tree_items doesn't color them.
 
     # TODO: Add more scenarios for tree building and positions:
     # - Merge commits (parents list has 2 hashes)
