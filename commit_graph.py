@@ -108,19 +108,22 @@ class GroupNode(NodeDescriptor):
 
 class CommitGraphView(QTreeWidget):
     COMMIT_DOT_RADIUS = 5
-    COLUMN_WIDTH = 15
-    ROW_HEIGHT = 20
+    COLUMN_WIDTH = 15 # For lane spacing within the graph area
+    ROW_HEIGHT = 20   # For fallback Y, and vertical spacing of topological levels
+    GRAPH_X_OFFSET = 20 # Initial X offset for the graph drawing area from the tree items
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.commits_data = [] # Raw commit data list
         self.branch_colors = {}
-        self.commit_positions = {}  # Stores QPoint for each commit hash for drawing
-        self.node_positions: Dict[NodeDescriptor, QPoint] = {} # Stores QPoint for labels of nodes
+        self.commit_positions: Dict[str, QPoint] = {}  # Stores QPoint for each commit hash for drawing
+        # self.node_positions is removed as QTreeWidget handles label positions.
+        # CommitNode positions will be stored directly in self.commit_positions.
         self.branch_x_lanes: Dict[str, int] = {} # Stores X-coordinate for branch "lanes"
         self.root_node: Optional[NodeDescriptor] = None # Root of our structured tree
         self.commit_nodes_map: Dict[str, CommitNode] = {} # Map hash to CommitNode
         self.raw_graph_data: Dict[str, Any] = {} # To store the original graph_data if needed
+        self.branch_name_to_node_map: Dict[str, BranchNode] = {}
 
     def _find_or_create_group_node(self, parent_node: NodeDescriptor, group_name: str) -> GroupNode:
         """Finds an existing GroupNode or creates and adds a new one."""
@@ -309,63 +312,30 @@ class CommitGraphView(QTreeWidget):
                  self._assign_branch_lanes_recursive(child, current_x_ref, current_remote_name)
 
 
-    def _calculate_label_positions_recursive(self, node: NodeDescriptor, base_x_indent: int, current_y_ref: List[int], level: int):
-        """ Helper to position labels for GroupNode, BranchNode, TagNode etc. """
-        # CommitNodes are not given label positions by this function.
-        if isinstance(node, CommitNode):
-            return
+    # _calculate_label_positions_recursive is removed. QTreeWidget handles label positions.
 
-        # Default X for indentation, Y is sequential.
-        display_x = base_x_indent + level * self.COLUMN_WIDTH
-        display_y = current_y_ref[0]
-
+    def _collect_branch_nodes_recursive(self, node: NodeDescriptor):
         if isinstance(node, BranchNode):
-            # Align BranchNode label X with its assigned lane.
-            # Fallback to indented X if lane not found (should be rare).
-            display_x = self.branch_x_lanes.get(node.branch_info.name, display_x)
-            self.node_positions[node] = QPoint(display_x, display_y)
-            current_y_ref[0] += self.ROW_HEIGHT
-            # Branches are leaves in this label tree structure; no recursion for children here.
-
-        elif isinstance(node, TagNode):
-            # For now, position tags like groups/branches in the list.
-            # Future: Optionally align Y with commit_positions[node.tag_info.commit_hash].y()
-            # and X offset from that commit, or in a dedicated "tags column".
-            # If aligning with commit Y, care needed not to mess up current_y_ref for main list flow.
-            self.node_positions[node] = QPoint(display_x, display_y)
-            current_y_ref[0] += self.ROW_HEIGHT
-            # Tags are also leaves in this label tree.
-
-        elif isinstance(node, (GroupNode, RemoteNode)):
-            # Root node itself is not displayed, so skip assigning it a position.
-            if node.display_name == "root" and level == -1: # Special check for the absolute root
-                pass # Don't assign position to "root", just recurse.
-            else:
-                self.node_positions[node] = QPoint(display_x, display_y)
-                current_y_ref[0] += self.ROW_HEIGHT
-            
-            for child_node in node.children: # Corrected variable name
-                 self._calculate_label_positions_recursive(child_node, base_x_indent, current_y_ref, level + 1)
-        
-        # Other node types (if any) would be positioned with default indented X and sequential Y.
-        # elif not isinstance(node, (CommitNode, BranchNode, TagNode, GroupNode, RemoteNode)):
-        #    self.node_positions[node] = QPoint(display_x, display_y)
-        #    current_y_ref[0] += self.ROW_HEIGHT
-        #    for child_node in node.children: # Corrected variable name
-        #        self._calculate_label_positions_recursive(child_node, base_x_indent, current_y_ref, level + 1)
-
+            self.branch_name_to_node_map[node.branch_info.name] = node
+        for child in node.children:
+            self._collect_branch_nodes_recursive(child)
 
     def calculate_positions(self):
-        """Calculates positions for commit dots and branch/group labels."""
+        """Calculates positions for commit dots, now relative to QTreeWidgetItems."""
         self.commit_positions.clear()
-        self.node_positions.clear()
+        # self.node_positions.clear() # No longer used for labels
         self.branch_x_lanes.clear()
+        self.branch_name_to_node_map.clear()
 
         if not self.root_node or not self.commits_data:
-            self.update()
+            self.update() # Ensure repaint even if no data
             return
 
-        # Step 1: Assign X "lanes" to branches by traversing the root_node
+        # Populate branch_name_to_node_map
+        if self.root_node:
+            self._collect_branch_nodes_recursive(self.root_node)
+            
+        # Step 1: Assign X "lanes" to branches by traversing the NodeDescriptor tree
         # These lanes are for the commit graph part.
         initial_x_lane = self.COLUMN_WIDTH
         # We want to iterate through Local, then Remotes for lane assignment order.
@@ -383,10 +353,8 @@ class CommitGraphView(QTreeWidget):
                  self._assign_branch_lanes_recursive(remote_branches_node, current_x_ref, None) # Start with no remote, it will be set by RemoteNode
 
 
-        # Step 2: Position commit dots
-        # Step 2: Position commit dots using topological sort for Y-coordinates
-        
-        # Build adjacency lists (children_map) and in_degrees
+        # Step 2: Determine topological levels for Y-ordering of commits.
+        # This remains crucial for drawing lines and as a fallback Y.
         children_map: Dict[str, List[str]] = {commit_hash: [] for commit_hash in self.commit_nodes_map.keys()}
         in_degree: Dict[str, int] = {commit_hash: 0 for commit_hash in self.commit_nodes_map.keys()}
         
@@ -439,29 +407,43 @@ class CommitGraphView(QTreeWidget):
             level +=1
 
 
-        # Assign X and Y positions
+        # Step 3: Assign X and Y positions to commits
         
         # Build a map of tip commit hashes to their branch names (keys from self.branch_x_lanes)
         tip_commit_to_branch_names: Dict[str, List[str]] = {}
-        def _collect_branch_tips_recursive(node: NodeDescriptor):
+        # Inner helper function for recursion within calculate_positions context
+        def _collect_branch_tips_recursive_inner(node: NodeDescriptor):
             if isinstance(node, BranchNode):
-                # node.branch_info.name is the key used in self.branch_x_lanes ("main" or "origin/main")
                 tip_hash = node.branch_info.commit_hash
                 tip_commit_to_branch_names.setdefault(tip_hash, []).append(node.branch_info.name)
-            for child_node in node.children: # Corrected variable name from child to child_node
-                _collect_branch_tips_recursive(child_node)
+            for child_node in node.children:
+                _collect_branch_tips_recursive_inner(child_node)
 
         if self.root_node:
-            _collect_branch_tips_recursive(self.root_node)
+            _collect_branch_tips_recursive_inner(self.root_node)
 
-        head_ref_full = self.raw_graph_data.get("head_ref", "") # Full ref like "refs/heads/main"
-        # current_head_branch_key is the key for self.branch_x_lanes ("main" or "origin/main")
+        head_ref_full = self.raw_graph_data.get("head_ref", "")
         current_head_branch_key: Optional[str] = None
         if head_ref_full.startswith("refs/heads/"):
             current_head_branch_key = head_ref_full[len("refs/heads/"):]
         elif head_ref_full.startswith("refs/remotes/"):
             parts = head_ref_full.split('/', 3)
             if len(parts) == 4: current_head_branch_key = f"{parts[2]}/{parts[3]}"
+
+        # Determine a base X for the graph drawing area, right of the tree items.
+        # This might need adjustment based on actual QTreeWidget column 0 width.
+        # For now, using a fixed offset from the viewport, plus self.indentation for some padding.
+        # A more robust way might involve self.header().sectionViewportPosition(0) + self.header().sectionSize(0)
+        # if the header is visible and sections are well-defined.
+        # Let's assume column 0 is where items are, and graph starts after it.
+        # This is a placeholder; a more robust calculation might be needed.
+        # Effective indentation for items in column 0. Max depth of visible tree could be used.
+        # For simplicity, let's use a fixed offset.
+        # If header is not visible, sectionSize(0) might be entire viewport.
+        # self.indentation() is the per-level indent.
+        base_x_for_graph = self.indentation() * 3 + self.GRAPH_X_OFFSET # Approx 3 levels of indent + offset
+        if self.header().isVisible():
+             base_x_for_graph = self.header().sectionSize(0) + self.GRAPH_X_OFFSET
 
 
         for commit_data_item in self.commits_data:
@@ -472,12 +454,10 @@ class CommitGraphView(QTreeWidget):
                 print(f"Warning: Commit {commit_hash} was not assigned a topological level.")
                 topo_level = level 
             
-            y_pos = topo_level * self.ROW_HEIGHT + self.ROW_HEIGHT // 2
+            owning_branch_name: Optional[str] = None
+            owning_branch_node: Optional[BranchNode] = None
             
-            # Refined X-coordinate assignment
-            commit_branch_full_refs = commit_data_item.get("branches", []) # Raw full refs
-            
-            # Convert full refs to keys used in self.branch_x_lanes ("main" or "origin/main")
+            commit_branch_full_refs = commit_data_item.get("branches", [])
             commit_branch_keys: List[str] = []
             for b_full_ref in commit_branch_full_refs:
                 if b_full_ref.startswith("refs/heads/"):
@@ -486,21 +466,15 @@ class CommitGraphView(QTreeWidget):
                     parts = b_full_ref.split('/', 3)
                     if len(parts) == 4: commit_branch_keys.append(f"{parts[2]}/{parts[3]}")
             
-            owning_branch_name: Optional[str] = None
-
-            # Priority 1: Current HEAD branch if commit is on it
             if current_head_branch_key and current_head_branch_key in commit_branch_keys:
                 owning_branch_name = current_head_branch_key
             
-            # Priority 2: If commit is a tip of any branch(es)
             if not owning_branch_name:
                 branches_where_this_is_tip = tip_commit_to_branch_names.get(commit_hash, [])
                 if branches_where_this_is_tip:
-                    # Sort by lane X to pick the leftmost if multiple
                     branches_where_this_is_tip.sort(key=lambda bn: self.branch_x_lanes.get(bn, float('inf')))
                     owning_branch_name = branches_where_this_is_tip[0]
             
-            # Priority 3: Leftmost branch this commit is on (that has a lane)
             if not owning_branch_name and commit_branch_keys:
                 valid_branches_with_lanes = [
                     bn_key for bn_key in commit_branch_keys if bn_key in self.branch_x_lanes
@@ -508,36 +482,39 @@ class CommitGraphView(QTreeWidget):
                 if valid_branches_with_lanes:
                     valid_branches_with_lanes.sort(key=lambda bn_key: self.branch_x_lanes[bn_key])
                     owning_branch_name = valid_branches_with_lanes[0]
-            
-            # Assign X
-            assigned_x = self.COLUMN_WIDTH # Default X
-            if owning_branch_name and owning_branch_name in self.branch_x_lanes:
-                assigned_x = self.branch_x_lanes[owning_branch_name]
-            elif commit_branch_keys: # Fallback to first known branch if owner logic fails
+
+            # Determine X and Y for the commit dot
+            assigned_x = base_x_for_graph + self.COLUMN_WIDTH # Default lane X within graph area
+            y_pos = topo_level * self.ROW_HEIGHT + self.ROW_HEIGHT // 2 # Fallback Y based on topo level
+
+            if owning_branch_name:
+                owning_branch_node = self.branch_name_to_node_map.get(owning_branch_name)
+                if owning_branch_node and owning_branch_node.q_tree_widget_item:
+                    q_item = owning_branch_node.q_tree_widget_item
+                    # Ensure item is expanded to get valid rect (might need a full expandAll first)
+                    # Or, if item is not visible, visualItemRect is empty.
+                    item_rect = self.visualItemRect(q_item)
+                    if item_rect.isValid() and not (item_rect.width()==0 and item_rect.height()==0): # Check if rect is valid
+                        y_pos = item_rect.top() + item_rect.height() // 2
+                        # X is relative to graph area, which starts after tree labels
+                        assigned_x = base_x_for_graph + self.branch_x_lanes.get(owning_branch_name, self.COLUMN_WIDTH)
+                    else: # Fallback if item_rect is not valid (e.g. item is not visible)
+                        assigned_x = base_x_for_graph + self.branch_x_lanes.get(owning_branch_name, self.COLUMN_WIDTH)
+                        # y_pos remains topo_level based
+                elif owning_branch_name in self.branch_x_lanes: # Node or qitem missing, but lane exists
+                     assigned_x = base_x_for_graph + self.branch_x_lanes[owning_branch_name]
+            elif commit_branch_keys: # Fallback if no specific owning_branch_name, use first known branch
                 for bn_key in commit_branch_keys:
                     if bn_key in self.branch_x_lanes:
-                        assigned_x = self.branch_x_lanes[bn_key]
+                        assigned_x = base_x_for_graph + self.branch_x_lanes[bn_key]
                         break
             
             self.commit_positions[commit_hash] = QPoint(assigned_x, y_pos)
-            commit_node = self.commit_nodes_map.get(commit_hash)
-            if commit_node:
-                self.node_positions[commit_node] = QPoint(assigned_x, y_pos)
+            # No need to update self.node_positions for CommitNodes if paintEvent uses commit_positions
 
-        # Step 3: Position labels for Groups, Branches, Tags in the tree hierarchy
-        # This uses self.node_positions for the labels.
-        # Y positions will be based on tree traversal order.
-        label_y_ref = [self.ROW_HEIGHT // 2] # Start Y for labels from the top
-        label_start_x = self.COLUMN_WIDTH # Base X for the first level of labels
+        # NO LONGER NEEDED: Step 3: Position labels for Groups, Branches, Tags in the tree hierarchy
+        # QTreeWidget handles this.
         
-        # Traverse children of the true root ("Local Branches", "Remotes", "Tags")
-        # The true root "root" itself doesn't have a label.
-        if self.root_node:
-            for top_level_node_group in self.root_node.children: # Local Branches, Remotes, Tags
-                # Call for each top-level group, level 0 for them.
-                self._calculate_label_positions_recursive(top_level_node_group, label_start_x, label_y_ref, 0)
-                # Add a bit of extra space between top-level groups if desired, handled by ROW_HEIGHT in recursion.
-
         self.update()
 
     def _get_branch_color(self, branch_name_full_or_simple: str) -> QColor:
