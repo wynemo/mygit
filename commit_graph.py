@@ -1,7 +1,110 @@
 from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import QTreeWidget
+from typing import List, Optional, Any, Dict # Added Any and Dict for commit data
 
+
+# --- Data Structures for Graph Elements ---
+
+class RefInfo:
+    """Base class for information about a Git reference (branch or tag)."""
+    def __init__(self, name: str):
+        self.name: str = name
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}('{self.name}')"
+
+
+class BranchInfo(RefInfo):
+    """Information about a Git branch."""
+    def __init__(self, name: str, is_local: bool, is_current: bool, commit_hash: str):
+        super().__init__(name)
+        self.is_local: bool = is_local
+        self.is_current: bool = is_current
+        self.commit_hash: str = commit_hash  # Hash of the commit this branch points to
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}('{self.name}', local={self.is_local}, current={self.is_current}, commit='{self.commit_hash}')"
+
+
+class TagInfo(RefInfo):
+    """Information about a Git tag."""
+    def __init__(self, name: str, commit_hash: str):
+        super().__init__(name)
+        self.commit_hash: str = commit_hash  # Hash of the commit this tag points to
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}('{self.name}', commit='{self.commit_hash}')"
+
+
+class NodeDescriptor:
+    """Base class for all nodes in the visual tree of the commit graph."""
+    def __init__(self, display_name: str):
+        self.display_name: str = display_name
+        self.children: List['NodeDescriptor'] = [] # Forward reference for type hint
+
+    def add_child(self, child: 'NodeDescriptor'):
+        self.children.append(child)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}('{self.display_name}', children={len(self.children)})"
+
+
+class CommitNode(NodeDescriptor):
+    """Represents a commit in the graph."""
+    # Using Any for commit_data as its structure is not yet fully defined
+    def __init__(self, commit_data: Dict[str, Any], display_name_override: Optional[str] = None):
+        # Potentially use commit hash or a shortened version for display_name if not overridden
+        super().__init__(display_name_override or commit_data.get("hash", "Unknown Commit"))
+        self.commit_data: Dict[str, Any] = commit_data
+        # Parents in terms of NodeDescriptors will be set during graph construction
+        self.parent_nodes: List[NodeDescriptor] = []
+
+    def __repr__(self) -> str:
+        return f"CommitNode('{self.commit_data.get('hash', 'Unknown')}', children={len(self.children)})"
+
+
+class BranchNode(NodeDescriptor):
+    """Represents a branch in the visual tree."""
+    def __init__(self, branch_info: BranchInfo):
+        super().__init__(branch_info.name)
+        self.branch_info: BranchInfo = branch_info
+
+    def __repr__(self) -> str:
+        return f"BranchNode(info={self.branch_info}, children={len(self.children)})"
+
+
+class TagNode(NodeDescriptor):
+    """Represents a tag in the visual tree."""
+    def __init__(self, tag_info: TagInfo):
+        super().__init__(tag_info.name)
+        self.tag_info: TagInfo = tag_info
+
+    def __repr__(self) -> str:
+        return f"TagNode(info={self.tag_info}, children={len(self.children)})"
+
+
+class RemoteNode(NodeDescriptor):
+    """Represents a remote in the visual tree."""
+    def __init__(self, name: str):
+        super().__init__(name)
+        # Children will be BranchNodes under this remote
+
+    def __repr__(self) -> str:
+        return f"RemoteNode('{self.display_name}', children={len(self.children)})"
+
+
+class GroupNode(NodeDescriptor):
+    """Represents a group of branches (e.g., 'feature/', 'bugfix/')."""
+    def __init__(self, group_prefix: str):
+        super().__init__(group_prefix)
+        # Children will be BranchNodes or other GroupNodes
+
+    def __repr__(self) -> str:
+        return f"GroupNode('{self.display_name}', children={len(self.children)})"
+
+
+# --- Commit Graph Widget ---
 
 class CommitGraphView(QTreeWidget):
     COMMIT_DOT_RADIUS = 5
@@ -10,107 +113,498 @@ class CommitGraphView(QTreeWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.commits = []
+        self.commits_data = [] # Raw commit data list
         self.branch_colors = {}
-        self.commit_positions = {}  # 存储每个提交的位置
+        self.commit_positions = {}  # Stores QPoint for each commit hash for drawing
+        self.node_positions: Dict[NodeDescriptor, QPoint] = {} # Stores QPoint for labels of nodes
+        self.branch_x_lanes: Dict[str, int] = {} # Stores X-coordinate for branch "lanes"
+        self.root_node: Optional[NodeDescriptor] = None # Root of our structured tree
+        self.commit_nodes_map: Dict[str, CommitNode] = {} # Map hash to CommitNode
+        self.raw_graph_data: Dict[str, Any] = {} # To store the original graph_data if needed
 
-    def set_commit_data(self, graph_data):
-        """设置提交数据"""
-        self.commits = graph_data["commits"]
-        self.branch_colors = graph_data["branch_colors"]
-        self.calculate_positions()
-        self.update()
+    def _find_or_create_group_node(self, parent_node: NodeDescriptor, group_name: str) -> GroupNode:
+        """Finds an existing GroupNode or creates and adds a new one."""
+        for child in parent_node.children:
+            if isinstance(child, GroupNode) and child.display_name == group_name:
+                return child
+        new_group_node = GroupNode(group_name)
+        parent_node.add_child(new_group_node)
+        return new_group_node
+
+    def _find_or_create_remote_node(self, parent_node: NodeDescriptor, remote_name: str) -> RemoteNode:
+        """Finds an existing RemoteNode or creates and adds a new one."""
+        for child in parent_node.children:
+            if isinstance(child, RemoteNode) and child.display_name == remote_name:
+                return child
+        new_remote_node = RemoteNode(remote_name)
+        parent_node.add_child(new_remote_node)
+        return new_remote_node
+
+    def _build_branch_tree(self, graph_data: Dict[str, Any]) -> NodeDescriptor:
+        """
+        Transforms raw commit data into a structured tree of NodeDescriptors.
+        """
+        root = GroupNode("root")
+        local_branches_group = GroupNode("Local Branches")
+        remotes_group = GroupNode("Remotes")
+        tags_group = GroupNode("Tags")
+        root.add_child(local_branches_group)
+        root.add_child(remotes_group)
+        root.add_child(tags_group)
+
+        self.commit_nodes_map.clear()
+        if "commits" not in graph_data:
+            return root # Return empty structure if no commits
+
+        # 1. Create CommitNode for all commits
+        for commit_data_item in graph_data["commits"]:
+            commit_hash = commit_data_item["hash"]
+            self.commit_nodes_map[commit_hash] = CommitNode(commit_data_item)
+
+        # 2. Process branches and tags from commit data
+        # head_hash helps determine the current branch.
+        # The head_hash from graph_data might be a commit hash if HEAD is detached,
+        # or a ref name like 'refs/heads/main'.
+        raw_head_ref = graph_data.get("head_ref", "") # e.g., "refs/heads/main"
+        current_branch_name = ""
+        if raw_head_ref.startswith("refs/heads/"):
+            current_branch_name = raw_head_ref[len("refs/heads/"):]
+
+        all_branch_infos: List[BranchInfo] = []
+        all_tag_infos: List[TagInfo] = []
+
+        for commit_data_item in graph_data["commits"]:
+            commit_hash = commit_data_item["hash"]
+            
+            # Process branches associated with this commit
+            for branch_name_full in commit_data_item.get("branches", []):
+                is_local = not branch_name_full.startswith("refs/remotes/")
+                is_current = False
+                
+                if is_local:
+                    # Simple name like "main" or "feature/foo"
+                    actual_branch_name = branch_name_full
+                    if actual_branch_name == current_branch_name:
+                        is_current = True
+                    all_branch_infos.append(BranchInfo(actual_branch_name, True, is_current, commit_hash))
+                else:
+                    # Remote branch like "refs/remotes/origin/main"
+                    # Format is usually refs/remotes/<remote_name>/<branch_name_on_remote>
+                    parts = branch_name_full.split('/', 4)
+                    if len(parts) >= 4 and parts[0] == "refs" and parts[1] == "remotes":
+                        remote_name = parts[2]
+                        branch_name_on_remote = "/".join(parts[3:])
+                        # For current purposes, remote branches are not "current" in the local repo sense
+                        all_branch_infos.append(BranchInfo(f"{remote_name}/{branch_name_on_remote}", False, False, commit_hash))
+
+            # Process tags associated with this commit
+            for tag_name in commit_data_item.get("tags", []):
+                all_tag_infos.append(TagInfo(tag_name, commit_hash))
+        
+        # Deduplicate BranchInfo and TagInfo (preferring current branch if duplicates exist)
+        # A commit can be pointed to by multiple refs, but we want unique BranchInfo/TagInfo for tree
+        unique_branch_infos: Dict[str, BranchInfo] = {}
+        for bi in all_branch_infos:
+            key = bi.name # Using full name for uniqueness (e.g. "origin/main")
+            if key not in unique_branch_infos or (bi.is_current and not unique_branch_infos[key].is_current) :
+                 unique_branch_infos[key] = bi
+        
+        unique_tag_infos: Dict[str, TagInfo] = {ti.name: ti for ti in all_tag_infos}
+
+
+        # 3. Build tree structure for local branches
+        for branch_info in unique_branch_infos.values():
+            if not branch_info.is_local:
+                continue
+
+            parts = branch_info.name.split('/')
+            current_parent_node: NodeDescriptor = local_branches_group
+            for i, part_name in enumerate(parts):
+                if i == len(parts) - 1: # Last part is the branch name itself
+                    branch_node = BranchNode(branch_info)
+                    current_parent_node.add_child(branch_node)
+                else: # Intermediate parts are group names
+                    current_parent_node = self._find_or_create_group_node(current_parent_node, part_name)
+        
+        # 4. Build tree structure for remote branches
+        for branch_info in unique_branch_infos.values():
+            if branch_info.is_local:
+                continue
+
+            # Name is already "remote/branch" e.g. "origin/main" or "origin/feature/foo"
+            remote_and_branch_name = branch_info.name 
+            parts = remote_and_branch_name.split('/', 1)
+            remote_name = parts[0]
+            branch_path = parts[1] if len(parts) > 1 else "" # Should always have a branch path
+
+            remote_node = self._find_or_create_remote_node(remotes_group, remote_name)
+            
+            branch_parts = branch_path.split('/')
+            current_parent_node: NodeDescriptor = remote_node
+            for i, part_name in enumerate(branch_parts):
+                if i == len(branch_parts) - 1: # Last part is the branch name
+                    # We need to create a new BranchInfo here that reflects the "display name" within the remote
+                    # The original branch_info.name is "origin/main", but in the tree, we want "main" under "origin"
+                    # For now, reuse existing branch_info, but ideally BranchInfo.name would be the short name
+                    # and it would have a separate `remote_name` attribute.
+                    # Let's adjust BranchNode's display name for now.
+                    # Create a new BranchInfo for this context
+                    # This is a bit of a hack; BranchInfo should ideally store remote name separately
+                    display_branch_info = BranchInfo(part_name, False, False, branch_info.commit_hash)
+                    branch_node = BranchNode(display_branch_info) # branch_info.name is full, use part_name
+                    branch_node.display_name = part_name # Override display name
+                    current_parent_node.add_child(branch_node)
+                else: # Intermediate parts are group names under the remote
+                    current_parent_node = self._find_or_create_group_node(current_parent_node, part_name)
+
+        # 5. Build tree structure for tags
+        for tag_info in unique_tag_infos.values():
+            # Tags are generally not namespaced in the same way as branches,
+            # but some projects might use '/' in tag names. For now, treat them as flat.
+            # If namespacing for tags (e.g. "release/v1.0") is needed, similar logic to branches applies.
+            tag_node = TagNode(tag_info)
+            tags_group.add_child(tag_node)
+            
+        return root
+
+    def set_commit_data(self, graph_data: Dict[str, Any]):
+        """设置提交数据 and build the branch tree."""
+        self.raw_graph_data = graph_data # Store raw graph data
+        self.commits_data = graph_data.get("commits", [])
+        self.branch_colors = graph_data.get("branch_colors", {})
+        
+        self.root_node = self._build_branch_tree(graph_data)
+        
+        self.calculate_positions() 
+        self.update() # Triggers repaint
+
+    def _assign_branch_lanes_recursive(self, node: NodeDescriptor, current_x_ref: List[int], current_remote_name: Optional[str] = None):
+        """ Helper to assign X-coordinates (lanes) to branches. """
+        if isinstance(node, RemoteNode):
+            # Update current_remote_name for children of this RemoteNode
+            for child in node.children:
+                self._assign_branch_lanes_recursive(child, current_x_ref, node.display_name)
+            return # RemoteNode itself doesn't get a lane, its branches do
+
+        if isinstance(node, BranchNode):
+            branch_key = node.branch_info.name # This is the short name for remote branches
+            if current_remote_name: # If under a remote, prefix with "remote_name/"
+                branch_key = f"{current_remote_name}/{node.branch_info.name}"
+            
+            if branch_key not in self.branch_x_lanes:
+                self.branch_x_lanes[branch_key] = current_x_ref[0]
+                current_x_ref[0] += self.COLUMN_WIDTH * 2 # Increment X for the next distinct branch lane
+
+        # For GroupNodes, continue traversal with the same remote_name context
+        elif isinstance(node, GroupNode):
+            for child in node.children:
+                self._assign_branch_lanes_recursive(child, current_x_ref, current_remote_name)
+            return # GroupNode itself doesn't get a lane
+
+        # Default traversal for other node types if necessary (though primarily targeting BranchNodes)
+        # This path should ideally not be hit if structure is as expected (Group or Remote as parents of Branches)
+        else:
+            for child in node.children:
+                 self._assign_branch_lanes_recursive(child, current_x_ref, current_remote_name)
+
+
+    def _calculate_label_positions_recursive(self, node: NodeDescriptor, base_x: int, current_y_ref: List[int], level: int):
+        """ Helper to position labels for GroupNode, BranchNode, TagNode etc. """
+        if not isinstance(node, CommitNode): # CommitNode positions are handled separately
+            # Exception: Root node itself is not displayed, so skip it.
+            if node.display_name == "root" and level == -1: # Special handling for the absolute root
+                 pass
+            else:
+                label_x = base_x + level * self.COLUMN_WIDTH # Indentation for hierarchy
+                self.node_positions[node] = QPoint(label_x, current_y_ref[0])
+                current_y_ref[0] += self.ROW_HEIGHT
+        
+        for child in node.children:
+            # Only recurse for non-commit children to position their labels.
+            # CommitNodes are part of the graph, not separate entries in the tree list here.
+            if not isinstance(child, CommitNode):
+                 self._calculate_label_positions_recursive(child, base_x, current_y_ref, level + 1)
+
 
     def calculate_positions(self):
-        """计算每个提交的位置"""
+        """Calculates positions for commit dots and branch/group labels."""
         self.commit_positions.clear()
+        self.node_positions.clear()
+        self.branch_x_lanes.clear()
 
-        for idx, commit in enumerate(self.commits):
-            # 计算垂直位置
-            y = idx * self.ROW_HEIGHT + self.ROW_HEIGHT // 2
-
-            # 根据分支计算水平位置
-            branch_idx = 0
-            if commit["branches"]:
-                branch_name = commit["branches"][0]
-                branch_idx = list(self.branch_colors.keys()).index(branch_name)
-
-            x = branch_idx * self.COLUMN_WIDTH + self.COLUMN_WIDTH
-
-            self.commit_positions[commit["hash"]] = QPoint(x, y)
-
-    def calculate_positions(self):
-        """计算每个提交的位置"""
-        self.commit_positions.clear()
-
-        for idx, commit in enumerate(self.commits):
-            # 计算垂直位置 (不需要考虑滚动偏移，在绘制时处理)
-            y = idx * self.ROW_HEIGHT + self.ROW_HEIGHT // 2
-
-            # 根据分支计算水平位置
-            branch_idx = 0
-            if commit["branches"]:
-                branch_name = commit["branches"][0]
-                branch_idx = list(self.branch_colors.keys()).index(branch_name)
-
-            x = branch_idx * self.COLUMN_WIDTH + self.COLUMN_WIDTH
-
-            self.commit_positions[commit["hash"]] = QPoint(x, y)
-
-    def paintEvent(self, event):
-        """重写绘制事件"""
-        super().paintEvent(event)
-
-        if not self.commits:
+        if not self.root_node or not self.commits_data:
+            self.update()
             return
 
+        # Step 1: Assign X "lanes" to branches by traversing the root_node
+        # These lanes are for the commit graph part.
+        initial_x_lane = self.COLUMN_WIDTH
+        # We want to iterate through Local, then Remotes for lane assignment order.
+        if self.root_node.children:
+            local_branches_node = next((n for n in self.root_node.children if n.display_name == "Local Branches"), None)
+            remote_branches_node = next((n for n in self.root_node.children if n.display_name == "Remotes"), None)
+            
+            current_x_ref = [initial_x_lane]
+            if local_branches_node:
+                self._assign_branch_lanes_recursive(local_branches_node, current_x_ref, None) # No remote name for local branches
+            
+            # Reset X slightly or continue for remotes, ensuring they don't overlap too much if desired
+            # For now, remotes will continue from where local branches left off.
+            if remote_branches_node:
+                 self._assign_branch_lanes_recursive(remote_branches_node, current_x_ref, None) # Start with no remote, it will be set by RemoteNode
+
+
+        # Step 2: Position commit dots
+        # Assumes self.commits_data is sorted (e.g., newest first for Y increasing downwards from top)
+        head_ref_name = self.raw_graph_data.get("head_ref", "") # e.g. "refs/heads/main"
+        current_commit_branch_name = ""
+        if head_ref_name.startswith("refs/heads/"):
+            current_commit_branch_name = head_ref_name[len("refs/heads/"):]
+        elif head_ref_name.startswith("refs/remotes/"): # "origin/main"
+            current_commit_branch_name = head_ref_name[len("refs/remotes/"):]
+
+
+        for idx, commit_data_item in enumerate(self.commits_data):
+            commit_hash = commit_data_item["hash"]
+            y_pos = idx * self.ROW_HEIGHT + self.ROW_HEIGHT // 2
+            
+            assigned_x = self.COLUMN_WIDTH # Default X
+            
+            # Determine X based on branch lanes
+            commit_branches = commit_data_item.get("branches", [])
+            target_branch_name_for_lane = None
+
+            # Priority 1: Current active local branch if commit is on it
+            if current_commit_branch_name and current_commit_branch_name in commit_branches:
+                if current_commit_branch_name in self.branch_x_lanes:
+                    target_branch_name_for_lane = current_commit_branch_name
+            
+            # Priority 2: Other local branches
+            if not target_branch_name_for_lane:
+                for b_name in commit_branches:
+                    if not b_name.startswith("refs/remotes/") and b_name in self.branch_x_lanes:
+                        target_branch_name_for_lane = b_name
+                        break
+            
+            # Priority 3: Remote branches
+            if not target_branch_name_for_lane:
+                for b_name in commit_branches: # These are full "refs/remotes/origin/main"
+                    # Convert to "origin/main" style key for branch_x_lanes
+                    simple_remote_branch_name = ""
+                    if b_name.startswith("refs/remotes/"):
+                        parts = b_name.split('/', 3) # refs/remotes/origin/main -> origin/main
+                        if len(parts) == 4 :
+                             simple_remote_branch_name = f"{parts[2]}/{parts[3]}"
+                    
+                    if simple_remote_branch_name and simple_remote_branch_name in self.branch_x_lanes:
+                        target_branch_name_for_lane = simple_remote_branch_name
+                        break
+            
+            if target_branch_name_for_lane:
+                assigned_x = self.branch_x_lanes[target_branch_name_for_lane]
+            else:
+                # Fallback if no lane assigned (e.g. detached HEAD or new branch not yet in tree)
+                # This might need a dynamic lane assignment strategy later.
+                # For now, use a default or increment a dynamic 'unknown' lane.
+                assigned_x = self.branch_x_lanes.get("master", self.COLUMN_WIDTH) # Default to master or first column
+
+            self.commit_positions[commit_hash] = QPoint(assigned_x, y_pos)
+            commit_node = self.commit_nodes_map.get(commit_hash)
+            if commit_node:
+                self.node_positions[commit_node] = QPoint(assigned_x, y_pos)
+
+        # Step 3: Position labels for Groups, Branches, Tags in the tree hierarchy
+        # This uses self.node_positions for the labels.
+        # Y positions will be based on tree traversal order.
+        label_y_ref = [self.ROW_HEIGHT // 2] # Start Y for labels from the top
+        label_start_x = self.COLUMN_WIDTH # Base X for the first level of labels
+        
+        # Traverse children of the true root ("Local Branches", "Remotes", "Tags")
+        # The true root "root" itself doesn't have a label.
+        if self.root_node:
+            for top_level_node_group in self.root_node.children: # Local Branches, Remotes, Tags
+                # Call for each top-level group, level 0 for them.
+                self._calculate_label_positions_recursive(top_level_node_group, label_start_x, label_y_ref, 0)
+                # Add a bit of extra space between top-level groups if desired, handled by ROW_HEIGHT in recursion.
+
+        self.update()
+
+    def _get_branch_color(self, branch_name_full_or_simple: str) -> QColor:
+        """Gets color for a branch, handling full ref or simple name."""
+        # self.branch_colors keys are simple for local (main), remote/branch for remote (origin/main)
+        
+        if branch_name_full_or_simple.startswith("refs/heads/"):
+            key = branch_name_full_or_simple[len("refs/heads/"):]
+        elif branch_name_full_or_simple.startswith("refs/remotes/"):
+            parts = branch_name_full_or_simple.split('/', 3)
+            if len(parts) == 4: # refs/remotes/origin/main -> origin/main
+                key = f"{parts[2]}/{parts[3]}"
+            else: # Should not happen if format is correct
+                key = branch_name_full_or_simple 
+        else: # Already a simple name
+            key = branch_name_full_or_simple
+            
+        return QColor(self.branch_colors.get(key, "#cccccc")) # Default color if not found
+
+    def _get_commit_color(self, commit_data_item: Dict[str, Any]) -> QColor:
+        """Determines the color for a commit dot or line based on its branches."""
+        if not commit_data_item:
+            return QColor("#cccccc") # Default
+            
+        commit_branches = commit_data_item.get("branches", [])
+        if not commit_branches:
+            return QColor("#cccccc") # Default for commits with no branch association (e.g., detached)
+
+        head_ref = self.raw_graph_data.get("head_ref", "") # e.g. "refs/heads/main"
+        
+        # Priority 1: Current checked-out branch
+        if head_ref:
+            simple_head_ref = ""
+            if head_ref.startswith("refs/heads/"):
+                simple_head_ref = head_ref[len("refs/heads/"):]
+            elif head_ref.startswith("refs/remotes/"): # Should not be primary for local commit color
+                parts = head_ref.split('/',3)
+                if len(parts) == 4: simple_head_ref = f"{parts[2]}/{parts[3]}"
+
+            if simple_head_ref and simple_head_ref in commit_branches : # commit_branches are simple names for local, full for remote
+                 # Need to check if simple_head_ref (if local) is in commit_branches (which are full names)
+                 # Or if simple_head_ref (if remote, e.g. "origin/main") is in commit_branches (which are full names)
+                if head_ref in commit_branches: # commit_branches from item are full "refs/..." names
+                    return self._get_branch_color(head_ref)
+
+
+        # Priority 2: First local branch
+        for b_name_full in commit_branches: # e.g. "main" or "refs/remotes/origin/main"
+            if not b_name_full.startswith("refs/remotes/"):
+                # It's a local branch name, already simple like "main" or "feature/foo"
+                return self._get_branch_color(b_name_full)
+        
+        # Priority 3: First remote branch
+        for b_name_full in commit_branches:
+            if b_name_full.startswith("refs/remotes/"):
+                 return self._get_branch_color(b_name_full) # _get_branch_color handles parsing "refs/remotes/..."
+
+        return QColor("#cccccc") # Fallback
+
+    def paintEvent(self, event):
+        """Draws the commit graph and branch/tag labels."""
+        super().paintEvent(event)
         painter = QPainter(self.viewport())
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # 获取滚动条位置
+        if not self.root_node or not self.commits_data:
+            return
+
         v_scroll = self.verticalScrollBar().value()
         h_scroll = self.horizontalScrollBar().value()
 
-        # 绘制连线和提交点
-        for commit in self.commits:
-            # 应用滚动偏移
-            current_pos = QPoint(
-                self.commit_positions[commit["hash"]].x() - h_scroll,
-                self.commit_positions[commit["hash"]].y() - v_scroll,
-            )
-
-            # 检查是否在可见区域内
-            if not (0 <= current_pos.y() <= self.viewport().height()):
+        # 1. Draw Commit Graph Lines (Connections)
+        for commit_data_item in self.commits_data: # Iterate raw commit data for parent info
+            commit_hash = commit_data_item["hash"]
+            original_child_pos = self.commit_positions.get(commit_hash)
+            if not original_child_pos:
                 continue
 
-            # 绘制到父提交的连线
-            for parent_hash in commit["parents"]:
-                if parent_hash in self.commit_positions:
-                    # 应用滚动偏移到父节点位置
-                    parent_pos = QPoint(
-                        self.commit_positions[parent_hash].x() - h_scroll,
-                        self.commit_positions[parent_hash].y() - v_scroll,
-                    )
+            child_pos = QPoint(original_child_pos.x() - h_scroll, original_child_pos.y() - v_scroll)
+            
+            # Determine line color based on the child commit
+            line_color = self._get_commit_color(commit_data_item)
+            pen = QPen(line_color, 2)
+            painter.setPen(pen)
 
-                    # 确定连线颜色
-                    line_color = QColor("#cccccc")
-                    if commit["branches"]:
-                        branch_name = commit["branches"][0]
-                        line_color = QColor(self.branch_colors[branch_name])
+            for parent_hash in commit_data_item.get("parents", []):
+                original_parent_pos = self.commit_positions.get(parent_hash)
+                if not original_parent_pos:
+                    continue
+                
+                parent_pos = QPoint(original_parent_pos.x() - h_scroll, original_parent_pos.y() - v_scroll)
+                
+                # Check visibility for lines (optional, can be expensive)
+                # For simplicity, draw if either end is visible or near visible.
+                # A more robust check would involve line clipping algorithms.
+                line_rect = QRect(child_pos, parent_pos).normalized()
+                if not self.viewport().rect().intersects(line_rect.adjusted(-20,-20,20,20)): # Add some margin
+                    # continue # This might be too aggressive, let's draw for now
+                    pass
 
-                    # 绘制连线
-                    pen = QPen(line_color, 2)
-                    painter.setPen(pen)
-                    painter.drawLine(current_pos, parent_pos)
 
-            # 绘制提交点
-            for branch_name in commit["branches"]:
-                color = QColor(self.branch_colors[branch_name])
-                painter.setBrush(color)
-                painter.setPen(Qt.PenStyle.NoPen)
-                painter.drawEllipse(
-                    current_pos.x() - self.COMMIT_DOT_RADIUS,
-                    current_pos.y() - self.COMMIT_DOT_RADIUS,
-                    self.COMMIT_DOT_RADIUS * 2,
-                    self.COMMIT_DOT_RADIUS * 2,
-                )
+                painter.drawLine(child_pos, parent_pos)
+
+        # 2. Draw Commit Dots
+        # Need commit_data_item again for coloring, so iterate self.commits_data
+        commit_data_map = {c["hash"]: c for c in self.commits_data}
+
+        for commit_hash, original_pos in self.commit_positions.items():
+            pos = QPoint(original_pos.x() - h_scroll, original_pos.y() - v_scroll)
+
+            if not (0 <= pos.y() <= self.viewport().height() + self.COMMIT_DOT_RADIUS * 2): # Check Y visibility
+                 if not (-self.COMMIT_DOT_RADIUS*2 <= pos.y() <= self.viewport().height() + self.COMMIT_DOT_RADIUS*2): # Check Y visibility
+                    continue
+
+
+            commit_data_item = commit_data_map.get(commit_hash)
+            dot_color = self._get_commit_color(commit_data_item)
+
+            painter.setBrush(dot_color)
+            painter.setPen(Qt.PenStyle.NoPen) # No border for dots typically
+            painter.drawEllipse(
+                pos.x() - self.COMMIT_DOT_RADIUS,
+                pos.y() - self.COMMIT_DOT_RADIUS,
+                self.COMMIT_DOT_RADIUS * 2,
+                self.COMMIT_DOT_RADIUS * 2,
+            )
+
+        # 3. Draw Node Labels (Branches, Groups, Tags)
+        font = painter.font()
+        font_metrics = painter.fontMetrics()
+
+        for node, original_pos in self.node_positions.items():
+            if isinstance(node, CommitNode): # Commit dots already drawn
+                continue
+
+            pos = QPoint(original_pos.x() - h_scroll, original_pos.y() - v_scroll)
+
+            # Check Y visibility for labels
+            # Approximate height of text for visibility check
+            text_height = font_metrics.height()
+            if not (-text_height <= pos.y() <= self.viewport().height() + text_height):
+                continue
+            
+            display_name = node.display_name
+            label_color = QColor(Qt.GlobalColor.black) # Default label color
+
+            if isinstance(node, BranchNode):
+                # node.display_name is short name for remote, full for local
+                # node.branch_info.name is short for remote, full for local
+                # This is due to how BranchNode was constructed for remotes.
+                # For coloring with self.branch_colors, we need the key that matches.
+                branch_key_for_color = node.branch_info.name # Default to info's name
+                if node.parent and isinstance(node.parent, RemoteNode): # If it's a remote branch child
+                    branch_key_for_color = f"{node.parent.display_name}/{node.branch_info.name}"
+                
+                label_color = self._get_branch_color(branch_key_for_color)
+                
+                if node.branch_info.is_current:
+                    font.setBold(True)
+                    # Add a visual marker like '*' or 'HEAD ->'
+                    # display_name = f"* {display_name}" # Simple star
+                else:
+                    font.setBold(False)
+            elif isinstance(node, TagNode):
+                label_color = QColor("#FFA500") # Orange for tags
+                font.setBold(False)
+            else: # GroupNode, RemoteNode
+                font.setBold(True) # Make group names bold
+
+            painter.setFont(font)
+            painter.setPen(label_color)
+            
+            # Adjust text position for better alignment with the point
+            # Point is typically middle-left or top-left for the label.
+            # Let's assume point is middle-left of where text should start.
+            text_x = pos.x() + self.COMMIT_DOT_RADIUS # Start text slightly to the right of where a dot might be
+            text_y = pos.y() + font_metrics.ascent() // 2 # Align text vertically centered
+            
+            painter.drawText(text_x, text_y, display_name)
+            font.setBold(False) # Reset bold for next iteration
+        painter.setFont(font) # Ensure font is reset finally
