@@ -159,17 +159,20 @@ class TestCommitGraphView(unittest.TestCase):
         self.assertIsNotNone(origin_node)
         self.assertIsInstance(origin_node, RemoteNode)
 
-        origin_main_node = find_node_by_path(origin_node, ["main"])
+        origin_main_node = find_node_by_path(origin_node, ["main"]) # Find by display name "main"
         self.assertIsNotNone(origin_main_node)
         self.assertIsInstance(origin_main_node, BranchNode)
-        self.assertEqual(origin_main_node.branch_info.name, "main") # Short name in BranchInfo for remotes
-        self.assertEqual(origin_main_node.display_name, "main") # Display name is short
-        self.assertEqual(origin_main_node.branch_info.commit_hash, "c3") # c3 has refs/remotes/origin/main
+        self.assertEqual(origin_main_node.branch_info.name, "origin/main") # branch_info.name is full "origin/main"
+        self.assertEqual(origin_main_node.display_name, "main") # display_name is short "main"
+        self.assertFalse(origin_main_node.branch_info.is_local)
+        self.assertEqual(origin_main_node.branch_info.commit_hash, "c3")
 
-        origin_feature_x_node = find_node_by_path(origin_node, ["feature-x"])
+        origin_feature_x_node = find_node_by_path(origin_node, ["feature-x"]) # Find by display name "feature-x"
         self.assertIsNotNone(origin_feature_x_node)
         self.assertIsInstance(origin_feature_x_node, BranchNode)
-        self.assertEqual(origin_feature_x_node.branch_info.name, "feature-x")
+        self.assertEqual(origin_feature_x_node.branch_info.name, "origin/feature-x") # branch_info.name is full "origin/feature-x"
+        self.assertEqual(origin_feature_x_node.display_name, "feature-x") # display_name is short "feature-x"
+        self.assertFalse(origin_feature_x_node.branch_info.is_local)
         self.assertEqual(origin_feature_x_node.branch_info.commit_hash, "c4")
 
     def test_build_tree_namespaced_branches(self):

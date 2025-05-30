@@ -249,11 +249,12 @@ class CommitGraphView(QTreeWidget):
                     # and it would have a separate `remote_name` attribute.
                     # Let's adjust BranchNode's display name for now.
                     # Create a new BranchInfo for this context
-                    # This is a bit of a hack; BranchInfo should ideally store remote name separately
-                    display_branch_info = BranchInfo(part_name, False, False, branch_info.commit_hash)
-                    branch_node = BranchNode(display_branch_info) # branch_info.name is full, use part_name
-                    branch_node.display_name = part_name # Override display name
-                    current_parent_node.add_child(branch_node)
+                    # The 'branch_info' (from unique_branch_infos) has the full correct name like "origin/main".
+                    # We want the BranchNode to store this BranchInfo.
+                    # The display name for the node in the tree should be the short part_name (e.g., "main").
+                    bn = BranchNode(branch_info) 
+                    bn.display_name = part_name # Set display name to the short name
+                    current_parent_node.add_child(bn)
                 else: # Intermediate parts are group names under the remote
                     current_parent_node = self._find_or_create_group_node(current_parent_node, part_name)
 
@@ -287,9 +288,9 @@ class CommitGraphView(QTreeWidget):
             return # RemoteNode itself doesn't get a lane, its branches do
 
         if isinstance(node, BranchNode):
-            branch_key = node.branch_info.name # This is the short name for remote branches
-            if current_remote_name: # If under a remote, prefix with "remote_name/"
-                branch_key = f"{current_remote_name}/{node.branch_info.name}"
+            # After fixes to _build_branch_tree, node.branch_info.name is already the correct
+            # full key, e.g., "main" for local, "origin/main" for remote.
+            branch_key = node.branch_info.name
             
             if branch_key not in self.branch_x_lanes:
                 self.branch_x_lanes[branch_key] = current_x_ref[0]
@@ -578,9 +579,9 @@ class CommitGraphView(QTreeWidget):
                 # node.branch_info.name is short for remote, full for local
                 # This is due to how BranchNode was constructed for remotes.
                 # For coloring with self.branch_colors, we need the key that matches.
-                branch_key_for_color = node.branch_info.name # Default to info's name
-                if node.parent and isinstance(node.parent, RemoteNode): # If it's a remote branch child
-                    branch_key_for_color = f"{node.parent.display_name}/{node.branch_info.name}"
+                # node.branch_info.name should already be correctly formatted by _build_branch_tree
+                # (e.g., "main" for local, "origin/main" for remote branches).
+                branch_key_for_color = node.branch_info.name
                 
                 label_color = self._get_branch_color(branch_key_for_color)
                 
