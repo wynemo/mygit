@@ -649,9 +649,10 @@ class CommitGraphView(QTreeWidget):
         for commit_hash, original_pos in self.commit_positions.items():
             pos = QPoint(original_pos.x() - h_scroll, original_pos.y() - v_scroll)
 
-            if not (0 <= pos.y() <= self.viewport().height() + self.COMMIT_DOT_RADIUS * 2): # Check Y visibility
-                 if not (-self.COMMIT_DOT_RADIUS*2 <= pos.y() <= self.viewport().height() + self.COMMIT_DOT_RADIUS*2): # Check Y visibility
-                    continue
+            # Viewport culling for dots
+            if not (-self.COMMIT_DOT_RADIUS*2 <= pos.y() <= self.viewport().height() + self.COMMIT_DOT_RADIUS*2 and \
+                    -self.COMMIT_DOT_RADIUS*2 <= pos.x() <= self.viewport().width() + self.COMMIT_DOT_RADIUS*2 ) :
+                continue
 
 
             commit_data_item = commit_data_map.get(commit_hash)
@@ -660,63 +661,10 @@ class CommitGraphView(QTreeWidget):
             painter.setBrush(dot_color)
             painter.setPen(Qt.PenStyle.NoPen) # No border for dots typically
             painter.drawEllipse(
-                pos.x() - self.COMMIT_DOT_RADIUS,
-                pos.y() - self.COMMIT_DOT_RADIUS,
-                self.COMMIT_DOT_RADIUS * 2,
-                self.COMMIT_DOT_RADIUS * 2,
+                pos, # QPainter.drawEllipse takes QPointF or QPoint for center
+                self.COMMIT_DOT_RADIUS, # rx
+                self.COMMIT_DOT_RADIUS  # ry
             )
 
-        # 3. Draw Node Labels (Branches, Groups, Tags)
-        font = painter.font()
-        font_metrics = painter.fontMetrics()
-
-        for node, original_pos in self.node_positions.items():
-            if isinstance(node, CommitNode): # Commit dots already drawn
-                continue
-
-            pos = QPoint(original_pos.x() - h_scroll, original_pos.y() - v_scroll)
-
-            # Check Y visibility for labels
-            # Approximate height of text for visibility check
-            text_height = font_metrics.height()
-            if not (-text_height <= pos.y() <= self.viewport().height() + text_height):
-                continue
-            
-            display_name = node.display_name
-            label_color = QColor(Qt.GlobalColor.black) # Default label color
-
-            if isinstance(node, BranchNode):
-                # node.display_name is short name for remote, full for local
-                # node.branch_info.name is short for remote, full for local
-                # This is due to how BranchNode was constructed for remotes.
-                # For coloring with self.branch_colors, we need the key that matches.
-                # node.branch_info.name should already be correctly formatted by _build_branch_tree
-                # (e.g., "main" for local, "origin/main" for remote branches).
-                branch_key_for_color = node.branch_info.name
-                
-                label_color = self._get_branch_color(branch_key_for_color)
-                
-                if node.branch_info.is_current:
-                    font.setBold(True)
-                    # Add a visual marker like '*' or 'HEAD ->'
-                    # display_name = f"* {display_name}" # Simple star
-                else:
-                    font.setBold(False)
-            elif isinstance(node, TagNode):
-                label_color = QColor("#FFA500") # Orange for tags
-                font.setBold(False)
-            else: # GroupNode, RemoteNode
-                font.setBold(True) # Make group names bold
-
-            painter.setFont(font)
-            painter.setPen(label_color)
-            
-            # Adjust text position for better alignment with the point
-            # Point is typically middle-left or top-left for the label.
-            # Let's assume point is middle-left of where text should start.
-            text_x = pos.x() + self.COMMIT_DOT_RADIUS # Start text slightly to the right of where a dot might be
-            text_y = pos.y() + font_metrics.ascent() // 2 # Align text vertically centered
-            
-            painter.drawText(text_x, text_y, display_name)
-            font.setBold(False) # Reset bold for next iteration
-        painter.setFont(font) # Ensure font is reset finally
+        # Manual label drawing (section 3) is removed.
+        # QTreeWidget (super_class) handles drawing item labels.
