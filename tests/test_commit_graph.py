@@ -210,12 +210,16 @@ class TestCommitGraphView(unittest.TestCase):
         graph_data = self.get_scenario_linear_data()
         self.view.set_commit_data(graph_data) # calculate_positions is called inside
 
-        # Commit positions (Y based on reverse chronological index)
-        self.assertEqual(self.view.commit_positions["c3"].y(), self.view.ROW_HEIGHT // 2 + 0 * self.view.ROW_HEIGHT)
-        self.assertEqual(self.view.commit_positions["c2"].y(), self.view.ROW_HEIGHT // 2 + 1 * self.view.ROW_HEIGHT)
-        self.assertEqual(self.view.commit_positions["c1"].y(), self.view.ROW_HEIGHT // 2 + 2 * self.view.ROW_HEIGHT)
+        # Commit positions (Y based on topological sort: c1 is root, then c2, then c3)
+        # ROW_HEIGHT = 20, COLUMN_WIDTH = 15
+        # Level 0: c1, Level 1: c2, Level 2: c3
+        self.assertEqual(self.view.commit_positions["c1"].y(), 20 // 2 + 0 * 20) # y = 10
+        self.assertEqual(self.view.commit_positions["c2"].y(), 20 // 2 + 1 * 20) # y = 30
+        self.assertEqual(self.view.commit_positions["c3"].y(), 20 // 2 + 2 * 20) # y = 50
 
         # All commits on 'main' should have same X from branch_x_lanes
+        # In this linear case, 'main' is the only branch, c3 is its tip.
+        # c1, c2, c3 should all take main's lane due to current X assignment logic.
         main_lane_x = self.view.branch_x_lanes.get("main")
         self.assertIsNotNone(main_lane_x)
         self.assertEqual(self.view.commit_positions["c3"].x(), main_lane_x)
@@ -243,11 +247,13 @@ class TestCommitGraphView(unittest.TestCase):
         self.assertTrue(self.view.node_positions[tags_node].y() < self.view.node_positions[tag_v1_node].y())
         
         # Check X indentation for labels
-        self.assertEqual(self.view.node_positions[local_branches_node].x(), self.view.COLUMN_WIDTH) # Level 0
-        self.assertEqual(self.view.node_positions[main_branch_node].x(), self.view.COLUMN_WIDTH + self.view.COLUMN_WIDTH) # Level 1
-        self.assertEqual(self.view.node_positions[tags_node].x(), self.view.COLUMN_WIDTH) # Level 0
-        self.assertEqual(self.view.node_positions[tag_v1_node].x(), self.view.COLUMN_WIDTH + self.view.COLUMN_WIDTH) # Level 1
-
+        # COLUMN_WIDTH = 15
+        self.assertEqual(self.view.node_positions[local_branches_node].x(), 15) # Level 0
+        # main_branch_node label X should be its lane's X.
+        self.assertEqual(self.view.node_positions[main_branch_node].x(), main_lane_x) 
+        self.assertEqual(self.view.node_positions[tags_node].x(), 15) # Level 0
+        # TagNode label X is currently indented by level, not aligned with commit.
+        self.assertEqual(self.view.node_positions[tag_v1_node].x(), 15 + 15) # Level 1
 
     def test_positions_fork(self):
         graph_data = self.get_scenario_fork_data()

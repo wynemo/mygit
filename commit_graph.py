@@ -108,8 +108,8 @@ class GroupNode(NodeDescriptor):
 
 class CommitGraphView(QTreeWidget):
     COMMIT_DOT_RADIUS = 5
-    COLUMN_WIDTH = 20
-    ROW_HEIGHT = 30
+    COLUMN_WIDTH = 15
+    ROW_HEIGHT = 20
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -309,22 +309,50 @@ class CommitGraphView(QTreeWidget):
                  self._assign_branch_lanes_recursive(child, current_x_ref, current_remote_name)
 
 
-    def _calculate_label_positions_recursive(self, node: NodeDescriptor, base_x: int, current_y_ref: List[int], level: int):
+    def _calculate_label_positions_recursive(self, node: NodeDescriptor, base_x_indent: int, current_y_ref: List[int], level: int):
         """ Helper to position labels for GroupNode, BranchNode, TagNode etc. """
-        if not isinstance(node, CommitNode): # CommitNode positions are handled separately
-            # Exception: Root node itself is not displayed, so skip it.
-            if node.display_name == "root" and level == -1: # Special handling for the absolute root
-                 pass
+        # CommitNodes are not given label positions by this function.
+        if isinstance(node, CommitNode):
+            return
+
+        # Default X for indentation, Y is sequential.
+        display_x = base_x_indent + level * self.COLUMN_WIDTH
+        display_y = current_y_ref[0]
+
+        if isinstance(node, BranchNode):
+            # Align BranchNode label X with its assigned lane.
+            # Fallback to indented X if lane not found (should be rare).
+            display_x = self.branch_x_lanes.get(node.branch_info.name, display_x)
+            self.node_positions[node] = QPoint(display_x, display_y)
+            current_y_ref[0] += self.ROW_HEIGHT
+            # Branches are leaves in this label tree structure; no recursion for children here.
+
+        elif isinstance(node, TagNode):
+            # For now, position tags like groups/branches in the list.
+            # Future: Optionally align Y with commit_positions[node.tag_info.commit_hash].y()
+            # and X offset from that commit, or in a dedicated "tags column".
+            # If aligning with commit Y, care needed not to mess up current_y_ref for main list flow.
+            self.node_positions[node] = QPoint(display_x, display_y)
+            current_y_ref[0] += self.ROW_HEIGHT
+            # Tags are also leaves in this label tree.
+
+        elif isinstance(node, (GroupNode, RemoteNode)):
+            # Root node itself is not displayed, so skip assigning it a position.
+            if node.display_name == "root" and level == -1: # Special check for the absolute root
+                pass # Don't assign position to "root", just recurse.
             else:
-                label_x = base_x + level * self.COLUMN_WIDTH # Indentation for hierarchy
-                self.node_positions[node] = QPoint(label_x, current_y_ref[0])
+                self.node_positions[node] = QPoint(display_x, display_y)
                 current_y_ref[0] += self.ROW_HEIGHT
+            
+            for child_node in node.children: # Corrected variable name
+                 self._calculate_label_positions_recursive(child_node, base_x_indent, current_y_ref, level + 1)
         
-        for child in node.children:
-            # Only recurse for non-commit children to position their labels.
-            # CommitNodes are part of the graph, not separate entries in the tree list here.
-            if not isinstance(child, CommitNode):
-                 self._calculate_label_positions_recursive(child, base_x, current_y_ref, level + 1)
+        # Other node types (if any) would be positioned with default indented X and sequential Y.
+        # elif not isinstance(node, (CommitNode, BranchNode, TagNode, GroupNode, RemoteNode)):
+        #    self.node_positions[node] = QPoint(display_x, display_y)
+        #    current_y_ref[0] += self.ROW_HEIGHT
+        #    for child_node in node.children: # Corrected variable name
+        #        self._calculate_label_positions_recursive(child_node, base_x_indent, current_y_ref, level + 1)
 
 
     def calculate_positions(self):
@@ -356,59 +384,141 @@ class CommitGraphView(QTreeWidget):
 
 
         # Step 2: Position commit dots
-        # Assumes self.commits_data is sorted (e.g., newest first for Y increasing downwards from top)
-        head_ref_name = self.raw_graph_data.get("head_ref", "") # e.g. "refs/heads/main"
-        current_commit_branch_name = ""
-        if head_ref_name.startswith("refs/heads/"):
-            current_commit_branch_name = head_ref_name[len("refs/heads/"):]
-        elif head_ref_name.startswith("refs/remotes/"): # "origin/main"
-            current_commit_branch_name = head_ref_name[len("refs/remotes/"):]
+        # Step 2: Position commit dots using topological sort for Y-coordinates
+        
+        # Build adjacency lists (children_map) and in_degrees
+        children_map: Dict[str, List[str]] = {commit_hash: [] for commit_hash in self.commit_nodes_map.keys()}
+        in_degree: Dict[str, int] = {commit_hash: 0 for commit_hash in self.commit_nodes_map.keys()}
+        
+        all_present_commit_hashes = set(self.commit_nodes_map.keys())
+
+        for commit_hash, commit_node in self.commit_nodes_map.items():
+            num_present_parents = 0
+            for parent_hash in commit_node.commit_data.get("parents", []):
+                if parent_hash in all_present_commit_hashes:
+                    children_map.setdefault(parent_hash, []).append(commit_hash)
+                    num_present_parents += 1
+            in_degree[commit_hash] = num_present_parents
+
+        # Initialize queue with root nodes (in_degree == 0)
+        # These are nodes without parents within the current commits_data set
+        current_level_queue: List[str] = [commit_hash for commit_hash, degree in in_degree.items() if degree == 0]
+        
+        commit_levels: Dict[str, int] = {}
+        level = 0
+        
+        processed_commits_count = 0
+        while current_level_queue:
+            next_level_queue: List[str] = []
+            for commit_hash_u in current_level_queue:
+                commit_levels[commit_hash_u] = level
+                processed_commits_count +=1
+                
+                for child_hash_v in children_map.get(commit_hash_u, []):
+                    in_degree[child_hash_v] -= 1
+                    if in_degree[child_hash_v] == 0:
+                        next_level_queue.append(child_hash_v)
+            
+            # For commits on the same level, sort them by original index (approximating date)
+            # to maintain some visual consistency if graph_data was date-sorted.
+            # This helps make layout more deterministic if multiple orders are possible.
+            original_indices = {chash: i for i, cdata in enumerate(self.commits_data) for chash in [cdata["hash"]]}
+            next_level_queue.sort(key=lambda ch: original_indices.get(ch, float('inf')))
+
+            current_level_queue = next_level_queue
+            level += 1
+        
+        if processed_commits_count < len(all_present_commit_hashes):
+            # This indicates a cycle in the graph or commits with missing (but expected) parents.
+            # Assign remaining commits to a default level or handle as an error.
+            # For now, assign them to a high level to make them visible.
+            print(f"Warning: Cycle detected or missing parents. {len(all_present_commit_hashes) - processed_commits_count} commits not leveled.")
+            for chash in all_present_commit_hashes:
+                if chash not in commit_levels:
+                    commit_levels[chash] = level # Place them at the next available level
+            level +=1
 
 
-        for idx, commit_data_item in enumerate(self.commits_data):
+        # Assign X and Y positions
+        
+        # Build a map of tip commit hashes to their branch names (keys from self.branch_x_lanes)
+        tip_commit_to_branch_names: Dict[str, List[str]] = {}
+        def _collect_branch_tips_recursive(node: NodeDescriptor):
+            if isinstance(node, BranchNode):
+                # node.branch_info.name is the key used in self.branch_x_lanes ("main" or "origin/main")
+                tip_hash = node.branch_info.commit_hash
+                tip_commit_to_branch_names.setdefault(tip_hash, []).append(node.branch_info.name)
+            for child_node in node.children: # Corrected variable name from child to child_node
+                _collect_branch_tips_recursive(child_node)
+
+        if self.root_node:
+            _collect_branch_tips_recursive(self.root_node)
+
+        head_ref_full = self.raw_graph_data.get("head_ref", "") # Full ref like "refs/heads/main"
+        # current_head_branch_key is the key for self.branch_x_lanes ("main" or "origin/main")
+        current_head_branch_key: Optional[str] = None
+        if head_ref_full.startswith("refs/heads/"):
+            current_head_branch_key = head_ref_full[len("refs/heads/"):]
+        elif head_ref_full.startswith("refs/remotes/"):
+            parts = head_ref_full.split('/', 3)
+            if len(parts) == 4: current_head_branch_key = f"{parts[2]}/{parts[3]}"
+
+
+        for commit_data_item in self.commits_data:
             commit_hash = commit_data_item["hash"]
-            y_pos = idx * self.ROW_HEIGHT + self.ROW_HEIGHT // 2
             
+            topo_level = commit_levels.get(commit_hash)
+            if topo_level is None: 
+                print(f"Warning: Commit {commit_hash} was not assigned a topological level.")
+                topo_level = level 
+            
+            y_pos = topo_level * self.ROW_HEIGHT + self.ROW_HEIGHT // 2
+            
+            # Refined X-coordinate assignment
+            commit_branch_full_refs = commit_data_item.get("branches", []) # Raw full refs
+            
+            # Convert full refs to keys used in self.branch_x_lanes ("main" or "origin/main")
+            commit_branch_keys: List[str] = []
+            for b_full_ref in commit_branch_full_refs:
+                if b_full_ref.startswith("refs/heads/"):
+                    commit_branch_keys.append(b_full_ref[len("refs/heads/"):])
+                elif b_full_ref.startswith("refs/remotes/"):
+                    parts = b_full_ref.split('/', 3)
+                    if len(parts) == 4: commit_branch_keys.append(f"{parts[2]}/{parts[3]}")
+            
+            owning_branch_name: Optional[str] = None
+
+            # Priority 1: Current HEAD branch if commit is on it
+            if current_head_branch_key and current_head_branch_key in commit_branch_keys:
+                owning_branch_name = current_head_branch_key
+            
+            # Priority 2: If commit is a tip of any branch(es)
+            if not owning_branch_name:
+                branches_where_this_is_tip = tip_commit_to_branch_names.get(commit_hash, [])
+                if branches_where_this_is_tip:
+                    # Sort by lane X to pick the leftmost if multiple
+                    branches_where_this_is_tip.sort(key=lambda bn: self.branch_x_lanes.get(bn, float('inf')))
+                    owning_branch_name = branches_where_this_is_tip[0]
+            
+            # Priority 3: Leftmost branch this commit is on (that has a lane)
+            if not owning_branch_name and commit_branch_keys:
+                valid_branches_with_lanes = [
+                    bn_key for bn_key in commit_branch_keys if bn_key in self.branch_x_lanes
+                ]
+                if valid_branches_with_lanes:
+                    valid_branches_with_lanes.sort(key=lambda bn_key: self.branch_x_lanes[bn_key])
+                    owning_branch_name = valid_branches_with_lanes[0]
+            
+            # Assign X
             assigned_x = self.COLUMN_WIDTH # Default X
-            
-            # Determine X based on branch lanes
-            commit_branches = commit_data_item.get("branches", [])
-            target_branch_name_for_lane = None
-
-            # Priority 1: Current active local branch if commit is on it
-            if current_commit_branch_name and current_commit_branch_name in commit_branches:
-                if current_commit_branch_name in self.branch_x_lanes:
-                    target_branch_name_for_lane = current_commit_branch_name
-            
-            # Priority 2: Other local branches
-            if not target_branch_name_for_lane:
-                for b_name in commit_branches:
-                    if not b_name.startswith("refs/remotes/") and b_name in self.branch_x_lanes:
-                        target_branch_name_for_lane = b_name
+            if owning_branch_name and owning_branch_name in self.branch_x_lanes:
+                assigned_x = self.branch_x_lanes[owning_branch_name]
+            elif commit_branch_keys: # Fallback to first known branch if owner logic fails
+                for bn_key in commit_branch_keys:
+                    if bn_key in self.branch_x_lanes:
+                        assigned_x = self.branch_x_lanes[bn_key]
                         break
             
-            # Priority 3: Remote branches
-            if not target_branch_name_for_lane:
-                for b_name in commit_branches: # These are full "refs/remotes/origin/main"
-                    # Convert to "origin/main" style key for branch_x_lanes
-                    simple_remote_branch_name = ""
-                    if b_name.startswith("refs/remotes/"):
-                        parts = b_name.split('/', 3) # refs/remotes/origin/main -> origin/main
-                        if len(parts) == 4 :
-                             simple_remote_branch_name = f"{parts[2]}/{parts[3]}"
-                    
-                    if simple_remote_branch_name and simple_remote_branch_name in self.branch_x_lanes:
-                        target_branch_name_for_lane = simple_remote_branch_name
-                        break
-            
-            if target_branch_name_for_lane:
-                assigned_x = self.branch_x_lanes[target_branch_name_for_lane]
-            else:
-                # Fallback if no lane assigned (e.g. detached HEAD or new branch not yet in tree)
-                # This might need a dynamic lane assignment strategy later.
-                # For now, use a default or increment a dynamic 'unknown' lane.
-                assigned_x = self.branch_x_lanes.get("master", self.COLUMN_WIDTH) # Default to master or first column
-
             self.commit_positions[commit_hash] = QPoint(assigned_x, y_pos)
             commit_node = self.commit_nodes_map.get(commit_hash)
             if commit_node:
