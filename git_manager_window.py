@@ -1,29 +1,22 @@
 import logging
 import os
 
-from PyQt6.QtCore import QEvent, QSize, Qt  # Added QEvent
-from PyQt6.QtGui import QAction, QColor, QGuiApplication, QIcon, QPainter, QPixmap
+from PyQt6.QtCore import QEvent, Qt  # Added QEvent
+from PyQt6.QtGui import QGuiApplication
 from PyQt6.QtWidgets import (
     QAbstractItemView,
-    QComboBox, # Keep QComboBox if other parts of the window use it, remove if only for branch_combo
     QDialog,
     QFileDialog,
     QHBoxLayout,
-    QLabel, # Keep QLabel if other parts of the window use it, remove if only for branch_label
     QMainWindow,
-    QMenu, # Keep QMenu if other parts of the window use it, remove if only for recent_menu
     QMessageBox,
-    QPushButton, # Keep QPushButton if other parts of the window use it, remove if only for open_button, commit_button
     QSplitter,
     QTabBar,
     QTabWidget,  # 添加 QTabWidget 导入
-    QToolButton, # Keep QToolButton if other parts of the window use it, remove if only for top bar buttons
-    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
-from top_bar_widget import TopBarWidget # Import TopBarWidget
 from commit_detail_view import CommitDetailView
 from commit_dialog import CommitDialog
 from commit_history_view import CommitHistoryView
@@ -33,6 +26,7 @@ from file_changes_view import FileChangesView
 from git_manager import GitManager
 from settings import Settings
 from settings_dialog import SettingsDialog
+from top_bar_widget import TopBarWidget  # Import TopBarWidget
 from workspace_explorer import WorkspaceExplorer
 
 
@@ -193,7 +187,7 @@ class GitManagerWindow(QMainWindow):
         # 从设置中恢复底部面板状态
         self.bottom_widget_visible = self.settings.settings.get("bottom_widget_visible", True)
         self.bottom_widget.setVisible(self.bottom_widget_visible)
-        if hasattr(self, 'top_bar'): # Ensure top_bar exists before calling its methods
+        if hasattr(self, "top_bar"):  # Ensure top_bar exists before calling its methods
             self.top_bar.update_toggle_button_icon(self.bottom_widget_visible)
 
         # 在初始化完成后,尝试打开上次的文件夹 (this will call update_branches_on_top_bar and update_recent_menu_on_top_bar)
@@ -202,14 +196,14 @@ class GitManagerWindow(QMainWindow):
             self.open_folder(last_folder)
         else:
             # If no last folder, still update top_bar for initial state (e.g. disabled buttons)
-            self.update_branches_on_top_bar() 
+            self.update_branches_on_top_bar()
             self.update_recent_menu_on_top_bar()
 
         # Final updates for initial state if not covered by open_folder
         self.update_recent_menu_on_top_bar()
         self.update_branches_on_top_bar()
-        if hasattr(self, 'top_bar'):
-             self.top_bar.update_toggle_button_icon(self.bottom_widget_visible)
+        if hasattr(self, "top_bar"):
+            self.top_bar.update_toggle_button_icon(self.bottom_widget_visible)
 
     def show_commit_dialog(self):
         """显示提交对话框"""
@@ -224,11 +218,11 @@ class GitManagerWindow(QMainWindow):
     #     """更新最近文件夹菜单 - This method is now in TopBarWidget"""
     #     # This method will now call self.top_bar.update_recent_menu()
     #     # with self.settings.get_recent_folders()
-    #     pass 
+    #     pass
 
     def update_recent_menu_on_top_bar(self):
         """Helper to update recent folders on TopBarWidget."""
-        if hasattr(self, 'top_bar'):
+        if hasattr(self, "top_bar"):
             recent_folders = self.settings.get_recent_folders()
             # Filter out non-existent folders before passing to top_bar
             valid_recent_folders = [f for f in recent_folders if os.path.exists(f)]
@@ -241,7 +235,6 @@ class GitManagerWindow(QMainWindow):
         self.settings.save_settings()
         # self.update_recent_menu() # Now call the TopBarWidget's method
         self.update_recent_menu_on_top_bar()
-
 
     def open_folder_dialog(self):
         """打开文件夹选择对话框"""
@@ -265,7 +258,7 @@ class GitManagerWindow(QMainWindow):
             # 更新UI
             # self.update_branches() # Now call the TopBarWidget's method
             self.update_branches_on_top_bar()
-            self.update_commit_history() # This updates the history view, not branches in top bar
+            self.update_commit_history()  # This updates the history view, not branches in top bar
 
             # 更新工作区浏览器
             self.workspace_explorer.set_workspace_path(folder_path)
@@ -275,8 +268,8 @@ class GitManagerWindow(QMainWindow):
         else:
             self.commit_history_view.history_list.clear()
             self.commit_history_view.history_list.addItem("所选文件夹不是有效的Git仓库")
-            if hasattr(self, 'top_bar'):
-                self.top_bar.set_buttons_enabled(False) # Disable buttons if repo init fails
+            if hasattr(self, "top_bar"):
+                self.top_bar.set_buttons_enabled(False)  # Disable buttons if repo init fails
 
     # def update_branches(self): # Partially removed/adapted
     #     """更新分支列表 - This method will now primarily fetch data and call TopBarWidget's update"""
@@ -286,56 +279,42 @@ class GitManagerWindow(QMainWindow):
 
     def update_branches_on_top_bar(self):
         """Fetches branch data and updates the TopBarWidget."""
-        if hasattr(self, 'top_bar'): # Ensure top_bar exists
-            if not self.git_manager or not self.git_manager.repo: # Check if git_manager and its repo are valid
+        if hasattr(self, "top_bar"):  # Ensure top_bar exists
+            if not self.git_manager or not self.git_manager.repo:  # Check if git_manager and its repo are valid
                 self.top_bar.update_branches([], None)
                 self.top_bar.set_buttons_enabled(False)
                 return
 
             branches = self.git_manager.get_branches()
             default_branch = self.git_manager.get_default_branch()
-            
+
             # Add "all" option. TopBarWidget's update_branches should handle its placement.
             # Ensure "all" is handled gracefully if it's not a real branch.
-            branches_for_combo = branches + ["all"] 
-            
+            branches_for_combo = branches + ["all"]
+
             self.top_bar.update_branches(branches_for_combo, default_branch)
             self.top_bar.set_buttons_enabled(True)
-
 
     def update_commit_history(self):
         """更新提交历史"""
         if not self.git_manager:
             return
 
-        current_branch = "" 
-        if hasattr(self, 'top_bar') and self.top_bar:
+        current_branch = ""
+        if hasattr(self, "top_bar") and self.top_bar:
             current_branch = self.top_bar.get_current_branch()
-        else: # Should not happen if top_bar is initialized correctly
+        else:  # Should not happen if top_bar is initialized correctly
             logging.warning("TopBar not available in update_commit_history")
             return
 
-
-        if current_branch == "all": # "all" might be a special value not directly from git branches
+        if current_branch == "all":  # "all" might be a special value not directly from git branches
             # Decide what "all" means, e.g., show history for the default branch or all branches if supported
             # For now, using 'main' as a placeholder if 'all' is selected,
             # this might need more sophisticated handling in GitManager or CommitHistoryView
-            self.commit_history_view.update_history(self.git_manager, "main") # Assuming "main" for "all"
+            self.commit_history_view.update_history(self.git_manager, "main")  # Assuming "main" for "all"
             self.commit_history_view.history_graph_list.show()
             self.commit_history_view.history_list.hide()
 
-            graph_data = self.git_manager.get_commit_graph("main", 500)
-
-            # 设置提交图数据
-            self.commit_history_view.history_graph_list.set_commit_data(graph_data)
-
-            # 添加提交信息到列表
-            for commit in graph_data["commits"]:
-                item = QTreeWidgetItem(self.commit_history_view.history_graph_list)
-                item.setText(1, commit["hash"][:7])
-                item.setText(2, commit["message"])
-                item.setText(3, commit["author"])
-                item.setText(4, commit["date"])
         else:
             self.commit_history_view.update_history(self.git_manager, current_branch)
             self.commit_history_view.history_graph_list.hide()
@@ -480,7 +459,7 @@ class GitManagerWindow(QMainWindow):
         """切换底部面板的显示状态"""
         self.bottom_widget_visible = not self.bottom_widget_visible
         self.bottom_widget.setVisible(self.bottom_widget_visible)
-        if hasattr(self, 'top_bar'):
+        if hasattr(self, "top_bar"):
             self.top_bar.update_toggle_button_icon(self.bottom_widget_visible)
 
         # 保存状态到设置
@@ -516,7 +495,7 @@ class GitManagerWindow(QMainWindow):
             return
         try:
             self.git_manager.push()
-            self.update_commit_history() # This updates the history view
+            self.update_commit_history()  # This updates the history view
         except:
             QMessageBox.critical(self, "错误", "推送仓库时发生错误")
             logging.exception("推送仓库时发生错误")

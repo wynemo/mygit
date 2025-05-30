@@ -68,61 +68,6 @@ class GitManager:
             print(f"获取提交历史失败: {e!s}")
             return []
 
-    def get_commit_graph(self, branch: str = "", limit: int = 50) -> dict:
-        """获取提交图数据"""
-        if not self.repo:
-            return {"commits": [], "branch_colors": {}}
-
-        try:
-            if not branch:
-                branch = self.repo.active_branch.name
-
-            # 获取所有分支名称和颜色映射
-            branches = {b.name: b for b in self.repo.branches}
-            colors = [
-                "#e11d21",
-                "#fbca04",
-                "#009800",
-                "#006b75",
-                "#207de5",
-                "#0052cc",
-                "#5319e7",
-            ]
-            branch_colors = {name: colors[idx % len(colors)] for idx, name in enumerate(branches)}
-
-            # 预先获取每个分支的所有提交
-            branch_commits = {}
-            for branch_name, branch_ref in branches.items():
-                # Rewrite generator as set comprehension
-                branch_commits[branch_name] = {commit.hexsha for commit in self.repo.iter_commits(branch_ref.name)}
-
-            commits = []
-            # 获取主分支的提交历史
-            for commit in self.repo.iter_commits(branch, max_count=limit):
-                # Check which branches this commit belongs to
-                commit_branches = [
-                    branch_name for branch_name, commit_set in branch_commits.items() if commit.hexsha in commit_set
-                ]
-
-                # Decode commit message assuming it might be bytes
-                message = commit.message.strip().split("\n")[0]
-
-                commits.append(
-                    {
-                        "hash": commit.hexsha,
-                        "message": message,
-                        "author": commit.author.name,
-                        "date": commit.committed_datetime.strftime("%Y-%m-%d %H:%M:%S"),
-                        "branches": commit_branches,
-                        "parents": [parent.hexsha for parent in commit.parents],
-                    }
-                )
-
-            return {"commits": commits, "branch_colors": branch_colors}
-        except Exception as e:
-            print(f"获取提交图失败: {e!s}")
-            return {"commits": [], "branch_colors": {}}
-
     def get_blame_data(self, file_path: str, commit_hash: str = "HEAD") -> List[dict]:
         """获取文件的blame信息"""
         if not self.repo:
