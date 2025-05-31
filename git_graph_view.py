@@ -126,7 +126,7 @@ class GitGraphView(QGraphicsView):
                     self._edge_items.append(edge)
 
         # Adjust scene rect after all items are added and positioned
-        self.scene.setSceneRect(self.scene.itemsBoundingRect().adjusted(-50, -50, 50, 50)) # Add some padding
+        self.scene.setSceneRect(self.scene.itemsBoundingRect().adjusted(0, -50, 50, 50)) # Add some padding
 
     def load_repository(self, repo_path: str = "."):
         """High-level method to parse, layout, and display a repository's graph."""
