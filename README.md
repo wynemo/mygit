@@ -124,3 +124,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 43. ~~text_edit.py/FindDialog 换成浮动的widget, 查找的过程浮动在 SyncedTextEdit 之上，然后SyncedTextEdit不会失焦~~
 44. ~~git push以后，需要更新分支的remote提示~~
 45. ~~SyncedTextEdit 字体大小是硬编码的~~
+46. 比较页面，也需要有代码语法高亮的支持
