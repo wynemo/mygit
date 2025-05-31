@@ -43,10 +43,11 @@ class GitGraphView(QGraphicsView):
 
         # First pass: Create all commit circles and reference labels
         for commit_node in commits:
-            # Create CommitCircle
-            # Use commit_node.color_idx for the color palette index
-            color = COLOR_PALETTE[commit_node.color_idx % len(COLOR_PALETTE)]
-            commit_item = CommitCircle(commit_node, color_idx=commit_node.color_idx)
+            # Determine the color index to use for the commit circle
+            final_color_idx_for_circle = commit_node.branch_color_idx if commit_node.branch_color_idx is not None else commit_node.color_idx
+            # color = COLOR_PALETTE[final_color_idx_for_circle % len(COLOR_PALETTE)] # This line is not directly used for CommitCircle constructor
+
+            commit_item = CommitCircle(commit_node, color_idx=final_color_idx_for_circle)
             commit_item.setPos(commit_node.x, commit_node.y)
             self.scene.addItem(commit_item)
             self._commit_items[commit_node.sha] = commit_item
@@ -109,7 +110,10 @@ class GitGraphView(QGraphicsView):
                 continue # Should not happen if first pass was successful
 
             current_commit_item = self._commit_items[commit_node.sha]
-            edge_color = COLOR_PALETTE[commit_node.color_idx % len(COLOR_PALETTE)]
+
+            # Determine the color for edges leading to this commit_node
+            final_color_idx_for_edge = commit_node.branch_color_idx if commit_node.branch_color_idx is not None else commit_node.color_idx
+            edge_color_for_commit = COLOR_PALETTE[final_color_idx_for_edge % len(COLOR_PALETTE)]
 
             for parent_sha in commit_node.parents:
                 if parent_sha in self._commit_items:
@@ -117,7 +121,7 @@ class GitGraphView(QGraphicsView):
 
                     # Edge color can be from child (commit_node) or parent.
                     # Using child's color for the incoming edge is common.
-                    edge = EdgeLine(parent_commit_item, current_commit_item, color=edge_color)
+                    edge = EdgeLine(parent_commit_item, current_commit_item, color=edge_color_for_commit)
                     self.scene.addItem(edge)
                     self._edge_items.append(edge)
 

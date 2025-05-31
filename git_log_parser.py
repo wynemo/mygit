@@ -41,30 +41,61 @@ def _parse_references(raw_refs_str: str) -> list[str]:
 
 def parse_git_log(repo_path: str = ".") -> list[CommitNode]:
     """
-    Fetches git log from the specified repository path and parses it into CommitNode objects.
+    Fetches git log from the specified repository path (for HEAD and merged branches)
+    and parses it into CommitNode objects.
     """
+    try:
+        # Ensure the repo_path is a valid git directory
+        subprocess.run(["git", "-C", repo_path, "rev-parse", "--is-inside-work-tree"],
+                       check=True, capture_output=True, text=True, encoding='utf-8')
+
+        # Get HEAD commit SHA to ensure repo is not empty and HEAD exists
+        subprocess.run(["git", "-C", repo_path, "rev-parse", "HEAD"],
+                               check=True, capture_output=True, text=True, encoding='utf-8')
+    except subprocess.CalledProcessError as e:
+        # Likely an empty repo or not a git repo
+        # print(f"Error initial git check (rev-parse HEAD or is-inside-work-tree): {e.stderr}")
+        return []
+    except FileNotFoundError:
+        print("Git command not found. Please ensure Git is installed and in your PATH.")
+        return []
+
+    commit_sources = {"HEAD"} # Start with HEAD symbolic reference
+
+    try:
+        merged_branches_result = subprocess.run(
+            ["git", "-C", repo_path, "branch", "--merged", "HEAD"],
+            check=True, capture_output=True, text=True, encoding='utf-8'
+        )
+        merged_branches_raw = merged_branches_result.stdout.splitlines()
+
+        for line in merged_branches_raw:
+            branch_name = line.strip()
+            if branch_name.startswith("* "): # Current branch, already covered by "HEAD"
+                continue
+            if branch_name and branch_name != "(no branch)" and not branch_name.startswith("(HEAD detached at"):
+                commit_sources.add(branch_name) # Add other merged branch names
+
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: Could not get list of merged branches: {e.stderr}. Graph will be based on HEAD's history only.")
+        # commit_sources remains {"HEAD"}
+
     git_log_command = [
         "git",
         "log",
-        "--all",
-        "--date=iso-strict", # Consistent date format
+        "--date=iso-strict",
         f"--pretty=format:{GIT_LOG_FORMAT}",
-    ]
+        "--topo-order", # Ensure consistent topological order
+    ] + list(commit_sources)
 
     try:
-        # Ensure the repo_path is a valid git directory by running a benign command first
-        subprocess.run(["git", "-C", repo_path, "rev-parse", "--is-inside-work-tree"],
-                       check=True, capture_output=True, text=True)
-
         result = subprocess.run(git_log_command, cwd=repo_path, check=True, capture_output=True, text=True, encoding='utf-8')
         log_output = result.stdout
     except subprocess.CalledProcessError as e:
         print(f"Error executing git log: {e}")
         print(f"Stderr: {e.stderr}")
         return []
-    except FileNotFoundError:
-        print("Git command not found. Please ensure Git is installed and in your PATH.")
-        return []
+    # FileNotFoundError already handled by initial checks
 
     commits_map: dict[str, CommitNode] = {}
     commit_list_ordered: list[CommitNode] = [] # To maintain the order from git log (generally topo)

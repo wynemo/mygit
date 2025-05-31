@@ -11,6 +11,7 @@ class CommitNode:
         self.author_date: str = author_date
         self.references: list[str] = []  # e.g., ['HEAD -> main', 'origin/main', 'refs/tags/v1.0']
         self.is_on_mainline: bool = False # New attribute
+        self.branch_color_idx: int | None = None
 
         # Layout-related attributes, to be filled by the layout algorithm
         self.x: float = 0.0
@@ -25,7 +26,9 @@ class CommitNode:
                 f"references={self.references}, "
                 f"message='{self.message[:20]}...', "
                 f"mainline={self.is_on_mainline}, "
-                f"column={self.column}, y={self.y})")
+                f"column={self.column}, y={self.y}, "
+                f"color_idx={self.color_idx}, "
+                f"branch_color_idx={self.branch_color_idx})")
 
 if __name__ == '__main__':
     # Example Usage (optional, for testing the data structure)
