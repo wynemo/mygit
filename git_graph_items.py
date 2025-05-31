@@ -1,8 +1,8 @@
 # git_graph_items.py
 
-from PyQt5.QtWidgets import QGraphicsEllipseItem, QGraphicsPathItem, QGraphicsTextItem, QGraphicsItem
-from PyQt5.QtGui import QBrush, QPen, QColor, QPainterPath, QFont
-from PyQt5.QtCore import Qt, QRectF
+from PyQt6.QtWidgets import QGraphicsEllipseItem, QGraphicsPathItem, QGraphicsTextItem, QGraphicsItem
+from PyQt6.QtGui import QBrush, QPen, QColor, QPainterPath, QFont
+from PyQt6.QtCore import Qt, QRectF
 
 from git_graph_data import CommitNode # Assuming git_graph_data.py is available
 
@@ -17,26 +17,26 @@ COLOR_PALETTE = [
     QColor("#9467bd"), QColor("#8c564b"), QColor("#e377c2"), QColor("#7f7f7f"),
     QColor("#bcbd22"), QColor("#17becf")
 ]
-DEFAULT_COMMIT_COLOR = QColor(Qt.gray)
-SELECTED_COMMIT_COLOR = QColor(Qt.yellow)
-HOVER_COMMIT_COLOR = QColor(Qt.lightGray)
+DEFAULT_COMMIT_COLOR = QColor(Qt.GlobalColor.gray)
+SELECTED_COMMIT_COLOR = QColor(Qt.GlobalColor.yellow)
+HOVER_COMMIT_COLOR = QColor(Qt.GlobalColor.lightGray)
 
-DEFAULT_EDGE_COLOR = QColor(Qt.darkGray)
+DEFAULT_EDGE_COLOR = QColor(Qt.GlobalColor.darkGray)
 EDGE_THICKNESS = 1.5
 
 REF_PADDING_X = 4
 REF_PADDING_Y = 2
 REF_BACKGROUND_COLOR_BRANCH = QColor("#e6f7ff") # Light blue
 REF_BORDER_COLOR_BRANCH = QColor("#91d5ff")
-REF_TEXT_COLOR_BRANCH = QColor(Qt.black)
+REF_TEXT_COLOR_BRANCH = QColor(Qt.GlobalColor.black)
 
 REF_BACKGROUND_COLOR_TAG = QColor("#fffbe6") # Light yellow
 REF_BORDER_COLOR_TAG = QColor("#ffe58f")
-REF_TEXT_COLOR_TAG = QColor(Qt.black)
+REF_TEXT_COLOR_TAG = QColor(Qt.GlobalColor.black)
 
 REF_BACKGROUND_COLOR_HEAD = QColor("#f6ffed") # Light green
 REF_BORDER_COLOR_HEAD = QColor("#b7eb8f")
-REF_TEXT_COLOR_HEAD = QColor(Qt.black)
+REF_TEXT_COLOR_HEAD = QColor(Qt.GlobalColor.black)
 
 
 class CommitCircle(QGraphicsEllipseItem):
@@ -46,12 +46,12 @@ class CommitCircle(QGraphicsEllipseItem):
         self.base_color = COLOR_PALETTE[color_idx % len(COLOR_PALETTE)]
         self.current_brush_color = self.base_color
 
-        self.setFlag(QGraphicsItem.ItemIsSelectable, True)
-        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True) # For updates if needed
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True) # For updates if needed
         self.setAcceptHoverEvents(True)
 
         self.setBrush(QBrush(self.base_color))
-        self.setPen(QPen(Qt.black, 1))
+        self.setPen(QPen(Qt.GlobalColor.black, 1))
 
         tooltip_text = (
             f"SHA: {self.commit_node.sha}\n"
@@ -62,7 +62,7 @@ class CommitCircle(QGraphicsEllipseItem):
         self.setToolTip(tooltip_text)
 
     def itemChange(self, change, value):
-        if change == QGraphicsItem.ItemSelectedChange:
+        if change == QGraphicsItem.GraphicsItemChange.ItemSelectedChange:
             if value: # Selected
                 self.current_brush_color = SELECTED_COMMIT_COLOR
             else: # Deselected
@@ -90,7 +90,7 @@ class EdgeLine(QGraphicsPathItem):
         self.end_item = end_item
         self.line_color = color
 
-        self.setPen(QPen(self.line_color, EDGE_THICKNESS, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+        self.setPen(QPen(self.line_color, EDGE_THICKNESS, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
         self.setZValue(-1) # Draw edges behind commits
 
         self.update_path()

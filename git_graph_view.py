@@ -1,8 +1,8 @@
 # git_graph_view.py
 
-from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QApplication, QGraphicsItem
-from PyQt5.QtGui import QPainter, QTransform, QColor
-from PyQt5.QtCore import Qt, QRectF
+from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QApplication, QGraphicsItem
+from PyQt6.QtGui import QPainter, QTransform, QColor
+from PyQt6.QtCore import Qt, QRectF
 
 from git_graph_data import CommitNode
 from git_graph_items import CommitCircle, EdgeLine, ReferenceLabel, COLOR_PALETTE, COMMIT_RADIUS
@@ -15,9 +15,9 @@ class GitGraphView(QGraphicsView):
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
 
-        self.setRenderHint(QPainter.Antialiasing)
-        self.setDragMode(QGraphicsView.ScrollHandDrag) # Enable panning
-        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse) # Zoom towards mouse
+        self.setRenderHint(QPainter.RenderHint.Antialiasing)
+        self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag) # Enable panning
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse) # Zoom towards mouse
 
         self._commit_items: dict[str, CommitCircle] = {}
         self._edge_items: list[EdgeLine] = []
@@ -102,7 +102,7 @@ class GitGraphView(QGraphicsView):
     def wheelEvent(self, event):
         """Handle mouse wheel events for zooming."""
         # Check if Ctrl is pressed for zooming, otherwise default scroll behavior
-        if event.modifiers() & Qt.ControlModifier:
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             if event.angleDelta().y() > 0:
                 self.zoom_in()
             else:
@@ -119,11 +119,11 @@ class GitGraphView(QGraphicsView):
 
     def keyPressEvent(self, event):
         """Handle key presses for zooming or other actions."""
-        if event.key() == Qt.Key_Plus or event.key() == Qt.Key_Equal:
-            if event.modifiers() & Qt.ControlModifier: # Ctrl + / Ctrl =
+        if event.key() == Qt.Key.Key_Plus or event.key() == Qt.Key.Key_Equal:
+            if event.modifiers() & Qt.KeyboardModifier.ControlModifier: # Ctrl + / Ctrl =
                  self.zoom_in()
-        elif event.key() == Qt.Key_Minus:
-            if event.modifiers() & Qt.ControlModifier: # Ctrl -
+        elif event.key() == Qt.Key.Key_Minus:
+            if event.modifiers() & Qt.KeyboardModifier.ControlModifier: # Ctrl -
                 self.zoom_out()
         else:
             super().keyPressEvent(event)
@@ -217,4 +217,4 @@ if __name__ == '__main__':
     view.resize(800, 600)
     view.show()
 
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
