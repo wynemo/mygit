@@ -38,6 +38,12 @@ REF_BACKGROUND_COLOR_HEAD = QColor("#f6ffed") # Light green
 REF_BORDER_COLOR_HEAD = QColor("#b7eb8f")
 REF_TEXT_COLOR_HEAD = QColor(Qt.GlobalColor.black)
 
+# Configuration for CommitMessageItem
+COMMIT_MSG_MAX_LENGTH = 60
+COMMIT_MSG_COLOR = QColor("#444444") # Dark gray for commit messages
+COMMIT_MSG_FONT_FAMILY = "Arial"
+COMMIT_MSG_FONT_SIZE = 9
+
 
 class CommitCircle(QGraphicsEllipseItem):
     def __init__(self, commit_node: CommitNode, color_idx: int = 0, parent: QGraphicsItem = None):
@@ -157,6 +163,29 @@ class ReferenceLabel(QGraphicsTextItem):
         rect = super().boundingRect()
         rect.adjust(-REF_PADDING_X, -REF_PADDING_Y, REF_PADDING_X, REF_PADDING_Y)
         return rect
+
+
+class CommitMessageItem(QGraphicsTextItem):
+    def __init__(self, full_message: str, parent: QGraphicsItem = None):
+        super().__init__(parent)
+
+        self.full_message = full_message # Store original for potential future use
+
+        # Truncate message for display
+        if len(full_message) > COMMIT_MSG_MAX_LENGTH:
+            display_text = full_message[:COMMIT_MSG_MAX_LENGTH - 3] + "..."
+        else:
+            display_text = full_message
+
+        self.setPlainText(display_text)
+
+        font = QFont(COMMIT_MSG_FONT_FAMILY, COMMIT_MSG_FONT_SIZE)
+        self.setFont(font)
+        self.setDefaultTextColor(COMMIT_MSG_COLOR)
+
+        # Basic tooltip showing the full message if it was truncated
+        if display_text != full_message:
+            self.setToolTip(f"Full message: {full_message}")
 
 
 if __name__ == '__main__':

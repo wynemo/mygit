@@ -5,7 +5,7 @@ from PyQt6.QtGui import QPainter, QTransform, QColor
 from PyQt6.QtCore import Qt, QRectF
 
 from git_graph_data import CommitNode
-from git_graph_items import CommitCircle, EdgeLine, ReferenceLabel, COLOR_PALETTE, COMMIT_RADIUS
+from git_graph_items import CommitCircle, EdgeLine, ReferenceLabel, CommitMessageItem, COLOR_PALETTE, COMMIT_RADIUS, REF_PADDING_X
 from git_log_parser import parse_git_log
 from git_graph_layout import calculate_commit_positions
 
@@ -22,6 +22,7 @@ class GitGraphView(QGraphicsView):
         self._commit_items: dict[str, CommitCircle] = {}
         self._edge_items: list[EdgeLine] = []
         self._ref_labels: list[ReferenceLabel] = []
+        self._message_items: list[CommitMessageItem] = []
 
         self._zoom_factor_base = 1.1 # Base factor for zooming
 
@@ -30,6 +31,7 @@ class GitGraphView(QGraphicsView):
         self._commit_items.clear()
         self._edge_items.clear()
         self._ref_labels.clear()
+        self._message_items.clear()
 
     def populate_graph(self, commits: list[CommitNode]):
         self.clear_graph()
@@ -49,23 +51,57 @@ class GitGraphView(QGraphicsView):
             self.scene.addItem(commit_item)
             self._commit_items[commit_node.sha] = commit_item
 
-            # Create ReferenceLabels (basic positioning, might overlap if many)
-            ref_y_offset = -COMMIT_RADIUS - 5 # Start above the commit circle
+            # --- ReferenceLabel creation and positioning ---
+            # Store reference labels for current commit to calculate their collective extent
+            current_commit_ref_labels = []
+            ref_y_offset = -COMMIT_RADIUS - 5
+
+            # Determine the starting x-position for reference labels.
+            # REF_PADDING_X is typically 4 or 5.
+            base_x_for_labels_and_msg = commit_node.x + COMMIT_RADIUS + REF_PADDING_X
+
+            max_ref_label_actual_width = 0 # The drawn width of the widest label
+
             for ref_text in commit_node.references:
                 is_head = "HEAD" in ref_text
-                is_tag = "tag:" in ref_text # Simple check
+                is_tag = "tag:" in ref_text
 
                 ref_label = ReferenceLabel(ref_text, commit_item, is_head=is_head, is_tag=is_tag)
 
-                # Adjust position of ReferenceLabel relative to its CommitCircle item
-                # This uses the CommitCircle's current scene position
-                label_x = commit_node.x + COMMIT_RADIUS + 5 # To the right
-                label_y = commit_node.y + ref_y_offset
-                ref_label.setPos(label_x, label_y)
+                # Position the reference label. They stack vertically.
+                # All ref labels for a commit will share the same X starting point.
+                ref_label.setPos(base_x_for_labels_and_msg, commit_node.y + ref_y_offset)
 
                 self.scene.addItem(ref_label)
-                self._ref_labels.append(ref_label)
-                ref_y_offset -= ref_label.boundingRect().height() # Stack them upwards
+                self._ref_labels.append(ref_label) # Keep flat list as before for general management
+                current_commit_ref_labels.append(ref_label) # For positioning message item
+
+                # Update max_ref_label_actual_width based on this label's drawn width
+                # Note: boundingRect for ReferenceLabel includes its internal padding.
+                if ref_label.boundingRect().width() > max_ref_label_actual_width:
+                    max_ref_label_actual_width = ref_label.boundingRect().width()
+
+                ref_y_offset -= ref_label.boundingRect().height() + 2 # Stack them upwards
+
+            # --- CommitMessageItem creation and positioning ---
+            # Position the message item to the right of all reference labels for this commit.
+            # If there were reference labels, message_x_start is after them.
+            # If no reference labels, message_x_start is just after the commit circle.
+
+            message_x_start = base_x_for_labels_and_msg
+            if max_ref_label_actual_width > 0:
+                message_x_start += max_ref_label_actual_width + REF_PADDING_X # Add padding after the widest label
+
+            commit_msg_item = CommitMessageItem(commit_node.message, parent=None) # Or parent=commit_item
+
+            # Vertically center the message item with the commit circle
+            msg_item_height = commit_msg_item.boundingRect().height()
+            commit_msg_item.setPos(
+                message_x_start,
+                commit_node.y - msg_item_height / 2
+            )
+            self.scene.addItem(commit_msg_item)
+            self._message_items.append(commit_msg_item)
 
         # Second pass: Create edges
         for commit_node in commits:
