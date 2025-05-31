@@ -70,7 +70,7 @@ def calculate_commit_positions(commits: list[CommitNode]):
                 if ref_name_part == head_target_branch_name or ref == f"refs/heads/{head_target_branch_name}":
                     mainline_tip_sha = commit_node.sha
                     break
-            if mainline_tip_sha and commits_map[mainline_tip_sha].references  # ensure it's a branch tip
+            if mainline_tip_sha and commits_map[mainline_tip_sha].references:  # ensure it's a branch tip
                and any(r == head_target_branch_name or r == f"refs/heads/{head_target_branch_name}" for r in commits_map[mainline_tip_sha].references):
                 break # Found the actual tip of the branch HEAD was pointing to
         if not mainline_tip_sha : # fallback if loop above didnt find a better one.
