@@ -2,7 +2,7 @@
 
 from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QApplication, QGraphicsItem
 from PyQt6.QtGui import QPainter, QTransform, QColor
-from PyQt6.QtCore import Qt, QRectF
+from PyQt6.QtCore import pyqtSignal, Qt, QRectF
 
 from git_graph_data import CommitNode
 from git_graph_items import CommitCircle, EdgeLine, ReferenceLabel, CommitMessageItem, COLOR_PALETTE, COMMIT_RADIUS, REF_PADDING_X
@@ -10,6 +10,7 @@ from git_log_parser import parse_git_log
 from git_graph_layout import calculate_commit_positions
 
 class GitGraphView(QGraphicsView):
+    commit_item_clicked = pyqtSignal(str)
     def __init__(self, parent=None):
         super().__init__(parent)
         self.scene = QGraphicsScene(self)
@@ -167,6 +168,16 @@ class GitGraphView(QGraphicsView):
                 self.zoom_out()
         else:
             super().keyPressEvent(event)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            item = self.itemAt(event.pos())
+            if isinstance(item, CommitCircle):
+                commit_sha = item.commit_node.sha
+                self.commit_item_clicked.emit(commit_sha)
+                # event.accept() # Optionally accept the event if it's fully handled
+                # return # Return if you don't want further processing
+        super().mousePressEvent(event) # Call super for other event processing (like panning)
 
 
 if __name__ == '__main__':

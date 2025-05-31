@@ -64,7 +64,7 @@ class CommitHistoryView(QWidget):
         self.history_graph_list = GitGraphView()
         self.history_graph_list.load_repository(".")
         # self.history_graph_list.setHeaderLabels(["提交图", "提交ID", "提交信息", "作者", "日期"])
-        # self.history_graph_list.itemClicked.connect(self.on_commit_clicked)
+        self.history_graph_list.commit_item_clicked.connect(self.on_commit_clicked)
         layout.addWidget(self.history_graph_list)
 
         self.history_graph_list.hide()  # 默认隐藏
@@ -136,10 +136,25 @@ class CommitHistoryView(QWidget):
             print("滚动到底部, 自动加载更多...")  # cursor生成
             self.load_more_commits()
 
-    def on_commit_clicked(self, item):
+    def on_commit_clicked(self, item_or_sha):
         """当点击提交时发出信号"""
-        commit_hash = item.text(0) or item.text(1)
-        self.commit_selected.emit(commit_hash)
+        commit_hash = ""
+        if isinstance(item_or_sha, QTreeWidgetItem):
+            # Clicked from the QTreeWidget (history_list)
+            # The first column (index 0) is the commit hash (shortened)
+            # The second column (index 1) also could be used if the first is empty,
+            # but typically the short hash is in column 0.
+            commit_hash = item_or_sha.text(0)
+        elif isinstance(item_or_sha, str):
+            # Clicked from the GitGraphView (history_graph_list)
+            # The argument is already the commit SHA (full or short)
+            commit_hash = item_or_sha
+
+        if commit_hash: # Ensure we have a hash before emitting
+            self.commit_selected.emit(commit_hash)
+        else:
+            # Optional: Handle cases where commit_hash couldn't be determined
+            print(f"Warning: Could not determine commit hash from item: {item_or_sha}")
 
     def on_current_item_changed(self, current: QTreeWidgetItem, previous: QTreeWidgetItem):
         if current:
