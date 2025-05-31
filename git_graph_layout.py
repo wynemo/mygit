@@ -22,8 +22,85 @@ def calculate_commit_positions(commits: list[CommitNode]):
 
     commits_map = {c.sha: c for c in commits}
 
+    # Initialize is_on_mainline for all commits
+    for commit in commits:
+        commit.is_on_mainline = False
+
+    # --- Mainline Identification Logic ---
+    preferred_mainline_names = ['main', 'master']
+    mainline_tip_sha = None
+
+    # Try to find HEAD and its target branch first
+    head_ref_commit_sha = None
+    head_target_branch_name = None
+
+    for commit_node in commits: # Newest first
+        for ref in commit_node.references:
+            if ref.startswith("HEAD -> "):
+                head_target_branch_name = ref.split("HEAD -> ")[1].strip()
+                head_ref_commit_sha = commit_node.sha # This commit is where HEAD points
+                break
+        if head_target_branch_name:
+            break
+
+    # 1. Check preferred mainline names if HEAD points to one of them
+    if head_target_branch_name and head_target_branch_name in preferred_mainline_names:
+        mainline_tip_sha = head_ref_commit_sha
+
+    # 2. If not, check other preferred mainline names (e.g. main or master might exist even if HEAD is elsewhere)
+    if not mainline_tip_sha:
+        for commit_node in commits: # Newest first
+            for ref in commit_node.references:
+                ref_name_part = ref.split("tag: ", 1)[-1] # Get ref name, strip "tag: " if present
+                if ref_name_part in preferred_mainline_names or \
+                   any(f"refs/heads/{name}" == ref_name_part for name in preferred_mainline_names):
+                    mainline_tip_sha = commit_node.sha
+                    break
+            if mainline_tip_sha:
+                break
+
+    # 3. If still no mainline tip from preferred names, use the branch HEAD points to (if any)
+    if not mainline_tip_sha and head_ref_commit_sha and head_target_branch_name:
+        # We need the actual tip of head_target_branch_name, which might be newer than head_ref_commit_sha
+        # if HEAD was checked out earlier and not at the tip.
+        # Iterate again to find the commit that *is* the tip of head_target_branch_name
+        for commit_node in commits:
+            for ref in commit_node.references:
+                ref_name_part = ref.split("tag: ", 1)[-1]
+                if ref_name_part == head_target_branch_name or ref == f"refs/heads/{head_target_branch_name}":
+                    mainline_tip_sha = commit_node.sha
+                    break
+            if mainline_tip_sha and commits_map[mainline_tip_sha].references  # ensure it's a branch tip
+               and any(r == head_target_branch_name or r == f"refs/heads/{head_target_branch_name}" for r in commits_map[mainline_tip_sha].references):
+                break # Found the actual tip of the branch HEAD was pointing to
+        if not mainline_tip_sha : # fallback if loop above didnt find a better one.
+             mainline_tip_sha = head_ref_commit_sha
+
+
+    # 4. If no mainline tip from branch names, and HEAD is detached, use the commit HEAD points to
+    if not mainline_tip_sha and head_ref_commit_sha and "HEAD" in commits_map[head_ref_commit_sha].references and not head_target_branch_name: # Detached HEAD
+        mainline_tip_sha = head_ref_commit_sha
+
+    # Traverse up from mainline_tip_sha setting is_on_mainline
+    if mainline_tip_sha and mainline_tip_sha in commits_map:
+        current_sha = mainline_tip_sha
+        while current_sha:
+            commit = commits_map[current_sha]
+            commit.is_on_mainline = True
+            if commit.parents:
+                # Follow first parent for mainline path
+                # Check if parent is in the current list of commits
+                if commit.parents[0] in commits_map:
+                    current_sha = commit.parents[0]
+                else: # Parent not in map (e.g. shallow clone)
+                    current_sha = None
+            else:
+                current_sha = None
+    # --- End Mainline Identification ---
+
     # `lane_occupied_until_y` tracks how far down a column (lane) is occupied by a branch segment.
-    # Key: column index, Value: y-coordinate until which this lane is considered "busy".
+    # Key: column index, Value: y-coordinate (newest commit y in that lane).
+    # Key: column index, Value: y-coordinate (newest commit y in that lane).
     # This helps in deciding if a new branch needs to find a new lane or can reuse one.
     lane_occupied_until_y: dict[int, float] = {}
 
@@ -32,112 +109,101 @@ def calculate_commit_positions(commits: list[CommitNode]):
     lane_colors: dict[int, int] = {}
 
     next_global_color_idx = 0
+    mainline_col = 0
+    # Assign mainline_color_idx based on the first color or a specific choice
+    mainline_color_idx = 0 if COLOR_PALETTE else 0
 
-    # Assign Y coordinates and perform initial column/color assignment.
-    # Commits are processed from newest to oldest (as per typical git log --all order).
+
+    # Assign Y coordinates and perform column/color assignment.
+    # Commits are processed from newest to oldest.
     for i, commit_node in enumerate(commits):
         commit_node.y = i * LAYOUT_VERTICAL_SPACING
-
         parent_nodes = [commits_map[p_sha] for p_sha in commit_node.parents if p_sha in commits_map]
-        parent_nodes.sort(key=lambda p: p.y) # Oldest parent first
+        # Sort parents: mainline parent first (if any), then by y-coordinate (newest first)
+        parent_nodes.sort(key=lambda p: (not p.is_on_mainline, p.y))
 
-        if not parent_nodes:
-            # Root commit (or oldest in the current log view)
-            # Place in the first available column.
-            col = 0
-            while lane_occupied_until_y.get(col, -1) >= commit_node.y:
-                col += 1
 
-            commit_node.column = col
-            commit_node.color_idx = lane_colors.get(col)
-            if commit_node.color_idx is None:
-                commit_node.color_idx = next_global_color_idx
-                next_global_color_idx = (next_global_color_idx + 1) % len(COLOR_PALETTE)
-            lane_colors[col] = commit_node.color_idx
+        if commit_node.is_on_mainline:
+            commit_node.column = mainline_col
+            commit_node.color_idx = mainline_color_idx
+            lane_colors[mainline_col] = mainline_color_idx
+        else:
+            # This commit is NOT on the identified mainline
+            assigned_col = False
+            if parent_nodes:
+                first_parent = parent_nodes[0] # Primary parent to consider for lane continuation
 
-        elif len(parent_nodes) == 1:
-            # Single parent: try to follow parent's lane and color.
-            parent = parent_nodes[0]
-            commit_node.column = parent.column
-            commit_node.color_idx = parent.color_idx # Inherit color
+                if first_parent.is_on_mainline:
+                    # Branching directly from mainline
+                    commit_node.color_idx = (mainline_color_idx + 1 + next_global_color_idx) % len(COLOR_PALETTE)
+                    next_global_color_idx = (next_global_color_idx + 1) % (len(COLOR_PALETTE) -1 if len(COLOR_PALETTE) > 1 else 1) # ensure it cycles through non-mainline colors
+                    if next_global_color_idx == mainline_color_idx and len(COLOR_PALETTE) > 1: # Avoid reusing mainline color immediately
+                         next_global_color_idx = (next_global_color_idx + 1) % len(COLOR_PALETTE)
 
-            # Check if this commit is starting a new branch relative to its parent's other children.
-            # If the parent has multiple children, and this commit is not the "primary" one
-            # (primary assumed to be the one that continues the lane, often the one with smallest y diff or processed first),
-            # then this commit might need a new lane.
 
-            # A simple heuristic: if parent's lane is already taken by another child of the same parent
-            # that is *newer* than this commit, then this commit needs a new lane.
-            # This means we need to know the layout of newer items first.
-            # The current loop (newest to oldest) helps here.
+                    # Find a new column to the right of mainline (simplification)
+                    new_col = mainline_col + 1
+                    while lane_occupied_until_y.get(new_col, -1) >= commit_node.y :
+                        new_col += 1
+                    commit_node.column = new_col
+                    assigned_col = True
+                else:
+                    # Continuing an existing non-mainline branch
+                    commit_node.column = first_parent.column
+                    commit_node.color_idx = first_parent.color_idx # Inherit color
 
-            # If this commit's chosen column is already occupied by a line segment that isn't its direct parent's,
-            # or if the parent has other children that are "straighter" in this lane, find a new column.
-            is_branching_off = False
-            if len(parent.children) > 1:
-                # Find this commit in parent's children list (mapped to nodes)
-                parent_children_nodes = sorted(
-                    [commits_map[c_sha] for c_sha in parent.children if c_sha in commits_map],
-                    key=lambda c: c.y # Sort children by y (newest first)
-                )
-                if parent_children_nodes and commit_node.sha != parent_children_nodes[0].sha:
-                    # This is not the first (newest) child, so it's a branch-off.
-                    is_branching_off = True
+                    # Check if this lane is already occupied by a newer commit from a different branch,
+                    # or if this commit is a secondary branch from its non-mainline parent.
+                    is_secondary_branch = False
+                    if len(first_parent.children) > 1:
+                        parent_children_nodes = sorted(
+                            [commits_map[c_sha] for c_sha in first_parent.children if c_sha in commits_map],
+                            key=lambda c: c.y # Newest first
+                        )
+                        if parent_children_nodes and commit_node.sha != parent_children_nodes[0].sha:
+                            is_secondary_branch = True
 
-            current_occupant_y = lane_occupied_until_y.get(commit_node.column, -1)
-            # If column is busy *at or above* parent's Y, AND it's not parent itself, or if it's a clear branch-off:
-            if is_branching_off or \
-                (current_occupant_y >= parent.y and current_occupant_y != parent.y ) : # Simplified check
-                # Need a new column for this branch
-                new_col = commit_node.column + 1 # Try right first
+                    current_occupant_y = lane_occupied_until_y.get(commit_node.column, -1)
+                    if is_secondary_branch or \
+                       (current_occupant_y >= commit_node.y and current_occupant_y != first_parent.y and commits_map.get(current_occupant_y_sha_placeholder, {}).get('column') == commit_node.column) : # Placeholder for actual check
+                        # Lane taken or secondary branch, find new column
+                        new_col = commit_node.column + 1
+                        while lane_occupied_until_y.get(new_col, -1) >= commit_node.y or new_col == mainline_col:
+                            new_col += 1
+                        commit_node.column = new_col
+                        commit_node.color_idx = (first_parent.color_idx + 1 + next_global_color_idx) % len(COLOR_PALETTE) # New color
+                        next_global_color_idx = (next_global_color_idx + 1) % (len(COLOR_PALETTE) -1 if len(COLOR_PALETTE) > 1 else 1)
+                        if next_global_color_idx == mainline_color_idx and len(COLOR_PALETTE) >1 : next_global_color_idx = (next_global_color_idx + 1) % len(COLOR_PALETTE)
+
+                    assigned_col = True
+
+            if not assigned_col: # No parents in view or other complex cases (e.g. root of a non-mainline branch)
+                new_col = mainline_col + 1
                 while lane_occupied_until_y.get(new_col, -1) >= commit_node.y:
                     new_col += 1
                 commit_node.column = new_col
-                commit_node.color_idx = next_global_color_idx # New branch, new color
-                next_global_color_idx = (next_global_color_idx + 1) % len(COLOR_PALETTE)
+                commit_node.color_idx = (mainline_color_idx + 1 + next_global_color_idx) % len(COLOR_PALETTE)
+                next_global_color_idx = (next_global_color_idx + 1) % (len(COLOR_PALETTE) -1 if len(COLOR_PALETTE) > 1 else 1)
+                if next_global_color_idx == mainline_color_idx and len(COLOR_PALETTE) > 1 : next_global_color_idx = (next_global_color_idx + 1) % len(COLOR_PALETTE)
 
             lane_colors[commit_node.column] = commit_node.color_idx
 
-        else: # Merge commit (multiple parents)
-            # Merge into the lane of the first parent (typically the main branch being merged into).
-            # First parent by convention in `git log` output is the one on the current branch.
-            # Our `parent_nodes` are sorted by y, so `parent_nodes[0]` is the newest parent.
-            # Let's try to align with the *oldest* parent's column if possible, or first parent.
-
-            # Heuristic: merge into the column of the parent that is "most mainline"
-            # For now, use the column of the first parent in the list (newest `y` value).
-            first_parent = parent_nodes[0] # Parent with smallest y (newest)
-            commit_node.column = first_parent.column
-            commit_node.color_idx = first_parent.color_idx # Inherit color from this parent
-
-            # Ensure this chosen column is not "over-occupied" by something else unexpected.
-            # (Similar check to single-parent case, but less likely for merges to shift columns often)
-            # For now, we assume the first parent's column is the target.
-
-            lane_colors[commit_node.column] = commit_node.color_idx
-
-            # The lines from other parents will visually merge.
-            # Mark those other parent lanes as "ending" or "merging" at this commit's Y.
-            # This means their `lane_occupied_until_y` should be updated to `commit_node.y`.
-            for p_node in parent_nodes[1:]:
-                if p_node.column != commit_node.column: # If in a different lane
-                    # This lane is merging. If no other branches continue in p_node.column below this y,
-                    # it could be considered free. For now, just ensure it's marked up to here.
-                    lane_occupied_until_y[p_node.column] = max(lane_occupied_until_y.get(p_node.column, -1), commit_node.y)
+            # Merge commit specific: ensure other parent lanes are marked up to this commit_node.y
+            if len(parent_nodes) > 1:
+                 for p_node in parent_nodes[1:]: # Other parents
+                    if p_node.column != commit_node.column:
+                         lane_occupied_until_y[p_node.column] = max(lane_occupied_until_y.get(p_node.column, -1), commit_node.y)
 
 
-        # Update how far this lane is occupied.
-        # A lane is occupied by this commit's line segment continuing from its parent(s) to itself.
-        # Or, if it's a root, it starts here.
-        # The critical thing is that `lane_occupied_until_y[col]` should reflect the
-        # y-level of the *newest* commit currently defining the bottom of a segment in that lane.
+        # Update lane occupancy for the commit's final column
         lane_occupied_until_y[commit_node.column] = commit_node.y
 
-        # Assign X coordinate
+        # Assign X coordinate based on final column
         commit_node.x = commit_node.column * LAYOUT_HORIZONTAL_SPACING
 
-    # Post-layout adjustments (optional but good)
-    # 1. Normalize X coordinates: find min_x and shift all if min_x is not 0 (or some padding)
+    # Post-layout adjustments
+    # Normalize X coordinates: find min_x and shift all if min_x is not 0 (or some padding)
+    # This is important if branches can go to the left of mainline_col (e.g. col -1, -2)
     if commits:
         min_x_coord = min(c.x for c in commits)
         if min_x_coord != 0:

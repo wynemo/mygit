@@ -10,6 +10,7 @@ class CommitNode:
         self.author_email: str = author_email
         self.author_date: str = author_date
         self.references: list[str] = []  # e.g., ['HEAD -> main', 'origin/main', 'refs/tags/v1.0']
+        self.is_on_mainline: bool = False # New attribute
 
         # Layout-related attributes, to be filled by the layout algorithm
         self.x: float = 0.0
@@ -23,6 +24,7 @@ class CommitNode:
                 f"children={ [c[:7] for c in self.children] }, "
                 f"references={self.references}, "
                 f"message='{self.message[:20]}...', "
+                f"mainline={self.is_on_mainline}, "
                 f"column={self.column}, y={self.y})")
 
 if __name__ == '__main__':
