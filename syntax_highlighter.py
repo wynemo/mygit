@@ -12,9 +12,9 @@ from PyQt6.QtGui import (  # 导入 QFont (Import QFont)
 )
 
 
-class CodeHighlighter(QSyntaxHighlighter):
-    def __init__(self, parent=None):
-        super().__init__(parent)
+class PygmentsHighlighterEngine:
+    def __init__(self, highlighter: QSyntaxHighlighter):
+        self.highlighter = highlighter
 
         # Pygments 语法高亮相关初始化 (Pygments syntax highlighting related initialization)
         self.lexer = None  # Pygments 词法分析器 (Pygments lexer)
@@ -59,14 +59,9 @@ class CodeHighlighter(QSyntaxHighlighter):
     def set_language(self, language_name):
         # 设置高亮的语言 (Set the language for highlighting)
         self._initialize_language_styling(language_name)
-        self.rehighlight()  # 重新高亮整个文档 (Rehighlight the entire document)
 
     def highlightBlock(self, text):
         # 高亮当前文本块 (Highlight the current text block)
-
-        # 应用Pygments语法高亮 (Apply Pygments syntax highlighting)
-        # 默认情况下，将整个块的格式设置为默认文本格式 (By default, set format for the whole block to default text format)
-        self.setFormat(0, len(text), self.default_text_format)
 
         if self.lexer:
             try:
@@ -75,7 +70,20 @@ class CodeHighlighter(QSyntaxHighlighter):
                         # 获取语法高亮格式 (Get syntax highlighting format)
                         syntax_format = self.style_formats[token_type]
                         # 应用格式 (Apply format)
-                        self.setFormat(index, len(token_text), syntax_format)
+                        self.highlighter.setFormat(index, len(token_text), syntax_format)
             except Exception:
                 # Fallback: 确保在出错时至少应用默认格式 (Fallback: ensure default format is applied if error)
-                self.setFormat(0, len(text), self.default_text_format)
+                self.highlighter.setFormat(0, len(text), self.default_text_format)
+
+
+class CodeHighlighter(QSyntaxHighlighter):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.engine = PygmentsHighlighterEngine(self)
+
+    def set_language(self, language_name):
+        self.engine.set_language(language_name)
+        self.rehighlight()
+
+    def highlightBlock(self, text):
+        self.engine.highlightBlock(text)

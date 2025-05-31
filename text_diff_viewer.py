@@ -2,11 +2,12 @@ import logging
 from typing import Optional
 
 from PyQt6.QtCore import QPoint
-from PyQt6.QtWidgets import QHBoxLayout, QWidget, QPushButton, QVBoxLayout
+from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
 from diff_calculator import DiffCalculator, DiffChunk, DifflibCalculator
-from diff_highlighter import DiffHighlighter
+from diff_highlighter import DiffHighlighter, MultiHighlighter
 from text_edit import SyncedTextEdit
+from utils.language_map import LANGUAGE_MAP
 
 
 class DiffViewer(QWidget):
@@ -36,18 +37,19 @@ class DiffViewer(QWidget):
             # and findBlockByNumber expectation.
             # If a chunk indicates no lines on one side (e.g., pure insertion/deletion),
             # we scroll to the line *before* where the change is indicated, or line 0.
-            
-            left_target_line = chunk.left_start
-            if chunk.left_start == chunk.left_end and chunk.type == "insert": # Insertion in right, so left has a "gap"
-                 # Try to scroll to the line before the insertion point on the left
-                left_target_line = max(0, chunk.left_start -1) if chunk.left_start > 0 else 0
 
+            left_target_line = chunk.left_start
+            if chunk.left_start == chunk.left_end and chunk.type == "insert":  # Insertion in right, so left has a "gap"
+                # Try to scroll to the line before the insertion point on the left
+                left_target_line = max(0, chunk.left_start - 1) if chunk.left_start > 0 else 0
 
             right_target_line = chunk.right_start
-            if chunk.right_start == chunk.right_end and chunk.type == "delete": # Deletion in right, so right has a "gap"
+            if (
+                chunk.right_start == chunk.right_end and chunk.type == "delete"
+            ):  # Deletion in right, so right has a "gap"
                 # Try to scroll to the line before the deletion point on the right
-                right_target_line = max(0, chunk.right_start -1) if chunk.right_start > 0 else 0
-            
+                right_target_line = max(0, chunk.right_start - 1) if chunk.right_start > 0 else 0
+
             # For "modify" or "equal" (though "equal" is filtered out for actual_diff_chunks),
             # left_start and right_start are the lines to go to.
             # For "delete" (text removed from left, shown as gap in right), scroll left_edit to left_start, right_edit to right_start (which is the line before deletion).
@@ -55,11 +57,14 @@ class DiffViewer(QWidget):
 
             self.left_edit.scroll_to_line(left_target_line)
             self.right_edit.scroll_to_line(right_target_line)
-            
-            logging.info(f"Called scroll_to_line for left editor to line {left_target_line}, right editor to line {right_target_line}")
-        else:
-            logging.warning(f"Skipping scroll: current_diff_index={self.current_diff_index}, num_actual_diffs={len(self.actual_diff_chunks)}")
 
+            logging.info(
+                f"Called scroll_to_line for left editor to line {left_target_line}, right editor to line {right_target_line}"
+            )
+        else:
+            logging.warning(
+                f"Skipping scroll: current_diff_index={self.current_diff_index}, num_actual_diffs={len(self.actual_diff_chunks)}"
+            )
 
     def _update_button_states(self):
         num_actual_diffs = len(self.actual_diff_chunks)
@@ -68,7 +73,7 @@ class DiffViewer(QWidget):
 
         # Special case for initial load when diffs exist, current_diff_index is -1
         if self.current_diff_index == -1 and num_actual_diffs > 0:
-            next_enabled = True # Allow "Next" to reach the first diff
+            next_enabled = True  # Allow "Next" to reach the first diff
 
         self.prev_diff_button.setEnabled(prev_enabled)
         self.next_diff_button.setEnabled(next_enabled)
@@ -78,9 +83,10 @@ class DiffViewer(QWidget):
             f"Prev button enabled: {prev_enabled}, Next button enabled: {next_enabled}"
         )
         # Log the special handling for the next button if current_diff_index is -1 and diffs exist
-        if self.current_diff_index == -1 and num_actual_diffs > 0 and not next_enabled: # This case should not happen due to logic above, but good to log
-             logging.info(f"Initial state with diffs: Next button forced to enabled to reach first diff.")
-
+        if (
+            self.current_diff_index == -1 and num_actual_diffs > 0 and not next_enabled
+        ):  # This case should not happen due to logic above, but good to log
+            logging.info(f"Initial state with diffs: Next button forced to enabled to reach first diff.")
 
     def setup_ui(self):
         # Button layout
@@ -115,18 +121,12 @@ class DiffViewer(QWidget):
             lambda val: self._on_scroll(val, False)
         )  # False 表示右侧滚动
 
-        self.left_edit.horizontalScrollBar().valueChanged.connect(
-            lambda val: self._sync_hscroll(val, 0)
-        )
-        self.right_edit.horizontalScrollBar().valueChanged.connect(
-            lambda val: self._sync_hscroll(val, 1)
-        )
+        self.left_edit.horizontalScrollBar().valueChanged.connect(lambda val: self._sync_hscroll(val, 0))
+        self.right_edit.horizontalScrollBar().valueChanged.connect(lambda val: self._sync_hscroll(val, 1))
 
         # 添加差异高亮器
-        self.left_edit.highlighter = DiffHighlighter(self.left_edit.document(), "left")
-        self.right_edit.highlighter = DiffHighlighter(
-            self.right_edit.document(), "right"
-        )
+        self.left_edit.highlighter = MultiHighlighter(self.left_edit.document(), "left")
+        self.right_edit.highlighter = MultiHighlighter(self.right_edit.document(), "right")
 
         # 添加到布局
         editor_layout.addWidget(self.left_edit)
@@ -138,7 +138,14 @@ class DiffViewer(QWidget):
         main_layout.addLayout(editor_layout)
         self.setLayout(main_layout)
 
-    def set_texts(self, left_text: str, right_text: str, file_path: str, left_commit_hash: Optional[str], right_commit_hash: Optional[str]):
+    def set_texts(
+        self,
+        left_text: str,
+        right_text: str,
+        file_path: str,
+        left_commit_hash: Optional[str],
+        right_commit_hash: Optional[str],
+    ):
         """设置要比较的文本"""
         logging.debug("\n=== 设置新的文本进行比较 ===")
         # 先设置文本
@@ -154,6 +161,10 @@ class DiffViewer(QWidget):
         # 计算差异
         self._compute_diff(left_text, right_text)
 
+        language = LANGUAGE_MAP.get(file_path.split(".")[-1], "text")
+        self.left_edit.highlighter.set_language(language)
+        self.right_edit.highlighter.set_language(language)
+
     def _compute_diff(self, left_text: str, right_text: str):
         self.diff_chunks = self.diff_calculator.compute_diff(left_text, right_text)
 
@@ -164,9 +175,8 @@ class DiffViewer(QWidget):
         self.actual_diff_chunks = [chunk for chunk in self.diff_chunks if chunk.type != "equal"]
         logging.info(f"Number of actual (non-equal) diff chunks: {len(self.actual_diff_chunks)}")
         self.current_diff_index = -1  # Start before the first diff
-        self._update_button_states()   # Initial state for buttons
+        self._update_button_states()  # Initial state for buttons
         # Special handling for enabling "Next" is now within _update_button_states
-
 
     def navigate_to_previous_diff(self):
         logging.info(f"Attempting to navigate to previous diff. Current index: {self.current_diff_index}")
@@ -210,9 +220,7 @@ class DiffViewer(QWidget):
             logging.info("Already at the last diff or no diffs to navigate forward to.")
         self._update_button_states()
 
-    def _calculate_target_line(
-        self, current_line: int, diff_chunks: list, is_left_scroll: bool
-    ) -> int:
+    def _calculate_target_line(self, current_line: int, diff_chunks: list, is_left_scroll: bool) -> int:
         """计算目标行号
         Args:
             current_line: 当前行号
@@ -239,18 +247,14 @@ class DiffViewer(QWidget):
                     # 如果在差异块内，根据相对位置调整
                     if current_line < source_end:
                         # 计算在差异块内的精确位置
-                        block_progress = (current_line - source_start) / max(
-                            1, source_size
-                        )
+                        block_progress = (current_line - source_start) / max(1, source_size)
                         # 调整目标行号，考虑差异块内的相对位置
                         if target_size == 0:
                             # 对于删除块，使用当前行号减去删除的行数
                             target_line = current_line - (source_end - source_start)
                         else:
                             # 对于其他类型的块，使用相对位置计算
-                            target_line = target_start + int(
-                                block_progress * target_size
-                            )
+                            target_line = target_start + int(block_progress * target_size)
                         logging.debug(
                             "在差异块内 [%d, %d] -> [%d, %d]",
                             source_start,
@@ -258,9 +262,7 @@ class DiffViewer(QWidget):
                             target_start,
                             target_end,
                         )
-                        logging.debug(
-                            "块内进度: %.2f, 目标行: %d", block_progress, target_line
-                        )
+                        logging.debug("块内进度: %.2f, 目标行: %d", block_progress, target_line)
                         break
                     else:
                         # 如果已经过了这个差异块，直接累加差异
@@ -279,9 +281,7 @@ class DiffViewer(QWidget):
             target_line += accumulated_diff
         return target_line
 
-    def _calculate_scroll_value(
-        self, target_edit: SyncedTextEdit, target_line: int
-    ) -> int:
+    def _calculate_scroll_value(self, target_edit: SyncedTextEdit, target_line: int) -> int:
         """计算滚动值
         Args:
             target_edit: 目标编辑器
@@ -296,9 +296,7 @@ class DiffViewer(QWidget):
         # 根据目标行号计算滚动值
         target_doc_height = target_edit.document().size().height()
         target_line_count = target_edit.document().blockCount()
-        avg_line_height = (
-            target_doc_height / target_line_count if target_line_count > 0 else 0
-        )
+        avg_line_height = target_doc_height / target_line_count if target_line_count > 0 else 0
 
         # 直接使用目标行号计算滚动值
         target_scroll = int(target_line * avg_line_height)
@@ -317,9 +315,7 @@ class DiffViewer(QWidget):
 
         self._sync_vscroll_lock = True
         try:
-            logging.debug(
-                "\n=== %s 滚动事件开始 ===", "左侧" if is_left_scroll else "右侧"
-            )
+            logging.debug("\n=== %s 滚动事件开始 ===", "左侧" if is_left_scroll else "右侧")
 
             # 获取源编辑器和目标编辑器
             source_edit = self.left_edit if is_left_scroll else self.right_edit
@@ -331,9 +327,7 @@ class DiffViewer(QWidget):
             logging.debug("当前视口起始行: %d", current_line)
 
             # 计算目标行号
-            target_line = self._calculate_target_line(
-                current_line, self.diff_chunks, is_left_scroll
-            )
+            target_line = self._calculate_target_line(current_line, self.diff_chunks, is_left_scroll)
 
             # 计算滚动值
             target_scroll = self._calculate_scroll_value(target_edit, target_line)
@@ -342,9 +336,7 @@ class DiffViewer(QWidget):
             # 设置滚动条位置
             target_edit.verticalScrollBar().setValue(target_scroll)
 
-            logging.debug(
-                "=== %s 滚动事件结束 ===\n", "左侧" if is_left_scroll else "右侧"
-            )
+            logging.debug("=== %s 滚动事件结束 ===\n", "左侧" if is_left_scroll else "右侧")
 
         finally:
             self._sync_vscroll_lock = False
@@ -385,26 +377,14 @@ class MergeDiffViewer(DiffViewer):
         self.parent2_edit.setObjectName("parent2_edit")
 
         # 设置滚动事件处理
-        self.parent1_edit.verticalScrollBar().valueChanged.connect(
-            lambda val: self._on_scroll(val, "parent1")
-        )
-        self.result_edit.verticalScrollBar().valueChanged.connect(
-            lambda val: self._on_scroll(val, "result")
-        )
-        self.parent2_edit.verticalScrollBar().valueChanged.connect(
-            lambda val: self._on_scroll(val, "parent2")
-        )
+        self.parent1_edit.verticalScrollBar().valueChanged.connect(lambda val: self._on_scroll(val, "parent1"))
+        self.result_edit.verticalScrollBar().valueChanged.connect(lambda val: self._on_scroll(val, "result"))
+        self.parent2_edit.verticalScrollBar().valueChanged.connect(lambda val: self._on_scroll(val, "parent2"))
 
         # 设置水平滚动同步
-        self.parent1_edit.horizontalScrollBar().valueChanged.connect(
-            lambda val: self._sync_hscroll(val, "parent1")
-        )
-        self.result_edit.horizontalScrollBar().valueChanged.connect(
-            lambda val: self._sync_hscroll(val, "result")
-        )
-        self.parent2_edit.horizontalScrollBar().valueChanged.connect(
-            lambda val: self._sync_hscroll(val, "parent2")
-        )
+        self.parent1_edit.horizontalScrollBar().valueChanged.connect(lambda val: self._sync_hscroll(val, "parent1"))
+        self.result_edit.horizontalScrollBar().valueChanged.connect(lambda val: self._sync_hscroll(val, "result"))
+        self.parent2_edit.horizontalScrollBar().valueChanged.connect(lambda val: self._sync_hscroll(val, "parent2"))
 
         # 添加到布局
         layout.addWidget(self.parent1_edit)
@@ -412,7 +392,16 @@ class MergeDiffViewer(DiffViewer):
         layout.addWidget(self.parent2_edit)
         self.setLayout(layout)
 
-    def set_texts(self, parent1_text: str, result_text: str, parent2_text: str, file_path: str, parent1_commit_hash: Optional[str], result_commit_hash: Optional[str], parent2_commit_hash: Optional[str]):
+    def set_texts(
+        self,
+        parent1_text: str,
+        result_text: str,
+        parent2_text: str,
+        file_path: str,
+        parent1_commit_hash: Optional[str],
+        result_commit_hash: Optional[str],
+        parent2_commit_hash: Optional[str],
+    ):
         """设置要比较的三个文本"""
         logging.debug("\n=== 设置新的三向文本进行比较 ===")
         # 设置文本
@@ -434,13 +423,9 @@ class MergeDiffViewer(DiffViewer):
     def _compute_diffs(self, parent1_text: str, result_text: str, parent2_text: str):
         """计算三个文本之间的差异"""
         # 计算 parent1 和 result 的差异
-        self.parent1_chunks = self.diff_calculator.compute_diff(
-            parent1_text, result_text
-        )
+        self.parent1_chunks = self.diff_calculator.compute_diff(parent1_text, result_text)
         # 计算 result 和 parent2 的差异
-        self.parent2_chunks = self.diff_calculator.compute_diff(
-            result_text, parent2_text
-        )
+        self.parent2_chunks = self.diff_calculator.compute_diff(result_text, parent2_text)
 
         # 设置高亮
         self.parent1_edit.highlighter.set_diff_chunks(self.parent1_chunks)
@@ -565,17 +550,11 @@ class MergeDiffViewer(DiffViewer):
                         is_left_scroll = True
 
                     # 计算目标行号
-                    target_line = self._calculate_target_line(
-                        current_line, diff_chunks, is_left_scroll
-                    )
+                    target_line = self._calculate_target_line(current_line, diff_chunks, is_left_scroll)
 
                     # 计算滚动值
-                    target_scroll = self._calculate_scroll_value(
-                        target_edit, target_line
-                    )
-                    logging.debug(
-                        "目标行: %d, 目标滚动值: %d", target_line, target_scroll
-                    )
+                    target_scroll = self._calculate_scroll_value(target_edit, target_line)
+                    logging.debug("目标行: %d, 目标滚动值: %d", target_line, target_scroll)
 
                     # 设置滚动条位置
                     target_edit.verticalScrollBar().setValue(target_scroll)

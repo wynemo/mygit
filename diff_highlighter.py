@@ -3,11 +3,12 @@ import logging
 from PyQt6.QtGui import QColor, QSyntaxHighlighter, QTextCharFormat
 
 from diff_calculator import DiffChunk
+from syntax_highlighter import PygmentsHighlighterEngine
 
 
-class DiffHighlighter(QSyntaxHighlighter):
-    def __init__(self, parent=None, editor_type=""):
-        super().__init__(parent)
+class DiffHighlighterEngine:
+    def __init__(self, highlighter: QSyntaxHighlighter, editor_type=""):
+        self.highlighter = highlighter
         self.editor_type = editor_type
         self.diff_chunks: list[DiffChunk] = []
         logging.debug("\n=== 初始化DiffHighlighter ===")
@@ -41,11 +42,11 @@ class DiffHighlighter(QSyntaxHighlighter):
             logging.debug("左侧范围: %d-%d", chunk.left_start, chunk.left_end)
             logging.debug("右侧范围: %d-%d", chunk.right_start, chunk.right_end)
         self.diff_chunks = chunks
-        self.rehighlight()
+        self.highlighter.rehighlight()
 
     def highlightBlock(self, text):
         """高亮当前文本块"""
-        block_number = self.currentBlock().blockNumber()
+        block_number = self.highlighter.currentBlock().blockNumber()
         logging.debug("\n=== 高亮块详细信息 ===")
         logging.debug("高亮器类型: %s", self.editor_type)
         logging.debug("当前块号: %d", block_number)
@@ -90,7 +91,7 @@ class DiffHighlighter(QSyntaxHighlighter):
                         current_chunk = parent1_chunk
                         # 使用特殊的冲突颜色
                         conflict_format = self.create_format("#ffccff", "#cc00cc")  # 紫色
-                        self.setFormat(0, len(text), conflict_format)
+                        self.highlighter.setFormat(0, len(text), conflict_format)
                         return
                     elif parent1_chunk.type != "equal":
                         current_chunk = parent1_chunk
@@ -110,16 +111,39 @@ class DiffHighlighter(QSyntaxHighlighter):
                 format = self.diff_formats[format_type]
                 if format:
                     logging.debug("应用格式: %s", format_type)
-                    self.setFormat(0, len(text), format)
+                    self.highlighter.setFormat(0, len(text), format)
                     logging.debug("格式已应用")
+
+
+class DiffHighlighter(QSyntaxHighlighter):
+    def __init__(self, parent=None, editor_type=""):
+        super().__init__(parent)
+        self.engine = DiffHighlighterEngine(self, editor_type=editor_type)
+
+    def set_diff_chunks(self, chunks):
+        self.engine.set_diff_chunks(chunks)
+        self.rehighlight()
+
+    def highlightBlock(self, text):
+        self.engine.highlightBlock(text)
 
 
 # -------- 总高亮器 --------
 class MultiHighlighter(QSyntaxHighlighter):
-    def __init__(self, document, modules):
-        super().__init__(document)
-        self.modules = modules
+    def __init__(self, parent=None, editor_type=""):
+        super().__init__(parent)
+        self.diff_engine = DiffHighlighterEngine(self, editor_type=editor_type)
+        self.pygments_engine = PygmentsHighlighterEngine(self)
+        self.engines = [DiffHighlighterEngine(self, editor_type=editor_type), PygmentsHighlighterEngine(self)]
+
+    def set_language(self, language_name):
+        self.pygments_engine.set_language(language_name)
+        self.rehighlight()
+
+    def set_diff_chunks(self, chunks):
+        self.diff_engine.set_diff_chunks(chunks)
+        self.rehighlight()
 
     def highlightBlock(self, text):
-        for module in self.modules:
-            module.highlightBlock(self, text)
+        self.pygments_engine.highlightBlock(text)
+        self.diff_engine.highlightBlock(text)
