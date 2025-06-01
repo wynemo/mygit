@@ -286,8 +286,8 @@ class GitManager:
             source_line = 0
             target_line = 0
 
+            print("lines is", "\n".join(lines))
             for line in lines:
-                print(line)
                 if line.startswith("@@"):
                     # 解析 @@ -10,7 +10,8 @@ 这样的 Hunk 行
                     import re
@@ -303,7 +303,20 @@ class GitManager:
                     source_line += 1
                 elif line.startswith("+") and not line.startswith("+++"):
                     print(f"  ➕ 新增行 {target_line}: {line[1:].strip()}")
-                    d[target_line] = "added"
+                    if d.get(target_line) == "deleted":
+                        d[target_line] = "modified"
+                        print(f"  ｜ 修改行 {target_line}: {line[1:].strip()}")
+                    else:
+                        i = target_line
+                        while 1:
+                            last_line_status = d.get(i - 1)
+                            i -= 1
+                            if last_line_status not in ["deleted", "modified", "added"]:
+                                d[target_line] = "added"
+                                break
+                            if last_line_status in {"deleted", "modified"}:
+                                d[target_line] = "modified"
+                                break
                     target_line += 1
                 else:
                     # 上下文行
