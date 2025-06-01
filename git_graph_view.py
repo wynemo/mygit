@@ -1,8 +1,8 @@
 # git_graph_view.py
 
-from PyQt6.QtCore import QRectF, Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QPainter, QTransform
-from PyQt6.QtWidgets import QApplication, QGraphicsItem, QGraphicsScene, QGraphicsView
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QAction, QPainter
+from PyQt6.QtWidgets import QApplication, QGraphicsScene, QGraphicsView, QMenu
 
 from git_graph_data import CommitNode
 from git_graph_items import (
@@ -36,6 +36,10 @@ class GitGraphView(QGraphicsView):
         self._message_items: list[CommitMessageItem] = []
 
         self._zoom_factor_base = 1.1  # Base factor for zooming
+
+        # Set context menu policy
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._show_context_menu)
 
     def clear_graph(self):
         self.scene.clear()
@@ -92,8 +96,7 @@ class GitGraphView(QGraphicsView):
 
                 # Update max_ref_label_actual_width based on this label's drawn width
                 # Note: boundingRect for ReferenceLabel includes its internal padding.
-                if ref_label.boundingRect().width() > max_ref_label_actual_width:
-                    max_ref_label_actual_width = ref_label.boundingRect().width()
+                max_ref_label_actual_width = max(max_ref_label_actual_width, ref_label.boundingRect().width())
 
                 ref_y_offset -= ref_label.boundingRect().height() + 2  # Stack them upwards
 
@@ -188,6 +191,27 @@ class GitGraphView(QGraphicsView):
                 # event.accept() # Optionally accept the event if it's fully handled
                 # return # Return if you don't want further processing
         super().mousePressEvent(event)  # Call super for other event processing (like panning)
+
+    def _show_context_menu(self, pos):
+        """Show context menu for right-click on a commit circle."""
+        scene_pos = self.mapToScene(pos)
+        item = self.scene.itemAt(scene_pos, self.transform())
+
+        if isinstance(item, CommitCircle):
+            menu = QMenu(self)
+
+            # Add "Copy Commit" action
+            copy_action = QAction("Copy Commit", self)
+            copy_action.triggered.connect(lambda: self._copy_commit_sha(item.commit_node.sha))
+            menu.addAction(copy_action)
+
+            # Show menu at cursor position
+            menu.exec(self.viewport().mapToGlobal(pos))
+
+    def _copy_commit_sha(self, sha):
+        """Copy commit SHA to clipboard."""
+        clipboard = QApplication.clipboard()
+        clipboard.setText(sha)
 
 
 if __name__ == "__main__":
