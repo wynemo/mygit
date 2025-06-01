@@ -4,8 +4,8 @@ from git_graph_data import CommitNode
 from git_graph_items import COLOR_PALETTE, HORIZONTAL_SPACING, VERTICAL_SPACING
 
 # More spacing to make graph less dense initially
-LAYOUT_HORIZONTAL_SPACING = HORIZONTAL_SPACING * 1.5
-LAYOUT_VERTICAL_SPACING = VERTICAL_SPACING * 1.5
+LAYOUT_HORIZONTAL_SPACING = HORIZONTAL_SPACING * 1.0  # 减小水平间距
+LAYOUT_VERTICAL_SPACING = VERTICAL_SPACING * 1.0  # 减小垂直间距
 
 
 def calculate_commit_positions(commits: list[CommitNode]):
