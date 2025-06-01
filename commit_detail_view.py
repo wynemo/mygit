@@ -3,12 +3,7 @@ from datetime import datetime
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QFrame,
-    QLabel,
-    QScrollArea,
     QTextEdit,
-    QVBoxLayout,
-    QWidget,
 )
 
 # 常量用于分支显示
@@ -30,7 +25,6 @@ class CommitDetailView(QTextEdit):
             font-family: monospace;
             padding: 5px;
 
-            /* 美化滚动条 */
             QScrollBar:vertical {
                 background: #f0f0f0;
                 width: 12px;
@@ -39,7 +33,6 @@ class CommitDetailView(QTextEdit):
             QScrollBar::handle:vertical {
                 background: #c0c0c0;
                 min-height: 20px;
-                border-radius: 6px;
             }
             QScrollBar::handle:vertical:hover {
                 background: #a8a8a8;
@@ -59,7 +52,6 @@ class CommitDetailView(QTextEdit):
             QScrollBar::handle:horizontal {
                 background: #c0c0c0;
                 min-width: 20px;
-                border-radius: 6px;
             }
             QScrollBar::handle:horizontal:hover {
                 background: #a8a8a8;
@@ -72,7 +64,7 @@ class CommitDetailView(QTextEdit):
             }
         """)
         self.setFrameShape(QTextEdit.Shape.NoFrame)
-        self.setMinimumHeight(200)
+        self.setMinimumHeight(100)
         self.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard
         )
