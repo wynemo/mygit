@@ -2,7 +2,7 @@
 
 import subprocess
 import os
-from git_graph_data import CommitNode # Assuming git_graph_data.py is in the same directory or accessible
+from git_graph_data import CommitNode  # Assuming git_graph_data.py is in the same directory or accessible
 
 # Delimiters for parsing git log output
 FIELD_SEP = "\x01"
@@ -17,7 +17,10 @@ ENTRY_SEP = "\x02"
 # %ad: author date (ISO 8601 strict)
 # %s: subject
 # %b: body (this must be the last field before ENTRY_SEP)
-GIT_LOG_FORMAT = f"%H{FIELD_SEP}%P{FIELD_SEP}%d{FIELD_SEP}%an{FIELD_SEP}%ae{FIELD_SEP}%ad{FIELD_SEP}%s{FIELD_SEP}%b{ENTRY_SEP}"
+GIT_LOG_FORMAT = (
+    f"%H{FIELD_SEP}%P{FIELD_SEP}%d{FIELD_SEP}%an{FIELD_SEP}%ae{FIELD_SEP}%ad{FIELD_SEP}%s{FIELD_SEP}%b{ENTRY_SEP}"
+)
+
 
 def _parse_references(raw_refs_str: str) -> list[str]:
     """
@@ -39,6 +42,7 @@ def _parse_references(raw_refs_str: str) -> list[str]:
 
     return [ref.strip() for ref in content.split(",")]
 
+
 def parse_git_log(repo_path: str = ".") -> list[CommitNode]:
     """
     Fetches git log from the specified repository path (for HEAD and merged branches)
@@ -46,12 +50,18 @@ def parse_git_log(repo_path: str = ".") -> list[CommitNode]:
     """
     try:
         # Ensure the repo_path is a valid git directory
-        subprocess.run(["git", "-C", repo_path, "rev-parse", "--is-inside-work-tree"],
-                       check=True, capture_output=True, text=True, encoding='utf-8')
+        subprocess.run(
+            ["git", "-C", repo_path, "rev-parse", "--is-inside-work-tree"],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
 
         # Get HEAD commit SHA to ensure repo is not empty and HEAD exists
-        subprocess.run(["git", "-C", repo_path, "rev-parse", "HEAD"],
-                               check=True, capture_output=True, text=True, encoding='utf-8')
+        subprocess.run(
+            ["git", "-C", repo_path, "rev-parse", "HEAD"], check=True, capture_output=True, text=True, encoding="utf-8"
+        )
     except subprocess.CalledProcessError as e:
         # Likely an empty repo or not a git repo
         # print(f"Error initial git check (rev-parse HEAD or is-inside-work-tree): {e.stderr}")
@@ -60,24 +70,29 @@ def parse_git_log(repo_path: str = ".") -> list[CommitNode]:
         print("Git command not found. Please ensure Git is installed and in your PATH.")
         return []
 
-    commit_sources = {"HEAD"} # Start with HEAD symbolic reference
+    commit_sources = {"HEAD"}  # Start with HEAD symbolic reference
 
     try:
         merged_branches_result = subprocess.run(
             ["git", "-C", repo_path, "branch", "--merged", "HEAD"],
-            check=True, capture_output=True, text=True, encoding='utf-8'
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
         )
         merged_branches_raw = merged_branches_result.stdout.splitlines()
 
         for line in merged_branches_raw:
             branch_name = line.strip()
-            if branch_name.startswith("* "): # Current branch, already covered by "HEAD"
+            if branch_name.startswith("* "):  # Current branch, already covered by "HEAD"
                 continue
             if branch_name and branch_name != "(no branch)" and not branch_name.startswith("(HEAD detached at"):
-                commit_sources.add(branch_name) # Add other merged branch names
+                commit_sources.add(branch_name)  # Add other merged branch names
 
     except subprocess.CalledProcessError as e:
-        print(f"Warning: Could not get list of merged branches: {e.stderr}. Graph will be based on HEAD's history only.")
+        print(
+            f"Warning: Could not get list of merged branches: {e.stderr}. Graph will be based on HEAD's history only."
+        )
         # commit_sources remains {"HEAD"}
 
     git_log_command = [
@@ -85,11 +100,13 @@ def parse_git_log(repo_path: str = ".") -> list[CommitNode]:
         "log",
         "--date=iso-strict",
         f"--pretty=format:{GIT_LOG_FORMAT}",
-        "--topo-order", # Ensure consistent topological order
+        "--topo-order",  # Ensure consistent topological order
     ] + list(commit_sources)
 
     try:
-        result = subprocess.run(git_log_command, cwd=repo_path, check=True, capture_output=True, text=True, encoding='utf-8')
+        result = subprocess.run(
+            git_log_command, cwd=repo_path, check=True, capture_output=True, text=True, encoding="utf-8"
+        )
         log_output = result.stdout
     except subprocess.CalledProcessError as e:
         print(f"Error executing git log: {e}")
@@ -98,7 +115,7 @@ def parse_git_log(repo_path: str = ".") -> list[CommitNode]:
     # FileNotFoundError already handled by initial checks
 
     commits_map: dict[str, CommitNode] = {}
-    commit_list_ordered: list[CommitNode] = [] # To maintain the order from git log (generally topo)
+    commit_list_ordered: list[CommitNode] = []  # To maintain the order from git log (generally topo)
 
     if not log_output.strip():
         return []
@@ -110,7 +127,7 @@ def parse_git_log(repo_path: str = ".") -> list[CommitNode]:
             continue
 
         parts = entry.strip().split(FIELD_SEP)
-        if len(parts) < 7: # sha, parents, refs, author, email, date, subject (body can be empty)
+        if len(parts) < 7:  # sha, parents, refs, author, email, date, subject (body can be empty)
             # print(f"Skipping malformed entry: {entry}") # For debugging
             continue
 
@@ -129,14 +146,10 @@ def parse_git_log(repo_path: str = ".") -> list[CommitNode]:
         # For simplicity in this step, we'll primarily use the subject as 'message'.
         # A more sophisticated approach might combine subject and body.
 
-        message = subject # For now, use subject as the main message
+        message = subject  # For now, use subject as the main message
 
         node = CommitNode(
-            sha=sha,
-            message=message,
-            author_name=author_name,
-            author_email=author_email,
-            author_date=author_date
+            sha=sha, message=message, author_name=author_name, author_email=author_email, author_date=author_date
         )
 
         if parent_hashes_str:
@@ -157,19 +170,20 @@ def parse_git_log(repo_path: str = ".") -> list[CommitNode]:
 
     return commit_list_ordered
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # Example usage:
     # Create a dummy git repository for testing if one doesn't exist
     # For a real test, run this script from within a git repository directory
 
     # Simple test with the current directory
     print(f"Attempting to parse git log for repository: {os.getcwd()}")
-    commit_nodes = parse_git_log(".") # Use current directory
+    commit_nodes = parse_git_log(".")  # Use current directory
 
     if commit_nodes:
         print(f"Successfully parsed {len(commit_nodes)} commits.")
-        for i, node in enumerate(commit_nodes[:5]): # Print first 5 commits
-            print(f"--- Commit {i+1} ---")
+        for i, node in enumerate(commit_nodes[:5]):  # Print first 5 commits
+            print(f"--- Commit {i + 1} ---")
             print(f"  SHA: {node.sha}")
             print(f"  Parents: {node.parents}")
             print(f"  Children: {node.children}")

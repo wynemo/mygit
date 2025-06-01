@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import QGraphicsEllipseItem, QGraphicsPathItem, QGraphicsTe
 from PyQt6.QtGui import QBrush, QPen, QColor, QPainterPath, QFont
 from PyQt6.QtCore import Qt, QRectF
 
-from git_graph_data import CommitNode # Assuming git_graph_data.py is available
+from git_graph_data import CommitNode  # Assuming git_graph_data.py is available
 
 # --- Configuration for items ---
 COMMIT_RADIUS = 10
@@ -13,9 +13,16 @@ VERTICAL_SPACING = 40
 
 # Colors (can be expanded and made configurable)
 COLOR_PALETTE = [
-    QColor("#1f77b4"), QColor("#ff7f0e"), QColor("#2ca02c"), QColor("#d62728"),
-    QColor("#9467bd"), QColor("#8c564b"), QColor("#e377c2"), QColor("#7f7f7f"),
-    QColor("#bcbd22"), QColor("#17becf")
+    QColor("#1f77b4"),
+    QColor("#ff7f0e"),
+    QColor("#2ca02c"),
+    QColor("#d62728"),
+    QColor("#9467bd"),
+    QColor("#8c564b"),
+    QColor("#e377c2"),
+    QColor("#7f7f7f"),
+    QColor("#bcbd22"),
+    QColor("#17becf"),
 ]
 DEFAULT_COMMIT_COLOR = QColor(Qt.GlobalColor.gray)
 SELECTED_COMMIT_COLOR = QColor(Qt.GlobalColor.yellow)
@@ -26,21 +33,21 @@ EDGE_THICKNESS = 1.5
 
 REF_PADDING_X = 4
 REF_PADDING_Y = 2
-REF_BACKGROUND_COLOR_BRANCH = QColor("#e6f7ff") # Light blue
+REF_BACKGROUND_COLOR_BRANCH = QColor("#e6f7ff")  # Light blue
 REF_BORDER_COLOR_BRANCH = QColor("#91d5ff")
 REF_TEXT_COLOR_BRANCH = QColor(Qt.GlobalColor.black)
 
-REF_BACKGROUND_COLOR_TAG = QColor("#fffbe6") # Light yellow
+REF_BACKGROUND_COLOR_TAG = QColor("#fffbe6")  # Light yellow
 REF_BORDER_COLOR_TAG = QColor("#ffe58f")
 REF_TEXT_COLOR_TAG = QColor(Qt.GlobalColor.black)
 
-REF_BACKGROUND_COLOR_HEAD = QColor("#f6ffed") # Light green
+REF_BACKGROUND_COLOR_HEAD = QColor("#f6ffed")  # Light green
 REF_BORDER_COLOR_HEAD = QColor("#b7eb8f")
 REF_TEXT_COLOR_HEAD = QColor(Qt.GlobalColor.black)
 
 # Configuration for CommitMessageItem
 COMMIT_MSG_MAX_LENGTH = 60
-COMMIT_MSG_COLOR = QColor("#444444") # Dark gray for commit messages
+COMMIT_MSG_COLOR = QColor("#444444")  # Dark gray for commit messages
 COMMIT_MSG_FONT_FAMILY = "Arial"
 COMMIT_MSG_FONT_SIZE = 9
 
@@ -53,7 +60,7 @@ class CommitCircle(QGraphicsEllipseItem):
         self.current_brush_color = self.base_color
 
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
-        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True) # For updates if needed
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True)  # For updates if needed
         self.setAcceptHoverEvents(True)
 
         self.setBrush(QBrush(self.base_color))
@@ -69,9 +76,9 @@ class CommitCircle(QGraphicsEllipseItem):
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemSelectedChange:
-            if value: # Selected
+            if value:  # Selected
                 self.current_brush_color = SELECTED_COMMIT_COLOR
-            else: # Deselected
+            else:  # Deselected
                 self.current_brush_color = self.base_color
             self.setBrush(QBrush(self.current_brush_color))
         return super().itemChange(change, value)
@@ -83,21 +90,35 @@ class CommitCircle(QGraphicsEllipseItem):
 
     def hoverLeaveEvent(self, event):
         if not self.isSelected():
-            self.setBrush(QBrush(self.current_brush_color)) # Revert to current selected or base color
+            self.setBrush(QBrush(self.current_brush_color))  # Revert to current selected or base color
         super().hoverLeaveEvent(event)
 
     # Potentially add paint method for more custom drawing if needed
 
 
 class EdgeLine(QGraphicsPathItem):
-    def __init__(self, start_item: CommitCircle, end_item: CommitCircle, color: QColor = DEFAULT_EDGE_COLOR, parent: QGraphicsItem = None):
+    def __init__(
+        self,
+        start_item: CommitCircle,
+        end_item: CommitCircle,
+        color: QColor = DEFAULT_EDGE_COLOR,
+        parent: QGraphicsItem = None,
+    ):
         super().__init__(parent)
         self.start_item = start_item
         self.end_item = end_item
         self.line_color = color
 
-        self.setPen(QPen(self.line_color, EDGE_THICKNESS, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
-        self.setZValue(-1) # Draw edges behind commits
+        self.setPen(
+            QPen(
+                self.line_color,
+                EDGE_THICKNESS,
+                Qt.PenStyle.SolidLine,
+                Qt.PenCapStyle.RoundCap,
+                Qt.PenJoinStyle.RoundJoin,
+            )
+        )
+        self.setZValue(-1)  # Draw edges behind commits
 
         self.update_path()
 
@@ -117,6 +138,7 @@ class EdgeLine(QGraphicsPathItem):
     # This can be handled by the view/scene by calling update_path on relevant edges
     # when commit positions change.
 
+
 class ReferenceLabel(QGraphicsTextItem):
     def __init__(self, text: str, commit_item: CommitCircle, is_head=False, is_tag=False, parent: QGraphicsItem = None):
         super().__init__(text, parent)
@@ -134,7 +156,7 @@ class ReferenceLabel(QGraphicsTextItem):
             self.bg_color = REF_BACKGROUND_COLOR_TAG
             self.border_color = REF_BORDER_COLOR_TAG
             self.text_color = REF_TEXT_COLOR_TAG
-        else: # Branch
+        else:  # Branch
             self.bg_color = REF_BACKGROUND_COLOR_BRANCH
             self.border_color = REF_BORDER_COLOR_BRANCH
             self.text_color = REF_TEXT_COLOR_BRANCH
@@ -144,8 +166,10 @@ class ReferenceLabel(QGraphicsTextItem):
         # Adjust position relative to the commit circle
         # This might need refinement based on how many labels a commit has
         # For now, place it to the right of the commit circle
-        self.setPos(commit_item.pos().x() + COMMIT_RADIUS + REF_PADDING_X,
-                    commit_item.pos().y() - self.boundingRect().height() / 2)
+        self.setPos(
+            commit_item.pos().x() + COMMIT_RADIUS + REF_PADDING_X,
+            commit_item.pos().y() - self.boundingRect().height() / 2,
+        )
 
     def paint(self, painter, option, widget=None):
         # Draw background and border
@@ -169,11 +193,11 @@ class CommitMessageItem(QGraphicsTextItem):
     def __init__(self, full_message: str, parent: QGraphicsItem = None):
         super().__init__(parent)
 
-        self.full_message = full_message # Store original for potential future use
+        self.full_message = full_message  # Store original for potential future use
 
         # Truncate message for display
         if len(full_message) > COMMIT_MSG_MAX_LENGTH:
-            display_text = full_message[:COMMIT_MSG_MAX_LENGTH - 3] + "..."
+            display_text = full_message[: COMMIT_MSG_MAX_LENGTH - 3] + "..."
         else:
             display_text = full_message
 
@@ -188,7 +212,7 @@ class CommitMessageItem(QGraphicsTextItem):
             self.setToolTip(f"Full message: {full_message}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # This file is intended to be imported, not run directly.
     # Basic test code could be added here if using a QApplication,
     # but it's better to test these items within a QGraphicsScene in the main view.

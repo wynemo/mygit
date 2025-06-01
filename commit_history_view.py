@@ -150,7 +150,7 @@ class CommitHistoryView(QWidget):
             # The argument is already the commit SHA (full or short)
             commit_hash = item_or_sha
 
-        if commit_hash: # Ensure we have a hash before emitting
+        if commit_hash:  # Ensure we have a hash before emitting
             self.commit_selected.emit(commit_hash)
         else:
             # Optional: Handle cases where commit_hash couldn't be determined

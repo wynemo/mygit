@@ -5,27 +5,37 @@ from PyQt6.QtGui import QPainter, QTransform, QColor
 from PyQt6.QtCore import pyqtSignal, Qt, QRectF
 
 from git_graph_data import CommitNode
-from git_graph_items import CommitCircle, EdgeLine, ReferenceLabel, CommitMessageItem, COLOR_PALETTE, COMMIT_RADIUS, REF_PADDING_X
+from git_graph_items import (
+    CommitCircle,
+    EdgeLine,
+    ReferenceLabel,
+    CommitMessageItem,
+    COLOR_PALETTE,
+    COMMIT_RADIUS,
+    REF_PADDING_X,
+)
 from git_log_parser import parse_git_log
 from git_graph_layout import calculate_commit_positions
 
+
 class GitGraphView(QGraphicsView):
     commit_item_clicked = pyqtSignal(str)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
 
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
-        self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag) # Enable panning
-        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse) # Zoom towards mouse
+        self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)  # Enable panning
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)  # Zoom towards mouse
 
         self._commit_items: dict[str, CommitCircle] = {}
         self._edge_items: list[EdgeLine] = []
         self._ref_labels: list[ReferenceLabel] = []
         self._message_items: list[CommitMessageItem] = []
 
-        self._zoom_factor_base = 1.1 # Base factor for zooming
+        self._zoom_factor_base = 1.1  # Base factor for zooming
 
     def clear_graph(self):
         self.scene.clear()
@@ -45,7 +55,9 @@ class GitGraphView(QGraphicsView):
         # First pass: Create all commit circles and reference labels
         for commit_node in commits:
             # Determine the color index to use for the commit circle
-            final_color_idx_for_circle = commit_node.branch_color_idx if commit_node.branch_color_idx is not None else commit_node.color_idx
+            final_color_idx_for_circle = (
+                commit_node.branch_color_idx if commit_node.branch_color_idx is not None else commit_node.color_idx
+            )
             # color = COLOR_PALETTE[final_color_idx_for_circle % len(COLOR_PALETTE)] # This line is not directly used for CommitCircle constructor
 
             commit_item = CommitCircle(commit_node, color_idx=final_color_idx_for_circle)
@@ -62,7 +74,7 @@ class GitGraphView(QGraphicsView):
             # REF_PADDING_X is typically 4 or 5.
             base_x_for_labels_and_msg = commit_node.x + COMMIT_RADIUS + REF_PADDING_X
 
-            max_ref_label_actual_width = 0 # The drawn width of the widest label
+            max_ref_label_actual_width = 0  # The drawn width of the widest label
 
             for ref_text in commit_node.references:
                 is_head = "HEAD" in ref_text
@@ -75,15 +87,15 @@ class GitGraphView(QGraphicsView):
                 ref_label.setPos(base_x_for_labels_and_msg, commit_node.y + ref_y_offset)
 
                 self.scene.addItem(ref_label)
-                self._ref_labels.append(ref_label) # Keep flat list as before for general management
-                current_commit_ref_labels.append(ref_label) # For positioning message item
+                self._ref_labels.append(ref_label)  # Keep flat list as before for general management
+                current_commit_ref_labels.append(ref_label)  # For positioning message item
 
                 # Update max_ref_label_actual_width based on this label's drawn width
                 # Note: boundingRect for ReferenceLabel includes its internal padding.
                 if ref_label.boundingRect().width() > max_ref_label_actual_width:
                     max_ref_label_actual_width = ref_label.boundingRect().width()
 
-                ref_y_offset -= ref_label.boundingRect().height() + 2 # Stack them upwards
+                ref_y_offset -= ref_label.boundingRect().height() + 2  # Stack them upwards
 
             # --- CommitMessageItem creation and positioning ---
             # Position the message item to the right of all reference labels for this commit.
@@ -92,28 +104,27 @@ class GitGraphView(QGraphicsView):
 
             message_x_start = base_x_for_labels_and_msg
             if max_ref_label_actual_width > 0:
-                message_x_start += max_ref_label_actual_width + REF_PADDING_X # Add padding after the widest label
+                message_x_start += max_ref_label_actual_width + REF_PADDING_X  # Add padding after the widest label
 
-            commit_msg_item = CommitMessageItem(commit_node.message, parent=None) # Or parent=commit_item
+            commit_msg_item = CommitMessageItem(commit_node.message, parent=None)  # Or parent=commit_item
 
             # Vertically center the message item with the commit circle
             msg_item_height = commit_msg_item.boundingRect().height()
-            commit_msg_item.setPos(
-                message_x_start,
-                commit_node.y - msg_item_height / 2
-            )
+            commit_msg_item.setPos(message_x_start, commit_node.y - msg_item_height / 2)
             self.scene.addItem(commit_msg_item)
             self._message_items.append(commit_msg_item)
 
         # Second pass: Create edges
         for commit_node in commits:
             if commit_node.sha not in self._commit_items:
-                continue # Should not happen if first pass was successful
+                continue  # Should not happen if first pass was successful
 
             current_commit_item = self._commit_items[commit_node.sha]
 
             # Determine the color for edges leading to this commit_node
-            final_color_idx_for_edge = commit_node.branch_color_idx if commit_node.branch_color_idx is not None else commit_node.color_idx
+            final_color_idx_for_edge = (
+                commit_node.branch_color_idx if commit_node.branch_color_idx is not None else commit_node.color_idx
+            )
             edge_color_for_commit = COLOR_PALETTE[final_color_idx_for_edge % len(COLOR_PALETTE)]
 
             for parent_sha in commit_node.parents:
@@ -127,7 +138,7 @@ class GitGraphView(QGraphicsView):
                     self._edge_items.append(edge)
 
         # Adjust scene rect after all items are added and positioned
-        self.scene.setSceneRect(self.scene.itemsBoundingRect().adjusted(0, -50, 50, 50)) # Add some padding
+        self.scene.setSceneRect(self.scene.itemsBoundingRect().adjusted(0, -50, 50, 50))  # Add some padding
 
     def load_repository(self, repo_path: str = "."):
         """High-level method to parse, layout, and display a repository's graph."""
@@ -136,9 +147,8 @@ class GitGraphView(QGraphicsView):
             calculate_commit_positions(commits)
             self.populate_graph(commits)
         else:
-            self.clear_graph() # Clear if parsing fails or no commits
+            self.clear_graph()  # Clear if parsing fails or no commits
             print(f"No commits found or error parsing repository at {repo_path}")
-
 
     def wheelEvent(self, event):
         """Handle mouse wheel events for zooming."""
@@ -148,9 +158,9 @@ class GitGraphView(QGraphicsView):
                 self.zoom_in()
             else:
                 self.zoom_out()
-            event.accept() # Indicate that the event has been handled
+            event.accept()  # Indicate that the event has been handled
         else:
-            super().wheelEvent(event) # Default behavior (scrolling)
+            super().wheelEvent(event)  # Default behavior (scrolling)
 
     def zoom_in(self):
         self.scale(self._zoom_factor_base, self._zoom_factor_base)
@@ -161,10 +171,10 @@ class GitGraphView(QGraphicsView):
     def keyPressEvent(self, event):
         """Handle key presses for zooming or other actions."""
         if event.key() == Qt.Key.Key_Plus or event.key() == Qt.Key.Key_Equal:
-            if event.modifiers() & Qt.KeyboardModifier.ControlModifier: # Ctrl + / Ctrl =
-                 self.zoom_in()
+            if event.modifiers() & Qt.KeyboardModifier.ControlModifier:  # Ctrl + / Ctrl =
+                self.zoom_in()
         elif event.key() == Qt.Key.Key_Minus:
-            if event.modifiers() & Qt.KeyboardModifier.ControlModifier: # Ctrl -
+            if event.modifiers() & Qt.KeyboardModifier.ControlModifier:  # Ctrl -
                 self.zoom_out()
         else:
             super().keyPressEvent(event)
@@ -177,10 +187,10 @@ class GitGraphView(QGraphicsView):
                 self.commit_item_clicked.emit(commit_sha)
                 # event.accept() # Optionally accept the event if it's fully handled
                 # return # Return if you don't want further processing
-        super().mousePressEvent(event) # Call super for other event processing (like panning)
+        super().mousePressEvent(event)  # Call super for other event processing (like panning)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import sys
     import os
 
@@ -205,38 +215,42 @@ if __name__ == '__main__':
             # Check if it's already a git repo
             is_git_repo = os.path.exists(".git")
             if not is_git_repo:
-                 subprocess.run(["git", "init"], check=True, capture_output=True)
-                 subprocess.run(["git", "config", "user.name", "Test User"], check=True)
-                 subprocess.run(["git", "config", "user.email", "test@example.com"], check=True)
+                subprocess.run(["git", "init"], check=True, capture_output=True)
+                subprocess.run(["git", "config", "user.name", "Test User"], check=True)
+                subprocess.run(["git", "config", "user.email", "test@example.com"], check=True)
 
-                 with open("file1.txt", "w") as f: f.write("content1")
-                 subprocess.run(["git", "add", "file1.txt"], check=True)
-                 subprocess.run(["git", "commit", "-m", "Initial commit"], check=True)
+                with open("file1.txt", "w") as f:
+                    f.write("content1")
+                subprocess.run(["git", "add", "file1.txt"], check=True)
+                subprocess.run(["git", "commit", "-m", "Initial commit"], check=True)
 
-                 subprocess.run(["git", "checkout", "-b", "feature_branch"], check=True)
-                 with open("file2.txt", "w") as f: f.write("content2")
-                 subprocess.run(["git", "add", "file2.txt"], check=True)
-                 subprocess.run(["git", "commit", "-m", "Add feature on branch"], check=True)
+                subprocess.run(["git", "checkout", "-b", "feature_branch"], check=True)
+                with open("file2.txt", "w") as f:
+                    f.write("content2")
+                subprocess.run(["git", "add", "file2.txt"], check=True)
+                subprocess.run(["git", "commit", "-m", "Add feature on branch"], check=True)
 
-                 subprocess.run(["git", "checkout", "main"], check=True)
-                 with open("file3.txt", "w") as f: f.write("content3")
-                 subprocess.run(["git", "add", "file3.txt"], check=True)
-                 subprocess.run(["git", "commit", "-m", "Add another feature on main"], check=True)
+                subprocess.run(["git", "checkout", "main"], check=True)
+                with open("file3.txt", "w") as f:
+                    f.write("content3")
+                subprocess.run(["git", "add", "file3.txt"], check=True)
+                subprocess.run(["git", "commit", "-m", "Add another feature on main"], check=True)
 
-                 subprocess.run(["git", "merge", "feature_branch", "-m", "Merge feature_branch"], check=True)
+                subprocess.run(["git", "merge", "feature_branch", "-m", "Merge feature_branch"], check=True)
 
-                 subprocess.run(["git", "tag", "v1.0"], check=True)
+                subprocess.run(["git", "tag", "v1.0"], check=True)
 
-                 with open("file4.txt", "w") as f: f.write("content4")
-                 subprocess.run(["git", "add", "file4.txt"], check=True)
-                 subprocess.run(["git", "commit", "-m", "Commit after tag"], check=True)
+                with open("file4.txt", "w") as f:
+                    f.write("content4")
+                subprocess.run(["git", "add", "file4.txt"], check=True)
+                subprocess.run(["git", "commit", "-m", "Commit after tag"], check=True)
 
-                 subprocess.run(["git", "checkout", "-b", "another_branch"], check=True)
-                 with open("file5.txt", "w") as f: f.write("content5")
-                 subprocess.run(["git", "add", "file5.txt"], check=True)
-                 subprocess.run(["git", "commit", "-m", "Work on another branch"], check=True)
-                 subprocess.run(["git", "checkout", "main"], check=True)
-
+                subprocess.run(["git", "checkout", "-b", "another_branch"], check=True)
+                with open("file5.txt", "w") as f:
+                    f.write("content5")
+                subprocess.run(["git", "add", "file5.txt"], check=True)
+                subprocess.run(["git", "commit", "-m", "Work on another branch"], check=True)
+                subprocess.run(["git", "checkout", "main"], check=True)
 
         except Exception as e:
             print(f"Error setting up dummy repo: {e}")
@@ -244,25 +258,25 @@ if __name__ == '__main__':
             os.chdir(original_cwd)
 
     # Check if current dir is a git repo, else use/create dummy
-    current_path_is_repo = os.path.exists(".git") or os.path.exists("../.git") # Simple check
+    current_path_is_repo = os.path.exists(".git") or os.path.exists("../.git")  # Simple check
     repo_to_load = "."
 
-    if not QApplication.instance().topLevelWidgets(): # Check if running in an env where dummy setup is problematic
+    if not QApplication.instance().topLevelWidgets():  # Check if running in an env where dummy setup is problematic
         if not current_path_is_repo:
             print(f"Not in a git repo. Setting up a dummy repo in ./{TEST_REPO_DIR}")
-            import subprocess # Make sure it's imported for dummy repo setup
+            import subprocess  # Make sure it's imported for dummy repo setup
+
             setup_dummy_repo(TEST_REPO_DIR)
             repo_to_load = TEST_REPO_DIR
         else:
             print(f"Running in current git repository: {os.getcwd()}")
-    else: # Likely in an environment like a dedicated test runner or IDE plugin
+    else:  # Likely in an environment like a dedicated test runner or IDE plugin
         print("Skipping dummy repo setup as other top-level widgets exist or specific environment detected.")
         if not current_path_is_repo:
             print("Warning: Not in a git repository, and dummy setup skipped. Graph may be empty.")
 
-
     view = GitGraphView()
-    view.load_repository(repo_to_load) # Load current dir or dummy
+    view.load_repository(repo_to_load)  # Load current dir or dummy
 
     view.setWindowTitle("Git Commit Graph Viewer")
     view.resize(800, 600)
