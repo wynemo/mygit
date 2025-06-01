@@ -26,6 +26,7 @@ class TopBarWidget(QWidget):
     pull_requested = pyqtSignal()
     push_requested = pyqtSignal()
     toggle_bottom_panel_requested = pyqtSignal()
+    toggle_left_panel_requested = pyqtSignal()  # 新增信号
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -105,9 +106,21 @@ class TopBarWidget(QWidget):
         self.update_toggle_button_icon(True)  # Initial state
         self._layout.addWidget(self.toggle_bottom_button)
 
+        # --- Toggle Left Panel Button ---
+        self.toggle_left_panel_button = QToolButton()
+        self.toggle_left_panel_button.setCheckable(True)
+        self.toggle_left_panel_button.setIcon(self._create_left_panel_icon(True))
+        self.toggle_left_panel_button.setToolTip("隐藏左侧面板")
+        self.toggle_left_panel_button.clicked.connect(self._on_toggle_left_panel)
+        self._layout.addWidget(self.toggle_left_panel_button)
+
     def _on_toggle_bottom_panel(self):
         self.toggle_bottom_panel_requested.emit()
         # The actual icon update will be triggered by GitManagerWindow via update_toggle_button_icon
+
+    def _on_toggle_left_panel(self):
+        self.toggle_left_panel_requested.emit()
+        # 图标和状态由主窗口控制
 
     def update_recent_menu(self, recent_folders):
         self.recent_menu.clear()
@@ -147,6 +160,23 @@ class TopBarWidget(QWidget):
         painter.end()
         return QIcon(pixmap)
 
+    def _create_left_panel_icon(self, visible=True):
+        # 简单用左右箭头表示
+        pixmap = QPixmap(16, 16)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(QColor("black"))
+        if visible:
+            # 显示时，画一个向左的箭头
+            points = [QPoint(11, 3), QPoint(5, 8), QPoint(11, 13)]
+        else:
+            # 隐藏时，画一个向右的箭头
+            points = [QPoint(5, 3), QPoint(11, 8), QPoint(5, 13)]
+        painter.drawPolyline(points)
+        painter.end()
+        return QIcon(pixmap)
+
     def update_toggle_button_icon(self, is_panel_visible):
         # Using text for now, will switch to icons if provided
         # For example, using up/down arrows from a resource file or drawing them
@@ -159,6 +189,17 @@ class TopBarWidget(QWidget):
             self.toggle_bottom_button.setToolTip("Show Bottom Panel")
             self.toggle_bottom_button.setChecked(False)
         self.toggle_bottom_button.setIconSize(QSize(16, 16))
+
+    def update_toggle_left_panel_icon(self, is_panel_visible):
+        if is_panel_visible:
+            self.toggle_left_panel_button.setIcon(self._create_left_panel_icon(True))
+            self.toggle_left_panel_button.setToolTip("隐藏左侧面板")
+            self.toggle_left_panel_button.setChecked(True)
+        else:
+            self.toggle_left_panel_button.setIcon(self._create_left_panel_icon(False))
+            self.toggle_left_panel_button.setToolTip("显示左侧面板")
+            self.toggle_left_panel_button.setChecked(False)
+        self.toggle_left_panel_button.setIconSize(QSize(16, 16))
 
     def get_current_branch(self):
         return self.branch_combo.currentText()

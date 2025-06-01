@@ -79,6 +79,7 @@ class GitManagerWindow(QMainWindow):
         self.top_bar.pull_requested.connect(self.pull_repo)
         self.top_bar.push_requested.connect(self.push_repo)
         self.top_bar.toggle_bottom_panel_requested.connect(self.toggle_bottom_widget)
+        self.top_bar.toggle_left_panel_requested.connect(self.toggle_left_panel)
 
         # Initial population of TopBarWidget UI elements
         # self.update_recent_menu_on_top_bar() # Called later in __init__
@@ -189,6 +190,12 @@ class GitManagerWindow(QMainWindow):
         self.bottom_widget.setVisible(self.bottom_widget_visible)
         if hasattr(self, "top_bar"):  # Ensure top_bar exists before calling its methods
             self.top_bar.update_toggle_button_icon(self.bottom_widget_visible)
+
+        # 左侧面板显示状态
+        self.left_panel_visible = self.settings.settings.get("left_panel_visible", True)
+        self.workspace_explorer.set_left_panel_visible(self.left_panel_visible)
+        if hasattr(self, "top_bar"):
+            self.top_bar.update_toggle_left_panel_icon(self.left_panel_visible)
 
         # 在初始化完成后,尝试打开上次的文件夹 (this will call update_branches_on_top_bar and update_recent_menu_on_top_bar)
         last_folder = self.settings.get_last_folder()
@@ -464,6 +471,15 @@ class GitManagerWindow(QMainWindow):
 
         # 保存状态到设置
         self.settings.settings["bottom_widget_visible"] = self.bottom_widget_visible
+        self.settings.save_settings()
+
+    def toggle_left_panel(self):
+        """切换左侧面板（文件树）显示状态"""
+        self.left_panel_visible = not self.left_panel_visible
+        self.workspace_explorer.set_left_panel_visible(self.left_panel_visible)
+        if hasattr(self, "top_bar"):
+            self.top_bar.update_toggle_left_panel_icon(self.left_panel_visible)
+        self.settings.settings["left_panel_visible"] = self.left_panel_visible
         self.settings.save_settings()
 
     def fetch_repo(self):

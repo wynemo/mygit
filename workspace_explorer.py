@@ -224,6 +224,15 @@ class WorkspaceExplorer(QWidget):
             if i != current_index:
                 self.tab_widget.removeTab(i)
 
+    def set_left_panel_visible(self, visible: bool):
+        """显示或隐藏左侧文件树面板"""
+        if visible:
+            self.file_tree.show()
+            self.splitter.setSizes([200, 400])  # 可选：恢复默认比例
+        else:
+            self.file_tree.hide()
+            self.splitter.setSizes([0, 1])  # 只显示右侧
+
 
 class FileTreeWidget(QTreeWidget):
     def __init__(self, parent=None, git_manager=None):
