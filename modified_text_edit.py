@@ -28,6 +28,41 @@ class ModifiedTextEdit(SyncedTextEdit):
         self._update_overview_bar_geometry()
         self.verticalScrollBar().valueChanged.connect(self.overview_bar.update_overview)
 
+        # 设置滚动条为半透明
+        scrollbar = self.verticalScrollBar()
+        scrollbar.setStyleSheet("""
+QPlainTextEdit QScrollBar:vertical {
+    background: transparent;
+    width: 10px;
+    margin: 0px 0px 0px 0px;
+}
+QPlainTextEdit QScrollBar::handle:vertical {
+    background: rgba(0, 0, 0, 100);  /* 半透明黑色 */
+    min-height: 20px;
+    border-radius: 5px;
+}
+QPlainTextEdit QScrollBar::add-page:vertical,
+QPlainTextEdit QScrollBar::sub-page:vertical {
+    background: transparent;
+}
+QPlainTextEdit QScrollBar::add-line:vertical,
+QPlainTextEdit QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+QPlainTextEdit QScrollBar::up-arrow:vertical,
+QPlainTextEdit QScrollBar::down-arrow:vertical {
+    background: none;
+    height: 0px;
+    width: 0px;
+}
+QPlainTextEdit QScrollBar::handle:vertical:hover {
+    background: rgba(0, 0, 0, 140);
+}
+QPlainTextEdit QScrollBar::handle:vertical:pressed {
+    background: rgba(0, 0, 0, 180);
+}
+        """)
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._update_overview_bar_geometry()
@@ -37,11 +72,8 @@ class ModifiedTextEdit(SyncedTextEdit):
         if hasattr(self, "viewport"):
             viewport = self.viewport()
             bar_width = self.overview_bar.BAR_WIDTH
-            # Move the bar到widget最右侧，和滚动条重叠
-            x = self.width() - bar_width  # self.width() 包含滚动条宽度
-            # self.overview_bar.setGeometry(x, 0, bar_width, viewport.height())
             self.overview_bar.setGeometry(
-                viewport.width() + self.line_number_area_width() - bar_width, 0, bar_width, viewport.height()
+                viewport.width() + self.line_number_area_width(), 0, bar_width, viewport.height()
             )
             self.overview_bar.raise_()
 
