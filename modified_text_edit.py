@@ -81,22 +81,38 @@ class ModifiedTextEdit(SyncedTextEdit):
 
                 # 绘制修改状态标记
                 mod_status = self.line_modifications.get(block_line_number)
-                if mod_status and mod_status in self.LINE_STATUS_COLORS:
-                    color = self.LINE_STATUS_COLORS[mod_status]
-                    painter.setBrush(color)
-                    painter.setPen(Qt.PenStyle.NoPen)
+                if mod_status:  # 仅当有状态时处理
+                    color = self.LINE_STATUS_COLORS.get(mod_status)
+                    if color:  # 确保颜色存在
+                        print(f"mod_status: {mod_status}, color: {color}", block_line_number)
+                        painter.setBrush(color)
+                        painter.setPen(Qt.PenStyle.NoPen)
 
-                    # 计算标记的垂直中心位置
-                    mark_y = int(top + (current_block_height - self.MODIFICATION_MARK_SIZE) / 2)
+                        # 计算标记的垂直中心位置
+                        mark_y = int(top + (current_block_height - self.MODIFICATION_MARK_SIZE) / 2)
 
-                    # 绘制竖线表示修改状态
-                    # 设置画笔，用于画线
-                    painter.setPen(QPen(color, 2))  # 线宽设为2像素
-                    # 计算竖线的x位置（在标记区域的中心）
-                    line_x = modification_mark_x + self.MODIFICATION_MARK_SIZE // 2
-                    # 绘制竖线，从当前行的顶部到底部
-                    # 确保坐标值为整数
-                    painter.drawLine(int(line_x), int(top), int(line_x), int(top + current_block_height))
+                        if mod_status == "deleted":
+                            last_mod_status = self.line_modifications.get(block_line_number - 1)
+                            if not last_mod_status or not last_mod_status == "deleted":
+                                # 绘制红点表示删除
+                                # 计算圆心的x位置（在标记区域的中心）
+                                dot_center_x = modification_mark_x + self.MODIFICATION_MARK_SIZE // 2
+                                # 绘制圆点
+                                painter.drawEllipse(
+                                    int(dot_center_x - self.MODIFICATION_MARK_SIZE / 2),
+                                    int(mark_y),
+                                    int(self.MODIFICATION_MARK_SIZE),
+                                    int(self.MODIFICATION_MARK_SIZE),
+                                )
+                        elif mod_status in ("added", "modified"):
+                            # 绘制竖线表示新增或修改
+                            # 设置画笔，用于画线
+                            painter.setPen(QPen(color, 2))  # 线宽设为2像素
+                            # 计算竖线的x位置（在标记区域的中心）
+                            line_x = modification_mark_x + self.MODIFICATION_MARK_SIZE // 2
+                            # 绘制竖线，从当前行的顶部到底部
+                            # 确保坐标值为整数
+                            painter.drawLine(int(line_x), int(top), int(line_x), int(top + current_block_height))
 
             block = block.next()
             top = bottom
