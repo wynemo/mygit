@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 
 from PyQt6.QtGui import QIcon
@@ -24,6 +25,9 @@ def main():
 
 
 if __name__ == "__main__":
-    # 配置日志 (Configure logging)
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
+    # 根据环境变量设置日志级别
+    log_level = logging.DEBUG if os.getenv("DEBUG") == "1" else logging.INFO
+
+    # 配置日志
+    logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
     main()
