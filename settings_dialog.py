@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QFormLayout, QLineEdit
+from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit
 
 # from git_manager_window import GitManagerWindow
 
@@ -13,33 +13,51 @@ class SettingsDialog(QDialog):
         # 创建布局
         layout = QFormLayout(self)
 
-        # 创建字体输入文本框
+        # 创建字体输入文本框（响应式布局）
         self.font_edit = QLineEdit()
         self.font_edit.setText(self.settings.get_font_family())
-        layout.addRow("字体:", self.font_edit)
+        font_layout = QHBoxLayout()
+        font_layout.addWidget(QLabel("字体:"))
+        font_layout.addWidget(self.font_edit, 1)  # 设置拉伸因子
+        layout.addRow(font_layout)
 
         # 创建字体大小输入框
         self.font_size_edit = QLineEdit()
         self.font_size_edit.setText(str(self.settings.get_font_size()))
-        layout.addRow("字体大小:", self.font_size_edit)
+        font_size_layout = QHBoxLayout()
+        font_size_layout.addWidget(QLabel("字体大小:"))
+        font_size_layout.addWidget(self.font_size_edit, 1)
+        layout.addRow(font_size_layout)
 
         # 创建API设置输入框
         self.api_url_edit = QLineEdit()
         self.api_url_edit.setText(self.settings.settings.get("api_url", ""))
-        layout.addRow("API URL:", self.api_url_edit)
+        api_url_layout = QHBoxLayout()
+        api_url_layout.addWidget(QLabel("API URL:"))
+        api_url_layout.addWidget(self.api_url_edit, 1)
+        layout.addRow(api_url_layout)
 
         self.api_secret_edit = QLineEdit()
         self.api_secret_edit.setText(self.settings.settings.get("api_secret", ""))
-        self.api_secret_edit.setEchoMode(QLineEdit.EchoMode.Password)  # 密码模式显示
-        layout.addRow("API Secret:", self.api_secret_edit)
+        self.api_secret_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        api_secret_layout = QHBoxLayout()
+        api_secret_layout.addWidget(QLabel("API Secret:"))
+        api_secret_layout.addWidget(self.api_secret_edit, 1)
+        layout.addRow(api_secret_layout)
 
         self.model_name_edit = QLineEdit()
         self.model_name_edit.setText(self.settings.settings.get("model_name", ""))
-        layout.addRow("Model Name:", self.model_name_edit)
+        model_layout = QHBoxLayout()
+        model_layout.addWidget(QLabel("Model Name:"))
+        model_layout.addWidget(self.model_name_edit, 1)
+        layout.addRow(model_layout)
 
         self.prompt = QLineEdit()
         self.prompt.setText(self.settings.settings.get("prompt", "帮我生成commit 信息, 用中文"))
-        layout.addRow("Prompt:", self.prompt)
+        prompt_layout = QHBoxLayout()
+        prompt_layout.addWidget(QLabel("Prompt:"))
+        prompt_layout.addWidget(self.prompt, 1)
+        layout.addRow(prompt_layout)
 
         # 添加确定和取消按钮
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
