@@ -1,14 +1,17 @@
-import unittest
-import tempfile
-import shutil
 import os
-import git # Make sure 'gitpython' is installed in the test environment
+import shutil
 
 # Assuming GitManager is in a module that can be imported, e.g., from git_manager import GitManager
 # Adjust the import path if your GitManager is in a subdirectory or package
 import sys
+import tempfile
+import unittest
+
+import git  # Make sure 'gitpython' is installed in the test environment
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from git_manager import GitManager 
+from git_manager import GitManager
+
 
 class TestGitManagerFileStatus(unittest.TestCase):
     def setUp(self):

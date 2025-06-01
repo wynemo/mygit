@@ -1,21 +1,21 @@
 # git_graph_view.py
 
-from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QApplication, QGraphicsItem
-from PyQt6.QtGui import QPainter, QTransform, QColor
-from PyQt6.QtCore import pyqtSignal, Qt, QRectF
+from PyQt6.QtCore import QRectF, Qt, pyqtSignal
+from PyQt6.QtGui import QColor, QPainter, QTransform
+from PyQt6.QtWidgets import QApplication, QGraphicsItem, QGraphicsScene, QGraphicsView
 
 from git_graph_data import CommitNode
 from git_graph_items import (
-    CommitCircle,
-    EdgeLine,
-    ReferenceLabel,
-    CommitMessageItem,
     COLOR_PALETTE,
     COMMIT_RADIUS,
     REF_PADDING_X,
+    CommitCircle,
+    CommitMessageItem,
+    EdgeLine,
+    ReferenceLabel,
 )
-from git_log_parser import parse_git_log
 from git_graph_layout import calculate_commit_positions
+from git_log_parser import parse_git_log
 
 
 class GitGraphView(QGraphicsView):
@@ -191,8 +191,8 @@ class GitGraphView(QGraphicsView):
 
 
 if __name__ == "__main__":
-    import sys
     import os
+    import sys
 
     app = QApplication(sys.argv)
 

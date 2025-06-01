@@ -1,12 +1,15 @@
 import unittest
 from unittest.mock import MagicMock, patch
-from PyQt6.QtWidgets import QApplication, QTreeWidget, QComboBox, QWidget
 
-# Application imports
-from git_manager_window import GitManagerWindow
+from PyQt6.QtWidgets import QApplication, QComboBox, QTreeWidget, QWidget
+
 # CommitHistoryView is used by GitManagerWindow, but we directly interact with window.commit_history_view
 # from commit_history_view import CommitHistoryView 
 from git_manager import GitManager
+
+# Application imports
+from git_manager_window import GitManagerWindow
+
 
 class TestBlameAnnotationClick(unittest.TestCase):
 

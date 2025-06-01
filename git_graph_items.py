@@ -1,8 +1,8 @@
 # git_graph_items.py
 
-from PyQt6.QtWidgets import QGraphicsEllipseItem, QGraphicsPathItem, QGraphicsTextItem, QGraphicsItem
-from PyQt6.QtGui import QBrush, QPen, QColor, QPainterPath, QFont
-from PyQt6.QtCore import Qt, QRectF
+from PyQt6.QtCore import QRectF, Qt
+from PyQt6.QtGui import QBrush, QColor, QFont, QPainterPath, QPen
+from PyQt6.QtWidgets import QGraphicsEllipseItem, QGraphicsItem, QGraphicsPathItem, QGraphicsTextItem
 
 from git_graph_data import CommitNode  # Assuming git_graph_data.py is available
 

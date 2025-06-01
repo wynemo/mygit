@@ -1,17 +1,19 @@
-import unittest
-import tempfile
-import shutil
 import os
-import git # GitPython
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtGui import QColor
-from PyQt6.QtCore import Qt # For Qt.GlobalColor if needed
+import shutil
 
 # Adjust import paths if necessary
 import sys
+import tempfile
+import unittest
+
+import git  # GitPython
+from PyQt6.QtCore import Qt  # For Qt.GlobalColor if needed
+from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import QApplication
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from git_manager import GitManager
-from workspace_explorer import WorkspaceExplorer # This contains FileTreeWidget
+from workspace_explorer import WorkspaceExplorer  # This contains FileTreeWidget
 
 # It's good practice to have a QApplication instance for widget tests
 app = None

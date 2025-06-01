@@ -1,7 +1,8 @@
 # git_log_parser.py
 
-import subprocess
 import os
+import subprocess
+
 from git_graph_data import CommitNode  # Assuming git_graph_data.py is in the same directory or accessible
 
 # Delimiters for parsing git log output
