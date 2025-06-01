@@ -636,11 +636,14 @@ class ModifiedTextEdit(SyncedTextEdit):
                     # 计算标记的垂直中心位置
                     mark_y = int(top + (current_block_height - self.MODIFICATION_MARK_SIZE) / 2)
 
-                    # 绘制圆点表示修改状态
-                    mark_rect = QRect(
-                        modification_mark_x, mark_y, self.MODIFICATION_MARK_SIZE, self.MODIFICATION_MARK_SIZE
-                    )
-                    painter.drawEllipse(mark_rect)
+                    # 绘制竖线表示修改状态
+                    # 设置画笔，用于画线
+                    painter.setPen(QPen(color, 2))   # 线宽设为2像素
+                    # 计算竖线的x位置（在标记区域的中心）
+                    line_x = modification_mark_x + self.MODIFICATION_MARK_SIZE // 2
+                    # 绘制竖线，从当前行的顶部到底部
+                    # 确保坐标值为整数
+                    painter.drawLine(int(line_x), int(top), int(line_x), int(top + current_block_height))
 
             block = block.next()
             top = bottom
