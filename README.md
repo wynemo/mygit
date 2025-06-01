@@ -140,3 +140,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 44. ~~git push以后，需要更新分支的remote提示~~
 45. ~~SyncedTextEdit 字体大小是硬编码的~~
 46. ~~比较页面，也需要有代码语法高亮的支持~~
+47. untracked files 在 workspace_explorer 需要显示状态
