@@ -100,7 +100,7 @@ class ModifiedTextEdit(SyncedTextEdit):
                                 # 绘制圆点
                                 painter.drawEllipse(
                                     int(dot_center_x - self.MODIFICATION_MARK_SIZE / 2),
-                                    int(mark_y),
+                                    int(top),
                                     int(self.MODIFICATION_MARK_SIZE),
                                     int(self.MODIFICATION_MARK_SIZE),
                                 )

@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from typing import List, Optional
 
 import git
@@ -290,7 +291,6 @@ class GitManager:
             for line in lines:
                 if line.startswith("@@"):
                     # 解析 @@ -10,7 +10,8 @@ 这样的 Hunk 行
-                    import re
 
                     m = re.match(r"^@@ -(\d+)(?:,\d+)? \+(\d+)", line)
                     if m:
@@ -298,9 +298,9 @@ class GitManager:
                         target_line = int(m.group(2))
                     print(f"\n  🔸 {line}")
                 elif line.startswith("-") and not line.startswith("---"):
-                    print(f"  ➖ 删除行 {source_line}: {line[1:].strip()}")
-                    d[source_line] = "deleted"
-                    source_line += 1
+                    print(f"  ➖ 删除行 {target_line}: {line[1:].strip()}")
+                    d[target_line] = "deleted"
+                    # target_line += 1
                 elif line.startswith("+") and not line.startswith("+++"):
                     print(f"  ➕ 新增行 {target_line}: {line[1:].strip()}")
                     if d.get(target_line) == "deleted":
