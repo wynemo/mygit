@@ -22,6 +22,7 @@ class Settings:
             "max_recent": 10,  # 最大记录数
             "font_family": "Courier New",  # 默认字体
             "font_size": 12,  # 默认字体大小
+            "code_style": "friendly",  # 代码风格设置
         }
 
         # 加载已有设置
@@ -35,7 +36,7 @@ class Settings:
                     saved_settings = json.load(f)
                     self.settings.update(saved_settings)
         except Exception as e:
-            print(f"加载设置失败: {str(e)}")
+            print(f"加载设置失败: {e!s}")
 
     def save_settings(self):
         """保存设置"""
@@ -43,7 +44,7 @@ class Settings:
             with open(self.config_file, "w", encoding="utf-8") as f:
                 json.dump(self.settings, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"保存设置失败: {str(e)}")
+            print(f"保存设置失败: {e!s}")
 
     def add_recent_folder(self, folder_path):
         """添加最近打开的文件夹"""
@@ -90,4 +91,13 @@ class Settings:
     def set_font_size(self, font_size):
         """设置字体大小"""
         self.settings["font_size"] = font_size
+        self.save_settings()
+
+    def get_code_style(self):
+        """获取代码风格设置"""
+        return self.settings.get("code_style", "friendly")
+
+    def set_code_style(self, code_style):
+        """设置代码风格"""
+        self.settings["code_style"] = code_style
         self.save_settings()
