@@ -120,13 +120,13 @@ class SyncedTextEdit(QPlainTextEdit):
         # Convert to 0-indexed if it's not already clear from usage context
         # Assuming line_number is passed as 0-indexed from DiffViewer
         self.highlighted_line_number = line_number
-        if hasattr(self, 'line_number_area') and self.line_number_area:
+        if hasattr(self, "line_number_area") and self.line_number_area:
             self.line_number_area.update()
 
     def clear_highlighted_line(self):
         """Clears any highlighted line number."""
         self.highlighted_line_number = -1
-        if hasattr(self, 'line_number_area') and self.line_number_area:
+        if hasattr(self, "line_number_area") and self.line_number_area:
             self.line_number_area.update()
 
     def open_find_dialog(self):
@@ -488,7 +488,7 @@ class SyncedTextEdit(QPlainTextEdit):
 
                 # Highlight background for the current line number if it's the highlighted one
                 if block_number == self.highlighted_line_number:
-                    highlight_color = QColor(Qt.GlobalColor.yellow).lighter(120) # A light yellow
+                    highlight_color = QColor(Qt.GlobalColor.yellow).lighter(120)  # A light yellow
                     # Define the rectangle for the line number highlight more precisely
                     # It should cover the area for this specific line number.
                     # line_num_rect is already calculated for drawing text, so we can reuse its geometry.

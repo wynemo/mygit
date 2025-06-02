@@ -68,22 +68,22 @@ class DiffViewer(QWidget):
             if chunk.type == "insert":
                 # Content added to right. Right editor highlights start of new block (chunk.right_start).
                 # Left editor highlights the line it's scrolled to (left_target_line, typically line before insertion).
-                if chunk.right_start < self.right_edit.document().blockCount(): # Check line validity
+                if chunk.right_start < self.right_edit.document().blockCount():  # Check line validity
                     self.right_edit.set_highlighted_line(chunk.right_start)
-                if left_target_line < self.left_edit.document().blockCount(): # Check line validity
+                if left_target_line < self.left_edit.document().blockCount():  # Check line validity
                     self.left_edit.set_highlighted_line(left_target_line)
             elif chunk.type == "delete":
                 # Content removed from left. Left editor highlights start of removed block (chunk.left_start).
                 # Right editor highlights the line it's scrolled to (right_target_line, typically line before deletion).
-                if chunk.left_start < self.left_edit.document().blockCount(): # Check line validity
+                if chunk.left_start < self.left_edit.document().blockCount():  # Check line validity
                     self.left_edit.set_highlighted_line(chunk.left_start)
-                if right_target_line < self.right_edit.document().blockCount(): # Check line validity
+                if right_target_line < self.right_edit.document().blockCount():  # Check line validity
                     self.right_edit.set_highlighted_line(right_target_line)
-            elif chunk.type == "replace": # <--- This line is changed
+            elif chunk.type == "replace":  # <--- This line is changed
                 # Content modified in both. Both editors highlight start of modified block.
-                if chunk.left_start < self.left_edit.document().blockCount(): # Check line validity
+                if chunk.left_start < self.left_edit.document().blockCount():  # Check line validity
                     self.left_edit.set_highlighted_line(chunk.left_start)
-                if chunk.right_start < self.right_edit.document().blockCount(): # Check line validity
+                if chunk.right_start < self.right_edit.document().blockCount():  # Check line validity
                     self.right_edit.set_highlighted_line(chunk.right_start)
 
             self.left_edit.scroll_to_line(left_target_line)
@@ -185,8 +185,8 @@ class DiffViewer(QWidget):
         self.left_edit.clear_highlighted_line()
         self.right_edit.clear_highlighted_line()
         # self.current_diff_index = -1 # This is already handled in _compute_diff, which is called shortly after.
-                                 # Keeping it here can be redundant but harmless.
-                                 # For clarity, let _compute_diff manage current_diff_index.
+        # Keeping it here can be redundant but harmless.
+        # For clarity, let _compute_diff manage current_diff_index.
         logging.debug("\n=== 设置新的文本进行比较 ===")
         # 先设置文本
         self.left_edit.setPlainText(left_text)
