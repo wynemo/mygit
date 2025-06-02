@@ -144,3 +144,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 48. ~~修复git push时的动画bug: QPropertyAnimation: you're trying to animate a non-existing property _rotation_angle of your QObject~~
 49. windows阶段测试
 50. linux阶段测试
+60. ~~与工作区比较，加入编辑功能~~
