@@ -328,7 +328,7 @@ class CommitDialog(QDialog):
             diff_viewer.set_texts(old_content, new_content, file_path, "HEAD", None)
 
             # 显示对话框
-            diff_dialog.exec()
+            diff_dialog.show()
 
         except Exception as e:
             logging.exception("显示文件差异失败")

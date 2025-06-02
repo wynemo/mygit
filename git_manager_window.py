@@ -393,7 +393,7 @@ class GitManagerWindow(QMainWindow):
             # 创建并显示比较对话框
             # todo 这个要改造, 看readme里的todo
             dialog = CompareWithWorkingDialog(f"比较 {file_path}", old_content, new_content, file_path, self)
-            dialog.exec()
+            dialog.show()
 
         except Exception as e:
             print(f"比较文件失败: {e!s}")
@@ -435,7 +435,7 @@ class GitManagerWindow(QMainWindow):
     def show_settings_dialog(self):
         """显示设置对话框"""
         dialog = SettingsDialog(self)
-        dialog.exec()
+        dialog.show()
 
     def close_tab(self, index):
         """关闭标签页"""
