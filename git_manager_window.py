@@ -6,7 +6,6 @@ from PyQt6.QtGui import QGuiApplication
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
-    QDialog,
     QFileDialog,
     QHBoxLayout,
     QMainWindow,
@@ -220,8 +219,7 @@ class GitManagerWindow(QMainWindow):
             return
 
         dialog = CommitDialog(self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            pass
+        dialog.show()
 
     # def update_recent_menu(self): # Removed, logic moved to TopBarWidget or adapted
     #     """更新最近文件夹菜单 - This method is now in TopBarWidget"""
