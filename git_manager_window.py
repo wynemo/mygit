@@ -27,7 +27,7 @@ from file_changes_view import FileChangesView
 from git_manager import GitManager
 from settings import Settings
 from settings_dialog import SettingsDialog
-from threads import PullThread
+from threads import PullThread, PushThread  # Import PullThread and PushThread
 from top_bar_widget import TopBarWidget  # Import TopBarWidget
 from workspace_explorer import WorkspaceExplorer
 
@@ -531,16 +531,24 @@ class GitManagerWindow(QMainWindow):
         if hasattr(self, "top_bar") and self.top_bar:
             self.top_bar.start_spinning()
             QApplication.processEvents()  # Ensure UI updates
+        # 创建并启动线程
+        self.push_thread = PushThread(self.git_manager)
+        self.push_thread.finished.connect(self.handle_push_finished)
+        self.push_thread.start()
+
+    def handle_push_finished(self, success, error_message):
+        """处理push操作完成"""
         try:
-            self.git_manager.push()
-            self.update_commit_history()  # This updates the history view
-        except Exception as e:
-            QMessageBox.critical(self, "错误", f"推送仓库时发生错误: {e}")
-            logging.exception("推送仓库时发生错误")
+            if success:
+                self.update_commit_history()
+            else:
+                QMessageBox.critical(self, "错误", f"推送仓库时发生错误: {error_message}")
+                logging.exception("推送仓库时发生错误")
         finally:
+            # 停止加载动画
             if hasattr(self, "top_bar") and self.top_bar:
                 self.top_bar.stop_spinning()
-                QApplication.processEvents()  # Ensure UI updates
+                QApplication.processEvents()
 
     def handle_blame_click_from_editor(self, commit_hash: str):
         """
