@@ -145,3 +145,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 49. windows阶段测试
 50. linux阶段测试
 60. ~~与工作区比较，加入编辑功能~~
+61. 将 fetch pull push 等按钮放到左小角
