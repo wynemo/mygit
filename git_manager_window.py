@@ -5,6 +5,7 @@ from PyQt6.QtCore import QEvent, Qt  # Added QEvent
 from PyQt6.QtGui import QGuiApplication
 from PyQt6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QDialog,
     QFileDialog,
     QHBoxLayout,
@@ -496,6 +497,9 @@ class GitManagerWindow(QMainWindow):
         """拉取仓库"""
         if not self.git_manager:
             return
+        if hasattr(self, "top_bar") and self.top_bar:
+            self.top_bar.start_spinning()
+            QApplication.processEvents()  # Ensure UI updates
         # 出异常了需要处理, 不然程序会崩溃
         try:
             self.git_manager.pull()
@@ -503,18 +507,29 @@ class GitManagerWindow(QMainWindow):
         except:
             QMessageBox.critical(self, "错误", "拉取仓库时发生错误")
             logging.exception("拉取仓库时发生错误")
+        finally:
+            if hasattr(self, "top_bar") and self.top_bar:
+                self.top_bar.stop_spinning()
+                QApplication.processEvents()  # Ensure UI updates
 
     def push_repo(self):
         """推送仓库"""
         if not self.git_manager:
             # Consider disabling push button via top_bar if no git_manager
             return
+        if hasattr(self, "top_bar") and self.top_bar:
+            self.top_bar.start_spinning()
+            QApplication.processEvents()  # Ensure UI updates
         try:
             self.git_manager.push()
             self.update_commit_history()  # This updates the history view
-        except:
-            QMessageBox.critical(self, "错误", "推送仓库时发生错误")
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"推送仓库时发生错误: {e}")
             logging.exception("推送仓库时发生错误")
+        finally:
+            if hasattr(self, "top_bar") and self.top_bar:
+                self.top_bar.stop_spinning()
+                QApplication.processEvents()  # Ensure UI updates
 
     def handle_blame_click_from_editor(self, commit_hash: str):
         """
