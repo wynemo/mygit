@@ -509,12 +509,19 @@ class GitManagerWindow(QMainWindow):
         if not self.git_manager:
             # Consider disabling push button via top_bar if no git_manager
             return
+
+        # 开始推送动画
+        self.top_bar.start_push_animation()
+
         try:
             self.git_manager.push()
             self.update_commit_history()  # This updates the history view
         except:
             QMessageBox.critical(self, "错误", "推送仓库时发生错误")
             logging.exception("推送仓库时发生错误")
+        finally:
+            # 停止推送动画
+            self.top_bar.stop_push_animation()
 
     def handle_blame_click_from_editor(self, commit_hash: str):
         """

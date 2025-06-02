@@ -1,7 +1,7 @@
 import sys
 
-from PyQt6.QtCore import QPoint, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
+from PyQt6.QtCore import QPoint, QPropertyAnimation, QSize, Qt, pyqtProperty, pyqtSignal
+from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap, QPolygon, QTransform
 from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -27,6 +27,7 @@ class TopBarWidget(QWidget):
     push_requested = pyqtSignal()
     toggle_bottom_panel_requested = pyqtSignal()
     toggle_left_panel_requested = pyqtSignal()  # 新增信号
+    rotationAngleChanged = pyqtSignal()  # 用于属性动画
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -36,6 +37,12 @@ class TopBarWidget(QWidget):
         self._layout.setContentsMargins(10, 5, 10, 5)  # Adjusted margins for more elements
         self._layout.setSpacing(10)  # Added spacing between widgets
         self.setLayout(self._layout)
+
+        # 旋转动画相关
+        self._rotation_angle_val = 0  # 内部存储属性值
+        self._rotation_animation = None
+        self._original_push_icon = None
+        self._is_pushing = False
 
         # --- Open Folder Button ---
         self.open_button = QPushButton("Open Folder")
@@ -84,6 +91,9 @@ class TopBarWidget(QWidget):
         self.push_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.push_button.clicked.connect(self.push_requested.emit)
         self._layout.addWidget(self.push_button)
+
+        # 保存原始图标
+        self._original_push_icon = self.push_button.icon()
 
         # --- Separator ---
         separator = QFrame()
@@ -156,7 +166,8 @@ class TopBarWidget(QWidget):
             points = [QPoint(3, 6), QPoint(8, 11), QPoint(13, 6)]
         else:
             points = [QPoint(3, 10), QPoint(8, 5), QPoint(13, 10)]
-        painter.drawPolyline(points)
+        polygon = QPolygon(points)
+        painter.drawPolyline(polygon)
         painter.end()
         return QIcon(pixmap)
 
@@ -173,7 +184,8 @@ class TopBarWidget(QWidget):
         else:
             # 隐藏时，画一个向右的箭头
             points = [QPoint(5, 3), QPoint(11, 8), QPoint(5, 13)]
-        painter.drawPolyline(points)
+        polygon = QPolygon(points)
+        painter.drawPolyline(polygon)
         painter.end()
         return QIcon(pixmap)
 
@@ -213,6 +225,88 @@ class TopBarWidget(QWidget):
         self.push_button.setEnabled(enabled)
         # `recent_button` and `open_button` should always be enabled or handled separately.
         # `settings_button` and `toggle_bottom_button` usually always enabled.
+
+    @pyqtProperty(float, notify=rotationAngleChanged)
+    def _rotation_angle(self):
+        return self._rotation_angle_val
+
+    @_rotation_angle.setter
+    def _rotation_angle(self, value):
+        normalized_value = value % 360
+        if self._rotation_angle_val != normalized_value:
+            self._rotation_angle_val = normalized_value
+            self.rotationAngleChanged.emit()
+            if self._is_pushing:
+                self.push_button.setIcon(self._create_rotated_icon(self._rotation_angle_val))
+
+    def _create_rotated_icon(self, angle):
+        """创建旋转的图标"""
+        # 加载 spin.png 图片
+        pixmap = QPixmap("icons/spin.png")
+        if pixmap.isNull():
+            # 如果找不到 spin.png，使用默认图标
+            pixmap = QPixmap(32, 32)
+            pixmap.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(pixmap)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            painter.setPen(QColor("black"))
+            painter.drawEllipse(8, 8, 16, 16)
+            painter.end()
+
+        # 创建旋转变换
+        transform = QTransform()
+        transform.translate(pixmap.width() / 2, pixmap.height() / 2)
+        transform.rotate(angle)
+        transform.translate(-pixmap.width() / 2, -pixmap.height() / 2)
+
+        # 应用旋转
+        rotated_pixmap = pixmap.transformed(transform, Qt.TransformationMode.SmoothTransformation)
+        return QIcon(rotated_pixmap)
+
+    def _update_rotation(self):
+        """更新旋转角度并刷新图标"""
+        if self._is_pushing:
+            self._rotation_angle = (self._rotation_angle + 10) % 360  # 调用setter
+
+    def start_push_animation(self):
+        """开始推送动画"""
+        if self._rotation_animation:
+            self._rotation_animation.stop()
+
+        self._is_pushing = True
+        self._rotation_angle = 0  # 调用setter, 设置初始图标
+
+        # 创建动画
+        self._rotation_animation = QPropertyAnimation(self, b"_rotation_angle")  # 现在属性存在
+        self._rotation_animation.setDuration(0)  # 不使用属性动画的时间控制
+        self._rotation_animation.setLoopCount(-1)  # 无限循环
+
+        # 使用定时器来控制旋转
+        from PyQt6.QtCore import QTimer
+
+        self._rotation_timer = QTimer()
+        self._rotation_timer.timeout.connect(self._update_rotation)
+        self._rotation_timer.start(50)  # 每50ms更新一次，创建平滑的旋转效果
+
+        # 禁用按钮防止重复点击
+        self.push_button.setEnabled(False)
+        self.push_button.setText("Pushing...")
+
+    def stop_push_animation(self):
+        """停止推送动画"""
+        self._is_pushing = False
+
+        if hasattr(self, "_rotation_timer"):
+            self._rotation_timer.stop()
+
+        if self._rotation_animation:
+            self._rotation_animation.stop()
+
+        # 恢复原始图标和状态
+        self.push_button.setIcon(self._original_push_icon)
+        self.push_button.setEnabled(True)
+        self.push_button.setText("Push")
+        self._rotation_angle_val = 0  # 直接重置内部值
 
 
 if __name__ == "__main__":
