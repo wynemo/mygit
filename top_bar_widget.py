@@ -106,7 +106,7 @@ class TopBarWidget(QWidget):
 
         # --- Spinner Label ---
         self.spinner_label = RotatingIcon("icons/spin.png")
-        self.spinner_label.show()
+        self.spinner_label.hide()
         self.layout().addWidget(self.spinner_label)
 
         self._layout.addStretch(1)  # Add stretch to push subsequent items to the right

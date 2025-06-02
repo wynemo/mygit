@@ -1,7 +1,7 @@
 import logging
 import os
 
-from PyQt6.QtCore import QEvent, Qt  # Added QEvent
+from PyQt6.QtCore import QEvent, Qt  # Added QEvent and threading
 from PyQt6.QtGui import QGuiApplication
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -27,6 +27,7 @@ from file_changes_view import FileChangesView
 from git_manager import GitManager
 from settings import Settings
 from settings_dialog import SettingsDialog
+from threads import PullThread
 from top_bar_widget import TopBarWidget  # Import TopBarWidget
 from workspace_explorer import WorkspaceExplorer
 
@@ -494,23 +495,33 @@ class GitManagerWindow(QMainWindow):
             logging.exception("获取仓库时发生错误")
 
     def pull_repo(self):
-        """拉取仓库"""
+        """拉取仓库（使用线程）"""
         if not self.git_manager:
             return
+
+        # 显示加载动画
         if hasattr(self, "top_bar") and self.top_bar:
             self.top_bar.start_spinning()
-            QApplication.processEvents()  # Ensure UI updates
-        # 出异常了需要处理, 不然程序会崩溃
+            QApplication.processEvents()
+
+        # 创建并启动线程
+        self.pull_thread = PullThread(self.git_manager)
+        self.pull_thread.finished.connect(self.handle_pull_finished)
+        self.pull_thread.start()
+
+    def handle_pull_finished(self, success, error_message):
+        """处理pull操作完成"""
         try:
-            self.git_manager.pull()
-            self.update_commit_history()
-        except:
-            QMessageBox.critical(self, "错误", "拉取仓库时发生错误")
-            logging.exception("拉取仓库时发生错误")
+            if success:
+                self.update_commit_history()
+            else:
+                QMessageBox.critical(self, "错误", f"拉取仓库时发生错误: {error_message}")
+                logging.exception("拉取仓库时发生错误")
         finally:
+            # 停止加载动画
             if hasattr(self, "top_bar") and self.top_bar:
                 self.top_bar.stop_spinning()
-                QApplication.processEvents()  # Ensure UI updates
+                QApplication.processEvents()
 
     def push_repo(self):
         """推送仓库"""
