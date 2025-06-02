@@ -117,7 +117,7 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 21. ~~“提交历史”标签，不可关闭，那么样式不需要一个“x“的关闭按钮~~
 22. ~~仓库需要优先显示默认分支~~
 23. ~~工作区的文件，右键菜单，加入git annoation 支持;完成一半了~~
-24. git push 以后，需要有点提示；~~或者说界面上有点不同；~~同时增加推送中的交互, 添加一个旋转图标, 后续git fetch/pull 也需要有这个交互
+24. git push 以后，需要有点提示；~~或者说界面上有点不同；~~ 同时增加推送中的交互, 添加一个旋转图标, 后续git fetch/pull 也需要有这个交互
 25. ~~CommitHistoryView 的 history_list (CustomTreeWidget) 需要显示remote与local，现在只显示了local, remote可加emoji ☁️~~
 26. ~~点击git annoation 单行的区域时，根据commit 信息，需要选中commit_history_view history_list的相应的item，然后 on_commit_clicked 触发~~
 27. ~~git annoation 宽度不一致 希望能计算出最宽的宽度 然后合理的显示~~
@@ -141,6 +141,6 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 45. ~~SyncedTextEdit 字体大小是硬编码的~~
 46. ~~比较页面，也需要有代码语法高亮的支持~~
 47. ~~untracked files 在 workspace_explorer FileTreeWidget 需要显示状态 可显示为灰色~~
-48. 修复git push时的动画bug: QPropertyAnimation: you're trying to animate a non-existing property _rotation_angle of your QObject
+48. ~~修复git push时的动画bug: QPropertyAnimation: you're trying to animate a non-existing property _rotation_angle of your QObject~~
 49. windows阶段测试
 50. linux阶段测试
