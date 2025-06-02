@@ -80,6 +80,7 @@ class SyncedTextEdit(QPlainTextEdit):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.highlighted_line_number = -1
         settings = Settings()
         self.setFont(QFont(settings.get_font_family(), settings.get_font_size()))
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
@@ -113,6 +114,20 @@ class SyncedTextEdit(QPlainTextEdit):
         self.customContextMenuRequested.connect(self.show_context_menu)
         self.find_dialog_instance = None  # Initialize find_dialog_instance
         self.search_highlights = []  # Initialize search_highlights
+
+    def set_highlighted_line(self, line_number: int):
+        """Sets the line number to be highlighted in the line number area."""
+        # Convert to 0-indexed if it's not already clear from usage context
+        # Assuming line_number is passed as 0-indexed from DiffViewer
+        self.highlighted_line_number = line_number
+        if hasattr(self, 'line_number_area') and self.line_number_area:
+            self.line_number_area.update()
+
+    def clear_highlighted_line(self):
+        """Clears any highlighted line number."""
+        self.highlighted_line_number = -1
+        if hasattr(self, 'line_number_area') and self.line_number_area:
+            self.line_number_area.update()
 
     def open_find_dialog(self):
         cursor = self.textCursor()
@@ -470,6 +485,19 @@ class SyncedTextEdit(QPlainTextEdit):
                 line_num_rect = QRect(
                     int(x_start_for_linenum), int(top), int(line_num_text_width), int(current_block_height)
                 )
+
+                # Highlight background for the current line number if it's the highlighted one
+                if block_number == self.highlighted_line_number:
+                    highlight_color = QColor(Qt.GlobalColor.yellow).lighter(120) # A light yellow
+                    # Define the rectangle for the line number highlight more precisely
+                    # It should cover the area for this specific line number.
+                    # line_num_rect is already calculated for drawing text, so we can reuse its geometry.
+                    painter.fillRect(line_num_rect, highlight_color)
+
+                # Line Number Drawing (existing code)
+                line_number_string = str(block_number + 1)
+                # x_start_for_linenum and line_num_text_width are already defined above this part of the loop
+                # line_num_rect is also defined based on these.
                 painter.setPen(QColor("#808080"))  # Color for line numbers
                 painter.drawText(
                     line_num_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, line_number_string
