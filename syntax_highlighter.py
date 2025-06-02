@@ -11,6 +11,8 @@ from PyQt6.QtGui import (  # 导入 QFont (Import QFont)
     QTextCharFormat,
 )
 
+from settings import Settings
+
 
 class PygmentsHighlighterEngine:
     def __init__(self, highlighter: QSyntaxHighlighter):
@@ -36,7 +38,11 @@ class PygmentsHighlighterEngine:
         try:
             # 您可以选择一个Pygments样式 (You can choose a Pygments style)
             # 例如 'default', 'monokai', 'emacs', 'friendly' 等 (e.g., 'default', 'monokai', 'emacs', 'friendly', etc.)
-            style = styles.get_style_by_name("friendly")
+            settings = Settings()
+            style_name = settings.get_code_style()  # 从设置中获取代码风格 (Get code style from settings)
+            if not style_name:
+                style_name = "friendly"  # 如果未设置，则使用默认样式 (Use default style if not set)
+            style = styles.get_style_by_name(style_name)
             self.style_formats = {}
             for token_type, style_definition in style:
                 qt_format = QTextCharFormat()

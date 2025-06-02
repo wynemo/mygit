@@ -5,6 +5,8 @@ from PyQt6.QtWidgets import QComboBox, QDialog, QDialogButtonBox, QFormLayout, Q
 if TYPE_CHECKING:
     from settings import Settings
 
+from pygments.styles import get_all_styles
+
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None):
@@ -34,7 +36,7 @@ class SettingsDialog(QDialog):
 
         # 创建代码风格下拉框
         self.code_style_combo = QComboBox()
-        self.code_style_combo.addItems(["friendly", "dark", "light", "monokai", "solarized"])
+        self.code_style_combo.addItems(get_all_styles())
         self.code_style_combo.setCurrentText(self.settings.get_code_style())
         code_style_layout = QHBoxLayout()
         code_style_layout.addWidget(QLabel("代码风格:"))
