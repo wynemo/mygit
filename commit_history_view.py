@@ -1,8 +1,13 @@
+from typing import TYPE_CHECKING
+
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton, QTreeWidgetItem, QVBoxLayout, QWidget
 
 from custom_tree_widget import CustomTreeWidget
 from git_graph_view import GitGraphView
+
+if TYPE_CHECKING:
+    from git_manager import GitManager  # Assuming GitManager is defined in git_manager.py
 
 
 class CommitHistoryView(QWidget):
@@ -12,7 +17,7 @@ class CommitHistoryView(QWidget):
         super().__init__(parent)
         self.loaded_count = 0  # cursor生成
         self.load_batch_size = 50  # cursor生成
-        self.git_manager = None  # cursor生成
+        self.git_manager: GitManager = None  # cursor生成
         self.branch = None  # cursor生成
         self._loading = False  # cursor生成
         self._all_loaded = False  # cursor生成
