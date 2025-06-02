@@ -5,6 +5,7 @@ from typing import Optional
 from PyQt6.QtCore import QMimeData, QPoint, Qt
 from PyQt6.QtGui import QAction, QColor, QDrag, QDragEnterEvent, QDropEvent
 from PyQt6.QtWidgets import (
+    QApplication,
     QMenu,
     QPushButton,  # Added QPushButton
     QSplitter,
@@ -313,6 +314,10 @@ class FileTreeWidget(QTreeWidget):
         blame_action = context_menu.addAction("Toggle Git Blame Annotations")  # Renamed for clarity
         blame_action.triggered.connect(lambda: self._toggle_blame_annotation_in_editor(file_path))
 
+        # 添加"复制相对路径"菜单项
+        copy_relative_path_action = context_menu.addAction("复制相对路径")
+        copy_relative_path_action.triggered.connect(lambda: self._copy_relative_path(file_path))
+
         # 只在git修改的文件上显示"Revert"菜单项
         workspace_explorer = self.parent()
         while workspace_explorer and not isinstance(workspace_explorer, WorkspaceExplorer):
@@ -448,3 +453,20 @@ class FileTreeWidget(QTreeWidget):
                 workspace_explorer.refresh_file_tree()
         else:
             print("Git repository not initialized in GitManager.")
+
+    def _copy_relative_path(self, file_path: str):
+        """复制文件相对于工作区目录的路径到剪贴板"""
+        workspace_explorer = self.parent()
+        while workspace_explorer and not isinstance(workspace_explorer, WorkspaceExplorer):
+            workspace_explorer = workspace_explorer.parent()
+
+        if workspace_explorer and hasattr(workspace_explorer, "workspace_path") and workspace_explorer.workspace_path:
+            try:
+                relative_path = os.path.relpath(file_path, workspace_explorer.workspace_path)
+                # 复制到剪贴板
+                clipboard = QApplication.clipboard()
+                clipboard.setText(relative_path)
+            except Exception as e:
+                logging.error(f"复制相对路径失败: {e}")
+        else:
+            logging.error("无法获取工作区路径")
