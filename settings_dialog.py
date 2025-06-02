@@ -1,6 +1,9 @@
-from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit
+from typing import TYPE_CHECKING
 
-# from git_manager_window import GitManagerWindow
+from PyQt6.QtWidgets import QComboBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit
+
+if TYPE_CHECKING:
+    from settings import Settings
 
 
 class SettingsDialog(QDialog):
@@ -8,7 +11,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.parent = parent
         self.setWindowTitle("设置")
-        self.settings = parent.settings
+        self.settings: Settings = parent.settings
 
         # 创建布局
         layout = QFormLayout(self)
@@ -28,6 +31,15 @@ class SettingsDialog(QDialog):
         font_size_layout.addWidget(QLabel("字体大小:"))
         font_size_layout.addWidget(self.font_size_edit, 1)
         layout.addRow(font_size_layout)
+
+        # 创建代码风格下拉框
+        self.code_style_combo = QComboBox()
+        self.code_style_combo.addItems(["friendly", "dark", "light", "monokai", "solarized"])
+        self.code_style_combo.setCurrentText(self.settings.get_code_style())
+        code_style_layout = QHBoxLayout()
+        code_style_layout.addWidget(QLabel("代码风格:"))
+        code_style_layout.addWidget(self.code_style_combo, 1)
+        layout.addRow(code_style_layout)
 
         # 创建API设置输入框
         self.api_url_edit = QLineEdit()
@@ -76,6 +88,9 @@ class SettingsDialog(QDialog):
         except ValueError:
             # 如果输入无效，保持原大小
             pass
+
+        # 保存代码风格设置
+        self.settings.set_code_style(self.code_style_combo.currentText())
 
         # 保存API相关设置
         self.settings.settings["api_url"] = self.api_url_edit.text()
