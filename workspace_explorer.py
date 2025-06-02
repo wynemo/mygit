@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Optional
 
 from PyQt6.QtCore import QMimeData, QPoint, Qt
 from PyQt6.QtGui import QAction, QColor, QDrag, QDragEnterEvent, QDropEvent
@@ -312,9 +313,27 @@ class FileTreeWidget(QTreeWidget):
         blame_action = context_menu.addAction("Toggle Git Blame Annotations")  # Renamed for clarity
         blame_action.triggered.connect(lambda: self._toggle_blame_annotation_in_editor(file_path))
 
-        # 添加"Revert"菜单项
-        revert_action = context_menu.addAction("Revert")
-        revert_action.triggered.connect(lambda: self.revert_file(file_path))
+        # 只在git修改的文件上显示"Revert"菜单项
+        workspace_explorer = self.parent()
+        while workspace_explorer and not isinstance(workspace_explorer, WorkspaceExplorer):
+            workspace_explorer = workspace_explorer.parent()
+
+        if workspace_explorer:
+            try:
+                # 获取相对于工作区的路径
+                relative_path = os.path.relpath(file_path, workspace_explorer.workspace_path)
+                relative_path = relative_path.replace(os.sep, "/")  # 统一使用斜杠
+
+                # 检查文件是否在修改状态集合中
+                if (
+                    relative_path in workspace_explorer.all_file_statuses.get("modified", set())
+                    or relative_path in workspace_explorer.all_file_statuses.get("staged", set())
+                    or relative_path in workspace_explorer.all_file_statuses.get("untracked", set())
+                ):
+                    revert_action = context_menu.addAction("Revert")
+                    revert_action.triggered.connect(lambda: self.revert_file(file_path))
+            except Exception as e:
+                logging.error(f"检查文件状态出错: {e}")
 
         # 在鼠标位置显示菜单
         context_menu.exec(self.mapToGlobal(position))
@@ -330,7 +349,7 @@ class FileTreeWidget(QTreeWidget):
             return
 
         tab_widget = main_window.tab_widget
-        target_editor: SyncedTextEdit = None
+        target_editor: Optional[SyncedTextEdit] = None
 
         # Find the SyncedTextEdit for the given file_path
         for i in range(tab_widget.count()):
