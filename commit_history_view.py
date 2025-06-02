@@ -67,7 +67,6 @@ class CommitHistoryView(QWidget):
 
         # 图形化提交历史
         self.history_graph_list = GitGraphView()
-        self.history_graph_list.load_repository(".")
         # self.history_graph_list.setHeaderLabels(["提交图", "提交ID", "提交信息", "作者", "日期"])
         self.history_graph_list.commit_item_clicked.connect(self.on_commit_clicked)
         layout.addWidget(self.history_graph_list)
@@ -82,6 +81,12 @@ class CommitHistoryView(QWidget):
         self._all_loaded = False  # cursor生成
         self.history_list.clear()
         self.load_more_commits()  # cursor生成
+
+        print("更新提交历史...")  # cursor生成
+
+        # 加载图形视图的仓库
+        if self.git_manager and self.git_manager.repo:
+            self.history_graph_list.load_repository(self.git_manager.repo.working_dir)
 
     def load_more_commits(self):
         """加载更多提交历史 (cursor生成)"""
