@@ -48,7 +48,7 @@
 46. ~~比较页面，也需要有代码语法高亮的支持~~
 47. ~~untracked files 在 workspace_explorer FileTreeWidget 需要显示状态 可显示为灰色~~
 48. ~~修复git push时的动画bug: QPropertyAnimation: you're trying to animate a non-existing property _rotation_angle of your QObject~~
-49. windows阶段测试
+49. ~~windows阶段测试 没有明显问题~~
 50. linux阶段测试
 60. ~~与工作区比较，加入编辑功能~~
 61. 将 fetch pull push 等按钮放到左小角
