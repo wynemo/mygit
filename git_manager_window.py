@@ -276,7 +276,7 @@ class GitManagerWindow(QMainWindow):
             self.workspace_explorer.refresh_file_tree()
         else:
             self.commit_history_view.history_list.clear()
-            self.commit_history_view.history_list.addItem("所选文件夹不是有效的Git仓库")
+            QMessageBox.warning(self, "警告", "所选文件夹不是有效的Git仓库")
             if hasattr(self, "top_bar"):
                 self.top_bar.set_buttons_enabled(False)  # Disable buttons if repo init fails
 
