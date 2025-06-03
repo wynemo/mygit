@@ -82,11 +82,11 @@ class CommitHistoryView(QWidget):
         self.history_list.clear()
         self.load_more_commits()  # cursor生成
 
+    def load_history_graph(self, git_manager):
         print("更新提交历史...")  # cursor生成
-
         # 加载图形视图的仓库
-        if self.git_manager and self.git_manager.repo:
-            self.history_graph_list.load_repository(self.git_manager.repo.working_dir)
+        if git_manager and git_manager.repo:
+            self.history_graph_list.load_repository(git_manager.repo.working_dir)
 
     def load_more_commits(self):
         """加载更多提交历史 (cursor生成)"""

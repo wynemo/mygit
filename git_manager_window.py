@@ -315,10 +315,7 @@ class GitManagerWindow(QMainWindow):
             return
 
         if current_branch == "all":  # "all" might be a special value not directly from git branches
-            # Decide what "all" means, e.g., show history for the default branch or all branches if supported
-            # For now, using 'main' as a placeholder if 'all' is selected,
-            # this might need more sophisticated handling in GitManager or CommitHistoryView
-            self.commit_history_view.update_history(self.git_manager, "main")  # Assuming "main" for "all"
+            self.commit_history_view.load_history_graph(self.git_manager)
             self.commit_history_view.history_graph_list.show()
             self.commit_history_view.history_list.hide()
 
