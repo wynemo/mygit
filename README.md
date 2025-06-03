@@ -88,6 +88,23 @@ python main.py
 - `utils/language_map.py`: 可能包含语言名称到文件扩展名或MIME类型的映射，用于语法高亮。
 - `workspace_explorer.py`: 工作区文件浏览器
 
+## 配置设置
+
+程序使用 `settings.py` 文件来管理配置。以下是可用的配置选项：
+
+- **recent_folders**: 最近打开的文件夹列表，自动记录。
+
+- **last_folder**: 上次打开的文件夹路径。
+
+- **max_recent**: 最大记录的最近文件夹数量，默认为 10。
+
+- **font_family**: 默认字体，例如 "Courier New"。
+
+- **font_size**: 默认字体大小，单位为点。
+
+- **code_style**: 代码风格设置，例如 "friendly"。
+
+这些设置可以被修改，并且会保存到配置文件中。
 ## 许可证
 
 MIT License - 详见 [LICENSE](LICENSE) 文件
