@@ -9,7 +9,6 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
     QMainWindow,
-    QMessageBox,
     QSplitter,
     QTabBar,
     QTabWidget,  # 添加 QTabWidget 导入
@@ -279,8 +278,7 @@ class GitManagerWindow(QMainWindow):
             self.workspace_explorer.refresh_file_tree()
         else:
             self.commit_history_view.history_list.clear()
-            # For folder selection issues, QMessageBox is fine.
-            QMessageBox.warning(self, "警告", "所选文件夹不是有效的Git仓库")
+            self.notification_widget.show_message("所选文件夹不是有效的Git仓库")
             if hasattr(self, "top_bar"):
                 self.top_bar.set_buttons_enabled(False)  # Disable buttons if repo init fails
 
@@ -439,9 +437,9 @@ class GitManagerWindow(QMainWindow):
 
     def reposition_notification_widget(self):
         """Repositions the notification widget, typically called on resize or init."""
-        if hasattr(self, 'notification_widget') and self.notification_widget:
+        if hasattr(self, "notification_widget") and self.notification_widget:
             x = self.width() - self.notification_widget.width() - 10  # 10 for margin
-            y = self.height() - self.notification_widget.height() - 10 # 10 for margin
+            y = self.height() - self.notification_widget.height() - 10  # 10 for margin
             self.notification_widget.move(x, y)
             # Ensure it's raised if visible, though show_message handles this too
             if self.notification_widget.isVisible():
@@ -519,11 +517,11 @@ class GitManagerWindow(QMainWindow):
             elif success:
                 self.notification_widget.show_message("Fetch successful.")
                 logging.info("Fetch successful.")
-                self.update_commit_history() # Update history as fetch can update remote-tracking branches
+                self.update_commit_history()  # Update history as fetch can update remote-tracking branches
         finally:
             if hasattr(self, "top_bar") and self.top_bar:
                 self.top_bar.stop_spinning()
-            QApplication.processEvents() # Ensure UI updates like spinner stop
+            QApplication.processEvents()  # Ensure UI updates like spinner stop
 
     def pull_repo(self):
         """拉取仓库（使用线程）"""
@@ -547,14 +545,14 @@ class GitManagerWindow(QMainWindow):
                 self.update_commit_history()
                 # Optionally show success: self.notification_widget.show_message("Pull successful.")
                 logging.info("Pull successful.")
-            elif error_message: # Only show notification if there's an error message
+            elif error_message:  # Only show notification if there's an error message
                 self.notification_widget.show_message(f"Pull failed: {error_message}")
-                logging.error(f"Pull failed: {error_message}") # More specific logging
+                logging.error(f"Pull failed: {error_message}")  # More specific logging
         finally:
             # 停止加载动画
             if hasattr(self, "top_bar") and self.top_bar:
                 self.top_bar.stop_spinning()
-            QApplication.processEvents() # Ensure UI updates
+            QApplication.processEvents()  # Ensure UI updates
 
     def push_repo(self):
         """推送仓库"""
@@ -576,14 +574,14 @@ class GitManagerWindow(QMainWindow):
                 self.update_commit_history()
                 # Optionally show success: self.notification_widget.show_message("Push successful.")
                 logging.info("Push successful.")
-            elif error_message: # Only show notification if there's an error message
+            elif error_message:  # Only show notification if there's an error message
                 self.notification_widget.show_message(f"Push failed: {error_message}")
-                logging.error(f"Push failed: {error_message}") # More specific logging
+                logging.error(f"Push failed: {error_message}")  # More specific logging
         finally:
             # 停止加载动画
             if hasattr(self, "top_bar") and self.top_bar:
                 self.top_bar.stop_spinning()
-            QApplication.processEvents() # Ensure UI updates
+            QApplication.processEvents()  # Ensure UI updates
 
     def handle_blame_click_from_editor(self, commit_hash: str):
         """
