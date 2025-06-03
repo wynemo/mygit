@@ -94,7 +94,7 @@ class WorkspaceExplorer(QWidget):
                 content = f.read()
 
             # 创建新的文本编辑器
-            text_edit = ModifiedTextEdit()
+            text_edit = ModifiedTextEdit(self)
             text_edit.setProperty("file_path", file_path)  # Keep for any existing logic relying on property
             text_edit.file_path = file_path  # Add this for consistency with show_blame
             text_edit.setPlainText(content)
@@ -126,7 +126,9 @@ class WorkspaceExplorer(QWidget):
                 main_git_window = parent_candidate
 
             # todo, get file_name in repo
-            diffs = main_git_window.git_manager.get_diff(file_name)
+            repo_path = main_git_window.git_manager.repo.working_dir
+            relative_path = os.path.relpath(file_path, repo_path)
+            diffs = main_git_window.git_manager.get_diff(relative_path)
             text_edit.set_line_modifications(diffs)
 
             if main_git_window and hasattr(main_git_window, handler_name):

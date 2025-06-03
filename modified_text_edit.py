@@ -1,3 +1,4 @@
+import os
 import typing
 
 from PyQt6.QtCore import Qt
@@ -8,7 +9,7 @@ from text_edit import SyncedTextEdit
 
 
 # <new_class>
-# Not yet perfect, especially for modified lines
+# 普通编辑器 主要专注于修改的文字部分
 class ModifiedTextEdit(SyncedTextEdit):
     """Inherits from SyncedTextEdit, supports displaying line modification status next to line numbers"""
 
@@ -23,12 +24,13 @@ class ModifiedTextEdit(SyncedTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.line_modifications = {}  # Store modification status for each line
-        self.overview_bar = OverViewBar(self, parent=self)
+        self.overview_bar = OverViewBar(self, parent=self) # 绘制在最右边
         self.overview_bar.setParent(self)
         self._update_overview_bar_geometry()
         self.verticalScrollBar().valueChanged.connect(self.overview_bar.update_overview)
 
-        # 设置滚动条为半透明
+        # 设置滚动条为半透明 这样overview_bar能与滚动条绘制在一起
+        # 但样式不是很好看 以后看看怎么弄
         scrollbar = self.verticalScrollBar()
         scrollbar.setStyleSheet("""
 QPlainTextEdit QScrollBar:vertical {
@@ -160,6 +162,22 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
             top = bottom
             bottom = top + self.blockBoundingRect(block).height()
             block_number += 1
+
+    def save_content(self):
+        super().save_content()
+        parent = self.parent()
+        while not hasattr(parent, "git_manager"):
+            parent = parent.parent()
+        if parent and hasattr(parent, "git_manager"):
+            # todo should check if it's under git version
+            # 获取仓库路径
+            repo_path = parent.git_manager.repo.working_dir
+            relative_path = os.path.relpath(self.file_path, repo_path)
+            diffs = parent.git_manager.get_diff(relative_path)
+            print(f"diffs: {diffs}")
+            self.set_line_modifications(diffs)
+        else:
+            print("cant get git manager")
 
 
 class OverViewBar(QWidget):
