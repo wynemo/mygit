@@ -4,6 +4,7 @@ import re
 from typing import List, Optional
 
 import git
+from git import GitCommandError
 
 
 class GitManager:
@@ -109,20 +110,45 @@ class GitManager:
     def fetch(self):
         """获取仓库"""
         if not self.repo:
-            return
-        self.repo.remotes.origin.fetch()
+            raise Exception("Repository not initialized.")
+        try:
+            self.repo.remotes.origin.fetch()
+        except GitCommandError as e:
+            error_message = f"Fetch failed: {e!s}"
+            if hasattr(e, 'stderr') and e.stderr:
+                error_message += f"\nDetails: {e.stderr.strip()}"
+            raise Exception(error_message)
+        except Exception as e:
+            # Catch any other unexpected errors
+            raise Exception(f"An unexpected error occurred during fetch: {e!s}")
 
     def pull(self):
         """拉取仓库"""
         if not self.repo:
-            return
-        self.repo.remotes.origin.pull()
+            raise Exception("Repository not initialized.")
+        try:
+            self.repo.remotes.origin.pull()
+        except GitCommandError as e:
+            error_message = f"Pull failed: {e!s}"
+            if hasattr(e, 'stderr') and e.stderr:
+                error_message += f"\nDetails: {e.stderr.strip()}"
+            raise Exception(error_message)
+        except Exception as e:
+            raise Exception(f"An unexpected error occurred during pull: {e!s}")
 
     def push(self):
         """推送仓库"""
         if not self.repo:
-            return
-        self.repo.remotes.origin.push()
+            raise Exception("Repository not initialized.")
+        try:
+            self.repo.remotes.origin.push()
+        except GitCommandError as e:
+            error_message = f"Push failed: {e!s}"
+            if hasattr(e, 'stderr') and e.stderr:
+                error_message += f"\nDetails: {e.stderr.strip()}"
+            raise Exception(error_message)
+        except Exception as e:
+            raise Exception(f"An unexpected error occurred during push: {e!s}")
 
     def get_file_status(self, file_path: str) -> str:
         """获取文件的Git状态"""

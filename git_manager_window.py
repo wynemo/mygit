@@ -24,9 +24,10 @@ from compare_view import CompareView
 from compare_with_working_dialog import CompareWithWorkingDialog
 from file_changes_view import FileChangesView
 from git_manager import GitManager
+from notification_widget import NotificationWidget
 from settings import Settings
 from settings_dialog import SettingsDialog
-from threads import PullThread, PushThread  # Import PullThread and PushThread
+from threads import FetchThread, PullThread, PushThread  # Import PullThread and PushThread
 from top_bar_widget import TopBarWidget  # Import TopBarWidget
 from workspace_explorer import WorkspaceExplorer
 
@@ -53,6 +54,7 @@ class GitManagerWindow(QMainWindow):
         self.git_manager = None
         self.current_commit = None
         self.settings = Settings()
+        self.notification_widget = NotificationWidget(self)
         self.bottom_widget_visible = True  # 添加状态标记
 
         # 创建主窗口部件
@@ -213,6 +215,9 @@ class GitManagerWindow(QMainWindow):
         if hasattr(self, "top_bar"):
             self.top_bar.update_toggle_button_icon(self.bottom_widget_visible)
 
+        # Ensure notification_widget is initially positioned
+        self.reposition_notification_widget()
+
     def show_commit_dialog(self):
         """显示提交对话框"""
         if not self.git_manager:
@@ -274,6 +279,7 @@ class GitManagerWindow(QMainWindow):
             self.workspace_explorer.refresh_file_tree()
         else:
             self.commit_history_view.history_list.clear()
+            # For folder selection issues, QMessageBox is fine.
             QMessageBox.warning(self, "警告", "所选文件夹不是有效的Git仓库")
             if hasattr(self, "top_bar"):
                 self.top_bar.set_buttons_enabled(False)  # Disable buttons if repo init fails
@@ -429,6 +435,18 @@ class GitManagerWindow(QMainWindow):
             # 此处可以保持原样或针对性调整
             pass  # horizontal_splitter 的宽度由其父控件和初始比例决定
 
+        self.reposition_notification_widget()
+
+    def reposition_notification_widget(self):
+        """Repositions the notification widget, typically called on resize or init."""
+        if hasattr(self, 'notification_widget') and self.notification_widget:
+            x = self.width() - self.notification_widget.width() - 10  # 10 for margin
+            y = self.height() - self.notification_widget.height() - 10 # 10 for margin
+            self.notification_widget.move(x, y)
+            # Ensure it's raised if visible, though show_message handles this too
+            if self.notification_widget.isVisible():
+                self.notification_widget.raise_()
+
     def show_settings_dialog(self):
         """显示设置对话框"""
         dialog = SettingsDialog(self)
@@ -480,14 +498,32 @@ class GitManagerWindow(QMainWindow):
         self.settings.save_settings()
 
     def fetch_repo(self):
-        """获取仓库"""
+        """获取仓库（使用线程）"""
         if not self.git_manager:
             return
+
+        if hasattr(self, "top_bar") and self.top_bar:
+            self.top_bar.start_spinning()
+        QApplication.processEvents()  # Ensure UI updates like spinner start
+
+        self.fetch_thread = FetchThread(self.git_manager)
+        self.fetch_thread.finished.connect(self.handle_fetch_finished)
+        self.fetch_thread.start()
+
+    def handle_fetch_finished(self, success, error_message):
+        """处理fetch操作完成"""
         try:
-            self.git_manager.fetch()
-        except:
-            QMessageBox.critical(self, "错误", "获取仓库时发生错误")
-            logging.exception("获取仓库时发生错误")
+            if not success and error_message:
+                self.notification_widget.show_message(f"Fetch failed: {error_message}")
+                logging.error(f"Fetch failed: {error_message}")
+            elif success:
+                self.notification_widget.show_message("Fetch successful.")
+                logging.info("Fetch successful.")
+                self.update_commit_history() # Update history as fetch can update remote-tracking branches
+        finally:
+            if hasattr(self, "top_bar") and self.top_bar:
+                self.top_bar.stop_spinning()
+            QApplication.processEvents() # Ensure UI updates like spinner stop
 
     def pull_repo(self):
         """拉取仓库（使用线程）"""
@@ -509,14 +545,16 @@ class GitManagerWindow(QMainWindow):
         try:
             if success:
                 self.update_commit_history()
-            else:
-                QMessageBox.critical(self, "错误", f"拉取仓库时发生错误: {error_message}")
-                logging.exception("拉取仓库时发生错误")
+                # Optionally show success: self.notification_widget.show_message("Pull successful.")
+                logging.info("Pull successful.")
+            elif error_message: # Only show notification if there's an error message
+                self.notification_widget.show_message(f"Pull failed: {error_message}")
+                logging.error(f"Pull failed: {error_message}") # More specific logging
         finally:
             # 停止加载动画
             if hasattr(self, "top_bar") and self.top_bar:
                 self.top_bar.stop_spinning()
-                QApplication.processEvents()
+            QApplication.processEvents() # Ensure UI updates
 
     def push_repo(self):
         """推送仓库"""
@@ -536,14 +574,16 @@ class GitManagerWindow(QMainWindow):
         try:
             if success:
                 self.update_commit_history()
-            else:
-                QMessageBox.critical(self, "错误", f"推送仓库时发生错误: {error_message}")
-                logging.exception("推送仓库时发生错误")
+                # Optionally show success: self.notification_widget.show_message("Push successful.")
+                logging.info("Push successful.")
+            elif error_message: # Only show notification if there's an error message
+                self.notification_widget.show_message(f"Push failed: {error_message}")
+                logging.error(f"Push failed: {error_message}") # More specific logging
         finally:
             # 停止加载动画
             if hasattr(self, "top_bar") and self.top_bar:
                 self.top_bar.stop_spinning()
-                QApplication.processEvents()
+            QApplication.processEvents() # Ensure UI updates
 
     def handle_blame_click_from_editor(self, commit_hash: str):
         """
