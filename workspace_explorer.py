@@ -149,6 +149,11 @@ class WorkspaceExplorer(QWidget):
         """关闭标签页"""
         self.tab_widget.removeTab(index)
 
+    def close_all_tabs(self):
+        """关闭所有标签页"""
+        for i in range(self.tab_widget.count() - 1, -1, -1):
+            self.tab_widget.removeTab(i)
+
     def set_workspace_path(self, path):
         """设置并加载工作区路径"""
         self.workspace_path = path
@@ -218,6 +223,10 @@ class WorkspaceExplorer(QWidget):
         close_others_action = QAction("关闭其他标签页", self)
         close_others_action.triggered.connect(lambda: self.close_other_tabs(tab_index))
         menu.addAction(close_others_action)
+
+        close_all_action = QAction("关闭所有标签页", self)
+        close_all_action.triggered.connect(self.close_all_tabs)
+        menu.addAction(close_all_action)
 
         menu.exec(self.tab_widget.tabBar().mapToGlobal(pos))
 
