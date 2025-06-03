@@ -99,9 +99,9 @@ class FileHistoryView(QWidget):
                 main_window.compare_view.show_diff(main_window.git_manager, current_commit, relative_path)
 
     def show_context_menu(self, position):
-        global_pos = self.mapToGlobal(position)
-        tree_pos = self.history_list.viewport().mapFromGlobal(global_pos)
-        item = self.history_list.itemAt(tree_pos)
+        # 将位置转换为视口坐标
+        viewport_pos = self.history_list.viewport().mapFrom(self, position)
+        item = self.history_list.itemAt(viewport_pos)
 
         if not item:
             logging.warning("file history view item is None at position %s (viewport: %s)", position, viewport_pos)
