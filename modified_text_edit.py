@@ -1,3 +1,4 @@
+import logging
 import os
 import typing
 
@@ -24,7 +25,7 @@ class ModifiedTextEdit(SyncedTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.line_modifications = {}  # Store modification status for each line
-        self.overview_bar = OverViewBar(self, parent=self) # 绘制在最右边
+        self.overview_bar = OverViewBar(self, parent=self)  # 绘制在最右边
         self.overview_bar.setParent(self)
         self._update_overview_bar_geometry()
         self.verticalScrollBar().valueChanged.connect(self.overview_bar.update_overview)
@@ -128,7 +129,7 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
                 if mod_status:  # Process only when there is a status
                     color = self.LINE_STATUS_COLORS.get(mod_status)
                     if color:  # Ensure the color exists
-                        print(f"mod_status: {mod_status}, color: {color}", block_line_number)
+                        logging.debug(f"mod_status: {mod_status}, color: {color}", block_line_number)
                         painter.setBrush(color)
                         painter.setPen(Qt.PenStyle.NoPen)
 

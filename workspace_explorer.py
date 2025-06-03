@@ -274,7 +274,7 @@ class FileTreeWidget(QTreeWidget):
 
         item = self.itemAt(self.drag_start_pos)
         if item and os.path.isfile(item.data(0, Qt.ItemDataRole.UserRole)):
-            print("drag")
+            logging.debug("drag")
             self.is_dragging = True
             drag = QDrag(self)
             mime_data = QMimeData()
@@ -285,13 +285,13 @@ class FileTreeWidget(QTreeWidget):
             self.drag_start_pos = None
 
     def mouseReleaseEvent(self, event):
-        print("mouseReleaseEvent")
+        logging.debug("mouseReleaseEvent")
         self.drag_start_pos = None
         super().mouseReleaseEvent(event)
 
     def _handle_double_click(self, item):
         """处理双击事件"""
-        print("handle_double_click")
+        logging.debug("handle_double_click")
         if self.is_dragging:  # 如果正在拖放，不处理双击
             return
 
