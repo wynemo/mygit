@@ -1,6 +1,5 @@
 import logging
 import os
-import re
 from typing import List, Optional
 
 import git
@@ -286,67 +285,3 @@ class GitManager:
         if not self.repo:
             return
         self.repo.git.checkout(file_path)
-
-    def get_diff(self, file_path: str) -> dict:
-        """
-        获取文件差异
-        "added" - 新增行
-        "modified" - 修改行
-        "deleted" - 删除行
-        """
-
-        d = {}
-        if not self.repo:
-            return {}
-        source_line = 0
-        target_line = 0
-        diffs = self.repo.index.diff(None, create_patch=True)
-        for diff in diffs:
-            if file_path != diff.a_path:
-                continue
-            # print(f"\n📄 文件: {diff.a_path}")
-
-            diff_text = diff.diff.decode()
-            # print(f"🔸 {diff_text}")
-            lines = diff_text.splitlines()
-
-            source_line = 0
-            target_line = 0
-
-            print("lines is", "\n".join(lines))
-            for line in lines:
-                if line.startswith("@@"):
-                    # 解析 @@ -10,7 +10,8 @@ 这样的 Hunk 行
-
-                    m = re.match(r"^@@ -(\d+)(?:,\d+)? \+(\d+)", line)
-                    if m:
-                        source_line = int(m.group(1))
-                        target_line = int(m.group(2))
-                    print(f"\n  🔸 {line}")
-                elif line.startswith("-") and not line.startswith("---"):
-                    print(f"  ➖ 删除行 {target_line}: {line[1:].strip()}")
-                    d[target_line] = "deleted"
-                    # target_line += 1
-                elif line.startswith("+") and not line.startswith("+++"):
-                    print(f"  ➕ 新增行 {target_line}: {line[1:].strip()}")
-                    if d.get(target_line) == "deleted":
-                        d[target_line] = "modified"
-                        print(f"  ｜ 修改行 {target_line}: {line[1:].strip()}")
-                    else:
-                        i = target_line
-                        while 1:
-                            last_line_status = d.get(i - 1)
-                            i -= 1
-                            if last_line_status not in ["deleted", "modified", "added"]:
-                                d[target_line] = "added"
-                                break
-                            if last_line_status in {"deleted", "modified"}:
-                                d[target_line] = "modified"
-                                break
-                    target_line += 1
-                else:
-                    # 上下文行
-                    source_line += 1
-                    target_line += 1
-        print("d is", d)
-        return d
