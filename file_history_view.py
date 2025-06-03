@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import datetime
 from functools import partial
@@ -99,6 +100,7 @@ class FileHistoryView(QWidget):
     def show_context_menu(self, position):
         item = self.history_list.itemAt(position)
         if not item:
+            logging.warning("file history view item is None")
             return
         menu = QMenu(self)
         copy_commit_action = menu.addAction("copy commit")
