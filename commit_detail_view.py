@@ -13,7 +13,7 @@ MAX_BRANCHES_TO_SHOW = 3
 class CommitDetailView(QTextEdit):
     """
     Commit详细信息视图
-    直接使用QTextEdit作为主控件，显示选中commit的详细信息
+    直接使用QTextEdit作为主控件, 显示选中commit的详细信息
     """
 
     def __init__(self, parent=None):
