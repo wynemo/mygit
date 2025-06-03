@@ -46,3 +46,30 @@ class DifflibCalculator(DiffCalculator):
             chunks.append(chunk)
 
         return chunks
+
+    def get_diff(self, left_text: str, right_text: str) -> dict:
+        """获取文件差异（转换为git_manager格式）
+
+        返回:
+            {行号: 修改类型} 的字典，修改类型为 "added", "modified", "deleted"
+        """
+        chunks = self.compute_diff(left_text, right_text)
+        diff_dict = {}
+
+        for chunk in chunks:
+            if chunk.type == "insert":
+                # 新增行：行号范围 [right_start+1, right_end]
+                for line in range(chunk.right_start, chunk.right_end):
+                    diff_dict[line + 1] = "added"
+
+            elif chunk.type == "delete":
+                # 删除行：行号对应删除位置（使用新文件行号）
+                # 删除发生在当前行号位置（新文件中的行号）
+                diff_dict[chunk.right_start + 1] = "deleted"
+
+            elif chunk.type == "replace":
+                # 修改行：行号范围 [right_start+1, right_end]
+                for line in range(chunk.right_start, chunk.right_end):
+                    diff_dict[line + 1] = "modified"
+
+        return diff_dict
