@@ -75,8 +75,6 @@ class SyncedTextEdit(QPlainTextEdit):
     PADDING_LEFT_OF_BLAME = 5
     PADDING_AFTER_BLAME = 10
     PADDING_RIGHT_OF_LINENUM = 5
-    # 编辑状态
-    edit_cancel_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -105,8 +103,6 @@ class SyncedTextEdit(QPlainTextEdit):
         self.updateRequest.connect(self.update_line_number_area)
         self.update_line_number_area_width()
 
-        # 连接编辑取消信号
-        self.edit_cancel_requested.connect(self.cancel_edit)
         # 初始化差异信息
         self.highlighter = None
 
@@ -256,21 +252,12 @@ class SyncedTextEdit(QPlainTextEdit):
 
     def show_context_menu(self, position):
         menu = QMenu(self)
-        if self.isReadOnly():
-            edit_action = menu.addAction("编辑内容")
-            edit_action.triggered.connect(self.set_editable)
-        else:
-            save_action = menu.addAction("保存更改")
-            save_action.triggered.connect(self.save_content)
-            cancel_edit_action = menu.addAction("取消编辑")
-            cancel_edit_action.triggered.connect(self.cancel_edit)
 
-        # 只在只读状态下显示blame相关菜单
-        if self.isReadOnly() or not self.blame_annotations_per_line:
-            blame_action = menu.addAction("Show Blame")
-            blame_action.triggered.connect(self.show_blame)
-            clear_blame_action = menu.addAction("Clear Blame")
-            clear_blame_action.triggered.connect(self.clear_blame_data)
+        # if self.isReadOnly() or not self.blame_annotations_per_line:
+        blame_action = menu.addAction("Show Blame")
+        blame_action.triggered.connect(self.show_blame)
+        clear_blame_action = menu.addAction("Clear Blame")
+        clear_blame_action.triggered.connect(self.clear_blame_data)
 
         # Fix for menu position when blame info is shown
         # Convert position from viewport coordinates to global coordinates
@@ -310,21 +297,7 @@ class SyncedTextEdit(QPlainTextEdit):
             logging.error("文件保存失败: %s", str(e))
             QMessageBox.critical(self, "保存错误", f"无法保存文件: {e!s}", QMessageBox.StandardButton.Ok)
 
-    def cancel_edit(self):
-        """取消编辑并恢复原始内容"""
-        if not self.isReadOnly() and self.edit_mode:
-            self.setPlainText(self.original_content)
-            self.setReadOnly(True)
-            self.edit_mode = False
-            logging.info("已取消编辑并恢复原始内容")
-            self.viewport().setCursor(Qt.CursorShape.ArrowCursor)  # 恢复箭头光标
-
     def set_blame_data(self, blame_data_list: list):
-        # 如果在编辑模式下，无法显示blame信息
-        if not self.isReadOnly():
-            logging.warning("当前处于编辑模式，无法显示blame信息")
-            return
-
         self.max_blame_display_width = 0
         # Store the full data separately, ensuring original commit_hash is preserved.
         self.blame_data_full = list(blame_data_list)  # Make a copy
