@@ -92,17 +92,19 @@ python main.py
 
 程序使用 `settings.py` 文件来管理配置。以下是可用的配置选项：
 
-- **recent_folders**: 最近打开的文件夹列表，自动记录。
-
-- **last_folder**: 上次打开的文件夹路径。
-
-- **max_recent**: 最大记录的最近文件夹数量，默认为 10。
-
 - **font_family**: 默认字体，例如 "Courier New"。
 
 - **font_size**: 默认字体大小，单位为点。
 
 - **code_style**: 代码风格设置，例如 "friendly"。
+
+- **api_url**: 用于生成注释的api url
+
+- **api_secret**: 用于生成注释的api secret
+
+- **model_name**: 用于生成注释的模型名称
+
+- **prompt**: 用于生成注释的提示词，可选
 
 这些设置可以被修改，并且会保存到配置文件中。
 ## 许可证
