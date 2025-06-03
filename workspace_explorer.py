@@ -125,7 +125,6 @@ class WorkspaceExplorer(QWidget):
                     break
                 main_git_window = parent_candidate
 
-            # todo, get file_name in repo
             repo_path = main_git_window.git_manager.repo.working_dir
             relative_path = os.path.relpath(file_path, repo_path)
             diffs = main_git_window.git_manager.get_diff(relative_path)
