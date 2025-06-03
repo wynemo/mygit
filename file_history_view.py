@@ -76,6 +76,7 @@ class FileHistoryView(QWidget):
                 item.setData(0, 256, commit.hexsha)  # Qt.ItemDataRole.UserRole = 256
 
                 self.history_list.addTopLevelItem(item)
+                logging.debug(f"Added commit {commit.hexsha[:7]} to history list for file {relative_path}")
         except Exception as e:
             item = QTreeWidgetItem()
             item.setText(0, f"获取历史失败: {e!s}")
@@ -98,9 +99,12 @@ class FileHistoryView(QWidget):
                 main_window.compare_view.show_diff(main_window.git_manager, current_commit, relative_path)
 
     def show_context_menu(self, position):
-        item = self.history_list.itemAt(position)
+        global_pos = self.mapToGlobal(position)
+        tree_pos = self.history_list.viewport().mapFromGlobal(global_pos)
+        item = self.history_list.itemAt(tree_pos)
+
         if not item:
-            logging.warning("file history view item is None")
+            logging.warning("file history view item is None at position %s (viewport: %s)", position, viewport_pos)
             return
         menu = QMenu(self)
         copy_commit_action = menu.addAction("copy commit")
