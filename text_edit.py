@@ -86,7 +86,7 @@ class SyncedTextEdit(QPlainTextEdit):
             QColor(235, 255, 235),  # Light Green
             QColor(235, 235, 255),  # Light Blue
         ]
-        self.commit_hash_colors = {} # Maps commit_hash to color_palette index
+        # self.commit_hash_colors removed
 
         settings = Settings()
         self.setFont(QFont(settings.get_font_family(), settings.get_font_size()))
@@ -120,30 +120,7 @@ class SyncedTextEdit(QPlainTextEdit):
         self.find_dialog_instance = None  # Initialize find_dialog_instance
         self.search_highlights = []  # Initialize search_highlights
 
-    def get_blame_color(self, commit_hash: str, previous_color_index: int) -> tuple[QColor, int]:
-        """
-        Assigns a color to a commit hash, ensuring it's different from the previous one.
-        Returns the QColor and its index in the palette.
-        """
-        if commit_hash in self.commit_hash_colors:
-            color_index = self.commit_hash_colors[commit_hash]
-            return self.blame_color_palette[color_index], color_index
-
-        num_colors = len(self.blame_color_palette)
-        if num_colors == 0:
-            # Fallback, though palette should always be initialized
-            return QColor(Qt.GlobalColor.lightGray), -1
-
-        # Try to pick a new color index different from previous_color_index
-        # Start with a candidate index based on the hash of the commit.
-        candidate_index = abs(hash(commit_hash)) % num_colors
-
-        # If there's more than one color and the candidate matches the previous, increment.
-        if num_colors > 1 and candidate_index == previous_color_index:
-            candidate_index = (candidate_index + 1) % num_colors
-
-        self.commit_hash_colors[commit_hash] = candidate_index
-        return self.blame_color_palette[candidate_index], candidate_index
+    # get_blame_color method removed
 
     def set_highlighted_line(self, line_number: int):
         """Sets the line number to be highlighted in the line number area."""
@@ -361,7 +338,7 @@ class SyncedTextEdit(QPlainTextEdit):
 
         self.blame_annotations_per_line = processed_for_display  # This list is for display and click handling
         self.showing_blame = True
-        self.commit_hash_colors = {} # Reset colors when new blame data is set
+        # self.commit_hash_colors removed
         self.update_line_number_area_width()
         self.viewport().update()
 
@@ -370,7 +347,7 @@ class SyncedTextEdit(QPlainTextEdit):
         self.blame_data_full = []  # Also clear the full data
         self.max_blame_display_width = 0  # Reset max width when clearing blame
         self.showing_blame = False
-        self.commit_hash_colors = {}  # Reset colors
+        # self.commit_hash_colors removed
         self.update_line_number_area_width()
         self.viewport().update()
 
@@ -463,7 +440,9 @@ class SyncedTextEdit(QPlainTextEdit):
         top = self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
         bottom = top + self.blockBoundingRect(block).height()
 
-        previous_drawn_color_index = -1 # Track the color index of the last drawn annotation
+        # Variables to track previous commit and color for alternating colors
+        previous_blamed_commit_hash = None
+        previous_drawn_color_index = -1
 
         while block.isValid() and top <= event.rect().bottom():
             if block.isVisible() and bottom >= event.rect().top():
@@ -502,48 +481,65 @@ class SyncedTextEdit(QPlainTextEdit):
 
                     if annotation_data and "_display_string" in annotation_data:
                         annotation_display_string = annotation_data["_display_string"]
-                        commit_hash = annotation_data.get("commit_hash", "")
+                        current_commit_hash = annotation_data.get("commit_hash", "")
 
-                        # Get color for the current commit, ensuring it's different from the previous
-                        blame_qcolor, current_color_index = self.get_blame_color(commit_hash, previous_drawn_color_index)
-                        previous_drawn_color_index = current_color_index # Update for the next iteration
+                        num_colors = len(self.blame_color_palette)
+                        blame_qcolor = QColor(Qt.GlobalColor.lightGray) # Default if no palette or error
+
+                        if num_colors > 0:
+                            base_color_index = abs(hash(current_commit_hash)) % num_colors
+                            final_color_index = base_color_index
+
+                            if current_commit_hash != previous_blamed_commit_hash:
+                                if final_color_index == previous_drawn_color_index:
+                                    final_color_index = (final_color_index + 1) % num_colors
+                                # Second increment for robustness, especially with 3 colors
+                                # to better avoid same color if the +1 still results in the same.
+                                if num_colors > 1 and final_color_index == previous_drawn_color_index:
+                                     final_color_index = (final_color_index + 1) % num_colors
+                            else: # Same commit hash as previous line, try to use the same color
+                                final_color_index = previous_drawn_color_index if previous_drawn_color_index != -1 else base_color_index
+
+
+                            blame_qcolor = self.blame_color_palette[final_color_index]
+
+                            previous_blamed_commit_hash = current_commit_hash
+                            previous_drawn_color_index = final_color_index
+                        else: # No colors in palette
+                            previous_blamed_commit_hash = None # Reset since we can't color
+                            previous_drawn_color_index = -1
+
 
                         max_width_for_blame_area = getattr(self, "max_blame_display_width", 0)
                         if not isinstance(max_width_for_blame_area, (int, float)):
                             max_width_for_blame_area = 0
 
-                        blame_text_rect = QRect( # Renamed from blame_rect to avoid confusion
+                        blame_text_rect = QRect(
                             int(self.PADDING_LEFT_OF_BLAME),
                             int(top),
                             int(max_width_for_blame_area),
                             int(current_block_height),
                         )
 
-                        # Fill background for the entire blame annotation area for this line
-                        # The blame_rect for fill should span the full allocated width for blame annotations
-                        # up to the line numbers area.
                         blame_fill_rect = QRect(
-                            0, # Start from the very left of the line number area
+                            0,
                             int(top),
-                            int(self.PADDING_LEFT_OF_BLAME + max_width_for_blame_area + self.PADDING_AFTER_BLAME), # Width of blame area
+                            int(self.PADDING_LEFT_OF_BLAME + max_width_for_blame_area + self.PADDING_AFTER_BLAME),
                             int(current_block_height)
                         )
                         painter.fillRect(blame_fill_rect, blame_qcolor)
 
-                        painter.setPen(QColor("#333333"))  # Color for blame text (ensure good contrast)
+                        painter.setPen(QColor("#333333"))
                         painter.drawText(
-                            blame_text_rect, # Use the text rect for drawing text
+                            blame_text_rect,
                             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
                             annotation_display_string,
                         )
-                    else: # No annotation for this line, or no display string
-                        # Reset previous_drawn_color_index if this line doesn't have a colored annotation.
-                        # This prevents an unrelated color from influencing the next valid annotation.
+                    else:
+                        previous_blamed_commit_hash = None
                         previous_drawn_color_index = -1
-                        # Optionally, fill with default background if there's no annotation or it's empty,
-                        # to ensure consistent background if some lines have blame and others don't.
-                        # painter.fillRect(QRect(0, int(top), int(self.line_number_area.width() - line_num_text_width - self.PADDING_RIGHT_OF_LINENUM), int(current_block_height)), QColor("#f0f0f0"))
-
+                        # Default background is painted at the start of paint event, so no specific fill needed here
+                        # unless a different "non-blamed" line color is desired.
 
             block = block.next()
             top = bottom
