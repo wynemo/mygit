@@ -82,9 +82,9 @@ class SyncedTextEdit(QPlainTextEdit):
 
         # Initialize blame color palette and commit hash color store
         self.blame_color_palette = [
-            QColor(255, 235, 235),  # Light Pink
-            QColor(235, 255, 235),  # Light Green
-            QColor(235, 235, 255),  # Light Blue
+            QColor(192, 203, 229),
+            QColor(222, 228, 240),
+            QColor(235, 235, 255),
         ]
         self.assigned_commit_base_colors = {}
         self.line_final_color_indices = []
@@ -354,9 +354,9 @@ class SyncedTextEdit(QPlainTextEdit):
         for line_idx in range(len(self.blame_annotations_per_line)):
             annotation_data = self.blame_annotations_per_line[line_idx]
             current_commit_hash = None
-            final_color_index_for_line = -1 # Default for lines with no blame or if coloring fails
+            final_color_index_for_line = -1  # Default for lines with no blame or if coloring fails
 
-            if annotation_data and isinstance(annotation_data, dict): # Ensure annotation_data is a dict
+            if annotation_data and isinstance(annotation_data, dict):  # Ensure annotation_data is a dict
                 current_commit_hash = annotation_data.get("commit_hash")
 
             if num_colors > 0 and current_commit_hash:
@@ -369,10 +369,11 @@ class SyncedTextEdit(QPlainTextEdit):
                 calculated_color_index = current_hash_base_color_index
 
                 # 2. Adjacency Rule for Different Hashes
-                if loop_previous_hash and \
-                    current_commit_hash != loop_previous_hash and \
-                    calculated_color_index == loop_previous_color_index:
-
+                if (
+                    loop_previous_hash
+                    and current_commit_hash != loop_previous_hash
+                    and calculated_color_index == loop_previous_color_index
+                ):
                     for i in range(1, num_colors):
                         candidate_color_index = (calculated_color_index + i) % num_colors
                         if candidate_color_index != loop_previous_color_index:
@@ -380,9 +381,9 @@ class SyncedTextEdit(QPlainTextEdit):
                             break
 
                 # 3. Consistency Rule for Same Hashes
-                elif loop_previous_hash and \
-                      current_commit_hash == loop_previous_hash and \
-                      loop_previous_color_index != -1:
+                elif (
+                    loop_previous_hash and current_commit_hash == loop_previous_hash and loop_previous_color_index != -1
+                ):
                     calculated_color_index = loop_previous_color_index
 
                 final_color_index_for_line = calculated_color_index
@@ -540,7 +541,7 @@ class SyncedTextEdit(QPlainTextEdit):
                         annotation_data = self.blame_annotations_per_line[block_number]
 
                     # Default color for the blame rectangle background
-                    blame_qcolor = QColor(Qt.GlobalColor.lightGray) # Or your desired default/non-blamed line color
+                    blame_qcolor = QColor(Qt.GlobalColor.lightGray)  # Or your desired default/non-blamed line color
 
                     if annotation_data and isinstance(annotation_data, dict) and "_display_string" in annotation_data:
                         # Retrieve the pre-calculated color index for this line
@@ -570,11 +571,11 @@ class SyncedTextEdit(QPlainTextEdit):
                             0,
                             int(top),
                             int(self.PADDING_LEFT_OF_BLAME + max_width_for_blame_area + self.PADDING_AFTER_BLAME),
-                            int(current_block_height)
+                            int(current_block_height),
                         )
                         painter.fillRect(blame_fill_rect, blame_qcolor)
 
-                        painter.setPen(QColor("#333333")) # Color for annotation text
+                        painter.setPen(QColor("#333333"))  # Color for annotation text
                         painter.drawText(
                             blame_text_rect,
                             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
