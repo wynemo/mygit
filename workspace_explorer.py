@@ -16,7 +16,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from diff_calculator import DifflibCalculator
 from file_history_view import FileHistoryView
 from modified_text_edit import ModifiedTextEdit
 from syntax_highlighter import CodeHighlighter
@@ -126,23 +125,7 @@ class WorkspaceExplorer(QWidget):
                     break
                 main_git_window = parent_candidate
 
-            repo_path = main_git_window.git_manager.repo.working_dir
-            relative_path = os.path.relpath(file_path, repo_path)
-            repo = main_git_window.git_manager.repo
-            is_untracked = relative_path in repo.untracked_files
-            if is_untracked:
-                diffs = {}
-            else:
-                try:
-                    old_content = repo.git.show(f":{relative_path}")  # 暂存区内容
-                except:
-                    old_content = ""
-                try:
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        new_content = f.read()
-                except Exception as e:
-                    new_content = f"Error reading file: {e!s}"
-                diffs = DifflibCalculator().get_diff(old_content, new_content)
+            diffs = text_edit.get_diffs(main_git_window.git_manager)
             text_edit.set_line_modifications(diffs)
 
             if main_git_window and hasattr(main_git_window, handler_name):

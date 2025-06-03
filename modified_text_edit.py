@@ -6,7 +6,11 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import QSizePolicy, QWidget
 
+from diff_calculator import DifflibCalculator
 from text_edit import SyncedTextEdit
+
+if typing.TYPE_CHECKING:
+    from git_manager import GitManager
 
 
 # <new_class>
@@ -172,13 +176,31 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
         if parent and hasattr(parent, "git_manager"):
             # todo should check if it's under git version
             # 获取仓库路径
-            repo_path = parent.git_manager.repo.working_dir
-            relative_path = os.path.relpath(self.file_path, repo_path)
-            diffs = parent.git_manager.get_diff(relative_path)
+            diffs = self.get_diffs(parent.git_manager)
             print(f"diffs: {diffs}")
             self.set_line_modifications(diffs)
         else:
             print("cant get git manager")
+
+    def get_diffs(self, git_manager: "GitManager") -> dict:
+        repo_path = git_manager.repo.working_dir
+        relative_path = os.path.relpath(self.file_path, repo_path)
+        repo = git_manager.repo
+        is_untracked = relative_path in repo.untracked_files
+        if is_untracked:
+            diffs = {}
+        else:
+            try:
+                old_content = repo.git.show(f":{relative_path}")  # 暂存区内容
+            except:
+                old_content = ""
+            try:
+                with open(self.file_path, "r", encoding="utf-8") as f:
+                    new_content = f.read()
+            except Exception as e:
+                new_content = f"Error reading file: {e!s}"
+            diffs = DifflibCalculator().get_diff(old_content, new_content)
+        return diffs
 
 
 class OverViewBar(QWidget):
