@@ -86,6 +86,8 @@ class SyncedTextEdit(QPlainTextEdit):
             QColor(235, 255, 235),  # Light Green
             QColor(235, 235, 255),  # Light Blue
         ]
+        self.assigned_commit_base_colors = {}
+        self.line_final_color_indices = []
         # self.commit_hash_colors removed
 
         settings = Settings()
@@ -309,6 +311,7 @@ class SyncedTextEdit(QPlainTextEdit):
             QMessageBox.critical(self, "保存错误", f"无法保存文件: {e!s}", QMessageBox.StandardButton.Ok)
 
     def set_blame_data(self, blame_data_list: list):
+        self.assigned_commit_base_colors = {}
         self.max_blame_display_width = 0
         # Store the full data separately, ensuring original commit_hash is preserved.
         self.blame_data_full = list(blame_data_list)  # Make a copy
@@ -339,6 +342,63 @@ class SyncedTextEdit(QPlainTextEdit):
         self.blame_annotations_per_line = processed_for_display  # This list is for display and click handling
         self.showing_blame = True
         # self.commit_hash_colors removed
+
+        # Clear and prepare for pre-calculating line colors
+        self.line_final_color_indices = []
+        # self.assigned_commit_base_colors is already initialized above - good.
+
+        num_colors = len(self.blame_color_palette)
+        loop_previous_hash = None
+        loop_previous_color_index = -1
+
+        for line_idx in range(len(self.blame_annotations_per_line)):
+            annotation_data = self.blame_annotations_per_line[line_idx]
+            current_commit_hash = None
+            final_color_index_for_line = -1 # Default for lines with no blame or if coloring fails
+
+            if annotation_data and isinstance(annotation_data, dict): # Ensure annotation_data is a dict
+                current_commit_hash = annotation_data.get("commit_hash")
+
+            if num_colors > 0 and current_commit_hash:
+                # 1. Determine base color for the current hash
+                current_hash_base_color_index = self.assigned_commit_base_colors.get(current_commit_hash)
+                if current_hash_base_color_index is None:
+                    current_hash_base_color_index = abs(hash(current_commit_hash)) % num_colors
+                    self.assigned_commit_base_colors[current_commit_hash] = current_hash_base_color_index
+
+                calculated_color_index = current_hash_base_color_index
+
+                # 2. Adjacency Rule for Different Hashes
+                if loop_previous_hash and \
+                    current_commit_hash != loop_previous_hash and \
+                    calculated_color_index == loop_previous_color_index:
+
+                    for i in range(1, num_colors):
+                        candidate_color_index = (calculated_color_index + i) % num_colors
+                        if candidate_color_index != loop_previous_color_index:
+                            calculated_color_index = candidate_color_index
+                            break
+
+                # 3. Consistency Rule for Same Hashes
+                elif loop_previous_hash and \
+                      current_commit_hash == loop_previous_hash and \
+                      loop_previous_color_index != -1:
+                    calculated_color_index = loop_previous_color_index
+
+                final_color_index_for_line = calculated_color_index
+
+                # Update trackers for the next iteration of this loop
+                loop_previous_hash = current_commit_hash
+                loop_previous_color_index = final_color_index_for_line
+            else:
+                # Line has no blame data, or no hash, or no colors defined. Reset for next valid line.
+                loop_previous_hash = None
+                loop_previous_color_index = -1
+
+            self.line_final_color_indices.append(final_color_index_for_line)
+
+        # Ensure viewport updates after colors are calculated, if not already done by subsequent calls.
+        # The existing self.viewport().update() at the end of the original set_blame_data might be sufficient.
         self.update_line_number_area_width()
         self.viewport().update()
 
@@ -347,6 +407,8 @@ class SyncedTextEdit(QPlainTextEdit):
         self.blame_data_full = []  # Also clear the full data
         self.max_blame_display_width = 0  # Reset max width when clearing blame
         self.showing_blame = False
+        self.assigned_commit_base_colors = {}
+        self.line_final_color_indices = []
         # self.commit_hash_colors removed
         self.update_line_number_area_width()
         self.viewport().update()
@@ -440,9 +502,7 @@ class SyncedTextEdit(QPlainTextEdit):
         top = self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
         bottom = top + self.blockBoundingRect(block).height()
 
-        # Variables to track previous commit and color for alternating colors
-        previous_blamed_commit_hash = None
-        previous_drawn_color_index = -1
+        # previous_blamed_commit_hash and previous_drawn_color_index removed as color calculation is now pre-done.
 
         while block.isValid() and top <= event.rect().bottom():
             if block.isVisible() and bottom >= event.rect().top():
@@ -479,37 +539,22 @@ class SyncedTextEdit(QPlainTextEdit):
                     if block_number < len(self.blame_annotations_per_line):
                         annotation_data = self.blame_annotations_per_line[block_number]
 
-                    if annotation_data and "_display_string" in annotation_data:
+                    # Default color for the blame rectangle background
+                    blame_qcolor = QColor(Qt.GlobalColor.lightGray) # Or your desired default/non-blamed line color
+
+                    if annotation_data and isinstance(annotation_data, dict) and "_display_string" in annotation_data:
+                        # Retrieve the pre-calculated color index for this line
+                        # An index of -1 (or other chosen default) means "no specific blame color"
+                        color_idx_for_line = -1
+                        if block_number < len(self.line_final_color_indices):
+                            color_idx_for_line = self.line_final_color_indices[block_number]
+
+                        if color_idx_for_line != -1 and 0 <= color_idx_for_line < len(self.blame_color_palette):
+                            blame_qcolor = self.blame_color_palette[color_idx_for_line]
+                        # else: line will use the default blame_qcolor (e.g., lightGray or transparent)
+
+                        # The rest of the drawing logic for the annotation text and rectangle fill remains
                         annotation_display_string = annotation_data["_display_string"]
-                        current_commit_hash = annotation_data.get("commit_hash", "")
-
-                        num_colors = len(self.blame_color_palette)
-                        blame_qcolor = QColor(Qt.GlobalColor.lightGray) # Default if no palette or error
-
-                        if num_colors > 0:
-                            base_color_index = abs(hash(current_commit_hash)) % num_colors
-                            final_color_index = base_color_index
-
-                            if current_commit_hash != previous_blamed_commit_hash:
-                                if final_color_index == previous_drawn_color_index:
-                                    final_color_index = (final_color_index + 1) % num_colors
-                                # Second increment for robustness, especially with 3 colors
-                                # to better avoid same color if the +1 still results in the same.
-                                if num_colors > 1 and final_color_index == previous_drawn_color_index:
-                                     final_color_index = (final_color_index + 1) % num_colors
-                            else: # Same commit hash as previous line, try to use the same color
-                                final_color_index = previous_drawn_color_index if previous_drawn_color_index != -1 else base_color_index
-
-
-                            blame_qcolor = self.blame_color_palette[final_color_index]
-
-                            previous_blamed_commit_hash = current_commit_hash
-                            previous_drawn_color_index = final_color_index
-                        else: # No colors in palette
-                            previous_blamed_commit_hash = None # Reset since we can't color
-                            previous_drawn_color_index = -1
-
-
                         max_width_for_blame_area = getattr(self, "max_blame_display_width", 0)
                         if not isinstance(max_width_for_blame_area, (int, float)):
                             max_width_for_blame_area = 0
@@ -529,17 +574,20 @@ class SyncedTextEdit(QPlainTextEdit):
                         )
                         painter.fillRect(blame_fill_rect, blame_qcolor)
 
-                        painter.setPen(QColor("#333333"))
+                        painter.setPen(QColor("#333333")) # Color for annotation text
                         painter.drawText(
                             blame_text_rect,
                             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
                             annotation_display_string,
                         )
-                    else:
-                        previous_blamed_commit_hash = None
-                        previous_drawn_color_index = -1
-                        # Default background is painted at the start of paint event, so no specific fill needed here
-                        # unless a different "non-blamed" line color is desired.
+                    # The 'else' case for 'if annotation_data and ...' (where no valid annotation for this line)
+                    # implicitly means the default background of the line number area will show,
+                    # or if you want a specific fill for non-annotated lines within the blame area,
+                    # that could be added here. For now, it will just not draw a specific blame colored box.
+
+                    # Note: The old 'else' that reset previous_blamed_commit_hash and previous_drawn_color_index
+                    # is no longer needed here because these variables are entirely removed from this method's scope
+                    # for color calculation.
 
             block = block.next()
             top = bottom
