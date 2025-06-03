@@ -98,6 +98,7 @@ class WorkspaceExplorer(QWidget):
             text_edit.setProperty("file_path", file_path)  # Keep for any existing logic relying on property
             text_edit.file_path = file_path  # Add this for consistency with show_blame
             text_edit.setPlainText(content)
+            text_edit.set_editable()
 
             text_edit.highlighter = CodeHighlighter(text_edit.document())
             language = LANGUAGE_MAP.get(file_path.split(".")[-1], "text")
