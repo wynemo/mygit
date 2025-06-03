@@ -8,7 +8,7 @@ class NotificationWidget(QFrame):
         super().__init__(parent)
 
         self.setFixedWidth(300)
-        self.setMinimumHeight(50)
+        self.setMinimumHeight(150)
         self.setStyleSheet("""
             NotificationWidget {
                 background-color: #f0f0f0;
