@@ -16,3 +16,4 @@ class CompareWithWorkingDialog(QDialog):
         layout.addWidget(self.diff_viewer)
 
         self.diff_viewer.set_texts(old_content, new_content, file_path, "HEAD", None)
+        self.diff_viewer.right_edit.set_editable()

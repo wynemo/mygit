@@ -326,6 +326,7 @@ class CommitDialog(QDialog):
 
             # 设置差异内容
             diff_viewer.set_texts(old_content, new_content, file_path, "HEAD", None)
+            diff_viewer.right_edit.set_editable()
 
             # 显示对话框
             diff_dialog.show()
