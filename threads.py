@@ -1,5 +1,6 @@
 from PyQt6.QtCore import QThread, pyqtSignal
 
+
 class FetchThread(QThread):
     finished = pyqtSignal(bool, str)
 
@@ -13,6 +14,7 @@ class FetchThread(QThread):
             self.finished.emit(True, "")
         except Exception as e:
             self.finished.emit(False, str(e))
+
 
 class PullThread(QThread):
     """用于在后台执行pull操作的线程"""

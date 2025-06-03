@@ -115,7 +115,7 @@ class GitManager:
             self.repo.remotes.origin.fetch()
         except GitCommandError as e:
             error_message = f"Fetch failed: {e!s}"
-            if hasattr(e, 'stderr') and e.stderr:
+            if hasattr(e, "stderr") and e.stderr:
                 error_message += f"\nDetails: {e.stderr.strip()}"
             raise Exception(error_message)
         except Exception as e:
@@ -130,7 +130,7 @@ class GitManager:
             self.repo.remotes.origin.pull()
         except GitCommandError as e:
             error_message = f"Pull failed: {e!s}"
-            if hasattr(e, 'stderr') and e.stderr:
+            if hasattr(e, "stderr") and e.stderr:
                 error_message += f"\nDetails: {e.stderr.strip()}"
             raise Exception(error_message)
         except Exception as e:
@@ -144,7 +144,7 @@ class GitManager:
             self.repo.remotes.origin.push()
         except GitCommandError as e:
             error_message = f"Push failed: {e!s}"
-            if hasattr(e, 'stderr') and e.stderr:
+            if hasattr(e, "stderr") and e.stderr:
                 error_message += f"\nDetails: {e.stderr.strip()}"
             raise Exception(error_message)
         except Exception as e:
