@@ -297,34 +297,15 @@ class SyncedTextEdit(QPlainTextEdit):
 
         try:
             current_content = self.toPlainText()
-            # 显示保存确认对话框
-            reply = QMessageBox.question(
-                self,
-                "确认保存",
-                f"确定保存更改到文件 '{os.path.basename(self.file_path)}'?",
-                QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Save,
-            )
 
-            if reply == QMessageBox.StandardButton.Save:
-                with open(self.file_path, "w", encoding="utf-8") as f:
-                    f.write(current_content)
+            with open(self.file_path, "w", encoding="utf-8") as f:
+                f.write(current_content)
 
-                logging.info("文件保存成功: %s", self.file_path)
-                self.original_content = current_content
+            logging.info("文件保存成功: %s", self.file_path)
+            self.original_content = current_content
 
-                # 保存后自动切换回只读模式
-                self.setReadOnly(True)
-                self.edit_mode = False
-                self.viewport().setCursor(Qt.CursorShape.ArrowCursor)  # 恢复箭头光标
+            self.viewport().setCursor(Qt.CursorShape.ArrowCursor)  # 恢复箭头光标
 
-                # 显示保存成功信息
-                QMessageBox.information(
-                    self,
-                    "保存成功",
-                    f"文件 '{os.path.basename(self.file_path)}' 已成功保存",
-                    QMessageBox.StandardButton.Ok,
-                )
         except Exception as e:
             logging.error("文件保存失败: %s", str(e))
             QMessageBox.critical(self, "保存错误", f"无法保存文件: {e!s}", QMessageBox.StandardButton.Ok)
