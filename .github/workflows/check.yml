@@ -18,7 +18,7 @@ jobs:
       run: sudo apt-get update && sudo apt-get install -y libxcb-randr0 libxcb-shape0 libxcb-xinerama0 libxcb-icccm4 libxcb-keysyms1 libxcb-render0 libxkbcommon-x11-0 libxcb-xfixes0
 
     - name: install xvfb
-      run: sudo apt-get update && sudo apt-get install -y xvfb
+      run: sudo apt-get update && sudo apt-get install -y xvfb 11bxcb-cursore
 
     - name: Set up Python 3.12
       uses: actions/setup-python@v4
