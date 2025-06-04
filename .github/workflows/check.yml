@@ -13,7 +13,13 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
-      
+
+    - name: Install dependencies
+      run: apt-get update && apt-get install -y libxcb-randr0 libxcb-shape0 libxcb-xinerama0 libxcb-icccm4 libxcb-keysyms1 libxcb-render0 libxkbcommon-x11-0 libxcb-xfixes0
+
+    - name: install xvfb
+      run: apt-get update && apt-get install -y xvfb
+
     - name: Set up Python 3.12
       uses: actions/setup-python@v4
       with:
