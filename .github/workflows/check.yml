@@ -20,6 +20,9 @@ jobs:
     - name: install xvfb
       run: sudo apt-get update && sudo apt-get install -y xvfb libxcb-cursor0
 
+    - name: Install EGL / OpenGL libs
+      run: sudo apt-get install -y libegl1
+
     - name: Set up Python 3.12
       uses: actions/setup-python@v4
       with:
