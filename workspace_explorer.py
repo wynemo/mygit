@@ -16,10 +16,10 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from editors.modified_text_edit import ModifiedTextEdit
+from editors.text_edit import SyncedTextEdit  # Ensure this is present
 from file_history_view import FileHistoryView
-from modified_text_edit import ModifiedTextEdit
 from syntax_highlighter import CodeHighlighter
-from text_edit import SyncedTextEdit  # Ensure this is present
 from utils.language_map import LANGUAGE_MAP
 
 

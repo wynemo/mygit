@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
 )
 
 if TYPE_CHECKING:
-    from text_edit import SyncedTextEdit  # 仅在类型检查时导入
+    from editors.text_edit import SyncedTextEdit  # 仅在类型检查时导入
 
 
 class FindDialog(QFrame):  # Changed from QDialog to QWidget

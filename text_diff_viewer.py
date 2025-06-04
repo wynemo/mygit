@@ -5,8 +5,8 @@ from PyQt6.QtCore import QPoint
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
 from diff_calculator import DiffCalculator, DiffChunk, DifflibCalculator
-from diff_highlighter import DiffHighlighter, MultiHighlighter
-from text_edit import SyncedTextEdit
+from diff_highlighter import MultiHighlighter
+from editors.text_edit import SyncedTextEdit
 from utils.language_map import LANGUAGE_MAP
 
 
@@ -117,7 +117,7 @@ class DiffViewer(QWidget):
         if (
             self.current_diff_index == -1 and num_actual_diffs > 0 and not next_enabled
         ):  # This case should not happen due to logic above, but good to log
-            logging.info(f"Initial state with diffs: Next button forced to enabled to reach first diff.")
+            logging.info("Initial state with diffs: Next button forced to enabled to reach first diff.")
 
     def setup_ui(self):
         # Button layout
@@ -527,10 +527,9 @@ class MergeDiffViewer(DiffViewer):
                 else:
                     current_chunk.left_end = line_num + 1
                     current_chunk.right_end = line_num + 1
-            else:
-                if current_chunk:
-                    result_chunks.append(current_chunk)
-                    current_chunk = None
+            elif current_chunk:
+                result_chunks.append(current_chunk)
+                current_chunk = None
 
         if current_chunk:
             result_chunks.append(current_chunk)

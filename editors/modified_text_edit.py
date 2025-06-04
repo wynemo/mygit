@@ -7,7 +7,7 @@ from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import QSizePolicy, QWidget
 
 from diff_calculator import DifflibCalculator
-from text_edit import SyncedTextEdit
+from editors.text_edit import SyncedTextEdit
 
 if typing.TYPE_CHECKING:
     from git_manager import GitManager
