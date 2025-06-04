@@ -247,15 +247,35 @@ class SyncedTextEdit(QPlainTextEdit):
         logging.debug(f"Search highlights cleared for {self.objectName()}")
 
     def scroll_to_line(self, line_number: int):
-        """Scrolls the text edit to the specified line number (0-indexed)."""
+        """Scrolls the text edit to make the specified line number (0-indexed) appear at the top."""
         document = self.document()
         if 0 <= line_number < document.blockCount():
             block = document.findBlockByNumber(line_number)
             if block.isValid():
                 cursor = QTextCursor(block)
-                self.setTextCursor(cursor)
+                self.setTextCursor(cursor) # Place the cursor at the start of the block
+
+                # Scroll to make this cursor appear at the top of the viewport
+                # Get the rectangle of the cursor in viewport coordinates
+                cursor_rect_in_viewport = self.cursorRect(cursor)
+                # Get the current value of the vertical scrollbar (document Y-coordinate at the top of viewport)
+                current_scroll_bar_value = self.verticalScrollBar().value()
+
+                # Calculate the new scrollbar value.
+                # new_scroll_bar_value is the document Y-coordinate that should be at the top of the viewport
+                # to make the current cursor_rect_in_viewport.top() become 0.
+                new_scroll_bar_value = current_scroll_bar_value + cursor_rect_in_viewport.top()
+
+                self.verticalScrollBar().setValue(new_scroll_bar_value)
+
+                # Call ensureCursorVisible as a safeguard, especially for lines taller than the viewport
+                # or to ensure the cursor has focus.
                 self.ensureCursorVisible()
-                logging.info(f"Scrolled {self.objectName()} to line {line_number + 1} (0-indexed: {line_number})")
+
+                logging.info(
+                    f"Scrolled {self.objectName()} to bring line {line_number + 1} (0-indexed: {line_number}) to the top. "
+                    f"Cursor viewport top: {cursor_rect_in_viewport.top()}, Current scroll val: {current_scroll_bar_value}, New scroll val: {new_scroll_bar_value}"
+                )
             else:
                 logging.warning(f"Block for line {line_number} (0-indexed) not found in {self.objectName()}.")
         else:
