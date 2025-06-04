@@ -85,6 +85,7 @@ class SyncedTextEdit(QPlainTextEdit):
             QColor(192, 203, 229),
             QColor(222, 228, 240),
             QColor(235, 235, 255),
+            QColor(255, 255, 255),
         ]
         self.assigned_commit_base_colors = {}
         self.line_final_color_indices = []
