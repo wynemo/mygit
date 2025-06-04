@@ -253,7 +253,7 @@ class SyncedTextEdit(QPlainTextEdit):
             block = document.findBlockByNumber(line_number)
             if block.isValid():
                 cursor = QTextCursor(block)
-                self.setTextCursor(cursor) # Place the cursor at the start of the block
+                self.setTextCursor(cursor)  # Place the cursor at the start of the block
 
                 # Scroll to make this cursor appear at the top of the viewport
                 # Get the rectangle of the cursor in viewport coordinates
