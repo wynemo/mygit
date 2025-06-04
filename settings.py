@@ -2,6 +2,8 @@ import json
 import os
 from pathlib import Path
 
+from PyQt6.QtGui import QColor
+
 
 class Settings:
     def __init__(self):
@@ -101,3 +103,11 @@ class Settings:
         """设置代码风格"""
         self.settings["code_style"] = code_style
         self.save_settings()
+
+
+BLAME_COLOR_PALETTE = [
+    QColor(192, 203, 229),  # light blue
+    QColor(222, 228, 240),  # lighter blue
+    QColor(235, 235, 255),  # lightest blue
+    QColor(255, 255, 255),  # white
+]

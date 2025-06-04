@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
 
 from diff_highlighter import DiffHighlighter
 from find_dialog import FindDialog
-from settings import Settings
+from settings import BLAME_COLOR_PALETTE, Settings
 
 
 class LineNumberArea(QWidget):
@@ -81,12 +81,7 @@ class SyncedTextEdit(QPlainTextEdit):
         self.highlighted_line_number = -1
 
         # Initialize blame color palette and commit hash color store
-        self.blame_color_palette = [
-            QColor(192, 203, 229),  # light blue
-            QColor(222, 228, 240),  # lighter blue
-            QColor(235, 235, 255),  # lightest blue
-            QColor(255, 255, 255),  # white
-        ]
+        self.blame_color_palette = BLAME_COLOR_PALETTE
         self.assigned_commit_base_colors = {}
         self.line_final_color_indices = []
         # self.commit_hash_colors removed
