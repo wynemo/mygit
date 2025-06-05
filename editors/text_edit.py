@@ -178,6 +178,30 @@ class SyncedTextEdit(QPlainTextEdit):
         ):
             self.open_find_dialog()
             event.accept()  # Indicate that the event has been handled
+        # 全选快捷键 (Ctrl+A 或 Cmd+A)
+        elif event.key() == Qt.Key.Key_A and (
+            event.modifiers() == Qt.KeyboardModifier.ControlModifier
+            or event.modifiers() == Qt.KeyboardModifier.MetaModifier
+        ):
+            self.select_all_text()
+            event.accept()
+        # 复制快捷键 (Ctrl+C 或 Cmd+C)
+        elif event.key() == Qt.Key.Key_C and (
+            event.modifiers() == Qt.KeyboardModifier.ControlModifier
+            or event.modifiers() == Qt.KeyboardModifier.MetaModifier
+        ):
+            self.copy_text()
+            event.accept()
+        # 粘贴快捷键 (Ctrl+V 或 Cmd+V)
+        elif event.key() == Qt.Key.Key_V and (
+            event.modifiers() == Qt.KeyboardModifier.ControlModifier
+            or event.modifiers() == Qt.KeyboardModifier.MetaModifier
+        ):
+            if not self.isReadOnly():
+                self.paste_text()
+                event.accept()
+            else:
+                super().keyPressEvent(event) # Allow paste to work in read-only mode if underlying widget supports it
         else:
             super().keyPressEvent(event)  # Call base class implementation for other keys
 
@@ -282,6 +306,19 @@ class SyncedTextEdit(QPlainTextEdit):
     def show_context_menu(self, position):
         menu = QMenu(self)
 
+        select_all_action = menu.addAction("Select All")
+        select_all_action.triggered.connect(self.select_all_text)
+
+        copy_action = menu.addAction("Copy")
+        copy_action.triggered.connect(self.copy_text)
+
+        paste_action = menu.addAction("Paste")
+        paste_action.triggered.connect(self.paste_text)
+        if self.isReadOnly():
+            paste_action.setEnabled(False)
+
+        menu.addSeparator()
+
         # if self.isReadOnly() or not self.blame_annotations_per_line:
         blame_action = menu.addAction("Show Blame")
         blame_action.triggered.connect(self.show_blame)
@@ -295,6 +332,21 @@ class SyncedTextEdit(QPlainTextEdit):
 
     # Renamed from _show_context_menu to show_context_menu for consistency
     # No other change in this method, just ensuring the diff picks up the rename if any confusion.
+
+    def select_all_text(self):
+        # Placeholder for select all functionality
+        logging.debug("Select All action triggered")
+        self.selectAll()
+
+    def copy_text(self):
+        # Placeholder for copy functionality
+        logging.debug("Copy action triggered")
+        self.copy()
+
+    def paste_text(self):
+        # Placeholder for paste functionality
+        logging.debug("Paste action triggered")
+        self.paste()
 
     def set_editable(self):
         """将文本编辑设置为可编辑模式并保存原始内容"""
