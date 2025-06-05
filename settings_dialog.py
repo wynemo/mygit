@@ -67,7 +67,9 @@ class SettingsDialog(QDialog):
         layout.addRow(model_layout)
 
         self.prompt = QTextEdit()
-        self.prompt.setText(self.settings.settings.get("prompt", "帮我生成commit 信息, 用中文, 简洁"))
+        self.prompt.setText(
+            self.settings.settings.get("prompt", "帮我生成commit 信息，用中文, 简洁， 使用 Conventional Commits 格式")
+        )
         prompt_layout = QHBoxLayout()
         prompt_layout.addWidget(QLabel("Prompt:"))
         prompt_layout.addWidget(self.prompt, 1)
