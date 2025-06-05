@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from PyQt6.QtWidgets import QComboBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit
+from PyQt6.QtWidgets import QComboBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QTextEdit
 
 if TYPE_CHECKING:
     from settings import Settings
@@ -66,7 +66,7 @@ class SettingsDialog(QDialog):
         model_layout.addWidget(self.model_name_edit, 1)
         layout.addRow(model_layout)
 
-        self.prompt = QLineEdit()
+        self.prompt = QTextEdit()
         self.prompt.setText(self.settings.settings.get("prompt", "帮我生成commit 信息, 用中文, 简洁"))
         prompt_layout = QHBoxLayout()
         prompt_layout.addWidget(QLabel("Prompt:"))
@@ -98,7 +98,7 @@ class SettingsDialog(QDialog):
         self.settings.settings["api_url"] = self.api_url_edit.text()
         self.settings.settings["api_secret"] = self.api_secret_edit.text()
         self.settings.settings["model_name"] = self.model_name_edit.text()
-        self.settings.settings["prompt"] = self.prompt.text()
+        self.settings.settings["prompt"] = self.prompt.toPlainText()
 
         # 保存设置到文件
         self.settings.save_settings()
