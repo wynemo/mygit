@@ -195,6 +195,7 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
 
     def save_content(self):
         super().save_content()
+        self.document().setModified(False)
         parent = self.parent()
         while not hasattr(parent, "git_manager"):
             parent = parent.parent()
