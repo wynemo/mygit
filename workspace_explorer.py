@@ -170,48 +170,58 @@ class WorkspaceExplorer(QWidget):
         if hasattr(self, "workspace_path"):
             self._add_directory_items(self.workspace_path, self.file_tree.invisibleRootItem())
 
-    def _add_directory_items(self, path, parent):
-        """递归添加目录内容到树形结构"""
+    def _add_directory_items(self, path: str, parent_item_in_tree: QTreeWidgetItem) -> bool:
+        # This is the method to be replaced / modified.
+        # Returns True if this directory or any of its subdirectories/files are 'modified'.
+        current_dir_or_descendant_is_modified = False
         try:
-            # item 排序 按首字母
-            for item in sorted(os.listdir(path), key=lambda x: x[0]):
-                item_path = os.path.join(path, item)
-                tree_item = QTreeWidgetItem(parent)
-                tree_item.setText(0, item)
+            # Sort items by name for consistent order (case-insensitive)
+            for item_name in sorted(os.listdir(path), key=lambda x: x.lower()):
+                item_path = os.path.join(path, item_name)
+                tree_item = QTreeWidgetItem(parent_item_in_tree)
+                tree_item.setText(0, item_name)
                 tree_item.setData(0, Qt.ItemDataRole.UserRole, item_path)
 
-                if os.path.isfile(item_path) and hasattr(self, "workspace_path"):
-                    try:
-                        # Ensure workspace_path is not None and is an absolute path
-                        if not self.workspace_path or not os.path.isabs(self.workspace_path):
-                            # Fallback or error logging if workspace_path isn't suitable
-                            pass  # Or log an error: logging.error("Workspace path is not set or not absolute.")
-                        else:
+                is_this_entry_modified = False
+
+                if os.path.isfile(item_path):
+                    if hasattr(self, "workspace_path") and self.workspace_path and os.path.isabs(self.workspace_path):
+                        try:
                             relative_path = os.path.relpath(item_path, self.workspace_path)
-                            # Normalize path separators for comparison, as GitPython uses '/'
                             relative_path = relative_path.replace(os.sep, "/")
 
                             if relative_path in self.all_file_statuses.get("modified", set()):
                                 tree_item.setForeground(0, QColor(165, 42, 42))  # Brown color
+                                is_this_entry_modified = True
                             elif relative_path in self.all_file_statuses.get("staged", set()):
                                 tree_item.setForeground(0, QColor(210, 180, 140))  # Light brown color
                             elif relative_path in self.all_file_statuses.get("untracked", set()):
-                                tree_item.setForeground(0, QColor(0, 128, 0))
-                    except ValueError as ve:
-                        # This can happen if item_path is not under self.workspace_path
-                        # For example, if self.workspace_path is relative and item_path is absolute
-                        # or they are on different drives on Windows.
-                        logging.warning(
-                            f"Could not determine relative path for {item_path} against {self.workspace_path}: {ve}"
+                                tree_item.setForeground(0, QColor(0, 128, 0))  # Green color
+                        except ValueError:
+                            logging.debug(f"Cannot get relative path for {item_path} against {self.workspace_path}.")
+                        except Exception as e_status:
+                            logging.error(f"Error processing file status for {item_path}: {e_status}")
+                    else:
+                        logging.debug(
+                            f"Workspace path not suitable for file status: {self.workspace_path if hasattr(self, 'workspace_path') else 'Not set'}"
                         )
-                    except Exception as e_status:
-                        logging.error(f"Error processing file status for {item_path}: {e_status}")
 
-                if os.path.isdir(item_path):
-                    self._add_directory_items(item_path, tree_item)
+                elif os.path.isdir(item_path):
+                    if self._add_directory_items(item_path, tree_item):
+                        tree_item.setForeground(0, QColor(165, 42, 42))  # Color directory brown
+                        is_this_entry_modified = True
 
+                if is_this_entry_modified:
+                    current_dir_or_descendant_is_modified = True
+
+        except FileNotFoundError:
+            logging.warning(f"Directory not found during tree population: {path}.")
+        except PermissionError:
+            logging.warning(f"Permission denied for directory: {path}.")
         except Exception as e:
-            print(f"Error loading directory {path}: {e}")
+            logging.error(f"Error loading directory contents for {path}: {e}")
+
+        return current_dir_or_descendant_is_modified
 
     def show_tab_context_menu(self, pos: QPoint):
         tab_index = self.tab_widget.tabBar().tabAt(pos)
