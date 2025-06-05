@@ -218,7 +218,7 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
         else:
             print("cant get git manager")
 
-    def get_diffs(self, git_manager: "GitManager", new_content: str = None) -> dict:
+    def get_diffs(self, git_manager: "GitManager", new_content: str | None = None) -> dict:
         repo_path = git_manager.repo.working_dir
         relative_path = os.path.relpath(self.file_path, repo_path)
         repo = git_manager.repo
