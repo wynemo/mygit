@@ -77,21 +77,31 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
             print("文档有未保存的修改，不刷新")
             return
 
+        current_content = self.toPlainText()
         try:
             with open(self.file_path, "r", encoding="utf-8") as f:
                 new_content = f.read()
-                # 设置document的文本
-                self.setPlainText(new_content)
         except Exception as e:
             logging.warning(f"Error reading file: {e!s}")
             return
+
+        # 仅当文件实际内容与编辑器当前内容不同时才更新文本,以避免不必要的刷新和光标位置丢失
+        if new_content != current_content:
+            scrollbar = self.verticalScrollBar()
+            # 保存当前滚动条的位置,以便在刷新内容后恢复
+            stored_value = scrollbar.value()
+            # 设置document的文本
+            self.setPlainText(new_content)
+            # 恢复滚动条位置,避免不必要的滚动到顶部
+            scrollbar.setValue(stored_value)
+
         parent = self.parent()
         while not hasattr(parent, "git_manager"):
             parent = parent.parent()
         if parent and hasattr(parent, "git_manager"):
             # todo should check if it's under git version
             # 获取仓库路径
-            diffs = self.get_diffs(parent.git_manager, new_content)
+            diffs = self.get_diffs(parent.git_manager, self.toPlainText())
             print(f"focusInEvent diffs: {diffs}")
             self.set_line_modifications(diffs)
 
