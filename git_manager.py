@@ -297,22 +297,24 @@ class GitManager:
         try:
             # 检查当前分支是否已经是目标分支
             if self.repo.active_branch.name == branch_name:
-                return None # 已经是目标分支，无需切换
+                return None  # 已经是目标分支，无需切换
 
             # 检查工作区是否有未提交的更改
-            if self.repo.is_dirty(untracked_files=True):
-                return "工作区有未提交的更改，请先提交或贮藏更改后再切换分支。" # Workspace has uncommitted changes.
+            # if self.repo.is_dirty(untracked_files=True):
+            # return "工作区有未提交的更改，请先提交或贮藏更改后再切换分支。" # Workspace has uncommitted changes.
 
             self.repo.git.checkout(branch_name)
             return None
         except git.GitCommandError as e:
-            logging.error(f"切换分支 {branch_name} 失败: {e!s}") # Failed to switch branch
+            logging.error(f"切换分支 {branch_name} 失败: {e!s}")  # Failed to switch branch
             # 提供更具体的错误信息
             if "did not match any file(s) known to git" in str(e):
-                return f"分支 '{branch_name}' 不存在。" # Branch does not exist.
+                return f"分支 '{branch_name}' 不存在。"  # Branch does not exist.
             elif "Your local changes to the following files would be overwritten by checkout" in str(e):
-                return "切换分支会覆盖本地未提交的更改，请先提交或贮藏。" # Switching branches would overwrite local uncommitted changes.
-            return f"切换到分支 '{branch_name}' 失败: {e.stderr.strip() if e.stderr else e!s}" # Failed to switch to branch.
+                return "切换分支会覆盖本地未提交的更改，请先提交或贮藏。"  # Switching branches would overwrite local uncommitted changes.
+            return f"切换到分支 '{branch_name}' 失败: {e.stderr.strip() if e.stderr else e!s}"  # Failed to switch to branch.
         except Exception as e:
-            logging.error(f"切换分支 {branch_name} 时发生未知错误: {e!s}") # Unknown error occurred while switching branch.
-            return f"切换到分支 '{branch_name}' 时发生未知错误。" # Unknown error occurred while switching to branch.
+            logging.error(
+                f"切换分支 {branch_name} 时发生未知错误: {e!s}"
+            )  # Unknown error occurred while switching branch.
+            return f"切换到分支 '{branch_name}' 时发生未知错误。"  # Unknown error occurred while switching to branch.
