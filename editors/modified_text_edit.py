@@ -3,7 +3,7 @@ import os
 import typing
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QPainter, QPen
+from PyQt6.QtGui import QColor, QFocusEvent, QPainter, QPen
 from PyQt6.QtWidgets import QSizePolicy, QWidget
 
 from diff_calculator import DifflibCalculator
@@ -69,6 +69,31 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
     background: rgba(0, 0, 0, 180);
 }
         """)
+
+    def focusInEvent(self, event: QFocusEvent):
+        """Handle the event when the widget gains focus."""
+        super().focusInEvent(event)
+        if self.document().isModified():
+            print("文档有未保存的修改，不刷新")
+            return
+
+        try:
+            with open(self.file_path, "r", encoding="utf-8") as f:
+                new_content = f.read()
+                # 设置document的文本
+                self.setPlainText(new_content)
+        except Exception as e:
+            logging.warning(f"Error reading file: {e!s}")
+            return
+        parent = self.parent()
+        while not hasattr(parent, "git_manager"):
+            parent = parent.parent()
+        if parent and hasattr(parent, "git_manager"):
+            # todo should check if it's under git version
+            # 获取仓库路径
+            diffs = self.get_diffs(parent.git_manager, new_content)
+            print(f"focusInEvent diffs: {diffs}")
+            self.set_line_modifications(diffs)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -182,7 +207,7 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
         else:
             print("cant get git manager")
 
-    def get_diffs(self, git_manager: "GitManager") -> dict:
+    def get_diffs(self, git_manager: "GitManager", new_content: str = None) -> dict:
         repo_path = git_manager.repo.working_dir
         relative_path = os.path.relpath(self.file_path, repo_path)
         repo = git_manager.repo
@@ -194,11 +219,12 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
                 old_content = repo.git.show(f":{relative_path}")  # 暂存区内容
             except:
                 old_content = ""
-            try:
-                with open(self.file_path, "r", encoding="utf-8") as f:
-                    new_content = f.read()
-            except Exception as e:
-                new_content = f"Error reading file: {e!s}"
+            if not new_content:
+                try:
+                    with open(self.file_path, "r", encoding="utf-8") as f:
+                        new_content = f.read()
+                except Exception as e:
+                    new_content = f"Error reading file: {e!s}"
             diffs = DifflibCalculator().get_diff(old_content, new_content)
         return diffs
 
