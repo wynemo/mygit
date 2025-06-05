@@ -328,10 +328,43 @@ class GitManagerWindow(QMainWindow):
             self.commit_history_view.history_graph_list.hide()
             self.commit_history_view.history_list.show()
 
-    def on_branch_changed(self, branch):
-        """当分支改变时更新提交历史"""
-        if self.git_manager:
+    def on_branch_changed(self, branch: str):
+        """当分支组合框中的选定分支改变时，尝试切换分支并更新UI。"""
+        if not self.git_manager or not self.git_manager.repo:
+            # 如果仓库未加载或无效，则不执行任何操作
+            return
+
+        if not branch or branch == self.git_manager.get_default_branch():
+            # 如果选择的分支为空或与当前活动分支相同，则不执行任何操作
+            # 这也防止了在加载时或以编程方式设置分支组合框时尝试不必要的切换
+            # self.update_commit_history() # 仍然更新历史记录，以防万一 (如果branch_combo信号本身会触发这个，可能不需要)
+            return
+
+        # 尝试切换分支
+        error_message = self.git_manager.switch_branch(branch)
+
+        if error_message:
+            # 切换失败，显示错误通知
+            self.notification_widget.show_message(f"切换分支失败: {error_message}")
+            # 将分支组合框恢复到实际的活动分支
+            actual_active_branch = self.git_manager.get_default_branch()
+            if actual_active_branch:
+                self.top_bar.branch_combo.blockSignals(True)
+                self.top_bar.branch_combo.setCurrentText(actual_active_branch)
+                self.top_bar.branch_combo.blockSignals(False)
+        else:
+            # 切换成功
+            self.notification_widget.show_message(f"成功切换到分支: {branch}") # 可选：成功提示
+            # 更新UI组件以反映分支更改
+            self.workspace_explorer.refresh_file_tree()
+            # self.update_branches_on_top_bar() # 确保组合框状态正确（如果需要, 但setCurrentText应该已处理）
+            # update_commit_history 会被连接到 branch_combo 的 activated 信号，
+            # 如果我们上面 blockSignals 并手动设置 setCurrentText,
+            # 这里的 branch_changed 信号可能不会再次触发 update_commit_history。
+            # 因此，在成功切换后显式调用它以确保历史记录已更新。
             self.update_commit_history()
+            # 确保 GitManager 内部状态（如果将来有的话）也反映了新分支
+            # （目前 get_default_branch() 会从 repo.active_branch 获取，所以应该是最新的）
 
     def on_commit_selected(self, commit_hash):
         """当选择提交时更新文件变化视图"""
