@@ -109,7 +109,7 @@ class GitGraphView(QGraphicsView):
             if max_ref_label_actual_width > 0:
                 message_x_start += max_ref_label_actual_width + REF_PADDING_X  # Add padding after the widest label
 
-            commit_msg_item = CommitMessageItem(commit_node.message, parent=None)  # Or parent=commit_item
+            commit_msg_item = CommitMessageItem(commit_node, parent=None)  # Or parent=commit_item
 
             # Vertically center the message item with the commit circle
             msg_item_height = commit_msg_item.boundingRect().height()

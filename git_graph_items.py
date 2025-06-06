@@ -1,5 +1,7 @@
 # git_graph_items.py
 
+from typing import Optional
+
 from PyQt6.QtCore import QRectF, Qt
 from PyQt6.QtGui import QBrush, QColor, QFont, QPainterPath, QPen
 from PyQt6.QtWidgets import QGraphicsEllipseItem, QGraphicsItem, QGraphicsPathItem, QGraphicsTextItem
@@ -53,7 +55,7 @@ COMMIT_MSG_FONT_SIZE = 9
 
 
 class CommitCircle(QGraphicsEllipseItem):
-    def __init__(self, commit_node: CommitNode, color_idx: int = 0, parent: QGraphicsItem = None):
+    def __init__(self, commit_node: CommitNode, color_idx: int = 0, parent: Optional[QGraphicsItem] = None):
         super().__init__(-COMMIT_RADIUS, -COMMIT_RADIUS, 2 * COMMIT_RADIUS, 2 * COMMIT_RADIUS, parent)
         self.commit_node = commit_node
         self.base_color = COLOR_PALETTE[color_idx % len(COLOR_PALETTE)]
@@ -102,7 +104,7 @@ class EdgeLine(QGraphicsPathItem):
         start_item: CommitCircle,
         end_item: CommitCircle,
         color: QColor = DEFAULT_EDGE_COLOR,
-        parent: QGraphicsItem = None,
+        parent: Optional[QGraphicsItem] = None,
     ):
         super().__init__(parent)
         self.start_item = start_item
@@ -140,7 +142,9 @@ class EdgeLine(QGraphicsPathItem):
 
 
 class ReferenceLabel(QGraphicsTextItem):
-    def __init__(self, text: str, commit_item: CommitCircle, is_head=False, is_tag=False, parent: QGraphicsItem = None):
+    def __init__(
+        self, text: str, commit_item: CommitCircle, is_head=False, is_tag=False, parent: Optional[QGraphicsItem] = None
+    ):
         super().__init__(text, parent)
         self.commit_item = commit_item
         self.text = text
@@ -190,16 +194,26 @@ class ReferenceLabel(QGraphicsTextItem):
 
 
 class CommitMessageItem(QGraphicsTextItem):
-    def __init__(self, full_message: str, parent: QGraphicsItem = None):
+    def __init__(self, commit_node: CommitNode, parent: Optional[QGraphicsItem] = None):
         super().__init__(parent)
 
-        self.full_message = full_message  # Store original for potential future use
+        self.commit_node = commit_node
+        self.full_message = commit_node.message  # Store original for potential future use
+
+        # Format date as "MM/DD HH:MM"
+        from datetime import datetime
+
+        commit_date = datetime.strptime(commit_node.author_date, "%Y-%m-%dT%H:%M:%S%z")
+        formatted_date = commit_date.strftime("%m/%d %H:%M")
 
         # Truncate message for display
-        if len(full_message) > COMMIT_MSG_MAX_LENGTH:
-            display_text = full_message[: COMMIT_MSG_MAX_LENGTH - 3] + "..."
+        if len(commit_node.message) > COMMIT_MSG_MAX_LENGTH:
+            display_text = commit_node.message[: COMMIT_MSG_MAX_LENGTH - 3] + "..."
         else:
-            display_text = full_message
+            display_text = commit_node.message
+
+        # Combine message and date with space separator
+        display_text = f"{display_text} {formatted_date}"
 
         self.setPlainText(display_text)
 
@@ -208,8 +222,10 @@ class CommitMessageItem(QGraphicsTextItem):
         self.setDefaultTextColor(COMMIT_MSG_COLOR)
 
         # Basic tooltip showing the full message if it was truncated
-        if display_text != full_message:
-            self.setToolTip(f"Full message: {full_message}")
+        if len(commit_node.message) > COMMIT_MSG_MAX_LENGTH:
+            self.setToolTip(f"Full message: {commit_node.message}\nDate: {commit_node.author_date}")
+        else:
+            self.setToolTip(f"Date: {commit_node.author_date}")
 
 
 if __name__ == "__main__":
