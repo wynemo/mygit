@@ -337,6 +337,10 @@ class FileTreeWidget(QTreeWidget):
         copy_relative_path_action = context_menu.addAction("复制相对路径")
         copy_relative_path_action.triggered.connect(lambda: self._copy_relative_path(file_path))
 
+        # 添加"拷贝完整路径"菜单项
+        copy_full_path_action = context_menu.addAction("拷贝完整路径")
+        copy_full_path_action.triggered.connect(lambda: self._copy_full_path(file_path))
+
         # 只在git修改的文件上显示"Revert"菜单项
         workspace_explorer = self.parent()
         while workspace_explorer and not isinstance(workspace_explorer, WorkspaceExplorer):
@@ -489,3 +493,12 @@ class FileTreeWidget(QTreeWidget):
                 logging.error(f"复制相对路径失败: {e}")
         else:
             logging.error("无法获取工作区路径")
+
+    def _copy_full_path(self, file_path: str):
+        """复制文件的完整路径到剪贴板"""
+        try:
+            clipboard = QApplication.clipboard()
+            clipboard.setText(file_path)
+            logging.info(f"已复制完整路径: {file_path}")
+        except Exception as e:
+            logging.error(f"复制完整路径失败: {e}")
