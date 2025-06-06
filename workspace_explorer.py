@@ -1,5 +1,6 @@
 import logging
 import os
+import weakref
 from typing import Optional
 
 from PyQt6.QtCore import QMimeData, QPoint, Qt
@@ -527,7 +528,9 @@ class FileTreeWidget(QTreeWidget):
         # 清除之前的高亮
         parent_workspace_explorer: WorkspaceExplorer = self.get_parent_workspace_explorer()
         if parent_workspace_explorer and parent_workspace_explorer.current_highlighted_item:
-            parent_workspace_explorer.current_highlighted_item.setForeground(0, self.normal_color)
+            current_highlighted_item = parent_workspace_explorer.current_highlighted_item()
+            if current_highlighted_item:
+                current_highlighted_item.setForeground(0, self.normal_color)
 
         # 查找并高亮新项目
         items = self.findItems(os.path.basename(file_path), Qt.MatchFlag.MatchContains | Qt.MatchFlag.MatchRecursive)
@@ -535,7 +538,7 @@ class FileTreeWidget(QTreeWidget):
             if item.data(0, Qt.ItemDataRole.UserRole) == file_path:
                 item.setForeground(0, self.highlight_color)
                 if parent_workspace_explorer:
-                    parent_workspace_explorer.current_highlighted_item = item
+                    parent_workspace_explorer.current_highlighted_item = weakref.ref(item)
                 break
 
     def _copy_full_path(self, file_path: str):
