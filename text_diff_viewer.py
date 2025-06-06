@@ -11,7 +11,7 @@ from utils.language_map import LANGUAGE_MAP
 
 
 class DiffViewer(QWidget):
-    def __init__(self, diff_calculator: DiffCalculator = None):
+    def __init__(self, diff_calculator: DiffCalculator | None = None):
         super().__init__()
         self.actual_diff_chunks = []
         self.current_diff_index = -1
@@ -306,7 +306,7 @@ class DiffViewer(QWidget):
                             target_start,
                             target_end,
                         )
-                        logging.debug("块内进度: %.2f, 目标行: %d", block_progress, target_line)
+                        logging.debug("块内进度：%.2f, 目标行：%d", block_progress, target_line)
                         break
                     else:
                         # 如果已经过了这个差异块，直接累加差异
@@ -318,7 +318,7 @@ class DiffViewer(QWidget):
                             target_start,
                             target_end,
                         )
-                        logging.debug("累计调整: %d", accumulated_diff)
+                        logging.debug("累计调整：%d", accumulated_diff)
 
         # 如果不在任何差异块内，应用累计的差异
         if target_line == current_line:
@@ -368,14 +368,14 @@ class DiffViewer(QWidget):
             # 获取当前视口中的行
             cursor = source_edit.cursorForPosition(QPoint(0, 0))
             current_line = cursor.blockNumber()
-            logging.debug("当前视口起始行: %d", current_line)
+            logging.debug("当前视口起始行：%d", current_line)
 
             # 计算目标行号
             target_line = self._calculate_target_line(current_line, self.diff_chunks, is_left_scroll)
 
             # 计算滚动值
             target_scroll = self._calculate_scroll_value(target_edit, target_line)
-            logging.debug("目标行: %d, 目标滚动值: %d", target_line, target_scroll)
+            logging.debug("目标行：%d, 目标滚动值：%d", target_line, target_scroll)
 
             # 设置滚动条位置
             target_edit.verticalScrollBar().setValue(target_scroll)
@@ -400,7 +400,7 @@ class DiffViewer(QWidget):
 
 
 class MergeDiffViewer(DiffViewer):
-    def __init__(self, diff_calculator: DiffCalculator = None):
+    def __init__(self, diff_calculator: DiffCalculator | None = None):
         super().__init__(diff_calculator)
         self.parent1_chunks = []
         self.parent2_chunks = []
@@ -540,7 +540,7 @@ class MergeDiffViewer(DiffViewer):
         """处理滚动同步
         Args:
             value: 滚动条的值
-            source: 滚动源('parent1', 'result', 'parent2')
+            source: 滚动源 ('parent1', 'result', 'parent2')
         """
         if self._sync_vscroll_lock:
             return
@@ -561,7 +561,7 @@ class MergeDiffViewer(DiffViewer):
             # 获取当前视口中的行
             cursor = source_edit.cursorForPosition(QPoint(0, 0))
             current_line = cursor.blockNumber()
-            logging.debug("当前视口起始行: %d", current_line)
+            logging.debug("当前视口起始行：%d", current_line)
 
             # 同步其他编辑器的滚动
             for target_name, target_edit in editors.items():
@@ -597,7 +597,7 @@ class MergeDiffViewer(DiffViewer):
 
                     # 计算滚动值
                     target_scroll = self._calculate_scroll_value(target_edit, target_line)
-                    logging.debug("目标行: %d, 目标滚动值: %d", target_line, target_scroll)
+                    logging.debug("目标行：%d, 目标滚动值：%d", target_line, target_scroll)
 
                     # 设置滚动条位置
                     target_edit.verticalScrollBar().setValue(target_scroll)
