@@ -71,9 +71,8 @@ class GitManagerWindow(QMainWindow):
         self.top_bar = TopBarWidget(self)
         main_layout.addWidget(self.top_bar)
 
-        # 添加侧边栏
+        # 创建侧边栏
         self.side_bar = SideBarWidget()
-        main_layout.addWidget(self.side_bar)
 
         # Connect signals from TopBarWidget to GitManagerWindow methods
         self.top_bar.open_folder_requested.connect(self.open_folder_dialog)
@@ -167,11 +166,19 @@ class GitManagerWindow(QMainWindow):
 
         # 添加工作区浏览器
         self.workspace_explorer = WorkspaceExplorer()
-
         self.compare_tab_widget = self.workspace_explorer.tab_widget
 
-        # 将右侧区域的分割器添加到主垂直分割器
-        vertical_splitter.addWidget(self.workspace_explorer)
+        # 创建左侧面板分割器(包含侧边栏和工作区浏览器)
+        left_panel_splitter = QSplitter(Qt.Orientation.Horizontal)
+        left_panel_splitter.setChildrenCollapsible(False)
+        left_panel_splitter.setOpaqueResize(False)
+        left_panel_splitter.setHandleWidth(8)
+        left_panel_splitter.addWidget(self.side_bar)
+        left_panel_splitter.addWidget(self.workspace_explorer)
+        left_panel_splitter.setSizes([200, 600])  # 设置初始比例
+
+        # 将左侧面板分割器添加到主垂直分割器
+        vertical_splitter.addWidget(left_panel_splitter)
 
         # 添加下半部分到垂直分割器
         vertical_splitter.addWidget(bottom_widget)
@@ -532,9 +539,9 @@ class GitManagerWindow(QMainWindow):
         self.settings.save_settings()
 
     def toggle_left_panel(self):
-        """切换左侧面板（文件树）显示状态"""
+        """切换左侧面板（侧边栏）显示状态"""
         self.left_panel_visible = not self.left_panel_visible
-        self.workspace_explorer.set_left_panel_visible(self.left_panel_visible)
+        self.side_bar.setVisible(self.left_panel_visible)
         if hasattr(self, "top_bar"):
             self.top_bar.update_toggle_left_panel_icon(self.left_panel_visible)
         self.settings.settings["left_panel_visible"] = self.left_panel_visible
