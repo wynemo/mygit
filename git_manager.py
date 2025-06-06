@@ -12,7 +12,7 @@ class GitManager:
         self.repo: Optional[git.Repo] = None
 
     def initialize(self) -> bool:
-        """初始化Git仓库"""
+        """初始化 Git 仓库"""
         try:
             self.repo = git.Repo(self.repo_path)
             return True
@@ -32,7 +32,7 @@ class GitManager:
         return self.repo.active_branch.name
 
     def get_commit_history(self, branch: str = "master", limit: int = 50, skip: int = 0) -> List[dict]:
-        """获取提交历史 (cursor生成)"""
+        """获取提交历史 (cursor 生成)"""
         if not self.repo:
             return []
 
@@ -52,7 +52,7 @@ class GitManager:
                 for ref in remote.refs:
                     decorations_map.setdefault(ref.commit.hexsha, []).append(ref.name)
 
-            for commit in self.repo.iter_commits(branch, max_count=limit, skip=skip):  # cursor生成
+            for commit in self.repo.iter_commits(branch, max_count=limit, skip=skip):  # cursor 生成
                 message = commit.message.strip().split("\n")[0]
                 decorations = decorations_map.get(commit.hexsha, [])
                 commits.append(
@@ -66,11 +66,11 @@ class GitManager:
                 )
             return commits
         except Exception as e:
-            print(f"获取提交历史失败: {e!s}")
+            print(f"获取提交历史失败：{e!s}")
             return []
 
     def get_blame_data(self, file_path: str, commit_hash: str = "HEAD") -> List[dict]:
-        """获取文件的blame信息"""
+        """获取文件的 blame 信息"""
         if not self.repo:
             return []
 
@@ -102,8 +102,8 @@ class GitManager:
         except git.GitCommandError:  # Catch specific error for file not found or not tracked
             return []
         except Exception as e:
-            logging.exception("获取blame信息失败")
-            print(f"获取blame信息失败: {e!s}")
+            logging.exception("获取 blame 信息失败")
+            print(f"获取 blame 信息失败：{e!s}")
             return []
 
     def fetch(self):
@@ -150,7 +150,7 @@ class GitManager:
             raise Exception(f"An unexpected error occurred during push: {e!s}")
 
     def get_file_status(self, file_path: str) -> str:
-        """获取文件的Git状态"""
+        """获取文件的 Git 状态"""
         if not self.repo:
             if not self.initialize():
                 return "unknown"
@@ -308,15 +308,15 @@ class GitManager:
             self.repo.git.checkout(branch_name)
             return None
         except git.GitCommandError as e:
-            logging.error(f"切换分支 {branch_name} 失败: {e!s}")  # Failed to switch branch
+            logging.error(f"切换分支 {branch_name} 失败：{e!s}")  # Failed to switch branch
             # 提供更具体的错误信息
             if "did not match any file(s) known to git" in str(e):
                 return f"分支 '{branch_name}' 不存在。"  # Branch does not exist.
             elif "Your local changes to the following files would be overwritten by checkout" in str(e):
                 return "切换分支会覆盖本地未提交的更改，请先提交或贮藏。"  # Switching branches would overwrite local uncommitted changes.
-            return f"切换到分支 '{branch_name}' 失败: {e.stderr.strip() if e.stderr else e!s}"  # Failed to switch to branch.
+            return f"切换到分支 '{branch_name}' 失败：{e.stderr.strip() if e.stderr else e!s}"  # Failed to switch to branch.
         except Exception as e:
             logging.error(
-                f"切换分支 {branch_name} 时发生未知错误: {e!s}"
+                f"切换分支 {branch_name} 时发生未知错误：{e!s}"
             )  # Unknown error occurred while switching branch.
             return f"切换到分支 '{branch_name}' 时发生未知错误。"  # Unknown error occurred while switching to branch.

@@ -1,8 +1,8 @@
 import logging
 
-from pygments import lexers, styles  # 导入Pygments模块 (Import Pygments modules)
+from pygments import lexers, styles  # 导入 Pygments 模块 (Import Pygments modules)
 from pygments.util import (
-    ClassNotFound,  # 导入Pygments异常类 (Import Pygments exception class)
+    ClassNotFound,  # 导入 Pygments 异常类 (Import Pygments exception class)
 )
 from PyQt6.QtGui import (  # 导入 QFont (Import QFont)
     QColor,
@@ -30,13 +30,13 @@ class PygmentsHighlighterEngine:
         # 根据语言名称初始化词法分析器和样式 (Initialize lexer and styles based on language name)
         try:
             self.lexer = lexers.get_lexer_by_name(language_name)
-            logging.info(f"词法分析器已设置为: {language_name}")
+            logging.info(f"词法分析器已设置为：{language_name}")
         except ClassNotFound:
             logging.warning(f"未找到语言 '{language_name}' 的词法分析器，将使用纯文本模式。")
             self.lexer = lexers.get_lexer_by_name("text")  # Fallback to plain text
 
         try:
-            # 您可以选择一个Pygments样式 (You can choose a Pygments style)
+            # 您可以选择一个 Pygments 样式 (You can choose a Pygments style)
             # 例如 'default', 'monokai', 'emacs', 'friendly' 等 (e.g., 'default', 'monokai', 'emacs', 'friendly', etc.)
             settings = Settings()
             style_name = settings.get_code_style()  # 从设置中获取代码风格 (Get code style from settings)
