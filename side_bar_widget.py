@@ -22,6 +22,7 @@ class SideBarWidget(QWidget):
         self.project_btn.setText("工程")
         self.project_btn.setIcon(QIcon("icons/project.svg"))
         self.project_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+        self.project_btn.setCheckable(True)
         self.project_btn.setStyleSheet("""
             QToolButton {
                 border: none;
@@ -45,6 +46,7 @@ class SideBarWidget(QWidget):
         self.commit_btn.setText("提交")
         self.commit_btn.setIcon(QIcon("icons/commit_icon.svg"))
         self.commit_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+        self.commit_btn.setCheckable(True)
         self.commit_btn.setStyleSheet("""
             QToolButton {
                 border: none;
@@ -64,3 +66,9 @@ class SideBarWidget(QWidget):
         layout.addWidget(self.commit_btn)
 
         layout.addStretch()
+
+    def focusOutEvent(self, event):
+        """窗口失去焦点时更新按钮样式状态"""
+        self.project_btn.setDown(False)
+        self.commit_btn.setDown(False)
+        super().focusOutEvent(event)
