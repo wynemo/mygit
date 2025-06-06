@@ -85,9 +85,9 @@ class CommitDetailView(QTextEdit):
                 f"{commit_date.strftime('%Y/%m/%d at %H:%M')}"
             )
 
-            # 获取分支信息
+            # 获取分支信息 (调用get_commit_branches方法)
             branches = self.get_commit_branches(git_manager, commit)
-            branch_text = "未知分支"
+            branch_text = "未知分支"  # 如果没有获取到分支信息，则显示"未知分支"
             if branches:
                 branch_text = f"In {len(branches)} branches: {', '.join(branches[:MAX_BRANCHES_TO_SHOW])}"
                 if len(branches) > MAX_BRANCHES_TO_SHOW:
@@ -106,28 +106,21 @@ class CommitDetailView(QTextEdit):
     def get_commit_branches(self, git_manager, commit):
         """获取包含此commit的分支列表"""
         try:
+            # 使用 git branch --contains <commit_sha> --all 命令获取包含特定commit的所有分支（本地和远程）
+            branch_str = git_manager.repo.git.branch("--contains", commit.hexsha, "--all")
             branches = []
-
-            # 获取本地分支
-            for branch in git_manager.repo.branches:
-                try:
-                    if git_manager.repo.is_ancestor(commit, branch.commit):
-                        branches.append(branch.name)
-                except Exception:
-                    logging.exception("检查分支失败")
-                    continue
-
-            # 如果没有找到分支，添加一些默认值
-            if not branches:
-                try:
-                    if commit == git_manager.repo.head.commit:
-                        branches.append("HEAD")
-                except Exception:
-                    logging.exception("检查分支失败")
-
-                if not branches:
-                    branches.extend(["main", "HEAD"])
-
+            # 处理git命令的输出字符串
+            for line in branch_str.splitlines():
+                line = line.strip()  # 去除行首尾的空白字符
+                # 如果是当前分支，git输出会以 "* " 开头，需要移除
+                if line.startswith("* "):
+                    line = line[2:]
+                # 对于远程分支，例如 "remotes/origin/main"，简化为 "origin/main"
+                if line.startswith("remotes/"):
+                    line = line[len("remotes/") :]
+                branches.append(line)
             return branches
         except Exception:
-            return ["main", "HEAD"]
+            # 如果发生任何异常，记录错误并返回空列表
+            logging.exception("Error getting commit branches")
+            return []

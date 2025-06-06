@@ -354,7 +354,7 @@ class GitManagerWindow(QMainWindow):
                 self.top_bar.branch_combo.blockSignals(False)
         else:
             # 切换成功
-            self.notification_widget.show_message(f"成功切换到分支: {branch}") # 可选：成功提示
+            self.notification_widget.show_message(f"成功切换到分支: {branch}")  # 可选：成功提示
             # 更新UI组件以反映分支更改
             self.workspace_explorer.refresh_file_tree()
             # self.update_branches_on_top_bar() # 确保组合框状态正确（如果需要, 但setCurrentText应该已处理）
