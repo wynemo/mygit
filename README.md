@@ -1,14 +1,14 @@
 # MyGit
 
-这是一个基于Python的Git仓库管理工具，提供图形界面来简化Git操作。
+这是一个基于 Python 的 Git 仓库管理工具，提供图形界面来简化 Git 操作。
 
-意义在于提供一个类似idea里面的git支持。
+意义在于提供一个类似 idea 里面的 git 支持。
 
-idea好用是好用，就是太重了, 内存占用太大了。
+idea 好用是好用，就是太重了，内存占用太大了。
 
 ## 功能特点
 
-- Git仓库可视化管理
+- Git 仓库可视化管理
 - 代码差异查看器
 - 语法高亮显示
 - 自定义设置
@@ -19,7 +19,7 @@ idea好用是好用，就是太重了, 内存占用太大了。
 
 ## 环境要求
 
-- Python 3.7+， 因为是pyqt6实现的
+- Python 3.7+，因为是 pyqt6 实现的
 - Git
 
 ## 安装步骤
@@ -38,7 +38,7 @@ source .venv/bin/activate  # Linux/macOS
 .venv\Scripts\activate  # Windows
 ```
 
-或者使用uv启动:
+或者使用 uv 启动：
 
     uv run main.py
 
@@ -54,13 +54,13 @@ pip install -r requirements.txt
 python main.py
 ```
 
-在windows以及mac下都测试过，linux没有测试过
+在 windows 以及 mac 下都测试过，linux 没有测试过
 
 ## 项目结构
 
 ### 主目录文件
 - `main.py`: 程序入口
-- `git_manager.py`: Git操作核心功能
+- `git_manager.py`: Git 操作核心功能
 - `git_manager_window.py`: 图形界面实现
 - `commit_dialog.py`: git commit 提交对话框
 - `commit_detail_view.py`: 显示选定提交的详细信息
@@ -78,7 +78,7 @@ python main.py
 - `git_graph_items.py`: 提交图图形元素
 - `git_graph_layout.py`: 提交图布局算法
 - `git_graph_view.py`: 提交历史图形视图
-- `git_log_parser.py`: git log解析器
+- `git_log_parser.py`: git log 解析器
 - `settings.py`: 程序设置管理
 - `settings_dialog.py`: 设置对话框
 - `syntax_highlighter.py`: 语法高亮
@@ -87,17 +87,17 @@ python main.py
 - `top_bar_widget.py`: 顶部工具栏控件
 - `workspace_explorer.py`: 工作区文件浏览器
 
-### editors目录
-- `text_edit.py`: 文本编辑器组件(集成行号、语法高亮等功能)
+### editors 目录
+- `text_edit.py`: 文本编辑器组件 (集成行号、语法高亮等功能)
 - `modified_text_edit.py`: 修改版文本编辑器
 
-### icons目录
-- 包含各种SVG和PNG图标资源
+### icons 目录
+- 包含各种 SVG 和 PNG 图标资源
 
-### tests目录
+### tests 目录
 - 包含单元测试和测试数据文件
 
-### utils目录
+### utils 目录
 - `language_map.py`: 语言名称到文件扩展名的映射
 
 ## 配置设置
@@ -110,9 +110,9 @@ python main.py
 
 - **code_style**: 代码风格设置，例如 "friendly"。
 
-- **api_url**: 用于生成注释的api url
+- **api_url**: 用于生成注释的 api url
 
-- **api_secret**: 用于生成注释的api secret
+- **api_secret**: 用于生成注释的 api secret
 
 - **model_name**: 用于生成注释的模型名称
 
