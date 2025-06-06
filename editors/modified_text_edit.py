@@ -82,6 +82,7 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
         while parent and not hasattr(parent, "file_tree"):
             parent = parent.parent()
         if parent and hasattr(parent, "file_tree"):
+            print(f"in focusInEvent highlight_file_item: {self.file_path}")
             parent.file_tree.highlight_file_item(self.file_path)
 
         current_content = self.toPlainText()

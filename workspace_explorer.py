@@ -516,19 +516,26 @@ class FileTreeWidget(QTreeWidget):
         else:
             logging.error("无法获取工作区路径")
 
+    def get_parent_workspace_explorer(self) -> Optional[WorkspaceExplorer]:
+        workspace_explorer = self.parent()
+        while workspace_explorer and not isinstance(workspace_explorer, WorkspaceExplorer):
+            workspace_explorer = workspace_explorer.parent()
+        return workspace_explorer
+
     def highlight_file_item(self, file_path: str):
         """高亮显示指定的文件项"""
         # 清除之前的高亮
-        if hasattr(self.parent(), "current_highlighted_item") and self.parent().current_highlighted_item:
-            self.parent().current_highlighted_item.setForeground(0, self.normal_color)
+        parent_workspace_explorer: WorkspaceExplorer = self.get_parent_workspace_explorer()
+        if parent_workspace_explorer and parent_workspace_explorer.current_highlighted_item:
+            parent_workspace_explorer.current_highlighted_item.setForeground(0, self.normal_color)
 
         # 查找并高亮新项目
         items = self.findItems(os.path.basename(file_path), Qt.MatchFlag.MatchContains | Qt.MatchFlag.MatchRecursive)
         for item in items:
             if item.data(0, Qt.ItemDataRole.UserRole) == file_path:
                 item.setForeground(0, self.highlight_color)
-                if hasattr(self.parent(), "current_highlighted_item"):
-                    self.parent().current_highlighted_item = item
+                if parent_workspace_explorer:
+                    parent_workspace_explorer.current_highlighted_item = item
                 break
 
     def _copy_full_path(self, file_path: str):
