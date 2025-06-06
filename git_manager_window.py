@@ -73,7 +73,6 @@ class GitManagerWindow(QMainWindow):
 
         # 添加侧边栏
         self.side_bar = SideBarWidget()
-        main_layout.addWidget(self.side_bar)
 
         # Connect signals from TopBarWidget to GitManagerWindow methods
         self.top_bar.open_folder_requested.connect(self.open_folder_dialog)
@@ -170,8 +169,17 @@ class GitManagerWindow(QMainWindow):
 
         self.compare_tab_widget = self.workspace_explorer.tab_widget
 
-        # 将右侧区域的分割器添加到主垂直分割器
-        vertical_splitter.addWidget(self.workspace_explorer)
+        # 创建左侧面板分割器(包含侧边栏和工作区浏览器)
+        left_panel_splitter = QSplitter(Qt.Orientation.Horizontal)
+        left_panel_splitter.setChildrenCollapsible(False)
+        left_panel_splitter.setOpaqueResize(False)
+        left_panel_splitter.setHandleWidth(8)  # 分隔条的宽度为 8 像素
+        left_panel_splitter.addWidget(self.side_bar)
+        left_panel_splitter.addWidget(self.workspace_explorer)
+        # left_panel_splitter.setSizes([200, 600])  # 设置初始比例
+
+        # 将左侧面板分割器添加到主垂直分割器
+        vertical_splitter.addWidget(left_panel_splitter)
 
         # 添加下半部分到垂直分割器
         vertical_splitter.addWidget(bottom_widget)

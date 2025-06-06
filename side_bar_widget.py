@@ -9,7 +9,7 @@ class SideBarWidget(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedWidth(50)
+        self.setFixedWidth(30)
         self.setStyleSheet("background-color: #f0f0f0;")
 
         layout = QVBoxLayout()
