@@ -320,24 +320,26 @@ class FileTreeWidget(QTreeWidget):
             return
 
         file_path = item.data(0, Qt.ItemDataRole.UserRole)
-        if not os.path.isfile(file_path):
+        if not (os.path.isfile(file_path) or os.path.isdir(file_path)):
             return
 
         context_menu = QMenu(self)
 
-        # 添加"文件历史"菜单项
-        history_action = context_menu.addAction("文件历史")
-        history_action.triggered.connect(lambda: self._show_file_history(file_path))
+        # 如果是文件，添加文件特有的菜单项
+        if os.path.isfile(file_path):
+            # 添加"文件历史"菜单项
+            history_action = context_menu.addAction("文件历史")
+            history_action.triggered.connect(lambda: self._show_file_history(file_path))
 
-        # 添加"Git Blame"菜单项
-        blame_action = context_menu.addAction("Toggle Git Blame Annotations")  # Renamed for clarity
-        blame_action.triggered.connect(lambda: self._toggle_blame_annotation_in_editor(file_path))
+            # 添加"Git Blame"菜单项
+            blame_action = context_menu.addAction("Toggle Git Blame Annotations")
+            blame_action.triggered.connect(lambda: self._toggle_blame_annotation_in_editor(file_path))
 
-        # 添加"复制相对路径"菜单项
+        # 添加"复制相对路径"菜单项（文件和文件夹都适用）
         copy_relative_path_action = context_menu.addAction("复制相对路径")
         copy_relative_path_action.triggered.connect(lambda: self._copy_relative_path(file_path))
 
-        # 添加"拷贝完整路径"菜单项
+        # 添加"拷贝完整路径"菜单项（文件和文件夹都适用）
         copy_full_path_action = context_menu.addAction("拷贝完整路径")
         copy_full_path_action.triggered.connect(lambda: self._copy_full_path(file_path))
 
