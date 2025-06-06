@@ -201,7 +201,7 @@ class SyncedTextEdit(QPlainTextEdit):
                 self.paste_text()
                 event.accept()
             else:
-                super().keyPressEvent(event) # Allow paste to work in read-only mode if underlying widget supports it
+                super().keyPressEvent(event)  # Allow paste to work in read-only mode if underlying widget supports it
         else:
             super().keyPressEvent(event)  # Call base class implementation for other keys
 
