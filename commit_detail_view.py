@@ -92,6 +92,7 @@ class CommitDetailView(QTextEdit):
                 branch_text = f"In {len(branches)} branches: {', '.join(branches[:MAX_BRANCHES_TO_SHOW])}"
                 if len(branches) > MAX_BRANCHES_TO_SHOW:
                     branch_text += f" (+{len(branches) - MAX_BRANCHES_TO_SHOW} more)"
+                # todos 如果超过 MAX_BRANCHES_TO_SHOW 想想该怎么交互
 
             # 组合所有信息
             detail_content = f"{message}\n\n{info_line}\n\n分支: {branch_text}"
