@@ -29,6 +29,7 @@ class WorkspaceExplorer(QWidget):
         self.git_manager = git_manager
         # Initialize all_file_statuses
         self.all_file_statuses = {"modified": set(), "staged": set(), "untracked": set()}
+        self.current_highlighted_item = None
         self.setup_ui()
 
     def setup_ui(self):
@@ -63,6 +64,9 @@ class WorkspaceExplorer(QWidget):
         # 添加组件到分割器
         self.splitter.addWidget(self.file_tree)
         self.splitter.addWidget(self.tab_widget)
+
+        # 连接标签页切换信号
+        self.tab_widget.currentChanged.connect(self.on_tab_changed)
 
         # 设置分割器的初始比例(1:2)
         self.splitter.setSizes([200, 400])
@@ -153,6 +157,19 @@ class WorkspaceExplorer(QWidget):
         """关闭所有标签页"""
         for i in range(self.tab_widget.count() - 1, -1, -1):
             self.tab_widget.removeTab(i)
+
+    def on_tab_changed(self, index: int):
+        """当标签页切换时高亮对应文件"""
+        current_widget = self.tab_widget.widget(index)
+        if current_widget and hasattr(current_widget, "file_path"):
+            self.file_tree.highlight_file_item(current_widget.file_path)
+
+    def get_current_file_path(self) -> Optional[str]:
+        """获取当前标签页的文件路径"""
+        current_widget = self.tab_widget.currentWidget()
+        if current_widget and hasattr(current_widget, "file_path"):
+            return current_widget.file_path
+        return None
 
     def set_workspace_path(self, path):
         """设置并加载工作区路径"""
@@ -260,6 +277,8 @@ class FileTreeWidget(QTreeWidget):
         super().__init__(parent)
         self.git_manager = git_manager
         self.setDragEnabled(True)
+        self.highlight_color = QColor(0, 120, 215)  # 蓝色高亮
+        self.normal_color = QColor(0, 0, 0)  # 默认黑色
         self.itemDoubleClicked.connect(self._handle_double_click)
         self.drag_start_pos = None
         self.is_dragging = False
@@ -302,6 +321,7 @@ class FileTreeWidget(QTreeWidget):
         logging.debug("handle_double_click")
         if self.is_dragging:  # 如果正在拖放，不处理双击
             return
+        self.highlight_file_item(item.data(0, Qt.ItemDataRole.UserRole))
 
         file_path = item.data(0, Qt.ItemDataRole.UserRole)
         if os.path.isfile(file_path):
@@ -495,6 +515,21 @@ class FileTreeWidget(QTreeWidget):
                 logging.error(f"复制相对路径失败: {e}")
         else:
             logging.error("无法获取工作区路径")
+
+    def highlight_file_item(self, file_path: str):
+        """高亮显示指定的文件项"""
+        # 清除之前的高亮
+        if hasattr(self.parent(), "current_highlighted_item") and self.parent().current_highlighted_item:
+            self.parent().current_highlighted_item.setForeground(0, self.normal_color)
+
+        # 查找并高亮新项目
+        items = self.findItems(os.path.basename(file_path), Qt.MatchFlag.MatchContains | Qt.MatchFlag.MatchRecursive)
+        for item in items:
+            if item.data(0, Qt.ItemDataRole.UserRole) == file_path:
+                item.setForeground(0, self.highlight_color)
+                if hasattr(self.parent(), "current_highlighted_item"):
+                    self.parent().current_highlighted_item = item
+                break
 
     def _copy_full_path(self, file_path: str):
         """复制文件的完整路径到剪贴板"""

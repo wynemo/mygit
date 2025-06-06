@@ -77,6 +77,13 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
             print("文档有未保存的修改，不刷新")
             return
 
+        # 高亮文件树中的对应文件
+        parent = self.parent()
+        while parent and not hasattr(parent, "file_tree"):
+            parent = parent.parent()
+        if parent and hasattr(parent, "file_tree"):
+            parent.file_tree.highlight_file_item(self.file_path)
+
         current_content = self.toPlainText()
         try:
             with open(self.file_path, "r", encoding="utf-8") as f:
