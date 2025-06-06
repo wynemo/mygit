@@ -292,6 +292,8 @@ class GitManager:
         如果成功，返回 None。
         如果失败，返回错误信息字符串。
         """
+        if branch_name == "all":
+            return None
         if not self.repo:
             return "仓库未初始化。"  # Repository not initialized.
         try:
