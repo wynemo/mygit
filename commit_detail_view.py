@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, Qt
 from PyQt6.QtWidgets import QTextBrowser, QTextEdit
 
 # 常量用于分支显示
@@ -113,6 +113,9 @@ class CommitDetailView(QTextBrowser):
         if not self.current_commit:  # 如果没有当前提交信息，则不执行任何操作
             return
 
+        # 保存当前滚动位置
+        scroll_position = self.verticalScrollBar().value()
+
         # 准备提交信息：替换换行符为<br>以在HTML中正确显示多行消息
         message = self.current_commit.message.strip().replace("\n", "<br>")
         # 格式化提交日期和作者信息
@@ -167,18 +170,26 @@ class CommitDetailView(QTextBrowser):
         # 将生成的HTML内容设置到QTextEdit控件中
         self.setHtml(detail_content)
 
+        # 恢复滚动位置
+        self.verticalScrollBar().setValue(scroll_position)
+
     def handle_branch_link_click(self, url):
         """
         处理HTML中分支展开/折叠链接 (<a> 标签) 的点击事件。
         此方法由 QTextEdit 的 anchorClicked 信号触发。
         """
-        # url.fragment() 获取链接的片段标识符 (例如 "#more_branches" 中的 "more_branches")
+        # 保存当前滚动位置
+        scroll_position = self.verticalScrollBar().value()
+
         if url.fragment() == "more_branches":  # 如果点击的是 "more" 链接
             self.branches_expanded = True  # 设置分支列表为展开状态
             self._render_commit_detail()  # 重新渲染提交详情以反映状态变化
         elif url.fragment() == "less_branches":  # 如果点击的是 "less" 链接
             self.branches_expanded = False  # 设置分支列表为折叠状态
             self._render_commit_detail()  # 重新渲染提交详情以反映状态变化
+
+        # 恢复滚动位置
+        self.verticalScrollBar().setValue(scroll_position)
 
     def get_commit_branches(self, git_manager, commit):
         """获取包含此commit的分支列表"""
