@@ -146,6 +146,8 @@ class WorkspaceExplorer(QWidget):
                     f"Could not find GitManagerWindow with handler '{handler_name}' for editor '{file_path}'. Blame click will not be handled globally."
                 )
 
+            text_edit.dirty_status_changed.connect(self.update_filename_display)
+
         except Exception as e:
             logging.exception("Error opening file")
             print(f"Error opening file: {e}")
@@ -271,6 +273,16 @@ class WorkspaceExplorer(QWidget):
         else:
             self.file_tree.hide()
             self.splitter.setSizes([0, 1])  # 只显示右侧
+
+    def update_filename_display(self, file_path: str, is_dirty: bool):
+        print("update_filename_display", file_path, is_dirty)
+        for i in range(self.tab_widget.count()):
+            tab = self.tab_widget.widget(i)
+            if isinstance(tab, ModifiedTextEdit) and tab.file_path == file_path:
+                if is_dirty:
+                    self.tab_widget.setTabText(i, f"*{os.path.basename(file_path)}")
+                else:
+                    self.tab_widget.setTabText(i, os.path.basename(file_path))
 
 
 class FileTreeWidget(QTreeWidget):

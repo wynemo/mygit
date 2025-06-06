@@ -2,7 +2,7 @@ import logging
 import os
 import typing
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal  # 引入 pyqtSignal
 from PyQt6.QtGui import QColor, QFocusEvent, QPainter, QPen
 from PyQt6.QtWidgets import QSizePolicy, QWidget
 
@@ -18,6 +18,9 @@ if typing.TYPE_CHECKING:
 class ModifiedTextEdit(SyncedTextEdit):
     """Inherits from SyncedTextEdit, supports displaying line modification status next to line numbers"""
 
+    # 文件脏状态改变信号 (文件路径, 是否变脏)
+    dirty_status_changed = pyqtSignal(str, bool)
+
     LINE_STATUS_COLORS: typing.ClassVar[dict] = {
         "added": QColor("#4CAF50"),  # green for added
         "modified": QColor("#FFC107"),  # yellow for modified
@@ -31,6 +34,8 @@ class ModifiedTextEdit(SyncedTextEdit):
         self.line_modifications = {}  # Store modification status for each line
         self.overview_bar = OverViewBar(self, parent=self)  # 绘制在最右边
         self.overview_bar.setParent(self)
+        # 连接文档内容修改信号
+        self.document().modificationChanged.connect(self._on_modification_changed)
         self._update_overview_bar_geometry()
         self.verticalScrollBar().valueChanged.connect(self.overview_bar.update_overview)
 
@@ -104,14 +109,23 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
             scrollbar.setValue(stored_value)
 
         parent = self.parent()
-        while not hasattr(parent, "git_manager"):
+        while parent and not hasattr(parent, "git_manager"): # Check parent exists
             parent = parent.parent()
         if parent and hasattr(parent, "git_manager"):
             # todo should check if it's under git version
             # 获取仓库路径
             diffs = self.get_diffs(parent.git_manager, self.toPlainText())
-            print(f"focusInEvent diffs: {diffs}")
+            # print(f"focusInEvent diffs: {diffs}") # TODO remove this print
             self.set_line_modifications(diffs)
+
+    # <new_method>
+    # 当文档内容修改状态改变时调用
+    def _on_modification_changed(self, modified: bool):
+        """当文档内容修改状态改变时调用，发出 dirty_status_changed 信号。"""
+        if self.file_path:
+            self.dirty_status_changed.emit(self.file_path, modified)
+            logging.debug(f"Emitted dirty_status_changed for {self.file_path}: {modified}")
+    # </new_method>
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -213,18 +227,23 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
 
     def save_content(self):
         super().save_content()
+        # 文件已保存，状态变为未修改
+        if self.file_path: # Ensure file_path is set
+            self.dirty_status_changed.emit(self.file_path, False)
+            logging.debug(f"Emitted dirty_status_changed for {self.file_path} (saved): False")
         self.document().setModified(False)
         parent = self.parent()
-        while not hasattr(parent, "git_manager"):
+        while parent and not hasattr(parent, "git_manager"): # Check parent exists
             parent = parent.parent()
         if parent and hasattr(parent, "git_manager"):
             # todo should check if it's under git version
             # 获取仓库路径
             diffs = self.get_diffs(parent.git_manager)
-            print(f"diffs: {diffs}")
+            # print(f"diffs: {diffs}") # TODO remove this print
             self.set_line_modifications(diffs)
         else:
-            print("cant get git manager")
+            # print("cant get git manager") # TODO remove this print
+            pass # No git manager found, nothing to do for diffs
 
     def get_diffs(self, git_manager: "GitManager", new_content: str | None = None) -> dict:
         repo_path = git_manager.repo.working_dir
