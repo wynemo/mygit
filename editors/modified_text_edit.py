@@ -109,7 +109,7 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
             scrollbar.setValue(stored_value)
 
         parent = self.parent()
-        while parent and not hasattr(parent, "git_manager"): # Check parent exists
+        while parent and not hasattr(parent, "git_manager"):  # Check parent exists
             parent = parent.parent()
         if parent and hasattr(parent, "git_manager"):
             # todo should check if it's under git version
@@ -125,6 +125,7 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
         if self.file_path:
             self.dirty_status_changed.emit(self.file_path, modified)
             logging.debug(f"Emitted dirty_status_changed for {self.file_path}: {modified}")
+
     # </new_method>
 
     def resizeEvent(self, event):
@@ -228,12 +229,12 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
     def save_content(self):
         super().save_content()
         # 文件已保存，状态变为未修改
-        if self.file_path: # Ensure file_path is set
+        if self.file_path:  # Ensure file_path is set
             self.dirty_status_changed.emit(self.file_path, False)
             logging.debug(f"Emitted dirty_status_changed for {self.file_path} (saved): False")
         self.document().setModified(False)
         parent = self.parent()
-        while parent and not hasattr(parent, "git_manager"): # Check parent exists
+        while parent and not hasattr(parent, "git_manager"):  # Check parent exists
             parent = parent.parent()
         if parent and hasattr(parent, "git_manager"):
             # todo should check if it's under git version
@@ -243,7 +244,7 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
             self.set_line_modifications(diffs)
         else:
             # print("cant get git manager") # TODO remove this print
-            pass # No git manager found, nothing to do for diffs
+            pass  # No git manager found, nothing to do for diffs
 
     def get_diffs(self, git_manager: "GitManager", new_content: str | None = None) -> dict:
         repo_path = git_manager.repo.working_dir
