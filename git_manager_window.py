@@ -119,15 +119,15 @@ class GitManagerWindow(QMainWindow):
         # 创建主要视图组件
         self.commit_history_view = CommitHistoryView()  # 左侧
         self.file_changes_view = FileChangesView()  # 右侧
-        self.commit_detail_view = CommitDetailView()  # commit详细信息视图
+        self.commit_detail_view = CommitDetailView()  # commit 详细信息视图
 
-        # 添加一个 CompareView, 默认隐藏, 点击"提交历史"也隐藏
-        # 切换到单个文件历史的标签页时,才显示
-        # 点击标签页里的FileHistoryView的commit时,触发 FileHistoryView.on_commit_clicked 根据拿到的文件路径 commit信息 这个CompareView需要对改动进行显示
+        # 添加一个 CompareView, 默认隐藏，点击"提交历史"也隐藏
+        # 切换到单个文件历史的标签页时，才显示
+        # 点击标签页里的 FileHistoryView 的 commit 时，触发 FileHistoryView.on_commit_clicked 根据拿到的文件路径 commit 信息 这个 CompareView 需要对改动进行显示
         self.compare_view = CompareView(self)  # 右侧
         self.compare_view.hide()
 
-        # 这个tab 包含提交历史和单个文件历史, 文件历史可以有多个标签
+        # 这个 tab 包含提交历史和单个文件历史，文件历史可以有多个标签
         self.tab_widget = QTabWidget()
         self.tab_widget.setTabPosition(QTabWidget.TabPosition.North)
         self.tab_widget.setStyleSheet(
@@ -150,7 +150,7 @@ class GitManagerWindow(QMainWindow):
         self.file_changes_view.file_selected.connect(self.on_file_selected)
         self.file_changes_view.compare_with_working_requested.connect(self.show_compare_with_working_dialog)
 
-        # 创建右侧垂直分割器，用于放置文件变化视图和commit详细信息视图
+        # 创建右侧垂直分割器，用于放置文件变化视图和 commit 详细信息视图
         right_splitter = QSplitter(Qt.Orientation.Vertical)
         right_splitter.addWidget(self.file_changes_view)
         right_splitter.addWidget(self.commit_detail_view)
@@ -166,7 +166,7 @@ class GitManagerWindow(QMainWindow):
 
         self.compare_tab_widget = self.workspace_explorer.tab_widget
 
-        # 创建左侧面板分割器(包含侧边栏和工作区浏览器)
+        # 创建左侧面板分割器 (包含侧边栏和工作区浏览器)
         left_panel_splitter = QSplitter(Qt.Orientation.Horizontal)
         left_panel_splitter.setChildrenCollapsible(False)
         left_panel_splitter.setOpaqueResize(False)
@@ -181,7 +181,7 @@ class GitManagerWindow(QMainWindow):
         # 添加下半部分到垂直分割器
         vertical_splitter.addWidget(bottom_widget)
 
-        # 调整垂直分割器的比例 (例如: 6:2, 上半部分占 6/8, 下半部分占 2/8)
+        # 调整垂直分割器的比例 (例如：6:2, 上半部分占 6/8, 下半部分占 2/8)
         total_height = self.height()
         vertical_splitter.setSizes(
             [
@@ -216,7 +216,7 @@ class GitManagerWindow(QMainWindow):
         if hasattr(self, "top_bar"):
             self.top_bar.update_toggle_left_panel_icon(self.left_panel_visible)
 
-        # 在初始化完成后,尝试打开上次的文件夹 (this will call update_branches_on_top_bar and update_recent_menu_on_top_bar)
+        # 在初始化完成后，尝试打开上次的文件夹 (this will call update_branches_on_top_bar and update_recent_menu_on_top_bar)
         last_folder = self.settings.get_last_folder()
         if last_folder and os.path.exists(last_folder):
             self.open_folder(last_folder)
@@ -266,9 +266,9 @@ class GitManagerWindow(QMainWindow):
 
     def open_folder_dialog(self):
         """打开文件夹选择对话框"""
-        folder_path = QFileDialog.getExistingDirectory(self, "选择Git仓库")
+        folder_path = QFileDialog.getExistingDirectory(self, "选择 Git 仓库")
         # macos 上 QFileDialog.getExistingDirectory 有时候选择"文件夹对话框" 灰色的 无法打开文件夹
-        # 再有bug 可以考虑用 QFileDialog.Option.DontUseNativeDialog
+        # 再有 bug 可以考虑用 QFileDialog.Option.DontUseNativeDialog
         # 就是这个没有保存最近打开的文件夹路径 每次都要重新选
         # 极有可能与输入法有关 error messaging the mach port for IMKCFRunLoopWakeUpReliable
         if folder_path:
@@ -283,7 +283,7 @@ class GitManagerWindow(QMainWindow):
             # self.update_recent_menu() # Now call the TopBarWidget's method
             self.update_recent_menu_on_top_bar()
 
-            # 更新UI
+            # 更新 UI
             # self.update_branches() # Now call the TopBarWidget's method
             self.update_branches_on_top_bar()
             self.update_commit_history()  # This updates the history view, not branches in top bar
@@ -295,7 +295,7 @@ class GitManagerWindow(QMainWindow):
             self.workspace_explorer.refresh_file_tree()
         else:
             self.commit_history_view.history_list.clear()
-            self.notification_widget.show_message("所选文件夹不是有效的Git仓库")
+            self.notification_widget.show_message("所选文件夹不是有效的 Git 仓库")
             if hasattr(self, "top_bar"):
                 self.top_bar.set_buttons_enabled(False)  # Disable buttons if repo init fails
 
@@ -318,7 +318,7 @@ class GitManagerWindow(QMainWindow):
 
             # Add "all" option. TopBarWidget's update_branches should handle its placement.
             # Ensure "all" is handled gracefully if it's not a real branch.
-            branches_for_combo = branches + ["all"]
+            branches_for_combo = [*branches, "all"]
 
             self.top_bar.update_branches(branches_for_combo, default_branch)
             self.top_bar.set_buttons_enabled(True)
@@ -346,7 +346,7 @@ class GitManagerWindow(QMainWindow):
             self.commit_history_view.history_list.show()
 
     def on_branch_changed(self, branch: str):
-        """当分支组合框中的选定分支改变时，尝试切换分支并更新UI。"""
+        """当分支组合框中的选定分支改变时，尝试切换分支并更新 UI。"""
         if not self.git_manager or not self.git_manager.repo:
             # 如果仓库未加载或无效，则不执行任何操作
             return
@@ -354,7 +354,7 @@ class GitManagerWindow(QMainWindow):
         if not branch or branch == self.git_manager.get_default_branch():
             # 如果选择的分支为空或与当前活动分支相同，则不执行任何操作
             # 这也防止了在加载时或以编程方式设置分支组合框时尝试不必要的切换
-            # self.update_commit_history() # 仍然更新历史记录，以防万一 (如果branch_combo信号本身会触发这个，可能不需要)
+            # self.update_commit_history() # 仍然更新历史记录，以防万一 (如果 branch_combo 信号本身会触发这个，可能不需要)
             return
 
         # 尝试切换分支
@@ -362,7 +362,7 @@ class GitManagerWindow(QMainWindow):
 
         if error_message:
             # 切换失败，显示错误通知
-            self.notification_widget.show_message(f"切换分支失败: {error_message}")
+            self.notification_widget.show_message(f"切换分支失败：{error_message}")
             # 将分支组合框恢复到实际的活动分支
             actual_active_branch = self.git_manager.get_default_branch()
             if actual_active_branch:
@@ -371,10 +371,10 @@ class GitManagerWindow(QMainWindow):
                 self.top_bar.branch_combo.blockSignals(False)
         else:
             # 切换成功
-            self.notification_widget.show_message(f"成功切换到分支: {branch}")  # 可选：成功提示
-            # 更新UI组件以反映分支更改
+            self.notification_widget.show_message(f"成功切换到分支：{branch}")  # 可选：成功提示
+            # 更新 UI 组件以反映分支更改
             self.workspace_explorer.refresh_file_tree()
-            # self.update_branches_on_top_bar() # 确保组合框状态正确（如果需要, 但setCurrentText应该已处理）
+            # self.update_branches_on_top_bar() # 确保组合框状态正确（如果需要，但 setCurrentText 应该已处理）
             # update_commit_history 会被连接到 branch_combo 的 activated 信号，
             # 如果我们上面 blockSignals 并手动设置 setCurrentText,
             # 这里的 branch_changed 信号可能不会再次触发 update_commit_history。
@@ -389,19 +389,19 @@ class GitManagerWindow(QMainWindow):
             return
         self.current_commit = self.git_manager.repo.commit(commit_hash)
         self.file_changes_view.update_changes(self.git_manager, self.current_commit)
-        # cursor生成 - 同时更新commit详细信息视图
+        # cursor 生成 - 同时更新 commit 详细信息视图
         self.commit_detail_view.update_commit_detail(self.git_manager, self.current_commit)
 
     def on_file_selected(self, file_path):
-        """当选择文件时，在TabWidget中显示比较视图"""
+        """当选择文件时，在 TabWidget 中显示比较视图"""
         if not self.current_commit or not self.git_manager:
             return
         self._on_file_selected(file_path, self.current_commit)
 
     def _on_file_selected(self, file_path, current_commit):
-        # 生成一个唯一的标签页标识符, 例如 "commit_hash:file_path"
-        # 为简化, 我们先用 file_path 作为标题, 并检查是否已存在
-        # 更健壮的方式是存储一个映射: tab_key -> tab_index
+        # 生成一个唯一的标签页标识符，例如 "commit_hash:file_path"
+        # 为简化，我们先用 file_path 作为标题，并检查是否已存在
+        # 更健壮的方式是存储一个映射：tab_key -> tab_index
 
         tab_title = os.path.basename(file_path)
         commit_short_hash = current_commit.hexsha[:7]
@@ -413,7 +413,7 @@ class GitManagerWindow(QMainWindow):
                 self.compare_tab_widget.setCurrentIndex(i)
                 return
 
-        # 如果不存在，创建新的CompareView实例并添加
+        # 如果不存在，创建新的 CompareView 实例并添加
         compare_view_instance = CompareView(self)
         compare_view_instance.show_diff(self.git_manager, current_commit, file_path)
 
@@ -425,7 +425,7 @@ class GitManagerWindow(QMainWindow):
     #     widget_to_close = self.compare_tab_widget.widget(index)
     #     self.compare_tab_widget.removeTab(index)
     #     if widget_to_close:
-    #         widget_to_close.deleteLater() # 确保Qt对象被正确删除
+    #         widget_to_close.deleteLater() # 确保 Qt 对象被正确删除
 
     def show_compare_with_working_dialog(self, file_path):
         """显示与工作区比较的对话框"""
@@ -442,12 +442,12 @@ class GitManagerWindow(QMainWindow):
                 new_content = ""
 
             # 创建并显示比较对话框
-            # todo 这个要改造, 看readme里的todo
+            # todo 这个要改造，看 readme 里的 todo
             dialog = CompareWithWorkingDialog(f"比较 {file_path}", old_content, new_content, file_path, self)
             dialog.show()
 
         except Exception as e:
-            print(f"比较文件失败: {e!s}")
+            print(f"比较文件失败：{e!s}")
 
     def save_splitter_state(self):
         """保存所有分割器的状态"""
@@ -470,15 +470,15 @@ class GitManagerWindow(QMainWindow):
     def resizeEvent(self, event):
         """处理窗口大小改变事件"""
         super().resizeEvent(event)
-        # 如果没有保存的分割器状态,则使用默认比例
+        # 如果没有保存的分割器状态，则使用默认比例
         if not self.settings.settings.get("vertical_splitter"):
             total_height = self.height()
             # 调整垂直分割器的默认比例
             self.vertical_splitter.setSizes([total_height * 5 // 8, total_height * 3 // 8])
         if not self.settings.settings.get("horizontal_splitter"):  # 主水平分割器
             total_width = self.width()  # 这是上半部分的宽度
-            # horizontal_splitter 在 upper_widget 中, 其宽度应基于 upper_widget
-            # 不过, 在初始化时设置比例通常足够, resizeEvent 更多是窗口整体调整后的事情
+            # horizontal_splitter 在 upper_widget 中，其宽度应基于 upper_widget
+            # 不过，在初始化时设置比例通常足够，resizeEvent 更多是窗口整体调整后的事情
             # 我们在 __init__ 中已设置了 horizontal_splitter.setSizes
             # 此处可以保持原样或针对性调整
             pass  # horizontal_splitter 的宽度由其父控件和初始比例决定
@@ -502,7 +502,7 @@ class GitManagerWindow(QMainWindow):
 
     def close_tab(self, index):
         """关闭标签页"""
-        # 不允许关闭提交历史标签页(假设它总是索引0)
+        # 不允许关闭提交历史标签页 (假设它总是索引 0)
         if index == 0:
             return
 
@@ -512,12 +512,12 @@ class GitManagerWindow(QMainWindow):
         """当标签页改变时"""
         if index == 0:
             self.compare_view.hide()
-            # cursor生成 - 显示右侧分割器（包含文件变化视图和commit详细信息视图）
+            # cursor 生成 - 显示右侧分割器（包含文件变化视图和 commit 详细信息视图）
             right_splitter = self.horizontal_splitter.widget(1)
             right_splitter.show()
         else:
             self.compare_view.show()
-            # cursor生成 - 隐藏右侧分割器
+            # cursor 生成 - 隐藏右侧分割器
             right_splitter = self.horizontal_splitter.widget(1)
             right_splitter.hide()
 
@@ -559,7 +559,7 @@ class GitManagerWindow(QMainWindow):
         self.fetch_thread.start()
 
     def handle_fetch_finished(self, success, error_message):
-        """处理fetch操作完成"""
+        """处理 fetch 操作完成"""
         try:
             if not success and error_message:
                 self.notification_widget.show_message(f"Fetch failed: {error_message}")
@@ -589,7 +589,7 @@ class GitManagerWindow(QMainWindow):
         self.pull_thread.start()
 
     def handle_pull_finished(self, success, error_message):
-        """处理pull操作完成"""
+        """处理 pull 操作完成"""
         try:
             if success:
                 self.update_commit_history()
@@ -627,7 +627,7 @@ class GitManagerWindow(QMainWindow):
             self.top_bar.commit_requested.emit()
 
     def handle_push_finished(self, success, error_message):
-        """处理push操作完成"""
+        """处理 push 操作完成"""
         try:
             if success:
                 self.update_commit_history()
