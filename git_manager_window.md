@@ -14,11 +14,14 @@
         ├── [TopBarWidget] (自定义顶部工具栏)
         │   │ - 提供打开仓库、切换分支、提交、拉取、推送、设置等操作按钮。
         │   │ - 显示最近打开的仓库列表。
-        │   └── 包含一个切换底部面板显示/隐藏的按钮。
+        │   └── 包含切换底部面板和左侧面板显示/隐藏的按钮。
         │
         └── [vertical_splitter] (QSplitter - 主垂直分割器)
             │
-            ├── [上半部分] workspace_explorer (WorkspaceExplorer)
+            ├── [左侧面板分割器] left_panel_splitter (QSplitter)
+            │   ├── [SideBarWidget] (自定义侧边栏)
+            │   │   └── 包含工程和提交按钮
+            │   └── [上半部分] workspace_explorer (WorkspaceExplorer)
             │   │ - 左侧：文件树视图 (FileTreeWidget)，显示当前工作区的文件结构。
             │   └── 右侧：compare_tab_widget (QTabWidget)，用于在多个标签页中显示文件比较视图 (CompareView)。
             │       └── 每个标签页标题格式: "文件名 @ commit短哈希"。
@@ -60,7 +63,7 @@
 
 **核心组件交互：**
 
-*   **TopBarWidget**: 作为应用的全局操作入口，负责处理仓库选择、分支切换、执行核心 Git 命令（提交、拉取、推送、抓取）以及打开设置对话框。它还维护最近打开的仓库列表，并提供切换底部面板可见性的功能。
+*   **TopBarWidget**: 作为应用的全局操作入口，负责处理仓库选择、分支切换、执行核心 Git 命令（提交、拉取、推送、抓取）以及打开设置对话框。它还维护最近打开的仓库列表，并提供切换底部面板和左侧面板可见性的功能。
 *   **WorkspaceExplorer**:
     *   左侧的文件树 (`FileTreeWidget`) 展示当前打开 Git 仓库的工作区文件。用户可以右键点击文件进行特定操作（如查看文件历史、进行 blame）。
     *   当用户在 `FileChangesView` 中选择一个文件并请求与工作区版本比较，或通过其他方式触发文件对比时，结果会显示在 `WorkspaceExplorer` 右侧的 `compare_tab_widget` 中的新标签页内。
@@ -74,7 +77,7 @@
 **状态持久化：**
 
 *   应用程序会保存和恢复各个分割器的尺寸比例，以便用户下次打开时保持其自定义布局。
-*   底部面板的显示/隐藏状态也会被保存。
+*   底部面板和左侧面板的显示/隐藏状态也会被保存。
 *   最近成功打开的 Git 仓库路径会被记录，并在下次启动时尝试自动重新打开最后一个仓库。
 
 ## 信号连接关系与交互流程
@@ -108,6 +111,7 @@
     *   `commit_requested` → `GitManagerWindow.show_commit_dialog()`
     *   `fetch_requested` / `pull_requested` / `push_requested` → 对应的 `fetch_repo()`, `pull_repo()`, `push_repo()` 方法。
     *   `toggle_bottom_panel_requested` → `GitManagerWindow.toggle_bottom_widget()`
+    *   `toggle_left_panel_requested` → `GitManagerWindow.toggle_left_panel()`
 
 *   **CommitHistoryView 信号:**
     *   `commit_selected` → `GitManagerWindow.on_commit_selected()`
@@ -135,6 +139,11 @@
     *   选中找到的提交项，并滚动到视图中央。
     *   自动切换主 `tab_widget` 到 "提交历史" 标签页，以便用户可以看到高亮选中的提交及其上下文。
 
-3.  **底部面板显隐切换**:
-    用户可以通过 `TopBarWidget` 上的一个专用按钮来切换底部面板 (`bottom_widget`) 的显示和隐藏状态。这个状态会被记录在设置中，并在下次启动时恢复。切换时，按钮图标也会相应更新。
+3.  **面板显隐切换**:
+    *   **底部面板**: 用户可以通过 `TopBarWidget` 上的按钮切换底部面板 (`bottom_widget`) 的显示和隐藏状态。
+    *   **左侧面板**: 用户可以通过 `TopBarWidget` 上的按钮或点击 `SideBarWidget` 的工程按钮来切换左侧面板 (`left_panel_splitter`) 的显示和隐藏状态。
+    这些状态会被记录在设置中，并在下次启动时恢复。切换时，按钮图标也会相应更新。
+
+4.  **异步操作处理**:
+    拉取(`pull`)、推送(`push`)和获取(`fetch`)操作使用专用线程(`PullThread`, `PushThread`, `FetchThread`)执行，避免阻塞UI线程。操作完成后会更新UI状态并显示通知消息。
 ```
