@@ -76,9 +76,6 @@ class GitManagerWindow(QMainWindow):
 
         # Connect signals from TopBarWidget to GitManagerWindow methods
         self.top_bar.open_folder_requested.connect(self.open_folder_dialog)
-        # Connect side bar button signals
-        self.side_bar.project_button_clicked.connect(self.on_project_button_clicked)
-        self.side_bar.commit_button_clicked.connect(self.on_commit_button_clicked)
 
         # Connect side bar button signals
         self.side_bar.project_button_clicked.connect(self.on_project_button_clicked)
@@ -622,13 +619,14 @@ class GitManagerWindow(QMainWindow):
 
     def on_project_button_clicked(self):
         """处理工程按钮点击事件"""
-        if hasattr(self, "workspace_explorer"):
-            self.workspace_explorer.setVisible(not self.workspace_explorer.isVisible())
-            self.left_panel_visible = self.workspace_explorer.isVisible()
-            self.settings.settings["left_panel_visible"] = self.left_panel_visible
-            self.settings.save_settings()
-            if hasattr(self, "top_bar"):
-                self.top_bar.update_toggle_left_panel_icon(self.left_panel_visible)
+        self.toggle_left_panel()
+        # if hasattr(self, "workspace_explorer"):
+        #     self.workspace_explorer.setVisible(not self.workspace_explorer.isVisible())
+        #     self.left_panel_visible = self.workspace_explorer.isVisible()
+        #     self.settings.settings["left_panel_visible"] = self.left_panel_visible
+        #     self.settings.save_settings()
+        #     if hasattr(self, "top_bar"):
+        #         self.top_bar.update_toggle_left_panel_icon(self.left_panel_visible)
 
     def on_commit_button_clicked(self):
         """处理提交按钮点击事件"""
