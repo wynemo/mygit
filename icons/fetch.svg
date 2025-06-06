@@ -1,8 +1,9 @@
+<!-- 获取图标 -->
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
   <style>
     .btn-circle {
-      fill: #007acc;
+      fill: #000000;
       transition: fill 0.3s;
     }
     .btn-arrow {
@@ -18,7 +19,7 @@
       text-anchor: middle;
     }
     svg:hover .btn-circle {
-      fill: #005999;
+      fill: #333333;
     }
     svg:hover .btn-text {
       fill: #000000;
@@ -28,8 +29,10 @@
   <!-- 圆形按钮背景 -->
   <circle class="btn-circle" cx="50" cy="50" r="35"/>
 
-  <!-- 向下箭头（获取）- 使用虚线样式 -->
-  <line class="btn-arrow" x1="50" y1="35" x2="50" y2="65"/>
-  <polyline class="btn-arrow" points="40,55 50,65 60,55"/>
+  <!-- 向下箭头（获取）-->
+  <g class="btn-arrow-group">
+    <line class="btn-arrow" x1="50" y1="35" x2="50" y2="65"/>
+    <polyline class="btn-arrow" points="40,55 50,65 60,55"/>
+  </g>
 
 </svg>
