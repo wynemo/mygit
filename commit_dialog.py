@@ -1,8 +1,6 @@
-import asyncio
 import logging
 
-import aiohttp
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -19,53 +17,7 @@ from PyQt6.QtWidgets import (
 )
 
 from text_diff_viewer import DiffViewer
-
-
-class AIGeneratorThread(QThread):
-    finished = pyqtSignal(str)  # 成功信号
-    error = pyqtSignal(str)  # 错误信号
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.diff_content = None
-        self.settings = None
-
-    def run(self):
-        try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            result = loop.run_until_complete(self._call_ai_api())
-            loop.close()
-            self.finished.emit(result)
-        except Exception as e:
-            self.error.emit(str(e))
-
-    async def _call_ai_api(self):
-        """调用AI API生成提交信息"""
-        api_url = self.settings.get("api_url", "").rstrip("/") + "/chat/completions"
-        api_secret = self.settings.get("api_secret", "")
-        model_name = self.settings.get("model_name", "")
-        prompt = self.settings.get("prompt", "请根据以下Git变更生成一个简洁的提交信息:")
-
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_secret}",
-        }
-
-        messages = [
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": self.diff_content},
-        ]
-
-        data = {"model": model_name, "messages": messages}
-
-        async with aiohttp.ClientSession() as session, session.post(api_url, headers=headers, json=data) as response:
-            if response.status == 200:
-                result = await response.json()
-                return result["choices"][0]["message"]["content"]
-            else:
-                error_text = await response.text()
-                raise Exception(f"API调用失败: {response.status} - {error_text}")
+from threads import AIGeneratorThread
 
 
 class CommitDialog(QDialog):
@@ -130,7 +82,7 @@ class CommitDialog(QDialog):
 
         splitter.addWidget(files_widget)
 
-        # 下半部分, 提交信息
+        # 下半部分，提交信息
         commit_widget = QWidget()
         commit_layout = QVBoxLayout(commit_widget)
 
@@ -138,7 +90,7 @@ class CommitDialog(QDialog):
         message_label = QLabel("Commit Message:")
         self.ai_button = QPushButton("✨")
         self.ai_button.setFixedWidth(30)
-        self.ai_button.setToolTip("使用AI生成提交信息")
+        self.ai_button.setToolTip("使用 AI 生成提交信息")
         self.ai_button.clicked.connect(self.generate_commit_message)
         message_header.addWidget(message_label)
         message_header.addWidget(self.ai_button)
@@ -165,7 +117,7 @@ class CommitDialog(QDialog):
         # 初始化显示文件状态
         self.refresh_file_status()
 
-        # 初始化AI生成器线程
+        # 初始化 AI 生成器线程
         self.ai_thread = AIGeneratorThread(self)
         self.ai_thread.finished.connect(self._on_message_generated)
         self.ai_thread.error.connect(self._on_generation_error)
@@ -218,7 +170,7 @@ class CommitDialog(QDialog):
                 self.git_manager.repo.index.add([file_path])
                 self.refresh_file_status()
             except Exception as e:
-                print(f"无法暂存文件: {e!s}")
+                print(f"无法暂存文件：{e!s}")
 
     def unstage_selected_file(self):
         """取消暂存选中的文件"""
@@ -230,7 +182,7 @@ class CommitDialog(QDialog):
                 self.git_manager.repo.git.reset("HEAD", file_path)
                 self.refresh_file_status()
             except Exception as e:
-                print(f"无法取消暂存文件: {e!s}")
+                print(f"无法取消暂存文件：{e!s}")
 
     def generate_commit_message(self):
         """生成提交信息"""
@@ -250,7 +202,7 @@ class CommitDialog(QDialog):
                 QMessageBox.warning(self, "警告", "没有已暂存的文件变更")
                 return
 
-            # 禁用AI按钮, 显示正在生成中
+            # 禁用 AI 按钮，显示正在生成中
             self.ai_button.setEnabled(False)
             self.ai_button.setText("⏳")
 
@@ -261,7 +213,7 @@ class CommitDialog(QDialog):
 
         except Exception as e:
             logging.exception("准备提交信息生成失败")
-            QMessageBox.critical(self, "错误", f"准备提交信息生成失败: {e!s}")
+            QMessageBox.critical(self, "错误", f"准备提交信息生成失败：{e!s}")
             self._reset_ai_button()
 
     def _on_message_generated(self, message):
@@ -271,11 +223,11 @@ class CommitDialog(QDialog):
 
     def _on_generation_error(self, error_message):
         """当消息生成出错时调用"""
-        QMessageBox.critical(self, "错误", f"生成提交信息失败: {error_message!s}")
+        QMessageBox.critical(self, "错误", f"生成提交信息失败：{error_message!s}")
         self._reset_ai_button()
 
     def _reset_ai_button(self):
-        """重置AI按钮状态"""
+        """重置 AI 按钮状态"""
         self.ai_button.setEnabled(True)
         self.ai_button.setText("✨")
 
@@ -296,16 +248,16 @@ class CommitDialog(QDialog):
 
             # 获取文件内容
             if is_staged:
-                # 对于暂存区文件, 比较 HEAD 和暂存区
+                # 对于暂存区文件，比较 HEAD 和暂存区
                 try:
                     old_content = repo.git.show(f"HEAD:{file_path}")
                 except:
-                    # 如果是新文件, HEAD中没有内容
+                    # 如果是新文件，HEAD 中没有内容
                     old_content = ""
                 new_content = repo.git.show(f":{file_path}")  # 暂存区内容
-            # 对于未暂存文件, 比较暂存区和工作区
+            # 对于未暂存文件，比较暂存区和工作区
             elif item.text(1) == "Untracked":
-                # 未跟踪文件, 显示空内容和当前文件内容
+                # 未跟踪文件，显示空内容和当前文件内容
                 old_content = ""
                 try:
                     with open(f"{repo.working_dir}/{file_path}", "r", encoding="utf-8") as f:
@@ -313,7 +265,7 @@ class CommitDialog(QDialog):
                 except Exception as e:
                     new_content = f"Error reading file: {e!s}"
             else:
-                # 已修改文件, 比较暂存区和工作区
+                # 已修改文件，比较暂存区和工作区
                 try:
                     old_content = repo.git.show(f":{file_path}")  # 暂存区内容
                 except:
@@ -333,7 +285,7 @@ class CommitDialog(QDialog):
 
         except Exception as e:
             logging.exception("显示文件差异失败")
-            QMessageBox.critical(self, "错误", f"显示文件差异失败: {e!s}")
+            QMessageBox.critical(self, "错误", f"显示文件差异失败：{e!s}")
 
     def accept(self):
         """处理确认操作"""
@@ -359,7 +311,7 @@ class CommitDialog(QDialog):
 
         except Exception as e:
             logging.exception("提交失败")
-            QMessageBox.critical(self, "错误", f"提交失败: {e!s}")
+            QMessageBox.critical(self, "错误", f"提交失败：{e!s}")
 
     def commit_and_push(self):
         """执行提交并推送"""
@@ -367,7 +319,7 @@ class CommitDialog(QDialog):
             # 先执行提交
             self.accept()
             if self.result() != QDialog.DialogCode.Accepted:
-                # 如果提交失败, 直接返回
+                # 如果提交失败，直接返回
                 return
 
             # 获取当前分支
@@ -386,4 +338,4 @@ class CommitDialog(QDialog):
 
         except Exception as e:
             logging.exception("推送失败")
-            QMessageBox.critical(self, "错误", f"推送失败: {e!s}")
+            QMessageBox.critical(self, "错误", f"推送失败：{e!s}")
