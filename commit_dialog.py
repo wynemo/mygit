@@ -2,6 +2,7 @@ import logging
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
+    QDialog,
     QDialogButtonBox,
     QHBoxLayout,
     QLabel,
@@ -17,6 +18,7 @@ from PyQt6.QtWidgets import (
 
 from text_diff_viewer import DiffViewer
 from threads import AIGeneratorThread
+from utils import get_main_window
 
 
 class CommitDialog(QWidget):
@@ -25,8 +27,6 @@ class CommitDialog(QWidget):
         self.setWindowTitle("提交更改")
         # self.setMinimumWidth(600)
         # self.setMinimumHeight(400)
-        self.git_manager = parent.git_manager
-        self.parent_window = parent
 
         # 创建主布局
         layout = QVBoxLayout(self)
@@ -114,7 +114,7 @@ class CommitDialog(QWidget):
         layout.addWidget(button_box)
 
         # 初始化显示文件状态
-        self.refresh_file_status()
+        # self.refresh_file_status()
 
         # 初始化 AI 生成器线程
         self.ai_thread = AIGeneratorThread(self)
@@ -125,13 +125,23 @@ class CommitDialog(QWidget):
         self.staged_tree.itemDoubleClicked.connect(lambda item: self.show_file_diff(item, True))
         self.unstaged_tree.itemDoubleClicked.connect(lambda item: self.show_file_diff(item, False))
 
+    def showEvent(self, event):
+        self.refresh_file_status()
+        super().showEvent(event)
+
+    # git manager property
+    @property
+    def git_manager(self):
+        return get_main_window().git_manager
+
+    @property
+    def parent_window(self):
+        return get_main_window()
+
     def refresh_file_status(self):
         """刷新文件状态显示"""
         self.staged_tree.clear()
         self.unstaged_tree.clear()
-
-        if not self.git_manager:
-            return
 
         repo = self.git_manager.repo
 
@@ -146,6 +156,7 @@ class CommitDialog(QWidget):
         unstaged = repo.index.diff(None)
         for diff in unstaged:
             item = QTreeWidgetItem(self.unstaged_tree)
+            logging.info(f"commit_dialog: unstaged file: {diff.a_path}")
             item.setText(0, diff.a_path)
             item.setText(1, "Modified")
 
@@ -306,7 +317,8 @@ class CommitDialog(QWidget):
 
             self.parent_window.update_commit_history()
 
-            super().accept()
+            # clear commit message
+            self.message_edit.clear()
 
         except Exception as e:
             logging.exception("提交失败")
