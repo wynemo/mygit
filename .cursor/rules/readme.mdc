@@ -4,11 +4,10 @@ globs:
 alwaysApply: true
 ---
 
-1. 不要删除print语句,除非用户明确表明
-2. 生成的代码,请加上“cursor生成”或同等的英文的注释,放在类或者函数的Docstrings里
-3. 不要使用全角符号的标点符号,例如中文的逗号,ruff会报错
-4. 这是用pyqt6的工程
-5. 专注于当前的功能，不要修改无关的代码
-6. logging 不要出现 flake8-logging-format 的情况;logging.exception不需要记录异常, 多余的
-7. edit the file in small chunks
++ 不要删除 print 语句，除非用户明确表明
++ 生成的代码，请加上“cursor 生成”或同等的英文的注释，放在类或者函数的 Docstrings 里
++ 这是用 pyqt6 的工程
++ 专注于当前的功能，不要修改无关的代码
++ logging 不要出现 flake8-logging-format 的情况;logging.exception 不需要记录异常，多余的
++ edit the file in small chunks
 
