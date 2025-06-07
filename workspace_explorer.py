@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from commit_dialog import CommitWidget
+from commit_widget import CommitWidget
 from editors.modified_text_edit import ModifiedTextEdit
 from editors.text_edit import SyncedTextEdit  # Ensure this is present
 from file_history_view import FileHistoryView
