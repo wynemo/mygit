@@ -67,7 +67,10 @@ class WorkspaceExplorer(QWidget):
 
         # 添加组件到分割器
         self.splitter.addWidget(self.file_tree)
+        self.splitter.addWidget(self.commit_dialog)
         self.splitter.addWidget(self.tab_widget)
+
+        self.commit_dialog.hide()  # 初始隐藏
 
         # 连接标签页切换信号
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
@@ -77,10 +80,6 @@ class WorkspaceExplorer(QWidget):
 
         # 添加分割器到布局
         layout.addWidget(self.splitter)
-
-        # 将 CommitDialog 添加到布局中
-        layout.addWidget(self.commit_dialog)
-        self.commit_dialog.hide()  # 初始隐藏
 
     def tab_drag_enter_event(self, event: QDragEnterEvent):
         """处理拖拽进入事件"""
@@ -277,16 +276,22 @@ class WorkspaceExplorer(QWidget):
         if visible:
             self.file_tree.show()
             self.commit_dialog.hide()
-            self.splitter.setSizes([200, 400])  # 可选：恢复默认比例
+            self.splitter.setSizes([200, 0, 400])
         else:
             self.file_tree.hide()
-            self.splitter.setSizes([0, 1])  # 只显示右侧
+            self.commit_dialog.hide()
+            self.splitter.setSizes([0, 0, 1])  # 只显示右侧
+
+    def show_file_tree(self):
+        self.file_tree.show()
+        self.commit_dialog.hide()
+        self.splitter.setSizes([200, 0, 400])
 
     def show_commit_dialog(self):
         """显示提交对话框并隐藏文件树"""
-        self.file_tree.hide()
         self.commit_dialog.show()
-        self.splitter.setSizes([0, 1])  # 只显示右侧
+        self.file_tree.hide()
+        self.splitter.setSizes([0, 200, 400])
 
     def update_filename_display(self, file_path: str, is_dirty: bool):
         print("update_filename_display", file_path, is_dirty)
