@@ -64,6 +64,7 @@ class FileHistoryView(QWidget):
             # 一次性获取所有需要的信息，避免后续查询
             log_output = self.git_manager.repo.git.log(
                 "--follow",
+                "--name-status",
                 "--pretty=format:%H|%an|%ct|%s",  # hash|author|timestamp|subject
                 relative_path,
             )
@@ -77,10 +78,29 @@ class FileHistoryView(QWidget):
                 if not line.strip():
                     continue
 
-                parts = line.split("|", 3)
-                if len(parts) < 4:
+                # 建议在 file_history_view.py 的 update_history 方法中添加以下代码来解析文件变更状态：
+
+                _file_path = None
+                if line and (line[0] in ("A", "M", "D") or line.startswith("R")):
+                    # 处理重命名格式：R100    oldfile    newfile
+                    if line.startswith("R"):
+                        parts = line.split("\t")
+                        if len(parts) >= 3:
+                            print(f"文件重命名：{parts[1]} -> {parts[2]}")
+                            _file_path = parts[2]
+                    else:
+                        # 处理普通变更格式：A/M/D    filename
+                        parts = line.split("\t")
+                        if len(parts) >= 2:
+                            status_map = {"A": "新增", "M": "修改", "D": "删除"}
+                            print(f"文件{status_map.get(line[0], line[0])}: {parts[1]}")
+                            _file_path = parts[1]
+                    self.history_list.topLevelItem(self.history_list.topLevelItemCount() - 1).setData(
+                        3, 256, _file_path
+                    )
                     continue
 
+                parts = line.split("|", 3)
                 commit_hash, author_name, timestamp_str, message = parts
 
                 item = QTreeWidgetItem()
@@ -105,6 +125,7 @@ class FileHistoryView(QWidget):
         except Exception as e:
             item = QTreeWidgetItem()
             item.setText(0, f"获取历史失败：{e!s}")
+            logging.exception("获取文件历史失败")
             self.history_list.addTopLevelItem(item)
 
     def on_commit_clicked(self, item):
@@ -112,16 +133,13 @@ class FileHistoryView(QWidget):
         # 需要改为在右侧显示文件变化
         # 根据拿到的文件路径 commit 信息 这个 GitManagerWindow.compare_view 需要对改动进行显示
         commit_hash = item.data(0, 256)  # Qt.ItemDataRole.UserRole = 256
+        file_path = item.data(3, 256)
         if commit_hash:
             # 尝试在主窗口的标签页中打开比较视图
             main_window = self.window()
             if hasattr(main_window, "compare_view"):
-                # 获取相对于 git 仓库根目录的文件路径
-                repo_path = self.git_manager.repo.working_dir
-                relative_path = os.path.relpath(self.file_path, repo_path)
-
                 current_commit: git.Commit = main_window.git_manager.repo.commit(commit_hash)
-                main_window.compare_view.show_diff(main_window.git_manager, current_commit, relative_path)
+                main_window.compare_view.show_diff(main_window.git_manager, current_commit, file_path)
 
     def show_context_menu(self, position):
         # 将位置转换为视口坐标
