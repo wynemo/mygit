@@ -99,11 +99,6 @@ class TopBarWidget(QWidget):
         self.branch_combo.currentTextChanged.connect(self.branch_changed.emit)
         self._layout.addWidget(self.branch_combo)
 
-        # --- Commit Button ---
-        self.commit_button = QPushButton("Commit")
-        self.commit_button.clicked.connect(self.commit_requested.emit)
-        self._layout.addWidget(self.commit_button)
-
         # --- Spinner Label ---
         self.spinner_label = RotatingIcon("icons/spin.png")
         self.spinner_label.hide()
@@ -254,7 +249,6 @@ class TopBarWidget(QWidget):
 
     def set_buttons_enabled(self, enabled):
         """Enable or disable buttons that require an open repository."""
-        self.commit_button.setEnabled(enabled)
         self.branch_combo.setEnabled(enabled)
         self.fetch_button.setEnabled(enabled)
         self.pull_button.setEnabled(enabled)
