@@ -162,7 +162,7 @@ class GitManagerWindow(QMainWindow):
         horizontal_splitter.addWidget(self.compare_view)
 
         # 添加工作区浏览器
-        self.workspace_explorer = WorkspaceExplorer()
+        self.workspace_explorer = WorkspaceExplorer(self)
 
         self.compare_tab_widget = self.workspace_explorer.tab_widget
 

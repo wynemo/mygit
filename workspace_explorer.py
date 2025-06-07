@@ -23,6 +23,7 @@ from editors.text_edit import SyncedTextEdit  # Ensure this is present
 from file_changes_view import FileChangesView
 from file_history_view import FileHistoryView
 from syntax_highlighter import CodeHighlighter
+from utils import get_main_window_by_parent
 from utils.language_map import LANGUAGE_MAP
 
 
@@ -57,6 +58,7 @@ class WorkspaceExplorer(QWidget):
 
         self.file_changes_view = FileChangesView(self)
         self.file_changes_view.hide()
+        self.file_changes_view.file_selected.connect(get_main_window_by_parent(self).on_file_selected)
 
         # 创建标签页组件
         self.tab_widget = QTabWidget()
