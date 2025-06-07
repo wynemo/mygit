@@ -17,7 +17,6 @@ from PyQt6.QtWidgets import (
 )
 
 from commit_detail_view import CommitDetailView
-from commit_dialog import CommitDialog
 from commit_history_view import CommitHistoryView
 from compare_view import CompareView
 from compare_with_working_dialog import CompareWithWorkingDialog
@@ -236,11 +235,7 @@ class GitManagerWindow(QMainWindow):
 
     def show_commit_dialog(self):
         """显示提交对话框"""
-        if not self.git_manager:
-            return
-
-        dialog = CommitDialog(self)
-        dialog.show()
+        self.workspace_explorer.show_commit_dialog()
 
     # def update_recent_menu(self): # Removed, logic moved to TopBarWidget or adapted
     #     """更新最近文件夹菜单 - This method is now in TopBarWidget"""

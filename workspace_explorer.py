@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from commit_dialog import CommitDialog
 from editors.modified_text_edit import ModifiedTextEdit
 from editors.text_edit import SyncedTextEdit  # Ensure this is present
 from file_history_view import FileHistoryView
@@ -48,8 +49,10 @@ class WorkspaceExplorer(QWidget):
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # 创建文件树
-        self.file_tree = FileTreeWidget(self, git_manager=self.git_manager)  # 传入self作为父部件和git_manager
+        self.file_tree = FileTreeWidget(self, git_manager=self.git_manager)  # 传入 self 作为父部件和 git_manager
         self.file_tree.setHeaderLabels(["工作区文件"])
+
+        self.commit_dialog = CommitDialog(self)
 
         # 创建标签页组件
         self.tab_widget = QTabWidget()
@@ -69,11 +72,15 @@ class WorkspaceExplorer(QWidget):
         # 连接标签页切换信号
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
 
-        # 设置分割器的初始比例(1:2)
+        # 设置分割器的初始比例 (1:2)
         self.splitter.setSizes([200, 400])
 
         # 添加分割器到布局
         layout.addWidget(self.splitter)
+
+        # 将 CommitDialog 添加到布局中
+        layout.addWidget(self.commit_dialog)
+        self.commit_dialog.hide()  # 初始隐藏
 
     def tab_drag_enter_event(self, event: QDragEnterEvent):
         """处理拖拽进入事件"""
@@ -269,10 +276,17 @@ class WorkspaceExplorer(QWidget):
         """显示或隐藏左侧文件树面板"""
         if visible:
             self.file_tree.show()
+            self.commit_dialog.hide()
             self.splitter.setSizes([200, 400])  # 可选：恢复默认比例
         else:
             self.file_tree.hide()
             self.splitter.setSizes([0, 1])  # 只显示右侧
+
+    def show_commit_dialog(self):
+        """显示提交对话框并隐藏文件树"""
+        self.file_tree.hide()
+        self.commit_dialog.show()
+        self.splitter.setSizes([0, 1])  # 只显示右侧
 
     def update_filename_display(self, file_path: str, is_dirty: bool):
         print("update_filename_display", file_path, is_dirty)
@@ -338,7 +352,7 @@ class FileTreeWidget(QTreeWidget):
 
         file_path = item.data(0, Qt.ItemDataRole.UserRole)
         if os.path.isfile(file_path):
-            # 获取父部件(WorkspaceExplorer)的引用
+            # 获取父部件 (WorkspaceExplorer) 的引用
             workspace_explorer = self.parent()
             while workspace_explorer and not isinstance(workspace_explorer, WorkspaceExplorer):
                 workspace_explorer = workspace_explorer.parent()
@@ -376,7 +390,7 @@ class FileTreeWidget(QTreeWidget):
         copy_full_path_action = context_menu.addAction("拷贝完整路径")
         copy_full_path_action.triggered.connect(lambda: self._copy_full_path(file_path))
 
-        # 只在git修改的文件上显示"Revert"菜单项
+        # 只在 git 修改的文件上显示"Revert"菜单项
         workspace_explorer = self.parent()
         while workspace_explorer and not isinstance(workspace_explorer, WorkspaceExplorer):
             workspace_explorer = workspace_explorer.parent()
@@ -396,7 +410,7 @@ class FileTreeWidget(QTreeWidget):
                     revert_action = context_menu.addAction("Revert")
                     revert_action.triggered.connect(lambda: self.revert_file(file_path))
             except Exception as e:
-                logging.error(f"检查文件状态出错: {e}")
+                logging.error(f"检查文件状态出错：{e}")
 
         # 在鼠标位置显示菜单
         context_menu.exec(self.mapToGlobal(position))
@@ -471,12 +485,12 @@ class FileTreeWidget(QTreeWidget):
 
     def _show_file_history(self, file_path):
         """显示文件历史"""
-        # 获取GitManagerWindow的引用
+        # 获取 GitManagerWindow 的引用
         main_window = self.window()
 
         print("main_window", id(main_window), main_window)
 
-        # 确认是否能找到主窗口的tab_widget
+        # 确认是否能找到主窗口的 tab_widget
         if not hasattr(main_window, "tab_widget"):
             print("无法找到主窗口的标签页组件")
             return
@@ -484,7 +498,7 @@ class FileTreeWidget(QTreeWidget):
         # 创建文件历史视图
         file_history_view = FileHistoryView(file_path, parent=self)
 
-        # 在GitManagerWindow的tab_widget中添加新标签页
+        # 在 GitManagerWindow 的 tab_widget 中添加新标签页
         file_name = os.path.basename(file_path)
         tab_title = f"{file_name} 历史"
 
@@ -525,7 +539,7 @@ class FileTreeWidget(QTreeWidget):
                 clipboard = QApplication.clipboard()
                 clipboard.setText(relative_path)
             except Exception as e:
-                logging.error(f"复制相对路径失败: {e}")
+                logging.error(f"复制相对路径失败：{e}")
         else:
             logging.error("无法获取工作区路径")
 
@@ -558,6 +572,6 @@ class FileTreeWidget(QTreeWidget):
         try:
             clipboard = QApplication.clipboard()
             clipboard.setText(file_path)
-            logging.info(f"已复制完整路径: {file_path}")
+            logging.info(f"已复制完整路径：{file_path}")
         except Exception as e:
-            logging.error(f"复制完整路径失败: {e}")
+            logging.error(f"复制完整路径失败：{e}")
