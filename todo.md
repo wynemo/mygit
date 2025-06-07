@@ -71,8 +71,9 @@
 78. 侧边栏两个按钮，选中的效果，选中但失去焦距的效果；ai 给加上了，但效果不太好，等待界面调整了以后再说
 79. ~~工作区文件编辑了以后，没有保存到磁盘前，标记一下，文件名上*~~
 80. ~~提交对话框换成标签页~~
-81. CommitDialog 太大了，超出框体，需要调整，需要重新设计，名字也得改下，现在容易误会，已经不是对话框了
+81. ~~CommitDialog 太大了，超出框体，需要调整，需要重新设计，名字也得改下，现在容易误会，已经不是对话框了~~
 82. ~~CommitDialog 获得焦点时，需要刷新~~
-83. file_history_view.py 需要处理 git mv 的情况，没有正确获取到历史
-84. file_changes_view.py 里面对于 git mv 的情况，是显示了 R 的情况，但没有显示移动为什么新文件了
-85. WorkspaceExplorer.file_changes_view 处理信号 点击文件 没有处理
+83. ~~file_history_view.py 需要处理 git mv 的情况，没有正确获取到历史~~
+84. ~~file_changes_view.py 里面对于 git mv 的情况，是显示了 R 的情况，但没有显示移动为什么新文件了~~
+85. ~~WorkspaceExplorer.file_changes_view 处理信号 点击文件 没有处理~~
+86. WorkspaceExplorer.file_changes_view 处理信号 与工作区比较 没有处理
