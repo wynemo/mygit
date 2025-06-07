@@ -59,6 +59,9 @@ class WorkspaceExplorer(QWidget):
         self.file_changes_view = FileChangesView(self)
         self.file_changes_view.hide()
         self.file_changes_view.file_selected.connect(get_main_window_by_parent(self).on_file_selected)
+        self.file_changes_view.compare_with_working_requested.connect(
+            get_main_window_by_parent(self).show_compare_with_working_dialog
+        )
 
         # 创建标签页组件
         self.tab_widget = QTabWidget()

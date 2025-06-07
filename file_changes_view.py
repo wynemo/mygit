@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
 
 class FileChangesView(QWidget):
     file_selected = pyqtSignal(str, str)  # 当选择文件时发出信号
-    compare_with_working_requested = pyqtSignal(str)  # 请求与工作区比较
+    compare_with_working_requested = pyqtSignal(str, str)  # 请求与工作区比较
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -114,6 +114,8 @@ class FileChangesView(QWidget):
         if item and item.childCount() == 0:
             menu = QMenu()
             compare_action = QAction("与工作区比较", self)
-            compare_action.triggered.connect(lambda: self.compare_with_working_requested.emit(self.get_full_path(item)))
+            compare_action.triggered.connect(
+                lambda: self.compare_with_working_requested.emit(self.get_full_path(item), self.commit_hash)
+            )
             menu.addAction(compare_action)
             menu.exec(self.changes_tree.viewport().mapToGlobal(position))
