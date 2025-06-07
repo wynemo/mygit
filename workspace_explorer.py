@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from commit_dialog import CommitDialog
+from commit_dialog import CommitWidget
 from editors.modified_text_edit import ModifiedTextEdit
 from editors.text_edit import SyncedTextEdit  # Ensure this is present
 from file_history_view import FileHistoryView
@@ -52,7 +52,7 @@ class WorkspaceExplorer(QWidget):
         self.file_tree = FileTreeWidget(self, git_manager=self.git_manager)  # 传入 self 作为父部件和 git_manager
         self.file_tree.setHeaderLabels(["工作区文件"])
 
-        self.commit_dialog = CommitDialog(self)
+        self.commit_widget = CommitWidget(self)
 
         # 创建标签页组件
         self.tab_widget = QTabWidget()
@@ -67,10 +67,10 @@ class WorkspaceExplorer(QWidget):
 
         # 添加组件到分割器
         self.splitter.addWidget(self.file_tree)
-        self.splitter.addWidget(self.commit_dialog)
+        self.splitter.addWidget(self.commit_widget)
         self.splitter.addWidget(self.tab_widget)
 
-        self.commit_dialog.hide()  # 初始隐藏
+        self.commit_widget.hide()  # 初始隐藏
 
         # 连接标签页切换信号
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
@@ -275,21 +275,21 @@ class WorkspaceExplorer(QWidget):
         """显示或隐藏左侧文件树面板"""
         if visible:
             self.file_tree.show()
-            self.commit_dialog.hide()
+            self.commit_widget.hide()
             self.splitter.setSizes([200, 0, 400])
         else:
             self.file_tree.hide()
-            self.commit_dialog.hide()
+            self.commit_widget.hide()
             self.splitter.setSizes([0, 0, 1])  # 只显示右侧
 
     def show_file_tree(self):
         self.file_tree.show()
-        self.commit_dialog.hide()
+        self.commit_widget.hide()
         self.splitter.setSizes([200, 0, 400])
 
     def show_commit_dialog(self):
         """显示提交对话框并隐藏文件树"""
-        self.commit_dialog.show()
+        self.commit_widget.show()
         self.file_tree.hide()
         self.splitter.setSizes([0, 200, 400])
 

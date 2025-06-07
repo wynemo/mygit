@@ -22,7 +22,7 @@ from threads import AIGeneratorThread
 from utils import get_main_window
 
 
-class CommitDialog(QFrame):
+class CommitWidget(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         parent = self.parent()
