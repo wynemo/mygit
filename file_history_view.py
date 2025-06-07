@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QApplication, QLabel, QMenu, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget
 
+from utils import get_main_window
+
 if TYPE_CHECKING:
     import git
 
@@ -206,6 +208,14 @@ class FileHistoryView(QWidget):
 
             # 调用 update_changes 方法
             file_changes_view.update_changes(self.git_manager, commit)
+
+            # 触发 SideBarWidget.changes_btn 点击
+            main_window = get_main_window()
+            if hasattr(main_window, "side_bar"):
+                try:
+                    main_window.side_bar.changes_btn.click()
+                except Exception as e:
+                    logging.warning(f"触发 changes_btn 点击失败：{e}")
 
         except Exception as e:
             logging.exception("显示所有受影响的文件失败")
