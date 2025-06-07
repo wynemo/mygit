@@ -27,6 +27,7 @@ class CommitDialog(QWidget):
         self.setWindowTitle("提交更改")
         # self.setMinimumWidth(600)
         # self.setMinimumHeight(400)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         # 创建主布局
         layout = QVBoxLayout(self)
@@ -49,6 +50,7 @@ class CommitDialog(QWidget):
         staged_header = QHBoxLayout()
         staged_label = QLabel("Staged Files")
         unstage_button = QPushButton("-")
+        unstage_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         unstage_button.setFixedWidth(30)
         unstage_button.clicked.connect(self.unstage_selected_file)
         staged_header.addWidget(staged_label)
@@ -57,6 +59,7 @@ class CommitDialog(QWidget):
         staged_layout.addLayout(staged_header)
 
         self.staged_tree = QTreeWidget()
+        self.staged_tree.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.staged_tree.setHeaderLabels(["Staged Files", "Status"])
         staged_layout.addWidget(self.staged_tree)
         files_layout.addWidget(staged_widget)
@@ -67,6 +70,7 @@ class CommitDialog(QWidget):
         unstaged_header = QHBoxLayout()
         unstaged_label = QLabel("Unstaged Files")
         stage_button = QPushButton("+")
+        # stage_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         stage_button.setFixedWidth(30)
         stage_button.clicked.connect(self.stage_selected_file)
         unstaged_header.addWidget(unstaged_label)
@@ -75,6 +79,7 @@ class CommitDialog(QWidget):
         unstaged_layout.addLayout(unstaged_header)
 
         self.unstaged_tree = QTreeWidget()
+        self.unstaged_tree.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.unstaged_tree.setHeaderLabels(["Unstaged Files", "Status"])
         unstaged_layout.addWidget(self.unstaged_tree)
         files_layout.addWidget(unstaged_widget)
@@ -128,6 +133,11 @@ class CommitDialog(QWidget):
     def showEvent(self, event):
         self.refresh_file_status()
         super().showEvent(event)
+
+    def focusInEvent(self, event):
+        print("focusInEvent in commit_dialog")
+        self.refresh_file_status()
+        super().focusInEvent(event)
 
     # git manager property
     @property
@@ -317,6 +327,7 @@ class CommitDialog(QWidget):
             self.git_manager.repo.index.commit(commit_message)
 
             self.parent_window.update_commit_history()
+            self.refresh_file_status()
 
             # clear commit message
             self.message_edit.clear()
