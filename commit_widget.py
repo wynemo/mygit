@@ -35,6 +35,7 @@ class CommitWidget(QFrame):
         # 创建主布局
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
         # 创建分割器
         splitter = QSplitter(Qt.Orientation.Vertical)
@@ -49,6 +50,7 @@ class CommitWidget(QFrame):
         staged_widget = QWidget()
         staged_layout = QVBoxLayout(staged_widget)
         staged_layout.setContentsMargins(0, 0, 0, 0)
+        staged_layout.setSpacing(0)
         staged_header = QHBoxLayout()
         staged_header.setContentsMargins(0, 0, 0, 0)
         staged_label = QLabel("Staged Files")
@@ -71,6 +73,7 @@ class CommitWidget(QFrame):
         unstaged_widget = QWidget()
         unstaged_layout = QVBoxLayout(unstaged_widget)
         unstaged_layout.setContentsMargins(0, 0, 0, 0)
+        unstaged_layout.setSpacing(0)
         unstaged_header = QHBoxLayout()
         unstaged_header.setContentsMargins(0, 0, 0, 0)
         unstaged_label = QLabel("Unstaged Files")
@@ -94,6 +97,7 @@ class CommitWidget(QFrame):
         commit_widget = QWidget()
         commit_layout = QVBoxLayout(commit_widget)
         commit_layout.setContentsMargins(0, 0, 0, 0)
+        commit_layout.setSpacing(0)
 
         message_header = QHBoxLayout()
         message_header.setContentsMargins(0, 0, 0, 0)
