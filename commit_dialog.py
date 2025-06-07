@@ -109,16 +109,10 @@ class CommitDialog(QWidget):
         button_box = QDialogButtonBox()
         self.commit_button = button_box.addButton("Commit", QDialogButtonBox.ButtonRole.AcceptRole)
         self.commit_and_push_button = button_box.addButton("Commit & Push", QDialogButtonBox.ButtonRole.ActionRole)
-        # self.cancel_button = button_box.addButton("Cancel", QDialogButtonBox.ButtonRole.RejectRole)
 
         # 连接信号
         self.commit_button.clicked.connect(self.accept)
         self.commit_and_push_button.clicked.connect(self.commit_and_push)
-        # self.cancel_button.clicked.connect(self.reject)
-        layout.addWidget(button_box)
-
-        # 初始化显示文件状态
-        # self.refresh_file_status()
 
         # 初始化 AI 生成器线程
         self.ai_thread = AIGeneratorThread(self)
