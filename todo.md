@@ -75,3 +75,4 @@
 82. ~~CommitDialog 获得焦点时，需要刷新~~
 83. file_history_view.py 需要处理 git mv 的情况，没有正确获取到历史
 84. file_changes_view.py 里面对于 git mv 的情况，是显示了 R 的情况，但没有显示移动为什么新文件了
+85. WorkspaceExplorer.file_changes_view 处理信号 点击文件 没有处理
