@@ -160,6 +160,11 @@ class FileHistoryView(QWidget):
         relative_path = os.path.relpath(self.file_path, repo_path)
         compare_action.triggered.connect(lambda: self.compare_with_working_requested.emit(relative_path, item.text(0)))
         menu.addAction(compare_action)
+
+        # 添加 "显示所有受影响的文件" 菜单项
+        show_all_affected_files_action = menu.addAction("显示所有受影响的文件")
+        show_all_affected_files_action.triggered.connect(partial(self.show_all_affected_files, item))
+
         menu.exec(self.mapToGlobal(position))
 
     def copy_commit_to_clipboard(self, item):
@@ -168,6 +173,43 @@ class FileHistoryView(QWidget):
             QApplication.clipboard().setText(item.text(0))
         else:
             print("item is None")
+
+    def show_all_affected_files(self, item):
+        """显示所有受影响的文件"""
+        if not item:
+            logging.warning("file history view item is None")
+            return
+
+        commit_hash = item.data(0, 256)
+        if not commit_hash:
+            logging.warning("commit hash is None")
+            return
+
+        try:
+            # 获取 git.Commit 对象
+            commit: git.Commit = self.git_manager.repo.commit(commit_hash)
+
+            # 获取 WorkspaceExplorer 窗口
+            main_window = self.window()
+            if not hasattr(main_window, "workspace_explorer"):
+                logging.error("WorkspaceExplorer not found")
+                return
+
+            workspace_explorer = main_window.workspace_explorer
+
+            # 获取 FileChangesView
+            if not hasattr(workspace_explorer, "file_changes_view"):
+                logging.error("FileChangesView not found")
+                return
+
+            file_changes_view = workspace_explorer.file_changes_view
+
+            # 调用 update_changes 方法
+            file_changes_view.update_changes(self.git_manager, commit)
+
+        except Exception as e:
+            logging.exception("显示所有受影响的文件失败")
+            print(f"显示所有受影响的文件失败：{e!s}")
 
     def copy_commmit_message_to_clipboard(self, item):
         if item:
