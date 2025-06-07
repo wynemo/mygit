@@ -6,6 +6,9 @@ from functools import partial
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QApplication, QLabel, QMenu, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget
 
+if TYPE_CHECKING:
+    import git
+
 
 class FileHistoryView(QWidget):
     compare_with_working_requested = pyqtSignal(str, str)  # 新增信号
@@ -57,28 +60,47 @@ class FileHistoryView(QWidget):
             repo_path = self.git_manager.repo.working_dir
             relative_path = os.path.relpath(self.file_path, repo_path)
 
-            # 使用 git log 命令获取文件的提交历史
-            commits = []
-            for commit in self.git_manager.repo.iter_commits(paths=relative_path):
-                commits.append(commit)
+            # 一次性获取所有需要的信息，避免后续查询
+            log_output = self.git_manager.repo.git.log(
+                "--follow",
+                "--pretty=format:%H|%an|%ct|%s",  # hash|author|timestamp|subject
+                relative_path,
+            )
 
-            # 添加到历史列表
-            for commit in commits:
+            if not log_output.strip():
+                logging.info(f"No commits found for file {relative_path}")
+                return
+
+            # 直接解析并添加到界面，不创建 commit 对象
+            for line in log_output.strip().split("\n"):
+                if not line.strip():
+                    continue
+
+                parts = line.split("|", 3)
+                if len(parts) < 4:
+                    continue
+
+                commit_hash, author_name, timestamp_str, message = parts
+
                 item = QTreeWidgetItem()
                 # 提交 ID, 短哈希
-                item.setText(0, commit.hexsha[:7])
+                item.setText(0, commit_hash[:7])
                 # 提交信息
-                item.setText(1, commit.summary)
+                item.setText(1, message)
                 # 作者
-                item.setText(2, commit.author.name)
+                item.setText(2, author_name)
                 # 日期
-                commit_date = datetime.fromtimestamp(commit.committed_date)
-                item.setText(3, commit_date.strftime("%Y-%m-%d %H:%M:%S"))
+                try:
+                    commit_date = datetime.fromtimestamp(int(timestamp_str))
+                    item.setText(3, commit_date.strftime("%Y-%m-%d %H:%M:%S"))
+                except (ValueError, OSError):
+                    item.setText(3, "Invalid Date")
+
                 # 存储完整哈希值用于后续操作
-                item.setData(0, 256, commit.hexsha)  # Qt.ItemDataRole.UserRole = 256
+                item.setData(0, 256, commit_hash)
 
                 self.history_list.addTopLevelItem(item)
-                logging.debug(f"Added commit {commit.hexsha[:7]} to history list for file {relative_path}")
+                # logging.debug(f"Added commit {commit.hexsha[:7]} to history list for file {relative_path}")
         except Exception as e:
             item = QTreeWidgetItem()
             item.setText(0, f"获取历史失败：{e!s}")
@@ -97,7 +119,7 @@ class FileHistoryView(QWidget):
                 repo_path = self.git_manager.repo.working_dir
                 relative_path = os.path.relpath(self.file_path, repo_path)
 
-                current_commit = main_window.git_manager.repo.commit(commit_hash)
+                current_commit: git.Commit = main_window.git_manager.repo.commit(commit_hash)
                 main_window.compare_view.show_diff(main_window.git_manager, current_commit, relative_path)
 
     def show_context_menu(self, position):
