@@ -69,7 +69,6 @@ class CommitDialog(QWidget):
         unstaged_header = QHBoxLayout()
         unstaged_label = QLabel("Unstaged Files")
         stage_button = QPushButton("+")
-        # stage_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         stage_button.setFixedWidth(30)
         stage_button.clicked.connect(self.stage_selected_file)
         unstaged_header.addWidget(unstaged_label)
