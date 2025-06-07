@@ -32,6 +32,7 @@ class CommitDialog(QWidget):
 
         # 创建主布局
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
 
         # 创建分割器
         splitter = QSplitter(Qt.Orientation.Vertical)
@@ -40,11 +41,14 @@ class CommitDialog(QWidget):
         # 上半部分 文件列表
         files_widget = QWidget()
         files_layout = QVBoxLayout(files_widget)
+        files_layout.setContentsMargins(0, 0, 0, 0)
 
         # 暂存区域
         staged_widget = QWidget()
         staged_layout = QVBoxLayout(staged_widget)
+        staged_layout.setContentsMargins(0, 0, 0, 0)
         staged_header = QHBoxLayout()
+        staged_header.setContentsMargins(0, 0, 0, 0)
         staged_label = QLabel("Staged Files")
         unstage_button = QPushButton("-")
         unstage_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -64,7 +68,9 @@ class CommitDialog(QWidget):
         # 未暂存区域
         unstaged_widget = QWidget()
         unstaged_layout = QVBoxLayout(unstaged_widget)
+        unstaged_layout.setContentsMargins(0, 0, 0, 0)
         unstaged_header = QHBoxLayout()
+        unstaged_header.setContentsMargins(0, 0, 0, 0)
         unstaged_label = QLabel("Unstaged Files")
         stage_button = QPushButton("+")
         stage_button.setFixedWidth(30)
@@ -85,8 +91,10 @@ class CommitDialog(QWidget):
         # 下半部分，提交信息
         commit_widget = QWidget()
         commit_layout = QVBoxLayout(commit_widget)
+        commit_layout.setContentsMargins(0, 0, 0, 0)
 
         message_header = QHBoxLayout()
+        message_header.setContentsMargins(0, 0, 0, 0)
         message_label = QLabel("Commit Message:")
         self.ai_button = QPushButton("✨")
         self.ai_button.setFixedWidth(30)
