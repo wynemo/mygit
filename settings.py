@@ -38,7 +38,7 @@ class Settings:
                     saved_settings = json.load(f)
                     self.settings.update(saved_settings)
         except Exception as e:
-            print(f"加载设置失败: {e!s}")
+            print(f"加载设置失败：{e!s}")
 
     def save_settings(self):
         """保存设置"""
@@ -46,7 +46,7 @@ class Settings:
             with open(self.config_file, "w", encoding="utf-8") as f:
                 json.dump(self.settings, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"保存设置失败: {e!s}")
+            print(f"保存设置失败：{e!s}")
 
     def add_recent_folder(self, folder_path):
         """添加最近打开的文件夹"""

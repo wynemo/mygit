@@ -30,10 +30,10 @@ class MainWindow(QMainWindow):
         self.load_test_data()
 
     def load_test_data(self):
-        # 获取tests文件夹路径
+        # 获取 tests 文件夹路径
         tests_dir = Path(__file__).parent / "tests"
 
-        # 检查tests文件夹是否存在
+        # 检查 tests 文件夹是否存在
         if not tests_dir.exists():
             print("Warning: tests directory not found, using default test data")
             # 使用默认测试数据
@@ -53,7 +53,7 @@ class MainWindow(QMainWindow):
         # 设置三向对比视图的文本
         self.merge_viewer.set_texts(parent1_text, result_text, parent2_text)
 
-        # 设置双向对比视图的文本（比较parent1和parent2）
+        # 设置双向对比视图的文本（比较 parent1 和 parent2）
         self.diff_viewer.set_texts(parent2_text, result_text)
 
     def _load_default_test_data(self):
@@ -62,7 +62,7 @@ class MainWindow(QMainWindow):
         result_text = []
         parent2_text = []
 
-        # 生成100行测试数据
+        # 生成 100 行测试数据
         for i in range(1, 101):
             base_line = f"Line {i}"
 
@@ -94,7 +94,7 @@ class MainWindow(QMainWindow):
         # 设置三向对比视图的文本
         self.merge_viewer.set_texts(parent1_text, result_text, parent2_text)
 
-        # 设置双向对比视图的文本（比较parent1和parent2）
+        # 设置双向对比视图的文本（比较 parent1 和 parent2）
         self.diff_viewer.set_texts(parent2_text, result_text)
 
 

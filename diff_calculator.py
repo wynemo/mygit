@@ -48,10 +48,10 @@ class DifflibCalculator(DiffCalculator):
         return chunks
 
     def get_diff(self, left_text: str, right_text: str) -> dict:
-        """获取文件差异（转换为git_manager格式）
+        """获取文件差异（转换为 git_manager 格式）
 
-        返回:
-            {行号: 修改类型} 的字典，修改类型为 "added", "modified", "deleted"
+        返回：
+            {行号：修改类型} 的字典，修改类型为 "added", "modified", "deleted"
         """
         chunks = self.compute_diff(left_text, right_text)
         diff_dict = {}

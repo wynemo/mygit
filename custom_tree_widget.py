@@ -55,7 +55,7 @@ class CustomTreeWidget(QTreeWidget):
 
     def _ensure_overlay_label(self):
         if self._overlay_label is None:
-            # 父对象设置为viewport, 这样它的坐标和滚动能与树内容同步
+            # 父对象设置为 viewport, 这样它的坐标和滚动能与树内容同步
             self._overlay_label = QLabel(self.viewport())
             self._overlay_label.setObjectName("overlayTextLabel")  # 便于用样式表控制
             self._overlay_label.setStyleSheet(
@@ -97,34 +97,34 @@ class CustomTreeWidget(QTreeWidget):
         label.setText(full_text)
         label.adjustSize()  # 根据文本调整大小
 
-        # 获取单元格在viewport中的几何位置
+        # 获取单元格在 viewport 中的几何位置
         item_rect = self.visualRect(self.indexFromItem(item, column))
 
         if item_rect.isValid():
-            # 计算理想的宽度, 但不超过treeWidget本身的宽度
-            preferred_width = label.width() + 5  # 加一点padding
+            # 计算理想的宽度，但不超过 treeWidget 本身的宽度
+            preferred_width = label.width() + 5  # 加一点 padding
             max_width = self.viewport().width() - item_rect.left() - 5
             display_width = min(preferred_width, max_width)
 
             # 定位 QLabel
-            # x坐标与单元格对齐, y坐标也与单元格对齐
-            # 高度是标签自适应的高度,宽度是计算后的宽度
-            # 我们希望它能覆盖其他列, 所以宽度就是标签根据文本内容自适应的宽度
+            # x 坐标与单元格对齐，y 坐标也与单元格对齐
+            # 高度是标签自适应的高度，宽度是计算后的宽度
+            # 我们希望它能覆盖其他列，所以宽度就是标签根据文本内容自适应的宽度
             label_rect = QRect(item_rect.topLeft(), label.sizeHint())  # 使用标签的推荐大小
             label_rect.setWidth(min(label.sizeHint().width(), self.viewport().width() - item_rect.left()))
 
-            # 如果文本很长, 确保标签不会超出视口太多
+            # 如果文本很长，确保标签不会超出视口太多
             # x, y 是相对于 viewport 的
             new_x = item_rect.left()
             new_y = item_rect.top()
 
-            # 简单的调整, 防止完全遮盖当前行（如果需要，可以调整y使其在下方或有偏移）
+            # 简单的调整，防止完全遮盖当前行（如果需要，可以调整 y 使其在下方或有偏移）
             # label.setGeometry(new_x, new_y, label.width(), label.height())
-            # 为了确保它在顶部并且不会被其他单元格的绘制覆盖（理论上，因为它是viewport的子控件且后创建）
-            # 并且, 确保它的宽度是它所需要的宽度
+            # 为了确保它在顶部并且不会被其他单元格的绘制覆盖（理论上，因为它是 viewport 的子控件且后创建）
+            # 并且，确保它的宽度是它所需要的宽度
             label.setGeometry(new_x, new_y, label.fontMetrics().horizontalAdvance(full_text) + 6, item_rect.height())
 
-            # 如果原始单元格文本已经被省略, 我们才显示overlay
+            # 如果原始单元格文本已经被省略，我们才显示 overlay
             font_metrics = self.fontMetrics()  # 或者 item.font(column) 的 fontMetrics
             text_width_in_cell = font_metrics.horizontalAdvance(full_text)
 
@@ -132,7 +132,7 @@ class CustomTreeWidget(QTreeWidget):
                 label.show()
                 label.raise_()  # 确保它在最上层
             else:
-                label.hide()  # 如果单元格能完整显示, 则不显示浮层
+                label.hide()  # 如果单元格能完整显示，则不显示浮层
 
         else:
             label.hide()
@@ -141,19 +141,19 @@ class CustomTreeWidget(QTreeWidget):
         if self._overlay_label:
             self._overlay_label.hide()
 
-    # 如果树本身滚动, 我们也需要更新浮动标签的位置或隐藏它
+    # 如果树本身滚动，我们也需要更新浮动标签的位置或隐藏它
     def scrollContentsBy(self, dx, dy):
         super().scrollContentsBy(dx, dy)
         if self._overlay_label and self._overlay_label.isVisible():
-            # 简单处理：滚动时先隐藏, 选中项改变时会重新计算显示
-            # 更复杂的：根据dx, dy移动overlay_label
+            # 简单处理：滚动时先隐藏，选中项改变时会重新计算显示
+            # 更复杂的：根据 dx, dy 移动 overlay_label
             self._overlay_label.hide()
-            # 或者, 如果当前有选中项, 重新定位
+            # 或者，如果当前有选中项，重新定位
             current = self.currentItem()
             if current:
                 self.show_full_text_for_item(current, 0)
 
-    # 当焦点改变时, 也隐藏浮动标签
+    # 当焦点改变时，也隐藏浮动标签
     def focusOutEvent(self, event):
         super().focusOutEvent(event)
         self.hide_overlay()
@@ -234,7 +234,7 @@ class MainWindow(QMainWindow):
                 "Item A2",
                 "Item A3",
             ),
-            ("短文本1", "Item B2", "Item B3"),
+            ("短文本 1", "Item B2", "Item B3"),
             ("这是另一段也比较长的文本内容，用于测试当它被选中时的浮动显示效果。", "Item C2", "Item C3"),
             ("正常长度文本", "Item D2", "Item D3"),
             (
@@ -249,12 +249,12 @@ class MainWindow(QMainWindow):
             item.setText(0, d[0])
             item.setText(1, d[1])
             item.setText(2, d[2])
-            # 可选：仍然设置ToolTip作为备用
+            # 可选：仍然设置 ToolTip 作为备用
             item.setToolTip(0, d[0])
 
         self.treeWidget.currentItemChanged.connect(self.on_current_item_changed)
 
-        # 如果希望鼠标悬停时也显示（更复杂，需要事件过滤器或mouseMoveEvent）
+        # 如果希望鼠标悬停时也显示（更复杂，需要事件过滤器或 mouseMoveEvent）
         # self.treeWidget.setMouseTracking(True)
         # self.treeWidget.viewport().installEventFilter(self)
 
@@ -278,10 +278,10 @@ class MainWindow(QMainWindow):
     #             index = self.treeWidget.indexAt(event.pos())
     #             if index.isValid() and index.column() == 0:
     #                 item = self.treeWidget.itemFromIndex(index)
-    #                 self.treeWidget.show_full_text_for_item(item, 0, hover=True, pos=event.globalPos()) # 需要修改show_full_text_for_item
+    #                 self.treeWidget.show_full_text_for_item(item, 0, hover=True, pos=event.globalPos()) # 需要修改 show_full_text_for_item
     #             else:
     #                 self.treeWidget.hide_overlay() # 鼠标移出有效区域
-    #         elif event.type() == QEvent.Type.Leave: # 鼠标离开viewport
+    #         elif event.type() == QEvent.Type.Leave: # 鼠标离开 viewport
     #             self.treeWidget.hide_overlay()
     #
     #     return super().eventFilter(source, event)

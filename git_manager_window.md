@@ -104,7 +104,7 @@
 
 **详细信号列表 (部分核心连接):**
 
-*   **TopBarWidget 信号:**
+*   **TopBarWidget 信号：**
     *   `open_folder_requested` → `GitManagerWindow.open_folder_dialog()`
     *   `recent_folder_selected` → `GitManagerWindow.open_folder()`
     *   `branch_changed` → `GitManagerWindow.on_branch_changed()` (进而更新提交历史)
@@ -113,17 +113,17 @@
     *   `toggle_bottom_panel_requested` → `GitManagerWindow.toggle_bottom_widget()`
     *   `toggle_left_panel_requested` → `GitManagerWindow.toggle_left_panel()`
 
-*   **CommitHistoryView 信号:**
+*   **CommitHistoryView 信号：**
     *   `commit_selected` → `GitManagerWindow.on_commit_selected()`
 
-*   **FileChangesView 信号:**
+*   **FileChangesView 信号：**
     *   `file_selected` → `GitManagerWindow.on_file_selected()` (在 `compare_tab_widget` 中显示差异)
     *   `compare_with_working_requested` → `GitManagerWindow.show_compare_with_working_dialog()`
 
 *   **WorkspaceExplorer 信号 (间接):**
     *   `WorkspaceExplorer` 内部的 `FileTreeWidget` 或 `SyncedTextEdit` (用于 blame) 可能发出信号，由 `GitManagerWindow.handle_blame_click_from_editor()` 处理。
 
-*   **QTabWidget 信号:**
+*   **QTabWidget 信号：**
     *   `tab_widget.currentChanged` → `GitManagerWindow.on_tab_changed()` (控制右侧视图切换)
     *   `tab_widget.tabCloseRequested` → `GitManagerWindow.close_tab()` (关闭动态添加的标签页)
 
@@ -145,5 +145,5 @@
     这些状态会被记录在设置中，并在下次启动时恢复。切换时，按钮图标也会相应更新。
 
 4.  **异步操作处理**:
-    拉取(`pull`)、推送(`push`)和获取(`fetch`)操作使用专用线程(`PullThread`, `PushThread`, `FetchThread`)执行，避免阻塞UI线程。操作完成后会更新UI状态并显示通知消息。
+    拉取 (`pull`)、推送 (`push`) 和获取 (`fetch`) 操作使用专用线程 (`PullThread`, `PushThread`, `FetchThread`) 执行，避免阻塞 UI 线程。操作完成后会更新 UI 状态并显示通知消息。
 ```
