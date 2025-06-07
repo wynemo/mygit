@@ -2,6 +2,7 @@ import logging
 import os
 from datetime import datetime
 from functools import partial
+from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QApplication, QLabel, QMenu, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget
