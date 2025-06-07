@@ -25,8 +25,11 @@ class CommitDialog(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("提交更改")
-        # self.setMinimumWidth(600)
-        # self.setMinimumHeight(400)
+        parent = self.parent()
+        print("parent has file_tree", hasattr(parent, "file_tree"))
+        if hasattr(parent, "file_tree"):
+            self.setMinimumWidth(parent.file_tree.width())
+            self.setMinimumHeight(parent.file_tree.height())
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         # 创建主布局
@@ -39,10 +42,6 @@ class CommitDialog(QWidget):
         # 上半部分 文件列表
         files_widget = QWidget()
         files_layout = QVBoxLayout(files_widget)
-
-        # 创建文件列表区域
-        files_label = QLabel("Changed Files:")
-        files_layout.addWidget(files_label)
 
         # 暂存区域
         staged_widget = QWidget()
