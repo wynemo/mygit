@@ -2,7 +2,6 @@ import logging
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QDialog,
     QDialogButtonBox,
     QHBoxLayout,
     QLabel,
@@ -20,12 +19,12 @@ from text_diff_viewer import DiffViewer
 from threads import AIGeneratorThread
 
 
-class CommitDialog(QDialog):
+class CommitDialog(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("提交更改")
-        self.setMinimumWidth(600)
-        self.setMinimumHeight(400)
+        # self.setMinimumWidth(600)
+        # self.setMinimumHeight(400)
         self.git_manager = parent.git_manager
         self.parent_window = parent
 
@@ -106,12 +105,12 @@ class CommitDialog(QDialog):
         button_box = QDialogButtonBox()
         self.commit_button = button_box.addButton("Commit", QDialogButtonBox.ButtonRole.AcceptRole)
         self.commit_and_push_button = button_box.addButton("Commit & Push", QDialogButtonBox.ButtonRole.ActionRole)
-        self.cancel_button = button_box.addButton("Cancel", QDialogButtonBox.ButtonRole.RejectRole)
+        # self.cancel_button = button_box.addButton("Cancel", QDialogButtonBox.ButtonRole.RejectRole)
 
         # 连接信号
         self.commit_button.clicked.connect(self.accept)
         self.commit_and_push_button.clicked.connect(self.commit_and_push)
-        self.cancel_button.clicked.connect(self.reject)
+        # self.cancel_button.clicked.connect(self.reject)
         layout.addWidget(button_box)
 
         # 初始化显示文件状态
