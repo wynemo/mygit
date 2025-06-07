@@ -14,6 +14,7 @@ from PyQt6.QtGui import (
     QTextDocument,
 )
 from PyQt6.QtWidgets import (
+    QApplication,
     QMenu,
     QMessageBox,  # Added for save confirmation
     QPlainTextEdit,
@@ -36,6 +37,33 @@ class LineNumberArea(QWidget):
 
     def paintEvent(self, event):
         self.editor.line_number_area_paint_event(event)
+
+    def contextMenuEvent(self, event: QMouseEvent):
+        """Handle right-click context menu event for line number area"""
+        menu = QMenu(self)
+        copy_action = menu.addAction("Copy Revision Number")
+        copy_action.triggered.connect(lambda: self.copy_revision_number(event.pos()))
+        menu.exec(event.globalPos())
+
+    def copy_revision_number(self, pos):
+        """Copy commit hash of the line at given position to clipboard"""
+        y_pos = pos.y()
+        block = self.editor.firstVisibleBlock()
+        block_number = block.blockNumber()
+        block_top = self.editor.blockBoundingGeometry(block).translated(self.editor.contentOffset()).top()
+        block_height = self.editor.blockBoundingRect(block).height()
+
+        if block_height == 0:
+            return
+
+        line_index = block_number + int((y_pos - block_top) / block_height)
+
+        if 0 <= line_index < len(self.editor.blame_annotations_per_line):
+            annotation = self.editor.blame_annotations_per_line[line_index]
+            if annotation and "commit_hash" in annotation:
+                # get clipboard pyqt6
+                clipboard = QApplication.clipboard()
+                clipboard.setText(annotation["commit_hash"])
 
     def mousePressEvent(self, event: QMouseEvent):
         if self.editor.showing_blame and self.editor.blame_annotations_per_line:
@@ -91,8 +119,8 @@ class SyncedTextEdit(QPlainTextEdit):
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self.setReadOnly(True)  # 默认设置为只读
         self.original_content = ""  # 保存原始内容，用于取消编辑时恢复
-        logging.debug("\n=== 初始化SyncedTextEdit ===")
-        logging.debug("默认只读模式: %s", self.isReadOnly())
+        logging.debug("\n=== 初始化 SyncedTextEdit ===")
+        logging.debug("默认只读模式：%s", self.isReadOnly())
 
         # Blame data storage
         # self.blame_data_full will store the original dicts with full hashes
@@ -355,7 +383,7 @@ class SyncedTextEdit(QPlainTextEdit):
             # 保存原始内容
             self.original_content = self.toPlainText()
             self.setReadOnly(False)
-            logging.info("进入编辑模式，文件路径: %s", self.file_path)
+            logging.info("进入编辑模式，文件路径：%s", self.file_path)
             self.viewport().setCursor(Qt.CursorShape.IBeamCursor)  # 显示可编辑光标
 
     def save_content(self):
@@ -369,14 +397,14 @@ class SyncedTextEdit(QPlainTextEdit):
             with open(self.file_path, "w", encoding="utf-8") as f:
                 f.write(current_content)
 
-            logging.info("文件保存成功: %s", self.file_path)
+            logging.info("文件保存成功：%s", self.file_path)
             self.original_content = current_content
 
             self.viewport().setCursor(Qt.CursorShape.ArrowCursor)  # 恢复箭头光标
 
         except Exception as e:
-            logging.error("文件保存失败: %s", str(e))
-            QMessageBox.critical(self, "保存错误", f"无法保存文件: {e!s}", QMessageBox.StandardButton.Ok)
+            logging.error("文件保存失败：%s", str(e))
+            QMessageBox.critical(self, "保存错误", f"无法保存文件：{e!s}", QMessageBox.StandardButton.Ok)
 
     def set_blame_data(self, blame_data_list: list):
         self.assigned_commit_base_colors = {}
@@ -520,7 +548,7 @@ class SyncedTextEdit(QPlainTextEdit):
         # 在设置对象名称后创建高亮器
         if self.highlighter is None:
             self.highlighter = DiffHighlighter(self.document(), name)
-            logging.debug("创建高亮器，类型: %s", name)
+            logging.debug("创建高亮器，类型：%s", name)
 
     def line_number_area_width(self):
         line_digits = len(str(max(1, self.blockCount())))
@@ -701,7 +729,7 @@ class SyncedTextEdit(QPlainTextEdit):
                             int(block_bottom),
                         )
                         logging.debug(
-                            "%s 删除块: %s - %s %s",
+                            "%s 删除块：%s - %s %s",
                             self.objectName(),
                             chunk.right_start,
                             chunk.right_end,
