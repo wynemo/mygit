@@ -11,19 +11,20 @@ from PyQt6.QtWidgets import (
 
 
 class FileChangesView(QWidget):
-    file_selected = pyqtSignal(str)  # 当选择文件时发出信号
+    file_selected = pyqtSignal(str, str)  # 当选择文件时发出信号
     compare_with_working_requested = pyqtSignal(str)  # 请求与工作区比较
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setup_ui()
+        self.commit_hash = None
 
     def setup_ui(self):
         layout = QVBoxLayout()
         layout.setContentsMargins(5, 5, 5, 5)
         self.setLayout(layout)
 
-        self.changes_label = QLabel("文件变化:")
+        self.changes_label = QLabel("文件变化：")
         layout.addWidget(self.changes_label)
 
         self.changes_tree = QTreeWidget()
@@ -37,6 +38,7 @@ class FileChangesView(QWidget):
     def update_changes(self, git_manager, commit):
         """更新文件变化列表"""
         self.changes_tree.clear()
+        self.commit_hash = commit.hexsha
 
         try:
             parent = commit.parents[0] if commit.parents else None
@@ -58,7 +60,7 @@ class FileChangesView(QWidget):
 
         except Exception as e:
             error_item = QTreeWidgetItem(self.changes_tree)
-            error_item.setText(0, f"获取文件变化失败: {e!s}")
+            error_item.setText(0, f"获取文件变化失败：{e!s}")
 
     def add_file_to_tree(self, path_parts, status, parent=None, old_path=None):
         """递归添加文件到树形结构"""
@@ -104,7 +106,7 @@ class FileChangesView(QWidget):
     def on_file_clicked(self, item):
         """当点击文件时发出信号"""
         if item and item.childCount() == 0:
-            self.file_selected.emit(self.get_full_path(item))
+            self.file_selected.emit(self.get_full_path(item), self.commit_hash)
 
     def show_context_menu(self, position):
         """显示右键菜单"""

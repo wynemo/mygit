@@ -390,11 +390,12 @@ class GitManagerWindow(QMainWindow):
         # cursor 生成 - 同时更新 commit 详细信息视图
         self.commit_detail_view.update_commit_detail(self.git_manager, self.current_commit)
 
-    def on_file_selected(self, file_path):
+    def on_file_selected(self, file_path, commit_hash=None):
         """当选择文件时，在 TabWidget 中显示比较视图"""
-        if not self.current_commit or not self.git_manager:
+        _commit = self.git_manager.repo.commit(commit_hash) if commit_hash else self.current_commit
+        if not _commit or not self.git_manager:
             return
-        self._on_file_selected(file_path, self.current_commit)
+        self._on_file_selected(file_path, _commit)
 
     def _on_file_selected(self, file_path, current_commit):
         # 生成一个唯一的标签页标识符，例如 "commit_hash:file_path"
