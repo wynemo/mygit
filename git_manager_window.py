@@ -79,6 +79,7 @@ class GitManagerWindow(QMainWindow):
         # Connect side bar button signals
         self.side_bar.project_button_clicked.connect(self.on_project_button_clicked)
         self.side_bar.commit_button_clicked.connect(self.on_commit_button_clicked)
+        self.side_bar.changes_button_clicked.connect(self.on_changes_button_clicked)
         self.top_bar.recent_folder_selected.connect(self.open_folder)
         self.top_bar.clear_recent_folders_requested.connect(self.clear_recent_folders)
         self.top_bar.branch_changed.connect(self.on_branch_changed)
@@ -624,6 +625,10 @@ class GitManagerWindow(QMainWindow):
         """处理提交按钮点击事件"""
         if hasattr(self, "top_bar"):
             self.top_bar.commit_requested.emit()
+
+    def on_changes_button_clicked(self):
+        """处理变更按钮点击事件"""
+        self.workspace_explorer.show_file_changes_view()
 
     def handle_push_finished(self, success, error_message):
         """处理 push 操作完成"""

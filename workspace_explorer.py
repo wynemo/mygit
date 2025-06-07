@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
 from commit_widget import CommitWidget
 from editors.modified_text_edit import ModifiedTextEdit
 from editors.text_edit import SyncedTextEdit  # Ensure this is present
+from file_changes_view import FileChangesView
 from file_history_view import FileHistoryView
 from syntax_highlighter import CodeHighlighter
 from utils.language_map import LANGUAGE_MAP
@@ -54,6 +55,9 @@ class WorkspaceExplorer(QWidget):
 
         self.commit_widget = CommitWidget(self)
 
+        self.file_changes_view = FileChangesView(self)
+        self.file_changes_view.hide()
+
         # 创建标签页组件
         self.tab_widget = QTabWidget()
         self.tab_widget.setTabsClosable(True)
@@ -68,6 +72,7 @@ class WorkspaceExplorer(QWidget):
         # 添加组件到分割器
         self.splitter.addWidget(self.file_tree)
         self.splitter.addWidget(self.commit_widget)
+        self.splitter.addWidget(self.file_changes_view)
         self.splitter.addWidget(self.tab_widget)
 
         self.commit_widget.hide()  # 初始隐藏
@@ -75,8 +80,8 @@ class WorkspaceExplorer(QWidget):
         # 连接标签页切换信号
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
 
-        # 设置分割器的初始比例 (1:2)
-        self.splitter.setSizes([200, 400])
+        # 设置分割器的初始比例
+        self.splitter.setSizes([200, 0, 0, 400])
 
         # 添加分割器到布局
         layout.addWidget(self.splitter)
@@ -276,22 +281,32 @@ class WorkspaceExplorer(QWidget):
         if visible:
             self.file_tree.show()
             self.commit_widget.hide()
-            self.splitter.setSizes([200, 0, 400])
+            self.file_changes_view.hide()
+            self.splitter.setSizes([200, 0, 0, 400])
         else:
             self.file_tree.hide()
             self.commit_widget.hide()
-            self.splitter.setSizes([0, 0, 1])  # 只显示右侧
+            self.file_changes_view.hide()
+            self.splitter.setSizes([0, 0, 0, 1])  # 只显示右侧
 
     def show_file_tree(self):
         self.file_tree.show()
         self.commit_widget.hide()
-        self.splitter.setSizes([200, 0, 400])
+        self.file_changes_view.hide()
+        self.splitter.setSizes([200, 0, 0, 400])
 
     def show_commit_dialog(self):
         """显示提交对话框并隐藏文件树"""
         self.commit_widget.show()
         self.file_tree.hide()
-        self.splitter.setSizes([0, 200, 400])
+        self.file_changes_view.hide()
+        self.splitter.setSizes([0, 200, 0, 400])
+
+    def show_file_changes_view(self):
+        self.file_changes_view.show()
+        self.file_tree.hide()
+        self.commit_widget.hide()
+        self.splitter.setSizes([0, 0, 200, 400])
 
     def update_filename_display(self, file_path: str, is_dirty: bool):
         print("update_filename_display", file_path, is_dirty)

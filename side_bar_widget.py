@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import QToolButton, QVBoxLayout, QWidget
 class SideBarWidget(QWidget):
     project_button_clicked = pyqtSignal()
     commit_button_clicked = pyqtSignal()
-    collapse_button_clicked = pyqtSignal()
+    changes_button_clicked = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -92,8 +92,8 @@ class SideBarWidget(QWidget):
                 background-color: #cccccc;
             }
         """)
-        self.changes_btn.clicked.connect(self.collapse_button_clicked.emit)
-        self.changes_btn.clicked.connect(self._on_collapse_clicked)
+        self.changes_btn.clicked.connect(self.changes_button_clicked.emit)
+        self.changes_btn.clicked.connect(self._on_changes_clicked)
         layout.addWidget(self.changes_btn)
 
         layout.addStretch()
@@ -108,12 +108,16 @@ class SideBarWidget(QWidget):
         """处理工程按钮点击事件"""
         self.project_btn.setChecked(True)
         self.commit_btn.setChecked(False)
+        self.changes_btn.setChecked(False)
 
     def _on_commit_clicked(self):
         """处理提交按钮点击事件"""
         self.commit_btn.setChecked(True)
         self.project_btn.setChecked(False)
+        self.changes_btn.setChecked(False)
 
-    def _on_collapse_clicked(self):
+    def _on_changes_clicked(self):
         """处理折叠按钮点击事件"""
         self.changes_btn.setChecked(True)
+        self.commit_btn.setChecked(False)
+        self.project_btn.setChecked(False)
