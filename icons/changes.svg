@@ -1,10 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
-  <!-- 三条横线 -->
-  <line x1="2" y1="4" x2="14" y2="4" stroke="currentColor" stroke-width="2"/>
-  <line x1="2" y1="8" x2="14" y2="8" stroke="currentColor" stroke-width="2"/>
-  <line x1="2" y1="12" x2="14" y2="12" stroke="currentColor" stroke-width="2"/>
-  
-  <!-- 两个向下箭头 -->
-  <path d="M4 6 L8 10 L12 6" fill="none" stroke="currentColor" stroke-width="2"/>
-  <path d="M4 10 L8 14 L12 10" fill="none" stroke="currentColor" stroke-width="2"/>
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- <rect width="24" height="24" fill="#F5F5F5"/> -->
+<path d="M4 5H20" stroke="black" stroke-linecap="round"/>
+<path d="M4.03201 9.9574H13.824" stroke="black" stroke-linecap="round"/>
+<path d="M4.03201 15.0638H11.136" stroke="black" stroke-linecap="round"/>
+<path d="M19.2 15.0638H12.672" stroke="black" stroke-linecap="round"/>
+<path d="M15.744 12L12.672 15.0638L15.744 18.1277" stroke="black" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M6 20L12.672 19.9149" stroke="black" stroke-linecap="round"/>
+<path d="M9.60001 16.8511L12.6 19.8511L9.60001 22.8511" stroke="black" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
