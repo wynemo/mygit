@@ -4,6 +4,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -21,7 +22,7 @@ from threads import AIGeneratorThread
 from utils import get_main_window
 
 
-class CommitDialog(QWidget):
+class CommitDialog(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         parent = self.parent()
@@ -29,6 +30,7 @@ class CommitDialog(QWidget):
             self.setMinimumWidth(parent.file_tree.width())
             self.setMinimumHeight(parent.file_tree.height())
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setFrameStyle(QFrame.Shape.StyledPanel)
 
         # 创建主布局
         layout = QVBoxLayout(self)
@@ -114,6 +116,7 @@ class CommitDialog(QWidget):
         button_box = QDialogButtonBox()
         self.commit_button = button_box.addButton("Commit", QDialogButtonBox.ButtonRole.AcceptRole)
         self.commit_and_push_button = button_box.addButton("Commit & Push", QDialogButtonBox.ButtonRole.ActionRole)
+        layout.addWidget(button_box)
 
         # 连接信号
         self.commit_button.clicked.connect(self.accept)
