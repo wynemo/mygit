@@ -424,11 +424,13 @@ class GitManagerWindow(QMainWindow):
     #     if widget_to_close:
     #         widget_to_close.deleteLater() # 确保 Qt 对象被正确删除
 
-    def show_compare_with_working_dialog(self, file_path):
+    def show_compare_with_working_dialog(self, file_path, commit_hash=None):
         """显示与工作区比较的对话框"""
         try:
+            _commit = self.git_manager.repo.commit(commit_hash) if commit_hash else self.current_commit
+
             # 获取历史版本的文件内容
-            old_content = self.current_commit.tree[file_path].data_stream.read().decode("utf-8", errors="replace")
+            old_content = _commit.tree[file_path].data_stream.read().decode("utf-8", errors="replace")
 
             # 获取工作区的文件内容
             working_file_path = os.path.join(self.git_manager.repo.working_dir, file_path)
@@ -443,8 +445,8 @@ class GitManagerWindow(QMainWindow):
             dialog = CompareWithWorkingDialog(f"比较 {file_path}", old_content, new_content, file_path, self)
             dialog.show()
 
-        except Exception as e:
-            print(f"比较文件失败：{e!s}")
+        except Exception:
+            logging.exception("比较文件失败")
 
     def save_splitter_state(self):
         """保存所有分割器的状态"""

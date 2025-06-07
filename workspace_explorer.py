@@ -517,6 +517,8 @@ class FileTreeWidget(QTreeWidget):
         main_window.tab_widget.addTab(file_history_view, tab_title)
         main_window.tab_widget.setCurrentIndex(main_window.tab_widget.count() - 1)
 
+        file_history_view.compare_with_working_requested.connect(main_window.show_compare_with_working_dialog)
+
         main_window.bottom_widget.show()
 
     def revert_file(self, file_path: str):
