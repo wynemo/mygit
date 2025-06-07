@@ -114,7 +114,7 @@ class CommitWidget(QFrame):
 
         # 修改按钮区域
         button_box = QDialogButtonBox()
-        self.commit_button = button_box.addButton("Commit", QDialogButtonBox.ButtonRole.AcceptRole)
+        self.commit_button = button_box.addButton("Commit", QDialogButtonBox.ButtonRole.ActionRole)
         self.commit_and_push_button = button_box.addButton("Commit & Push", QDialogButtonBox.ButtonRole.ActionRole)
         layout.addWidget(button_box)
 
