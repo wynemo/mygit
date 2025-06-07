@@ -24,9 +24,7 @@ from utils import get_main_window
 class CommitDialog(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("提交更改")
         parent = self.parent()
-        print("parent has file_tree", hasattr(parent, "file_tree"))
         if hasattr(parent, "file_tree"):
             self.setMinimumWidth(parent.file_tree.width())
             self.setMinimumHeight(parent.file_tree.height())
