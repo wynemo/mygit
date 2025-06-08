@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from PyQt6.QtCore import QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import (
@@ -25,6 +25,9 @@ from PyQt6.QtWidgets import (
 from diff_highlighter import DiffHighlighter
 from find_dialog import FindDialog
 from settings import BLAME_COLOR_PALETTE, Settings
+
+if TYPE_CHECKING:
+    from git_manager import GitManager
 
 
 class LineNumberArea(QWidget):
@@ -519,7 +522,7 @@ class SyncedTextEdit(QPlainTextEdit):
             logging.error("Git manager not found or accessible from SyncedTextEdit.")
             return
 
-        git_manager = main_window.git_manager
+        git_manager: "GitManager" = main_window.git_manager
         if not git_manager.repo:
             logging.error("Git repository not initialized in GitManager.")
             return
