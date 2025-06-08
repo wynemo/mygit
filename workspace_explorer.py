@@ -6,6 +6,7 @@ from typing import Optional
 from PyQt6.QtCore import QMimeData, QPoint, Qt
 from PyQt6.QtGui import QAction, QColor, QDrag, QDragEnterEvent, QDropEvent
 from PyQt6.QtWidgets import (
+    QAbstractItemView,
     QApplication,
     QMenu,
     QPushButton,  # Added QPushButton
@@ -624,6 +625,7 @@ class FileTreeWidget(QTreeWidget):
                 item.setForeground(0, self.highlight_color)
                 if parent_workspace_explorer:
                     parent_workspace_explorer.current_highlighted_item = weakref.ref(item)
+                self.scrollToItem(item, QAbstractItemView.ScrollHint.EnsureVisible)
                 break
 
     def _copy_full_path(self, file_path: str):
