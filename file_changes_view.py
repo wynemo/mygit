@@ -88,7 +88,11 @@ class FileChangesView(QWidget):
 
             if len(path_parts) == 1:
                 if status == "R":
-                    found_item.setText(1, f"moved from {old_path}")
+                    current_folder = self.get_full_path(parent)
+                    older_folder = old_path.split("/")[-1]
+                    # todo，比较复杂，后续在 utils 里写一个函数来做
+                    # 计算相对路径
+                    found_item.setText(1, f"moved from {older_folder} to {current_folder}/{current_part}")
                 else:
                     found_item.setText(1, status)
 
