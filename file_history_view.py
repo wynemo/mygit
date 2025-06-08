@@ -80,15 +80,18 @@ class FileHistoryView(QWidget):
                 if not line.strip():
                     continue
 
+                logging.debug("line is %s", line)
+                parts = line.split("|", 3)
+
                 # 建议在 file_history_view.py 的 update_history 方法中添加以下代码来解析文件变更状态：
 
                 _file_path = None
-                if line and (line[0] in ("A", "M", "D") or line.startswith("R")):
+                if len(parts) < 4:
                     # 处理重命名格式：R100    oldfile    newfile
-                    if line.startswith("R"):
+                    if line.startswith("R") or line.startswith("C"):
                         parts = line.split("\t")
                         if len(parts) >= 3:
-                            print(f"文件重命名：{parts[1]} -> {parts[2]}")
+                            print(f"文件重命名/复制：{parts[1]} -> {parts[2]}")
                             _file_path = parts[2]
                     else:
                         # 处理普通变更格式：A/M/D    filename
@@ -102,7 +105,6 @@ class FileHistoryView(QWidget):
                     )
                     continue
 
-                parts = line.split("|", 3)
                 commit_hash, author_name, timestamp_str, message = parts
 
                 item = QTreeWidgetItem()
