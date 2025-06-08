@@ -6,8 +6,10 @@ import shutil
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timezone
 
 import git  # Make sure 'gitpython' is installed in the test environment
+from git import Actor
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from git_manager import GitManager
@@ -250,6 +252,31 @@ class TestGitManagerFileStatus(unittest.TestCase):
         self.assertNotIn(self.initial_file_rel, statuses["modified"])
         self.assertNotIn(self.initial_file_rel, statuses["staged"])
         self.assertNotIn(self.initial_file_rel, statuses["untracked"])
+
+    def test_get_blame_data_date_format(self):
+        test_dt = datetime(2023, 5, 8, 10, 0, 0, tzinfo=timezone.utc)
+
+        with open(self.initial_file_abs, "a") as f:
+            f.write("\nTest line for blame date formatting.\n")
+
+        self.repo.index.add([self.initial_file_rel])
+        author = Actor("Test Blamer", "blamer@example.com")
+        c = self.repo.index.commit("Blame date test commit", author=author, commit_date=test_dt, author_date=test_dt)
+
+        blame_entries = self.git_manager.get_blame_data(self.initial_file_abs, commit_hash=c.hexsha)
+
+        entry_checked = False
+        correct_date_found = False
+        expected_date_str = f"{test_dt.year}/{test_dt.month}/{test_dt.day}"
+        for entry in blame_entries:
+            if entry["commit_hash"] == c.hexsha:
+                entry_checked = True
+                if entry["committed_date"] == expected_date_str:
+                    correct_date_found = True
+                    break
+
+        self.assertTrue(entry_checked, f"No blame entries from the test commit {c.hexsha} were found to check the date.")
+        self.assertTrue(correct_date_found, f"Date format test failed. Expected {expected_date_str}, but was not found for commit {c.hexsha}.")
 
 
 if __name__ == "__main__":
