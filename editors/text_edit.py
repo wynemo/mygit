@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Optional
 from PyQt6.QtCore import QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import (
     QColor,
+    QContextMenuEvent,
     QFont,
     QKeyEvent,  # Added QKeyEvent
     QMouseEvent,
@@ -19,6 +20,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,  # Added for save confirmation
     QPlainTextEdit,
     QTextEdit,  # Added QTextEdit
+    QToolTip,
     QWidget,
 )
 
@@ -34,6 +36,7 @@ class LineNumberArea(QWidget):
     def __init__(self, editor):
         super().__init__(editor)
         self.editor = editor
+        self.setMouseTracking(True)  # 启用鼠标跟踪以支持悬停事件
 
     def sizeHint(self):
         return QSize(self.editor.line_number_area_width(), 0)
@@ -41,7 +44,7 @@ class LineNumberArea(QWidget):
     def paintEvent(self, event):
         self.editor.line_number_area_paint_event(event)
 
-    def contextMenuEvent(self, event: QMouseEvent):
+    def contextMenuEvent(self, event: QContextMenuEvent):
         """Handle right-click context menu event for line number area"""
         menu = QMenu(self)
         copy_action = menu.addAction("Copy Revision Number")
@@ -68,8 +71,50 @@ class LineNumberArea(QWidget):
                 clipboard = QApplication.clipboard()
                 clipboard.setText(annotation["commit_hash"])
 
-    def mousePressEvent(self, event: QMouseEvent):
+    def mouseMoveEvent(self, event: QMouseEvent):
+        """处理鼠标移动事件，显示 blame 信息的工具提示"""
         if self.editor.showing_blame and self.editor.blame_annotations_per_line:
+            # 检查鼠标是否在 blame 注释区域内
+            blame_area_width = self.editor.PADDING_LEFT_OF_BLAME + getattr(self.editor, "max_blame_display_width", 0)
+            if event.pos().x() < blame_area_width:
+                # 获取鼠标所在行号
+                y_pos = event.pos().y()
+                block = self.editor.firstVisibleBlock()
+                block_number = block.blockNumber()
+                block_top = self.editor.blockBoundingGeometry(block).translated(self.editor.contentOffset()).top()
+                block_height = self.editor.blockBoundingRect(block).height()
+
+                if block_height > 0:  # 避免除以零
+                    line_index = block_number + int((y_pos - block_top) / block_height)
+
+                    # 获取该行的 blame 数据
+                    if 0 <= line_index < len(self.editor.blame_annotations_per_line):
+                        annotation = self.editor.blame_annotations_per_line[line_index]
+                        if annotation and "commit_hash" in annotation:
+                            # 从 blame_data_full 获取完整数据
+                            if line_index < len(self.editor.blame_data_full):
+                                full_data = self.editor.blame_data_full[line_index]
+                                # 格式化工具提示文本
+                                tooltip_text = (
+                                    f"commit {full_data['commit_hash']}\n"
+                                    f"Author: {full_data['author_name']}\n"
+                                    f"Date: {full_data['committed_date']}\n\n"
+                                    f"{full_data.get('summary', 'No commit message')}"
+                                )
+                                QToolTip.showText(event.globalPosition().toPoint(), tooltip_text)
+                                return
+            # 鼠标不在 blame 区域或没有数据时隐藏工具提示
+            QToolTip.hideText()
+
+        super().mouseMoveEvent(event)
+
+    def mousePressEvent(self, event: QMouseEvent):
+        # 如果是左键点击，定位到对应的 commit
+        if (
+            event.button() == Qt.MouseButton.LeftButton
+            and self.editor.showing_blame
+            and self.editor.blame_annotations_per_line
+        ):
             y_pos = event.pos().y()
             block = self.editor.firstVisibleBlock()
             block_number = block.blockNumber()
