@@ -8,7 +8,7 @@ Usage:
 from setuptools import setup
 
 APP = ["main.py"]
-DATA_FILES = ["mygit.icns", "icons"]
+DATA_FILES = ["icons"]
 OPTIONS = {}
 
 setup(
