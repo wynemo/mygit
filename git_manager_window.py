@@ -34,7 +34,7 @@ from workspace_explorer import WorkspaceExplorer
 class GitManagerWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Git Manager")
+        self.setWindowTitle(self.tr("Git Manager"))
 
         # Get screen geometry and set window size
         screen = QGuiApplication.primaryScreen()
