@@ -88,7 +88,7 @@ class FileChangesView(QWidget):
 
             if len(path_parts) == 1:
                 if status == "R":
-                    found_item.setText(1, f"{old_path} -> {'/'.join(path_parts)}")
+                    found_item.setText(1, f"moved from {old_path}")
                 else:
                     found_item.setText(1, status)
 
