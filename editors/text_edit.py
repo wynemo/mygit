@@ -24,8 +24,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from components.find_dialog import FindDialog
 from diff_highlighter import DiffHighlighter
-from find_dialog import FindDialog
 from settings import BLAME_COLOR_PALETTE, Settings
 
 if TYPE_CHECKING:
