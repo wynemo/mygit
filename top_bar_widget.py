@@ -73,7 +73,7 @@ class TopBarWidget(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(100)  # As per requirement
+        self.setFixedHeight(50)  # As per requirement
 
         self._layout = QHBoxLayout()
         self._layout.setContentsMargins(10, 5, 10, 5)  # Adjusted margins for more elements
