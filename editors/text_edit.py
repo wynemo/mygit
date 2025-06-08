@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 
 class LineNumberArea(QWidget):
-    def __init__(self, editor):
+    def __init__(self, editor: "SyncedTextEdit"):
         super().__init__(editor)
         self.editor = editor
         self.setMouseTracking(True)  # 启用鼠标跟踪以支持悬停事件
@@ -99,7 +99,7 @@ class LineNumberArea(QWidget):
                                     f"commit {full_data['commit_hash']}\n"
                                     f"Author: {full_data['author_name']}\n"
                                     f"Date: {full_data['committed_date']}\n\n"
-                                    f"{full_data.get('summary', 'No commit message')}"
+                                    f"{full_data.get('message', 'No commit message')}"
                                 )
                                 QToolTip.showText(event.globalPosition().toPoint(), tooltip_text)
                                 return
@@ -459,6 +459,7 @@ class SyncedTextEdit(QPlainTextEdit):
         self.max_blame_display_width = 0
         # Store the full data separately, ensuring original commit_hash is preserved.
         self.blame_data_full = list(blame_data_list)  # Make a copy
+        logging.debug(f"blame_data_full: {self.blame_data_full}")
 
         processed_for_display = []
         if blame_data_list:

@@ -96,6 +96,7 @@ class GitManager:
                             else "未提交",
                             "line_number": line_num_in_commit + 1,  # 1-indexed
                             "content": line_content.strip("\n"),
+                            "message": commit.message,
                         }
                     )
             return blame_data
