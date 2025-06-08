@@ -139,7 +139,7 @@ class GitManagerWindow(QMainWindow):
         )
         self.tab_widget.setTabsClosable(True)
         self.tab_widget.tabCloseRequested.connect(self.close_tab)
-        self.tab_widget.addTab(self.commit_history_view, "提交历史")
+        self.tab_widget.addTab(self.commit_history_view, self.tr("commit history"))
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
 
         # 提交历史标签页，不可关闭

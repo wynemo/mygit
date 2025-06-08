@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 
+from PyQt6.QtCore import QTranslator
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
 
@@ -10,7 +11,10 @@ from git_manager_window import GitManagerWindow
 
 def main():
     app = QApplication(sys.argv)
-
+    if os.path.exists("translations/app_zh_CN.qm"):
+        translator = QTranslator()
+        translator.load("translations/app_zh_CN.qm")
+        app.installTranslator(translator)
     # 设置应用图标
     app.setWindowIcon(QIcon("icons/mygit.icns"))
 
