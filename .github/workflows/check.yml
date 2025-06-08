@@ -9,6 +9,16 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+
+    # 将凭证和通用变量设置为整个作业的环境变量
+    # aws-cli 会自动读取 AWS_ 前缀的变量
+    env:
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }} # 建议也将 Bucket 名称设为 Secret
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto # 对于 R2，此项设为 'auto' 即可
+
     name: Run checks
     steps:
     - name: Checkout repository
@@ -48,18 +58,11 @@ jobs:
         pylupdate6 --verbose git_manager_window.py -ts translations/app_zh_CN.ts
         pylupdate6 --verbose git_manager_window.py -ts translations/app_en_US.ts
 
-    # 第二步：安装和配置 AWS CLI
-    # R2 与 S3 API 兼容，因此我们可以使用 aws-cli
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-        # AWS Region 是必需的，但对于 R2 可以设置为 "auto"
-        aws-region: auto
-
-    # 第三步：上传文件到 R2
-    - name: Upload to R2
+    - name: Upload files to R2
       run: |
-        aws s3 sync ./translations s3://${{ secrets.R2_BUCKET_NAME }} \
-          --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+        
+        # 使用 aws-cli 将指定目录同步到 R2
+        # --endpoint-url 是关键，它告诉 CLI 使用 Cloudflare 的 R2 API 端点
+        aws s3 sync ./translations s3://$R2_BUCKET_NAME \
+          --endpoint-url https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com \
+          
