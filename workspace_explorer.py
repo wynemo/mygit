@@ -197,6 +197,7 @@ class WorkspaceExplorer(QWidget):
 
     def refresh_file_tree(self):
         """刷新文件树"""
+        logging.debug("refresh_file_tree")
         if self.git_manager and self.git_manager.repo and hasattr(self, "workspace_path"):
             self.all_file_statuses = self.git_manager.get_all_file_statuses()
         else:

@@ -287,10 +287,10 @@ class GitManagerWindow(QMainWindow):
             self.update_commit_history()  # This updates the history view, not branches in top bar
 
             # 更新工作区浏览器
+            logging.debug("open_folder, refresh_file_tree")
             self.workspace_explorer.set_workspace_path(folder_path)
             self.workspace_explorer.git_manager = self.git_manager
             self.workspace_explorer.file_tree.git_manager = self.git_manager
-            self.workspace_explorer.refresh_file_tree()
         else:
             self.commit_history_view.history_list.clear()
             self.notification_widget.show_message("所选文件夹不是有效的 Git 仓库")
@@ -371,6 +371,7 @@ class GitManagerWindow(QMainWindow):
             # 切换成功
             self.notification_widget.show_message(f"成功切换到分支：{branch}")  # 可选：成功提示
             # 更新 UI 组件以反映分支更改
+            logging.debug("on_branch_changed, refresh_file_tree")
             self.workspace_explorer.refresh_file_tree()
             # self.update_branches_on_top_bar() # 确保组合框状态正确（如果需要，但 setCurrentText 应该已处理）
             # update_commit_history 会被连接到 branch_combo 的 activated 信号，
@@ -725,4 +726,5 @@ class GitManagerWindow(QMainWindow):
                 # print("Window activated, refreshing file tree...") # Optional: for debugging
                 if hasattr(self, "workspace_explorer") and self.workspace_explorer:
                     if self.git_manager and self.git_manager.repo:  # Ensure git repo is loaded
+                        logging.debug("changeEvent, refresh_file_tree")
                         self.workspace_explorer.refresh_file_tree()

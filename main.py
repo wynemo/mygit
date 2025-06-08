@@ -29,5 +29,7 @@ if __name__ == "__main__":
     log_level = logging.DEBUG if os.getenv("DEBUG") == "1" else logging.INFO
 
     # 配置日志
-    logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
+    logging.basicConfig(
+        level=log_level, format="%(asctime)s - %(levelname)s - %(name)s - %(filename)s:%(lineno)d - %(message)s"
+    )
     main()
