@@ -78,4 +78,4 @@
 85. ~~WorkspaceExplorer.file_changes_view 处理信号 点击文件 没有处理~~
 86. ~~WorkspaceExplorer.file_changes_view 处理信号 与工作区比较 没有处理~~
 87. ~~去掉最上方 commit 按钮，以及相应代码，现在 commit 按钮在侧边栏~~
-88. git blame tips 需要支持
+88. ~~git blame tips 需要支持~~ 如果说能做到停留半秒，再弹出更好
