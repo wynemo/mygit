@@ -26,8 +26,8 @@ from git_manager import GitManager
 from notification_widget import NotificationWidget
 from settings import Settings
 from threads import FetchThread, PullThread, PushThread  # Import PullThread and PushThread
-from top_bar_widget import TopBarWidget  # Import TopBarWidget
 from views.side_bar_widget import SideBarWidget
+from views.top_bar_widget import TopBarWidget  # Import TopBarWidget
 from workspace_explorer import WorkspaceExplorer
 
 
