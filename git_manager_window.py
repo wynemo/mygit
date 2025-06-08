@@ -19,11 +19,11 @@ from PyQt6.QtWidgets import (
 from commit_detail_view import CommitDetailView
 from commit_history_view import CommitHistoryView
 from compare_view import CompareView
+from components.notification_widget import NotificationWidget
 from dialogs.compare_with_working_dialog import CompareWithWorkingDialog
 from dialogs.settings_dialog import SettingsDialog
 from file_changes_view import FileChangesView
 from git_manager import GitManager
-from notification_widget import NotificationWidget
 from settings import Settings
 from threads import FetchThread, PullThread, PushThread  # Import PullThread and PushThread
 from views.side_bar_widget import SideBarWidget
