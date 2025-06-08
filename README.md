@@ -59,15 +59,12 @@ python main.py
 ## 项目结构
 
 ### 主目录文件
-- `main.py`: 程序入口
-- `git_manager.py`: Git 操作核心功能
-- `git_manager_window.py`: 图形界面实现
-- `commit_dialog.py`: git commit 提交
+- `blame_tooltip_plan.md`: blame 工具提示的计划文件
+- `check.sh`: 检查脚本
 - `commit_detail_view.py`: 显示选定提交的详细信息
-- `commit_graph.py`: 提交图绘制
 - `commit_history_view.py`: 提交历史视图
+- `commit_widget.py`: 提交相关控件
 - `compare_view.py`: 比较视图
-- `compare_with_working_dialog.py`: 与工作区比较对话框
 - `custom_tree_widget.py`: 自定义树形控件
 - `diff_calculator.py`: 差异计算器
 - `diff_highlighter.py`: 差异高亮
@@ -78,27 +75,40 @@ python main.py
 - `git_graph_items.py`: 提交图图形元素
 - `git_graph_layout.py`: 提交图布局算法
 - `git_graph_view.py`: 提交历史图形视图
-- `git_log_parser.py`: git log 解析器
+- `git_log_parser.py`: Git 日志解析器
+- `git_manager.py`: Git 操作核心功能
+- `git_manager_window.md`: Git 管理器窗口的 Markdown 文档
+- `git_manager_window.py`: Git 管理器窗口的 Python 实现
+- `main.py`: 程序入口
+- `mygit.icns`: 应用程序图标
+- `notification_widget.py`: 通知控件
+- `pyproject.toml`: 项目配置和依赖管理
+- `README.md`: 项目说明文件
+- `readme.txt`: 额外的说明文件
+- `requirements.txt`: Python 依赖列表
 - `settings.py`: 程序设置管理
-- `settings_dialog.py`: 设置对话框
+- `side_bar_widget.py`: 侧边栏控件
 - `syntax_highlighter.py`: 语法高亮
 - `test_text_diff_viewer.py`: 文本差异查看器测试
 - `text_diff_viewer.py`: 文本差异查看器
-- `top_bar_widget.py`: 顶部工具栏控件
-- `workspace_explorer.py`: 工作区文件浏览器
+- `threads.py`: 线程管理
+- `todo.md`: 待办事项 Markdown 文件
+- `todo.txt`: 待办事项文本文件
 
-### editors 目录
-- `text_edit.py`: 文本编辑器组件 (集成行号、语法高亮等功能)
-- `modified_text_edit.py`: 修改版文本编辑器
-
-### icons 目录
-- 包含各种 SVG 和 PNG 图标资源
-
-### tests 目录
-- 包含单元测试和测试数据文件
-
-### utils 目录
-- `language_map.py`: 语言名称到文件扩展名的映射
+### 目录
+- `dialogs/`: 包含各种对话框组件
+    - `__init__.py`
+    - `compare_with_working_dialog.py`: 与工作区比较对话框
+    - `settings_dialog.py`: 设置对话框
+- `editors/`: 包含文本编辑器相关组件
+    - `__init__.py`
+    - `modified_text_edit.py`: 修改版文本编辑器
+    - `text_edit.py`: 文本编辑器组件 (集成行号、语法高亮等功能)
+- `icons/`: 包含各种 SVG 和 PNG 图标资源
+- `tests/`: 包含单元测试和测试数据文件
+- `utils/`: 包含工具函数和辅助脚本
+    - `__init__.py`
+    - `language_map.py`: 语言名称到文件扩展名的映射
 
 ## 配置设置
 
