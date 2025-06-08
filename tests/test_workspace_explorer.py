@@ -5,25 +5,28 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest.mock import Mock, patch
 
 import git  # GitPython
 from PyQt6.QtCore import Qt  # For Qt.GlobalColor if needed
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QApplication
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from git_manager import GitManager
 from workspace_explorer import WorkspaceExplorer  # This contains FileTreeWidget
 
 # It's good practice to have a QApplication instance for widget tests
 app = None
 
+
 def setUpModule():
     global app
     app = QApplication.instance()
     if app is None:
         # Pass sys.argv or [] if no arguments are needed by QApplication
-        app = QApplication(sys.argv if hasattr(sys, 'argv') else [])
+        app = QApplication(sys.argv if hasattr(sys, "argv") else [])
+
 
 def tearDownModule():
     global app
@@ -31,7 +34,7 @@ def tearDownModule():
     # Depending on test runner, app might be None or already cleaned up
     if app is not None:
         # app.exit() # This can sometimes hang in test environments
-        app.quit() # Prefer quit for event loop termination
+        app.quit()  # Prefer quit for event loop termination
     app = None
 
 
@@ -39,7 +42,7 @@ class TestFileTreeStatusColors(unittest.TestCase):
     def setUp(self):
         self.repo_path = tempfile.mkdtemp()
         self.repo = git.Repo.init(self.repo_path)
-        
+
         # Initial commit for a normal file
         self.normal_file_rel = "normal_file.txt"
         self.normal_file_abs = os.path.join(self.repo_path, self.normal_file_rel)
@@ -50,21 +53,25 @@ class TestFileTreeStatusColors(unittest.TestCase):
 
         self.git_manager = GitManager(self.repo_path)
         self.git_manager.initialize()
-        
-        # WorkspaceExplorer now takes git_manager in its constructor
-        self.workspace_explorer = WorkspaceExplorer(git_manager=self.git_manager)
-        # No need to call set_workspace_path here if we do it per test or if setup should reflect an empty state first
 
+        # WorkspaceExplorer now takes git_manager in its constructor
+        with patch("workspace_explorer.get_main_window_by_parent") as mock_get_main:
+            mock_main_window = Mock()
+            mock_main_window.on_file_selected = Mock()
+            mock_get_main.return_value = mock_main_window
+
+            self.workspace_explorer = WorkspaceExplorer(git_manager=self.git_manager)
+        # No need to call set_workspace_path here if we do it per test or if setup should reflect an empty state first
 
     def tearDown(self):
         # Explicitly close any open tabs in workspace_explorer to free resources if necessary
-        if hasattr(self.workspace_explorer, 'tab_widget'):
+        if hasattr(self.workspace_explorer, "tab_widget"):
             for i in range(self.workspace_explorer.tab_widget.count()):
-                self.workspace_explorer.tab_widget.removeTab(0) # Remove always the first one
-        
+                self.workspace_explorer.tab_widget.removeTab(0)  # Remove always the first one
+
         # If WorkspaceExplorer or its children create persistent resources, clean them here
         # self.workspace_explorer.deleteLater() # Example if it were a QObject needing cleanup
-        
+
         shutil.rmtree(self.repo_path)
 
     def find_item_in_tree(self, file_tree, item_name):
@@ -78,7 +85,7 @@ class TestFileTreeStatusColors(unittest.TestCase):
     def test_modified_file_is_brown(self):
         modified_file_rel = "modified_file.txt"
         modified_file_abs = os.path.join(self.repo_path, modified_file_rel)
-        
+
         # Create and commit the file first so it's tracked
         with open(modified_file_abs, "w") as f:
             f.write("Original content for modification")
@@ -90,15 +97,17 @@ class TestFileTreeStatusColors(unittest.TestCase):
             f.write("This content is modified")
 
         # Refresh the file tree to reflect changes
-        self.workspace_explorer.set_workspace_path(self.repo_path) 
+        self.workspace_explorer.set_workspace_path(self.repo_path)
 
         file_tree = self.workspace_explorer.file_tree
         item_found = self.find_item_in_tree(file_tree, modified_file_rel)
-        
+
         self.assertIsNotNone(item_found, f"Modified file '{modified_file_rel}' not found in tree")
-        expected_color = QColor(165, 42, 42) # Brown color used in implementation
+        expected_color = QColor(165, 42, 42)  # Brown color used in implementation
         # Item's foreground is a QBrush, get its color.
-        self.assertEqual(item_found.foreground(0).color().rgb(), expected_color.rgb(), "Modified file color is not brown")
+        self.assertEqual(
+            item_found.foreground(0).color().rgb(), expected_color.rgb(), "Modified file color is not brown"
+        )
 
     def test_normal_file_default_color(self):
         # Refresh the file tree
@@ -106,15 +115,15 @@ class TestFileTreeStatusColors(unittest.TestCase):
 
         file_tree = self.workspace_explorer.file_tree
         item_found = self.find_item_in_tree(file_tree, self.normal_file_rel)
-        
+
         self.assertIsNotNone(item_found, f"Normal file '{self.normal_file_rel}' not found in tree")
-        
+
         # Check it's NOT brown. The actual default color can vary (system theme, Qt styling).
         # We check if a color was explicitly set by our logic. If not, it's default.
         # foreground(0) returns a QBrush. If no explicit color set, it might be a default brush.
         # A more direct check is to see if the color is the one we set for modified files.
         brown_color = QColor(165, 42, 42)
-        
+
         # If item.foreground(0) was never set, its .color() might be black by default or theme-dependent.
         # The key is that it should not be the "modified" color.
         current_color = item_found.foreground(0).color()
