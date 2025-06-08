@@ -71,6 +71,7 @@ class GitManager:
 
     def get_blame_data(self, file_path: str, commit_hash: str = "HEAD") -> List[dict]:
         """获取文件的 blame 信息"""
+        # todo 新增行 有 bug
         if not self.repo:
             return []
 
@@ -89,14 +90,14 @@ class GitManager:
                     blame_data.append(
                         {
                             "commit_hash": commit.hexsha,
-                            "author_name": commit.author.name,
-                            "author_email": commit.author.email,
+                            "author_name": commit.author.name if not uncommited_yet else "未提交",
+                            "author_email": commit.author.email if not uncommited_yet else "未提交",
                             "committed_date": f"{commit.committed_datetime.year}/{commit.committed_datetime.month}/{commit.committed_datetime.day}"
                             if not uncommited_yet
                             else "未提交",
                             "line_number": line_num_in_commit + 1,  # 1-indexed
                             "content": line_content.strip("\n"),
-                            "message": commit.message,
+                            "message": commit.message if not uncommited_yet else "未提交",
                         }
                     )
             return blame_data
