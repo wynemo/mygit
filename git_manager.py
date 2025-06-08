@@ -91,7 +91,7 @@ class GitManager:
                             "commit_hash": commit.hexsha,
                             "author_name": commit.author.name,
                             "author_email": commit.author.email,
-                            "committed_date": commit.committed_datetime.strftime("%Y/%-m/%-d")
+                            "committed_date": f"{commit.committed_datetime.year}/{commit.committed_datetime.month}/{commit.committed_datetime.day}"
                             if not uncommited_yet
                             else "未提交",
                             "line_number": line_num_in_commit + 1,  # 1-indexed
