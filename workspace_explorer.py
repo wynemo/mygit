@@ -207,12 +207,43 @@ class WorkspaceExplorer(QWidget):
             self._add_directory_items(self.workspace_path, self.file_tree.invisibleRootItem())
 
     def _add_directory_items(self, path: str, parent_item_in_tree: QTreeWidgetItem) -> bool:
-        # This is the method to be replaced / modified.
-        # Returns True if this directory or any of its subdirectories/files are 'modified'.
+        """cursor 生成 - 优先显示目录"""
         current_dir_or_descendant_is_modified = False
         try:
-            # Sort items by name for consistent order (case-insensitive)
-            for item_name in sorted(os.listdir(path), key=lambda x: x.lower()):
+            # 分离目录和文件
+            directories = []
+            files = []
+
+            for item_name in os.listdir(path):
+                item_path = os.path.join(path, item_name)
+                if os.path.isdir(item_path):
+                    directories.append(item_name)
+                elif os.path.isfile(item_path):
+                    files.append(item_name)
+
+            # 排序目录和文件
+            directories = sorted(directories, key=lambda x: x.lower())
+            files = sorted(files, key=lambda x: x.lower())
+
+            # 先处理目录
+            for item_name in directories:
+                item_path = os.path.join(path, item_name)
+                tree_item = QTreeWidgetItem(parent_item_in_tree)
+                tree_item.setText(0, item_name)
+                tree_item.setData(0, Qt.ItemDataRole.UserRole, item_path)
+
+                is_this_entry_modified = False
+
+                # 递归处理子目录
+                if self._add_directory_items(item_path, tree_item):
+                    tree_item.setForeground(0, QColor(165, 42, 42))  # 目录被修改
+                    is_this_entry_modified = True
+
+                if is_this_entry_modified:
+                    current_dir_or_descendant_is_modified = True
+
+            # 再处理文件
+            for item_name in files:
                 item_path = os.path.join(path, item_name)
                 tree_item = QTreeWidgetItem(parent_item_in_tree)
                 tree_item.setText(0, item_name)
