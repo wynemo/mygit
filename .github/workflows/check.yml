@@ -44,5 +44,22 @@ jobs:
 
     - name: Run pylupdate6
       run: |
+        mkdir -p translations/
         pylupdate6 --verbose git_manager_window.py -ts translations/app_zh_CN.ts
         pylupdate6 --verbose git_manager_window.py -ts translations/app_en_US.ts
+
+    # 第二步：安装和配置 AWS CLI
+    # R2 与 S3 API 兼容，因此我们可以使用 aws-cli
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        # AWS Region 是必需的，但对于 R2 可以设置为 "auto"
+        aws-region: auto
+
+    # 第三步：上传文件到 R2
+    - name: Upload to R2
+      run: |
+        aws s3 sync ./translations s3://${{ secrets.R2_BUCKET_NAME }} \
+          --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
