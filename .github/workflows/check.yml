@@ -10,15 +10,6 @@ jobs:
   check:
     runs-on: ubuntu-latest
 
-    # 将凭证和通用变量设置为整个作业的环境变量
-    # aws-cli 会自动读取 AWS_ 前缀的变量
-    env:
-      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-      R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }} # 建议也将 Bucket 名称设为 Secret
-      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-      AWS_DEFAULT_REGION: auto # 对于 R2，此项设为 'auto' 即可
-
     name: Run checks
     steps:
     - name: Checkout repository
@@ -48,21 +39,3 @@ jobs:
       run: |
         chmod +x ./check.sh
         ./check.sh
-
-    - name: install pyqt6-dev-tools
-      run: sudo apt-get install -y pyqt6-dev-tools
-
-    - name: Run pylupdate6
-      run: |
-        mkdir -p translations/
-        pylupdate6 --verbose git_manager_window.py -ts translations/app_zh_CN.ts
-        pylupdate6 --verbose git_manager_window.py -ts translations/app_en_US.ts
-
-    - name: Upload files to R2
-      run: |
-        
-        # 使用 aws-cli 将指定目录同步到 R2
-        # --endpoint-url 是关键，它告诉 CLI 使用 Cloudflare 的 R2 API 端点
-        aws s3 sync ./translations s3://$R2_BUCKET_NAME \
-          --endpoint-url https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com \
-          
