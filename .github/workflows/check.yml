@@ -44,5 +44,5 @@ jobs:
 
     - name: Run pylupdate6
       run: |
-        pylupdate6 git_manager_window.py -ts translations/app_zh_CN.ts
-        pylupdate6 git_manager_window.py -ts translations/app_en_US.ts
+        pylupdate6 --verbose git_manager_window.py -ts translations/app_zh_CN.ts
+        pylupdate6 --verbose git_manager_window.py -ts translations/app_en_US.ts
