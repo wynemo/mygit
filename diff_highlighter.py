@@ -16,10 +16,16 @@ class DiffHighlighterEngine:
 
         # 定义差异高亮的颜色
         self.diff_formats = {
-            "delete": self.create_format("#ffcccc", "#cc0000"),  # 更深的红色
-            "insert": self.create_format("#ccffcc", "#00cc00"),  # 更深的绿色
-            "replace": self.create_format("#ffffcc", "#cccc00"),  # 更深的黄色
+            "delete": self.create_format("#ffcccc", "#cc0000"),  # 行级删除 - 红色背景
+            "insert": self.create_format("#ccffcc", "#00cc00"),  # 行级插入 - 绿色背景
+            "replace": self.create_format("#ffffcc", "#cccc00"),  # 行级替换 - 黄色背景
             "equal": None,
+        }
+        # 行内差异高亮格式
+        self.inline_formats = {
+            "delete": self.create_text_format("#ff0000"),  # 删除字符 - 红色文字
+            "insert": self.create_text_format("#00aa00"),  # 插入字符 - 深绿色文字
+            "replace": self.create_text_format("#aa7700"),  # 替换字符 - 棕色文字
         }
         logging.debug("差异格式已创建：%s", self.diff_formats)
 
@@ -27,7 +33,15 @@ class DiffHighlighterEngine:
         """创建高亮格式，包含文字颜色和背景颜色"""
         logging.debug("\n创建格式 - 背景：%s, 文字：%s", background_color, text_color)
         fmt = QTextCharFormat()
-        fmt.setBackground(QColor(background_color))
+        if background_color:
+            fmt.setBackground(QColor(background_color))
+        if text_color:
+            fmt.setForeground(QColor(text_color))
+        return fmt
+
+    def create_text_format(self, text_color):
+        """创建仅包含文字颜色的高亮格式"""
+        fmt = QTextCharFormat()
         fmt.setForeground(QColor(text_color))
         return fmt
 
@@ -108,11 +122,22 @@ class DiffHighlighterEngine:
             format_type = current_chunk.type
 
             if format_type in self.diff_formats:
-                format = self.diff_formats[format_type]
-                if format:
-                    logging.debug("应用格式：%s", format_type)
-                    self.highlighter.setFormat(0, len(text), format)
-                    logging.debug("格式已应用")
+                # 应用行级格式
+                line_format = self.diff_formats[format_type]
+                if line_format:
+                    logging.debug("应用行级格式：%s", format_type)
+                    self.highlighter.setFormat(0, len(text), line_format)
+
+                # 应用行内差异格式
+                if current_chunk.inline_diffs:
+                    logging.debug("应用行内差异格式，共 %d 处", len(current_chunk.inline_diffs))
+                    for inline_diff in current_chunk.inline_diffs:
+                        if inline_diff.type in self.inline_formats:
+                            char_format = self.inline_formats[inline_diff.type]
+                            start = inline_diff.start
+                            length = inline_diff.end - inline_diff.start
+                            self.highlighter.setFormat(start, length, char_format)
+                            logging.debug("应用行内格式：%s [%d:%d]", inline_diff.type, start, start + length)
 
 
 class DiffHighlighter(QSyntaxHighlighter):
@@ -134,7 +159,7 @@ class MultiHighlighter(QSyntaxHighlighter):
         super().__init__(parent)
         self.diff_engine = DiffHighlighterEngine(self, editor_type=editor_type)
         self.pygments_engine = PygmentsHighlighterEngine(self)
-        self.engines = [DiffHighlighterEngine(self, editor_type=editor_type), PygmentsHighlighterEngine(self)]
+        self.engines = [self.diff_engine, self.pygments_engine]
 
     def set_language(self, language_name):
         self.pygments_engine.set_language(language_name)
