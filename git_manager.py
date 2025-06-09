@@ -1,8 +1,10 @@
 import logging
 import os
-from typing import List, Optional
+import pathlib
+from typing import List, Optional, Set
 
 import git
+import pathspec
 from git import GitCommandError
 
 
@@ -10,11 +12,13 @@ class GitManager:
     def __init__(self, repo_path: str):
         self.repo_path = repo_path
         self.repo: Optional[git.Repo] = None
+        self.ignore_spec: Optional[pathspec.PathSpec] = None
 
     def initialize(self) -> bool:
         """初始化 Git 仓库"""
         try:
             self.repo = git.Repo(self.repo_path)
+            self._load_gitignore_patterns()
             return True
         except git.InvalidGitRepositoryError:
             return False
@@ -322,3 +326,32 @@ class GitManager:
                 f"切换分支 {branch_name} 时发生未知错误：{e!s}"
             )  # Unknown error occurred while switching branch.
             return f"切换到分支 '{branch_name}' 时发生未知错误。"  # Unknown error occurred while switching to branch.
+
+    def _load_gitignore_patterns(self):
+        """加载.gitignore文件中的忽略规则"""
+        if not self.repo:
+            return
+
+        gitignore_path = os.path.join(self.repo_path, ".gitignore")
+        if not os.path.exists(gitignore_path):
+            self.ignore_spec = None
+            return
+
+        with open(gitignore_path, "r", encoding="utf-8") as f:
+            patterns = f.readlines()
+
+        self.ignore_spec = pathspec.PathSpec.from_lines("gitwildmatch", patterns)
+
+    def is_ignored(self, path: str) -> bool:
+        """检查路径是否被.gitignore忽略"""
+        if not self.ignore_spec:
+            return False
+
+        try:
+            # 获取相对于仓库根目录的路径
+            rel_path = os.path.relpath(path, self.repo_path)
+            # 统一使用正斜杠
+            rel_path = rel_path.replace(os.sep, "/")
+            return self.ignore_spec.match_file(rel_path)
+        except ValueError:
+            return False

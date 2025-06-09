@@ -210,6 +210,7 @@ class WorkspaceExplorer(QWidget):
 
     def _add_directory_items(self, path: str, parent_item_in_tree: QTreeWidgetItem, level: int = 0) -> bool:
         """cursor 生成 - 优先显示目录
+        将被.gitignore忽略的文件/文件夹显示为灰色
         Args:
             path: 目录路径
             parent_item_in_tree: 父节点
@@ -239,20 +240,24 @@ class WorkspaceExplorer(QWidget):
                 tree_item.setText(0, item_name)
                 tree_item.setData(0, Qt.ItemDataRole.UserRole, item_path)
 
+                # 检查是否被.gitignore忽略
+                if self.git_manager and self.git_manager.is_ignored(item_path):
+                    tree_item.setForeground(0, QColor(128, 128, 128))  # 灰色
+
                 is_this_entry_modified = False
 
                 # 递归处理子目录
                 if level < 2:
                     if self._add_directory_items(item_path, tree_item, level + 1):
-                        tree_item.setForeground(0, QColor(165, 42, 42)) # 目录被修改
+                        tree_item.setForeground(0, QColor(165, 42, 42))  # 目录被修改
                         is_this_entry_modified = True
                 else:
                     # 添加虚拟子项使目录可展开
                     placeholder = QTreeWidgetItem(tree_item)
                     tree_item.setChildIndicatorPolicy(QTreeWidgetItem.ChildIndicatorPolicy.ShowIndicator)
-                    
-                    #tree_item.setForeground(0, QColor(165, 42, 42))  # 这个后续再说
-                    #is_this_entry_modified = True
+
+                    # tree_item.setForeground(0, QColor(165, 42, 42))  # 这个后续再说
+                    # is_this_entry_modified = True
 
                 if is_this_entry_modified:
                     current_dir_or_descendant_is_modified = True
@@ -263,6 +268,10 @@ class WorkspaceExplorer(QWidget):
                 tree_item = QTreeWidgetItem(parent_item_in_tree)
                 tree_item.setText(0, item_name)
                 tree_item.setData(0, Qt.ItemDataRole.UserRole, item_path)
+
+                # 检查是否被.gitignore忽略
+                if self.git_manager and self.git_manager.is_ignored(item_path):
+                    tree_item.setForeground(0, QColor(128, 128, 128))  # 灰色
 
                 is_this_entry_modified = False
 
