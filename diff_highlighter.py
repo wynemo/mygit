@@ -21,14 +21,21 @@ class DiffHighlighterEngine:
             "replace": self.create_format("#ffffcc", "#cccc00"),  # 更深的黄色
             "equal": None,
         }
+        # 新增：互相包含差异的高亮格式
+        # 注意，颜色是叠加的， #ffffcc #800080 叠加后是 紫色
+        self.inline_contained_insert_format = self.create_format("#ccffcc", "#cccc00")
+        self.inline_contained_delete_format = self.create_format("#800080", "#cccc00")
+
         logging.debug("差异格式已创建：%s", self.diff_formats)
 
     def create_format(self, background_color, text_color):
         """创建高亮格式，包含文字颜色和背景颜色"""
         logging.debug("\n创建格式 - 背景：%s, 文字：%s", background_color, text_color)
         fmt = QTextCharFormat()
-        fmt.setBackground(QColor(background_color))
-        fmt.setForeground(QColor(text_color))
+        if background_color is not None:
+            fmt.setBackground(QColor(background_color))
+        if text_color is not None:
+            fmt.setForeground(QColor(text_color))
         return fmt
 
     def set_diff_chunks(self, chunks):
@@ -114,6 +121,49 @@ class DiffHighlighterEngine:
                     self.highlighter.setFormat(0, len(text), format)
                     logging.debug("格式已应用")
 
+                # 新增：处理互相包含的情况
+                if current_chunk.type == "replace":
+                    try:
+                        # 获取当前行的左右文本
+                        if self.editor_type in ["left", "parent1_edit"]:
+                            left_line_text = self.highlighter.document().findBlockByNumber(block_number).text()
+                            right_line_text = self.highlighter.other_document.findBlockByNumber(
+                                current_chunk.right_start + (block_number - current_chunk.left_start)
+                            ).text()
+                        elif self.editor_type in ["right", "parent2_edit"]:
+                            right_line_text = self.highlighter.document().findBlockByNumber(block_number).text()
+                            left_line_text = self.highlighter.other_document.findBlockByNumber(
+                                current_chunk.left_start + (block_number - current_chunk.right_start)
+                            ).text()
+                        else:
+                            return
+
+                        # 检查互相包含情况并高亮
+                        if self.editor_type in ["left", "parent1_edit"]:
+                            if right_line_text in left_line_text:  # 左行包含右行（删除情况）
+                                start_index = left_line_text.find(right_line_text)
+                                if start_index > 0:  # 左侧有前缀被删除
+                                    self.highlighter.setFormat(0, start_index, self.inline_contained_delete_format)
+                                if start_index + len(right_line_text) < len(left_line_text):  # 左侧有后缀被删除
+                                    self.highlighter.setFormat(
+                                        start_index + len(right_line_text),
+                                        len(left_line_text) - (start_index + len(right_line_text)),
+                                        self.inline_contained_delete_format,
+                                    )
+                        elif self.editor_type in ["right", "parent2_edit"]:
+                            if left_line_text in right_line_text:  # 右行包含左行（新增情况）
+                                start_index = right_line_text.find(left_line_text)
+                                if start_index > 0:  # 右侧有前缀被新增
+                                    self.highlighter.setFormat(0, start_index, self.inline_contained_insert_format)
+                                if start_index + len(left_line_text) < len(right_line_text):  # 右侧有后缀被新增
+                                    self.highlighter.setFormat(
+                                        start_index + len(left_line_text),
+                                        len(right_line_text) - (start_index + len(left_line_text)),
+                                        self.inline_contained_insert_format,
+                                    )
+                    except IndexError:
+                        logging.warning("获取行文本时发生索引错误")
+
 
 class DiffHighlighter(QSyntaxHighlighter):
     def __init__(self, parent=None, editor_type=""):
@@ -130,11 +180,12 @@ class DiffHighlighter(QSyntaxHighlighter):
 
 # -------- 总高亮器 --------
 class MultiHighlighter(QSyntaxHighlighter):
-    def __init__(self, parent=None, editor_type=""):
+    def __init__(self, parent=None, editor_type="", other_document=None):
         super().__init__(parent)
         self.diff_engine = DiffHighlighterEngine(self, editor_type=editor_type)
         self.pygments_engine = PygmentsHighlighterEngine(self)
         self.engines = [DiffHighlighterEngine(self, editor_type=editor_type), PygmentsHighlighterEngine(self)]
+        self.other_document = other_document
 
     def set_language(self, language_name):
         self.pygments_engine.set_language(language_name)

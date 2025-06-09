@@ -156,8 +156,8 @@ class DiffViewer(QWidget):
         self.right_edit.horizontalScrollBar().valueChanged.connect(lambda val: self._sync_hscroll(val, 1))
 
         # 添加差异高亮器
-        self.left_edit.highlighter = MultiHighlighter(self.left_edit.document(), "left")
-        self.right_edit.highlighter = MultiHighlighter(self.right_edit.document(), "right")
+        self.left_edit.highlighter = MultiHighlighter(self.left_edit.document(), "left", self.right_edit.document())
+        self.right_edit.highlighter = MultiHighlighter(self.right_edit.document(), "right", self.left_edit.document())
 
         # 添加到布局
         editor_layout.addWidget(self.left_edit)
