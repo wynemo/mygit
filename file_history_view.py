@@ -5,8 +5,9 @@ from functools import partial
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import QApplication, QLabel, QMenu, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QLabel, QMenu, QTreeWidgetItem, QVBoxLayout, QWidget
 
+from hover_reveal_tree_widget import HoverRevealTreeWidget
 from utils import get_main_window
 
 if TYPE_CHECKING:
@@ -40,7 +41,8 @@ class FileHistoryView(QWidget):
         self.history_label = QLabel(f"文件历史：{self.file_path}")
         layout.addWidget(self.history_label)
 
-        self.history_list = QTreeWidget()
+        self.history_list = HoverRevealTreeWidget()
+        self.history_list.set_hover_reveal_columns({1})
         self.history_list.setHeaderLabels(["提交 ID", "提交信息", "作者", "日期"])
         self.history_list.itemClicked.connect(self.on_commit_clicked)
         self.history_list.setColumnWidth(0, 80)  # Hash
