@@ -34,7 +34,7 @@
                         │
                         ├── [左侧] tab_widget (QTabWidget - 主功能标签页)
                         │   ├── 固定标签页 (索引 0): "提交历史" (CommitHistoryView)
-                        │   │   ├── history_list (QTreeWidget): 列表形式显示提交记录。
+                        │   │   ├── history_list (CustomTreeWidget): 列表形式显示提交记录。
                         │   │   └── history_graph_list (GitGraphView): 图形化显示提交历史。
                         │   │       (CommitHistoryView 会根据情况显示列表或图形视图)
                         │   └── 动态标签页: 用于显示单个文件的提交历史 (FileHistoryView 实例，按需创建)。
