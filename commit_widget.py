@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 
 from text_diff_viewer import DiffViewer
 from threads import AIGeneratorThread
-from utils import get_main_window
+from utils import get_main_window_by_parent
 
 
 class CommitWidget(QFrame):
@@ -147,11 +147,11 @@ class CommitWidget(QFrame):
     # git manager property
     @property
     def git_manager(self):
-        return get_main_window().git_manager
+        return self.parent_window.git_manager
 
     @property
     def parent_window(self):
-        return get_main_window()
+        return get_main_window_by_parent(self)
 
     def refresh_file_status(self):
         """刷新文件状态显示"""
