@@ -206,10 +206,15 @@ class WorkspaceExplorer(QWidget):
 
         self.file_tree.clear()
         if hasattr(self, "workspace_path"):
-            self._add_directory_items(self.workspace_path, self.file_tree.invisibleRootItem())
+            self._add_directory_items(self.workspace_path, self.file_tree.invisibleRootItem(), 0)
 
-    def _add_directory_items(self, path: str, parent_item_in_tree: QTreeWidgetItem) -> bool:
-        """cursor 生成 - 优先显示目录"""
+    def _add_directory_items(self, path: str, parent_item_in_tree: QTreeWidgetItem, level: int = 0) -> bool:
+        """cursor 生成 - 优先显示目录
+        Args:
+            path: 目录路径
+            parent_item_in_tree: 父节点
+            level: 当前目录深度(0表示根目录)
+        """
         current_dir_or_descendant_is_modified = False
         try:
             # 分离目录和文件
@@ -237,9 +242,17 @@ class WorkspaceExplorer(QWidget):
                 is_this_entry_modified = False
 
                 # 递归处理子目录
-                if self._add_directory_items(item_path, tree_item):
-                    tree_item.setForeground(0, QColor(165, 42, 42))  # 目录被修改
-                    is_this_entry_modified = True
+                if level < 2:
+                    if self._add_directory_items(item_path, tree_item, level + 1):
+                        tree_item.setForeground(0, QColor(165, 42, 42)) # 目录被修改
+                        is_this_entry_modified = True
+                else:
+                    # 添加虚拟子项使目录可展开
+                    placeholder = QTreeWidgetItem(tree_item)
+                    tree_item.setChildIndicatorPolicy(QTreeWidgetItem.ChildIndicatorPolicy.ShowIndicator)
+                    
+                    #tree_item.setForeground(0, QColor(165, 42, 42))  # 这个后续再说
+                    #is_this_entry_modified = True
 
                 if is_this_entry_modified:
                     current_dir_or_descendant_is_modified = True
@@ -361,6 +374,14 @@ class FileTreeWidget(QTreeWidget):
     def __init__(self, parent=None, git_manager=None):
         super().__init__(parent)
         self.git_manager = git_manager
+        self.workspace_explorer = None
+        # 查找父WorkspaceExplorer实例
+        p = parent
+        while p and not isinstance(p, WorkspaceExplorer):
+            p = p.parent()
+        if p:
+            self.workspace_explorer = p
+        self.itemExpanded.connect(self._on_item_expanded)
         self.setDragEnabled(True)
         self.highlight_color = QColor(0, 120, 215)  # 蓝色高亮
         self.normal_color = QColor(0, 0, 0)  # 默认黑色
@@ -627,6 +648,22 @@ class FileTreeWidget(QTreeWidget):
                     parent_workspace_explorer.current_highlighted_item = weakref.ref(item)
                 self.scrollToItem(item, QAbstractItemView.ScrollHint.EnsureVisible)
                 break
+
+    def _on_item_expanded(self, item: QTreeWidgetItem):
+        """处理目录展开事件"""
+        if not self.workspace_explorer:
+            return
+
+        path = item.data(0, Qt.ItemDataRole.UserRole)
+        if not path or not os.path.isdir(path):
+            return
+
+        # 检查是否有虚拟子项
+        if item.childCount() == 1 and not item.child(0).data(0, Qt.ItemDataRole.UserRole):
+            # 移除虚拟子项
+            item.takeChild(0)
+            # 加载实际内容
+            self.workspace_explorer._add_directory_items(path, item, 2)
 
     def _copy_full_path(self, file_path: str):
         """复制文件的完整路径到剪贴板"""
