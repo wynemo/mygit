@@ -181,7 +181,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("QTreeWidget Overlay Text Example")
         self.setGeometry(100, 100, 700, 400)
 
-        self.treeWidget = CustomTreeWidget()
+        self.treeWidget = HoverRevealTreeWidget()
         self.treeWidget.setColumnCount(3)
         self.treeWidget.setHeaderLabels(["Column 1 (Long Text)", "Column 2", "Column 3"])
 
