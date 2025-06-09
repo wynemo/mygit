@@ -1,3 +1,4 @@
+import difflib
 import logging
 
 from PyQt6.QtGui import QColor, QSyntaxHighlighter, QTextCharFormat
@@ -7,6 +8,8 @@ from syntax_highlighter import PygmentsHighlighterEngine
 
 
 class DiffHighlighterEngine:
+    SIMILARITY_THRESHOLD_FOR_DETAILED_DIFF = 0.8
+
     def __init__(self, highlighter: QSyntaxHighlighter, editor_type=""):
         self.highlighter = highlighter
         self.editor_type = editor_type
@@ -138,29 +141,53 @@ class DiffHighlighterEngine:
                         else:
                             return
 
-                        # 检查互相包含情况并高亮
-                        if self.editor_type in ["left", "parent1_edit"]:
-                            if right_line_text in left_line_text:  # 左行包含右行（删除情况）
-                                start_index = left_line_text.find(right_line_text)
-                                if start_index > 0:  # 左侧有前缀被删除
-                                    self.highlighter.setFormat(0, start_index, self.inline_contained_delete_format)
-                                if start_index + len(right_line_text) < len(left_line_text):  # 左侧有后缀被删除
-                                    self.highlighter.setFormat(
-                                        start_index + len(right_line_text),
-                                        len(left_line_text) - (start_index + len(right_line_text)),
-                                        self.inline_contained_delete_format,
-                                    )
-                        elif self.editor_type in ["right", "parent2_edit"]:
-                            if left_line_text in right_line_text:  # 右行包含左行（新增情况）
-                                start_index = right_line_text.find(left_line_text)
-                                if start_index > 0:  # 右侧有前缀被新增
-                                    self.highlighter.setFormat(0, start_index, self.inline_contained_insert_format)
-                                if start_index + len(left_line_text) < len(right_line_text):  # 右侧有后缀被新增
-                                    self.highlighter.setFormat(
-                                        start_index + len(left_line_text),
-                                        len(right_line_text) - (start_index + len(left_line_text)),
-                                        self.inline_contained_insert_format,
-                                    )
+                        # === BEGIN NEW DETAILED DIFF LOGIC ===
+                        if (
+                            left_line_text != right_line_text
+                        ):  # Ensure they are actually different before calculating ratio
+                            s = difflib.SequenceMatcher(None, left_line_text, right_line_text)
+                            similarity_ratio = s.ratio()
+
+                            if similarity_ratio > self.SIMILARITY_THRESHOLD_FOR_DETAILED_DIFF:
+                                # The base "replace" format for the line is applied by the code just before this 'replace' handling.
+                                # Now, apply character-level highlights on top.
+
+                                if self.editor_type in ["left", "parent1_edit"]:
+                                    # We are in the left editor, text is left_line_text.
+                                    # Highlight parts of left_line_text that are changed or deleted compared to right_line_text.
+                                    for tag, i1, i2, j1, j2 in s.get_opcodes():
+                                        if (
+                                            tag == "replace"
+                                        ):  # Characters in left_line_text[i1:i2] are replaced by right_line_text[j1:j2]
+                                            self.highlighter.setFormat(
+                                                i1, i2 - i1, self.inline_contained_delete_format
+                                            )  # Style for text being replaced in left view
+                                        elif (
+                                            tag == "delete"
+                                        ):  # Characters in left_line_text[i1:i2] are not in right_line_text
+                                            self.highlighter.setFormat(i1, i2 - i1, self.inline_contained_delete_format)
+                                        # 'insert' (char in right but not left) means a gap in left, nothing to format in left_line_text itself.
+
+                                elif self.editor_type in ["right", "parent2_edit"]:
+                                    # We are in the right editor, text is right_line_text.
+                                    # Highlight parts of right_line_text that are changed or inserted compared to left_line_text.
+                                    for tag, i1, i2, j1, j2 in s.get_opcodes():
+                                        if (
+                                            tag == "replace"
+                                        ):  # Characters in right_line_text[j1:j2] replace left_line_text[i1:i2]
+                                            self.highlighter.setFormat(
+                                                j1, j2 - j1, self.inline_contained_insert_format
+                                            )  # Style for text that is replacing in right view
+                                        elif (
+                                            tag == "insert"
+                                        ):  # Characters in right_line_text[j1:j2] are not in left_line_text
+                                            self.highlighter.setFormat(j1, j2 - j1, self.inline_contained_insert_format)
+                                        # 'delete' (char in left but not right) means a gap in right, nothing to format in right_line_text itself.
+
+                                # If detailed diff was applied, we 'return' from highlightBlock for this line to skip old logic.
+                                return
+                        # === END NEW DETAILED DIFF LOGIC ===
+
                     except IndexError:
                         logging.warning("获取行文本时发生索引错误")
 
