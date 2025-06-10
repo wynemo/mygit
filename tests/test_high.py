@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 
 
 class DiffSyntaxHighlighter(QSyntaxHighlighter):
-    """基于QSyntaxHighlighter的差异高亮类"""
+    """基于 QSyntaxHighlighter 的差异高亮类"""
 
     def __init__(self, parent: QTextDocument = None):
         super().__init__(parent)
@@ -91,7 +91,7 @@ class DiffSyntaxHighlighter(QSyntaxHighlighter):
                     if format_to_apply:
                         self.setFormat(start_in_block, end_in_block - start_in_block, format_to_apply)
 
-            # 只有在DELETE和EQUAL时才移动左侧位置，INSERT和EQUAL时才移动右侧位置
+            # 只有在 DELETE 和 EQUAL 时才移动左侧位置，INSERT 和 EQUAL 时才移动右侧位置
             if self.is_left_side:
                 if op != diff_match_patch.diff_match_patch.DIFF_INSERT:
                     current_pos += data_length
@@ -113,7 +113,7 @@ class DiffViewerMainWindow(QMainWindow):
         self.setWindowTitle("文件差异对比工具")
         self.setGeometry(100, 100, 1200, 800)
 
-        # 创建中央widget
+        # 创建中央 widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
@@ -209,10 +209,10 @@ class DiffViewerMainWindow(QMainWindow):
                 with open(file_path, "r", encoding="utf-8") as file:
                     content = file.read()
                     self.left_text_edit.setPlainText(content)
-                    self.left_label.setText(f"左侧文件: {file_path}")
-                    self.status_label.setText(f"已加载左侧文件: {file_path}")
+                    self.left_label.setText(f"左侧文件：{file_path}")
+                    self.status_label.setText(f"已加载左侧文件：{file_path}")
             except Exception as e:
-                QMessageBox.critical(self, "错误", f"无法加载文件: {e!s}")
+                QMessageBox.critical(self, "错误", f"无法加载文件：{e!s}")
 
     def load_right_file(self):
         """加载右侧文件"""
@@ -223,10 +223,10 @@ class DiffViewerMainWindow(QMainWindow):
                 with open(file_path, "r", encoding="utf-8") as file:
                     content = file.read()
                     self.right_text_edit.setPlainText(content)
-                    self.right_label.setText(f"右侧文件: {file_path}")
-                    self.status_label.setText(f"已加载右侧文件: {file_path}")
+                    self.right_label.setText(f"右侧文件：{file_path}")
+                    self.status_label.setText(f"已加载右侧文件：{file_path}")
             except Exception as e:
-                QMessageBox.critical(self, "错误", f"无法加载文件: {e!s}")
+                QMessageBox.critical(self, "错误", f"无法加载文件：{e!s}")
 
     def compare_texts(self):
         """执行文本对比并应用高亮"""
@@ -245,7 +245,7 @@ class DiffViewerMainWindow(QMainWindow):
             self.status_label.setText("对比完成！红色表示删除，绿色表示新增")
 
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"对比过程中出现错误: {e!s}")
+            QMessageBox.critical(self, "错误", f"对比过程中出现错误：{e!s}")
 
     def clear_texts(self):
         """清除文本内容"""
@@ -260,7 +260,7 @@ def main():
     """主函数"""
     app = QApplication(sys.argv)
 
-    # 检查diff_match_patch是否可用
+    # 检查 diff_match_patch 是否可用
     try:
         import diff_match_patch
     except ImportError:
@@ -270,7 +270,7 @@ def main():
         msg.setIcon(QMessageBox.Icon.Critical)
         msg.setWindowTitle("缺少依赖")
         msg.setText("缺少 diff-match-patch 库")
-        msg.setInformativeText("请运行: pip install diff-match-patch")
+        msg.setInformativeText("请运行：pip install diff-match-patch")
         msg.exec()
         sys.exit(1)
 
@@ -281,4 +281,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    pass
+    # main()
