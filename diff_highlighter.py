@@ -212,7 +212,6 @@ class MultiHighlighter(QSyntaxHighlighter):
         super().__init__(parent)
         self.diff_engine = NewDiffHighlighterEngine(self, editor_type=editor_type)
         self.pygments_engine = PygmentsHighlighterEngine(self)
-        # self.engines = [self.diff_engine, self.pygments_engine]
         self.other_document = other_document
 
     def set_language(self, language_name):
