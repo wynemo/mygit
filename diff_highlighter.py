@@ -280,13 +280,6 @@ class NewDiffHighlighterEngine:
     def is_right_side(self):
         return self.editor_type in ["right", "parent2_edit"]
 
-    # @property
-    # def document(self):
-    #     return self.highlighter.document()
-
-    # def currentBlock(self):
-    #     return self.highlighter.currentBlock()
-
     def highlightBlock(self, text: str):
         """重写高亮方法"""
         # if not self.diff_list:
@@ -303,11 +296,6 @@ class NewDiffHighlighterEngine:
 
         # 根据差异列表应用格式
         current_pos = 0
-
-        # if self.is_left_side:
-        #     self.set_texts(full_text, self.highlighter.other_document.toPlainText())
-        # else:
-        #     self.set_texts(self.highlighter.other_document.toPlainText(), full_text)
 
         for op, data in self.diff_list:
             data_length = len(data)
