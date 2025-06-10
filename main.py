@@ -36,4 +36,11 @@ if __name__ == "__main__":
     logging.basicConfig(
         level=log_level, format="%(asctime)s - %(levelname)s - %(name)s - %(filename)s:%(lineno)d - %(message)s"
     )
+    # add file handler
+    # file_handler = logging.FileHandler("mygit.log")
+    # file_handler.setLevel(logging.DEBUG)
+    # file_handler.setFormatter(
+    #     logging.Formatter("%(asctime)s - %(levelname)s - %(name)s - %(filename)s:%(lineno)d - %(message)s")
+    # )
+    # logging.getLogger().addHandler(file_handler)
     main()
