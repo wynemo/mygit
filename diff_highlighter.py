@@ -1,6 +1,7 @@
 import difflib
 import logging
 
+import diff_match_patch
 from PyQt6.QtGui import QColor, QSyntaxHighlighter, QTextCharFormat
 
 from diff_calculator import DiffChunk
@@ -209,9 +210,9 @@ class DiffHighlighter(QSyntaxHighlighter):
 class MultiHighlighter(QSyntaxHighlighter):
     def __init__(self, parent=None, editor_type="", other_document=None):
         super().__init__(parent)
-        self.diff_engine = DiffHighlighterEngine(self, editor_type=editor_type)
+        self.diff_engine = NewDiffHighlighterEngine(self, editor_type=editor_type)
         self.pygments_engine = PygmentsHighlighterEngine(self)
-        self.engines = [DiffHighlighterEngine(self, editor_type=editor_type), PygmentsHighlighterEngine(self)]
+        # self.engines = [self.diff_engine, self.pygments_engine]
         self.other_document = other_document
 
     def set_language(self, language_name):
@@ -222,6 +223,119 @@ class MultiHighlighter(QSyntaxHighlighter):
         self.diff_engine.set_diff_chunks(chunks)
         self.rehighlight()
 
+    def set_texts(self, left_text: str, right_text: str):
+        if hasattr(self.diff_engine, "set_texts"):
+            self.diff_engine.set_texts(left_text, right_text)
+            self.rehighlight()
+
     def highlightBlock(self, text):
         self.pygments_engine.highlightBlock(text)
         self.diff_engine.highlightBlock(text)
+
+
+# new DiffHighlighterEngine
+class NewDiffHighlighterEngine:
+    def __init__(self, highlighter: QSyntaxHighlighter, editor_type=""):
+        self.highlighter = highlighter
+        self.editor_type = editor_type
+        self.diff_chunks: list[DiffChunk] = []
+        self.diff_list = []
+        logging.debug("\n=== 初始化 DiffHighlighter ===")
+        logging.debug("编辑器类型：%s", editor_type)
+
+        self.dmp = diff_match_patch.diff_match_patch()
+
+        # 定义不同类型差异的格式
+        self.deleted_format = QTextCharFormat()
+        self.deleted_format.setBackground(QColor(255, 200, 200))  # 浅红色背景
+        self.deleted_format.setForeground(QColor(150, 0, 0))  # 深红色文字
+
+        self.inserted_format = QTextCharFormat()
+        self.inserted_format.setBackground(QColor(200, 255, 200))  # 浅绿色背景
+        self.inserted_format.setForeground(QColor(0, 150, 0))  # 深绿色文字
+
+        self.equal_format = QTextCharFormat()
+        self.equal_format.setBackground(QColor(255, 255, 255))  # 白色背景
+        self.equal_format.setForeground(QColor(0, 0, 0))  # 黑色文字
+
+    def set_diff_chunks(self, chunks):
+        self.diff_chunks = chunks
+
+    def set_texts(self, left_text: str, right_text: str):
+        """设置要对比的文本"""
+        # 计算差异
+        self.diff_list = self.dmp.diff_main(left_text, right_text)
+        self.dmp.diff_cleanupSemantic(self.diff_list)
+
+        # 触发重新高亮
+        # self.highlighter.rehighlight()
+
+    # left side property
+    @property
+    def is_left_side(self):
+        return self.editor_type in ["left", "parent1_edit"]
+
+    # right side property
+    @property
+    def is_right_side(self):
+        return self.editor_type in ["right", "parent2_edit"]
+
+    # @property
+    # def document(self):
+    #     return self.highlighter.document()
+
+    # def currentBlock(self):
+    #     return self.highlighter.currentBlock()
+
+    def highlightBlock(self, text: str):
+        """重写高亮方法"""
+        # if not self.diff_list:
+        #     return
+
+        # 构建完整文档文本用于定位
+        document = self.highlighter.document()
+        full_text = document.toPlainText()
+
+        # 获取当前块在整个文档中的位置
+        current_block = self.highlighter.currentBlock()
+        block_start = current_block.position()
+        block_length = len(text)
+
+        # 根据差异列表应用格式
+        current_pos = 0
+
+        # if self.is_left_side:
+        #     self.set_texts(full_text, self.highlighter.other_document.toPlainText())
+        # else:
+        #     self.set_texts(self.highlighter.other_document.toPlainText(), full_text)
+
+        for op, data in self.diff_list:
+            data_length = len(data)
+
+            # 检查这个差异是否与当前块重叠
+            if current_pos + data_length > block_start and current_pos < block_start + block_length:
+                # 计算在当前块中的相对位置
+                start_in_block = max(0, current_pos - block_start)
+                end_in_block = min(block_length, current_pos + data_length - block_start)
+
+                if end_in_block > start_in_block:
+                    format_to_apply = None
+
+                    if op == diff_match_patch.diff_match_patch.DIFF_DELETE:
+                        if self.is_left_side:
+                            format_to_apply = self.deleted_format
+                    elif op == diff_match_patch.diff_match_patch.DIFF_INSERT:
+                        if not self.is_left_side:
+                            format_to_apply = self.inserted_format
+                    # else:  # DIFF_EQUAL
+                    # format_to_apply = self.equal_format
+
+                    if format_to_apply:
+                        self.highlighter.setFormat(start_in_block, end_in_block - start_in_block, format_to_apply)
+
+            # 只有在 DELETE 和 EQUAL 时才移动左侧位置，INSERT 和 EQUAL 时才移动右侧位置
+            if self.is_left_side:
+                if op != diff_match_patch.diff_match_patch.DIFF_INSERT:
+                    current_pos += data_length
+            elif op != diff_match_patch.diff_match_patch.DIFF_DELETE:
+                current_pos += data_length

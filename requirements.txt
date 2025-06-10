@@ -3,3 +3,4 @@ gitpython>=3.1.44
 aiohttp>=3.11.16
 pygments>=2.19.1
 pathspec>=0.12.1
+diff_match_patch

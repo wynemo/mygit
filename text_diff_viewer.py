@@ -211,6 +211,9 @@ class DiffViewer(QWidget):
         self.left_edit.highlighter.set_diff_chunks(self.diff_chunks)
         self.right_edit.highlighter.set_diff_chunks(self.diff_chunks)
 
+        self.left_edit.highlighter.set_texts(left_text, right_text)
+        self.right_edit.highlighter.set_texts(left_text, right_text)
+
         logging.info(f"Total diff chunks from algorithm: {len(self.diff_chunks)}")
         self.actual_diff_chunks = [chunk for chunk in self.diff_chunks if chunk.type != "equal"]
         logging.info(f"Number of actual (non-equal) diff chunks: {len(self.actual_diff_chunks)}")
