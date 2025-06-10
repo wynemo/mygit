@@ -296,11 +296,24 @@ class DiffViewer(QWidget):
                         # 计算在差异块内的精确位置
                         block_progress = (current_line - source_start) / max(1, source_size)
                         # 调整目标行号，考虑差异块内的相对位置
-                        if target_size == 0:
+                        if target_size == 0 and chunk.type == "delete":
                             # 对于删除块，使用当前行号减去删除的行数
+                            logging.debug(
+                                "current_line: %d, source_end: %d, source_start: %d, chunk type %s",
+                                current_line,
+                                source_end,
+                                source_start,
+                                chunk.type,
+                            )
                             target_line = current_line - (source_end - source_start)
                         else:
                             # 对于其他类型的块，使用相对位置计算
+                            logging.debug(
+                                "block_progress: %f, target_size: %d, target_start: %d",
+                                block_progress,
+                                target_size,
+                                target_start,
+                            )
                             target_line = target_start + int(block_progress * target_size)
                         logging.debug(
                             "在差异块内 [%d, %d] -> [%d, %d]",
@@ -309,6 +322,7 @@ class DiffViewer(QWidget):
                             target_start,
                             target_end,
                         )
+                        print(chunk)
                         logging.debug("块内进度：%.2f, 目标行：%d", block_progress, target_line)
                         break
                     else:
@@ -378,7 +392,12 @@ class DiffViewer(QWidget):
 
             # 计算滚动值
             target_scroll = self._calculate_scroll_value(target_edit, target_line)
-            logging.debug("目标行：%d, 目标滚动值：%d", target_line, target_scroll)
+            logging.debug(
+                "目标编辑器：%s, 目标行：%d, 目标滚动值：%d",
+                target_edit.objectName(),
+                target_line,
+                target_scroll,
+            )
 
             # 设置滚动条位置
             target_edit.verticalScrollBar().setValue(target_scroll)
