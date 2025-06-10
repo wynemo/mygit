@@ -198,7 +198,7 @@ class CommitHistoryView(QWidget):
 
             # 检查各列的匹配情况 (0: id, 1: message, 3: author, 4: date)
             show_item = False
-            for col in (0, 1, 3, 4):
+            for col in range(self.history_list.columnCount()):
                 item_text = item.text(col).lower()
                 if self.filter_text in item_text:
                     show_item = True
