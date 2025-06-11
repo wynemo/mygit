@@ -91,3 +91,4 @@
 97. ~~比较差异，需要更精细化，多行的比较，~~ 但是高亮器不太完美 先这样吧
 98. 3-way 比较 修复
 99. 多文件的比较，现在只支持一个文件的比较，就是 commit 之间的比较：CustomTreeWidget 增加一个右键菜单 与工作区比较 这个菜单点击 把变更的文件（可能有多个）设置到 workerspace_explorer.file_changes_view 里去 你可以参考 show_all_affected_files
+100. NewDiffHighlighterEngine 效率有点慢
