@@ -212,6 +212,7 @@ class MultiHighlighter(QSyntaxHighlighter):
         self.diff_engine = NewDiffHighlighterEngine(self, editor_type=editor_type)
         self.pygments_engine = PygmentsHighlighterEngine(self)
         self.other_document = other_document
+        self.diff_chunks: list[DiffChunk] = []
 
     def set_language(self, language_name):
         self.pygments_engine.set_language(language_name)
@@ -219,6 +220,7 @@ class MultiHighlighter(QSyntaxHighlighter):
 
     def set_diff_chunks(self, chunks):
         self.diff_engine.set_diff_chunks(chunks)
+        self.diff_chunks = chunks
         self.rehighlight()
 
     def set_texts(self, left_text: str, right_text: str):
