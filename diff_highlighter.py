@@ -285,10 +285,6 @@ class NewDiffHighlighterEngine:
         # if not self.diff_list:
         #     return
 
-        # 构建完整文档文本用于定位
-        document = self.highlighter.document()
-        full_text = document.toPlainText()
-
         # 获取当前块在整个文档中的位置
         current_block = self.highlighter.currentBlock()
         block_start = current_block.position()
