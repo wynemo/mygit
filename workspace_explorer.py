@@ -1,7 +1,7 @@
 import logging
 import os
 import weakref
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from PyQt6.QtCore import QMimeData, QPoint, Qt
 from PyQt6.QtGui import QAction, QColor, QDrag, QDragEnterEvent, QDropEvent
@@ -26,6 +26,9 @@ from file_history_view import FileHistoryView
 from syntax_highlighter import CodeHighlighter
 from utils import get_main_window_by_parent
 from utils.language_map import LANGUAGE_MAP
+
+if TYPE_CHECKING:
+    from git_manager_window import GitManagerWindow
 
 
 class WorkspaceExplorer(QWidget):
@@ -210,11 +213,11 @@ class WorkspaceExplorer(QWidget):
 
     def _add_directory_items(self, path: str, parent_item_in_tree: QTreeWidgetItem, level: int = 0) -> bool:
         """cursor 生成 - 优先显示目录
-        将被.gitignore忽略的文件/文件夹显示为灰色
+        将被.gitignore 忽略的文件/文件夹显示为灰色
         Args:
             path: 目录路径
             parent_item_in_tree: 父节点
-            level: 当前目录深度(0表示根目录)
+            level: 当前目录深度 (0 表示根目录)
         """
         current_dir_or_descendant_is_modified = False
         try:
@@ -240,7 +243,7 @@ class WorkspaceExplorer(QWidget):
                 tree_item.setText(0, item_name)
                 tree_item.setData(0, Qt.ItemDataRole.UserRole, item_path)
 
-                # 检查是否被.gitignore忽略
+                # 检查是否被.gitignore 忽略
                 if self.git_manager and self.git_manager.is_ignored(item_path):
                     tree_item.setForeground(0, QColor(128, 128, 128))  # 灰色
 
@@ -269,7 +272,7 @@ class WorkspaceExplorer(QWidget):
                 tree_item.setText(0, item_name)
                 tree_item.setData(0, Qt.ItemDataRole.UserRole, item_path)
 
-                # 检查是否被.gitignore忽略
+                # 检查是否被.gitignore 忽略
                 if self.git_manager and self.git_manager.is_ignored(item_path):
                     tree_item.setForeground(0, QColor(128, 128, 128))  # 灰色
 
@@ -384,7 +387,7 @@ class FileTreeWidget(QTreeWidget):
         super().__init__(parent)
         self.git_manager = git_manager
         self.workspace_explorer = None
-        # 查找父WorkspaceExplorer实例
+        # 查找父 WorkspaceExplorer 实例
         p = parent
         while p and not isinstance(p, WorkspaceExplorer):
             p = p.parent()
@@ -574,7 +577,7 @@ class FileTreeWidget(QTreeWidget):
     def _show_file_history(self, file_path):
         """显示文件历史"""
         # 获取 GitManagerWindow 的引用
-        main_window = self.window()
+        main_window: "GitManagerWindow" = self.window()
 
         print("main_window", id(main_window), main_window)
 
