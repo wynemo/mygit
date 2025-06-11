@@ -26,7 +26,6 @@ class DiffHighlighterEngine:
             "equal": None,
         }
         # 新增：互相包含差异的高亮格式
-        # 注意，颜色是叠加的， #ffffcc #800080 叠加后是 紫色
         self.inline_contained_insert_format = self.create_format("#ccffcc", "#cccc00")
         self.inline_contained_delete_format = self.create_format("#800080", "#cccc00")
 
