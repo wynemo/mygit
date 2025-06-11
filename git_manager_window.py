@@ -427,13 +427,13 @@ class GitManagerWindow(QMainWindow):
     #     if widget_to_close:
     #         widget_to_close.deleteLater() # 确保 Qt 对象被正确删除
 
-    def show_compare_with_working_dialog(self, file_path, commit_hash=None):
+    def show_compare_with_working_dialog(self, file_path, commit_hash=None, old_file_path=None):
         """显示与工作区比较的对话框"""
         try:
             _commit = self.git_manager.repo.commit(commit_hash) if commit_hash else self.current_commit
 
             # 获取历史版本的文件内容
-            old_content = _commit.tree[file_path].data_stream.read().decode("utf-8", errors="replace")
+            old_content = _commit.tree[old_file_path or file_path].data_stream.read().decode("utf-8", errors="replace")
 
             # 获取工作区的文件内容
             working_file_path = os.path.join(self.git_manager.repo.working_dir, file_path)
