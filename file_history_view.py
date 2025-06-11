@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 class FileHistoryView(QWidget):
-    compare_with_working_requested = pyqtSignal(str, str)  # 新增信号
+    compare_with_working_requested = pyqtSignal(str, str, str)  # 新增信号
 
     def __init__(self, file_path, parent=None):
         super().__init__(parent)
@@ -164,7 +164,10 @@ class FileHistoryView(QWidget):
         compare_action = menu.addAction("与工作区比较")
         repo_path = self.git_manager.repo.working_dir
         relative_path = os.path.relpath(self.file_path, repo_path)
-        compare_action.triggered.connect(lambda: self.compare_with_working_requested.emit(relative_path, item.text(0)))
+        print("relative_path", relative_path, item.data(3, 256))
+        compare_action.triggered.connect(
+            lambda: self.compare_with_working_requested.emit(relative_path, item.text(0), item.data(3, 256))
+        )
         menu.addAction(compare_action)
 
         # 添加 "显示所有受影响的文件" 菜单项
