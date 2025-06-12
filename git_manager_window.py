@@ -1,8 +1,8 @@
 import logging
 import os
 
-from PyQt6.QtCore import QEvent, Qt  # Added QEvent and threading
-from PyQt6.QtGui import QGuiApplication
+from PyQt6.QtCore import QEvent, Qt, pyqtSignal  # Added QEvent and threading
+from PyQt6.QtGui import QGuiApplication, QIcon
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QSplitter,
     QTabBar,
     QTabWidget,  # 添加 QTabWidget 导入
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -32,6 +33,10 @@ from workspace_explorer import WorkspaceExplorer
 
 
 class GitManagerWindow(QMainWindow):
+    fetch_requested = pyqtSignal()
+    pull_requested = pyqtSignal()
+    push_requested = pyqtSignal()
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle(self.tr("Git Manager"))
@@ -85,9 +90,9 @@ class GitManagerWindow(QMainWindow):
         self.top_bar.branch_changed.connect(self.on_branch_changed)
         self.top_bar.commit_requested.connect(self.show_commit_dialog)
         self.top_bar.settings_requested.connect(self.show_settings_dialog)
-        self.top_bar.fetch_requested.connect(self.fetch_repo)
-        self.top_bar.pull_requested.connect(self.pull_repo)
-        self.top_bar.push_requested.connect(self.push_repo)
+        self.fetch_requested.connect(self.fetch_repo)
+        self.pull_requested.connect(self.pull_repo)
+        self.push_requested.connect(self.push_repo)
         self.top_bar.toggle_bottom_panel_requested.connect(self.toggle_bottom_widget)
         self.top_bar.toggle_left_panel_requested.connect(self.toggle_left_panel)
 
@@ -115,6 +120,35 @@ class GitManagerWindow(QMainWindow):
         horizontal_splitter.setOpaqueResize(False)  # 添加平滑调整
         horizontal_splitter.setHandleWidth(8)  # 增加分割条宽度，更容易拖动
         bottom_layout.addWidget(horizontal_splitter)
+
+        # 创建 Fetch/Pull/Push 按钮布局
+        git_button_layout = QHBoxLayout()
+        git_button_layout.setContentsMargins(0, 0, 0, 10)
+        git_button_layout.setSpacing(10)
+
+        self.fetch_button = QToolButton()
+        self.fetch_button.setIcon(QIcon("icons/fetch.svg"))
+        self.fetch_button.setText("Fetch")
+        self.fetch_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.fetch_button.clicked.connect(self.fetch_repo)
+        git_button_layout.addWidget(self.fetch_button)
+
+        self.pull_button = QToolButton()
+        self.pull_button.setIcon(QIcon("icons/pull.svg"))
+        self.pull_button.setText("Pull")
+        self.pull_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.pull_button.clicked.connect(self.pull_repo)
+        git_button_layout.addWidget(self.pull_button)
+
+        self.push_button = QToolButton()
+        self.push_button.setIcon(QIcon("icons/push.svg"))
+        self.push_button.setText("Push")
+        self.push_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.push_button.clicked.connect(self.push_repo)
+        git_button_layout.addWidget(self.push_button)
+
+        git_widget = QWidget()
+        git_widget.setLayout(git_button_layout)
 
         # 创建主要视图组件
         self.commit_history_view = CommitHistoryView()  # 左侧
@@ -157,7 +191,12 @@ class GitManagerWindow(QMainWindow):
         right_splitter.setSizes([300, 200])  # 设置初始比例
 
         # 添加到布局
-        horizontal_splitter.addWidget(self.tab_widget)
+        v_git_and_tab_layout = QVBoxLayout()
+        git_and_tab_widget = QWidget()
+        git_and_tab_widget.setLayout(v_git_and_tab_layout)
+        v_git_and_tab_layout.addWidget(git_widget)
+        v_git_and_tab_layout.addWidget(self.tab_widget)
+        horizontal_splitter.addWidget(git_and_tab_widget)
         horizontal_splitter.addWidget(right_splitter)
         horizontal_splitter.addWidget(self.compare_view)
 

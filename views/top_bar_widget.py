@@ -65,9 +65,6 @@ class TopBarWidget(QWidget):
     branch_changed = pyqtSignal(str)
     commit_requested = pyqtSignal()
     settings_requested = pyqtSignal()
-    fetch_requested = pyqtSignal()
-    pull_requested = pyqtSignal()
-    push_requested = pyqtSignal()
     toggle_bottom_panel_requested = pyqtSignal()
     toggle_left_panel_requested = pyqtSignal()  # 新增信号
 
@@ -105,28 +102,6 @@ class TopBarWidget(QWidget):
         self.layout().addWidget(self.spinner_label)
 
         self._layout.addStretch(1)  # Add stretch to push subsequent items to the right
-
-        # --- Fetch, Pull, Push Buttons ---
-        self.fetch_button = QToolButton()
-        self.fetch_button.setIcon(QIcon("icons/fetch.svg"))
-        self.fetch_button.setText("Fetch")
-        self.fetch_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.fetch_button.clicked.connect(self.fetch_requested.emit)
-        self._layout.addWidget(self.fetch_button)
-
-        self.pull_button = QToolButton()
-        self.pull_button.setIcon(QIcon("icons/pull.svg"))  # Placeholder, assuming pull.svg
-        self.pull_button.setText("Pull")
-        self.pull_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.pull_button.clicked.connect(self.pull_requested.emit)
-        self._layout.addWidget(self.pull_button)
-
-        self.push_button = QToolButton()
-        self.push_button.setIcon(QIcon("icons/push.svg"))  # Placeholder, assuming push.svg
-        self.push_button.setText("Push")
-        self.push_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.push_button.clicked.connect(self.push_requested.emit)
-        self._layout.addWidget(self.push_button)
 
         # --- Separator ---
         separator = QFrame()
@@ -250,9 +225,6 @@ class TopBarWidget(QWidget):
     def set_buttons_enabled(self, enabled):
         """Enable or disable buttons that require an open repository."""
         self.branch_combo.setEnabled(enabled)
-        self.fetch_button.setEnabled(enabled)
-        self.pull_button.setEnabled(enabled)
-        self.push_button.setEnabled(enabled)
         # `recent_button` and `open_button` should always be enabled or handled separately.
         # `settings_button` and `toggle_bottom_button` usually always enabled.
 
