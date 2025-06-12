@@ -117,7 +117,8 @@ class GitManagerWindow(QMainWindow):
         # 创建 Fetch/Pull/Push 按钮布局
         git_button_layout = QHBoxLayout()
         git_button_layout.setContentsMargins(0, 0, 0, 0)
-        git_button_layout.setSpacing(0)
+        git_button_layout.setSpacing(15)
+        git_button_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)  # 左对齐
 
         self.fetch_button = QToolButton()
         self.fetch_button.setIcon(QIcon("icons/fetch.svg"))
@@ -185,8 +186,8 @@ class GitManagerWindow(QMainWindow):
 
         # 添加到布局
         v_git_and_tab_layout = QVBoxLayout()
-        v_git_and_tab_layout.setContentsMargins(0, 0, 0, 0)
-        v_git_and_tab_layout.setSpacing(0)
+        v_git_and_tab_layout.setContentsMargins(10, 10, 10, 10)
+        v_git_and_tab_layout.setSpacing(15)
         git_and_tab_widget = QWidget()
         git_and_tab_widget.setLayout(v_git_and_tab_layout)
         v_git_and_tab_layout.addWidget(git_widget)
