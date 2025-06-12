@@ -672,7 +672,7 @@ class GitManagerWindow(QMainWindow):
         try:
             if success:
                 self.update_commit_history()
-                # Optionally show success: self.notification_widget.show_message("Push successful.")
+                self.notification_widget.show_message("Push successful.")
                 logging.info("Push successful.")
             elif error_message:  # Only show notification if there's an error message
                 self.notification_widget.show_message(f"Push failed: {error_message}")
