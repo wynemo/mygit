@@ -94,3 +94,4 @@
 100. NewDiffHighlighterEngine 效率有点慢 知道了一个是计算所有行慢 一个是一次性高亮所有行慢 那个 rehighligt 一次性高亮所有行慢
 101. git checkout 功能
 102. git reset 功能
+103. 文件夹历史记录
