@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QMenu,
     QMessageBox,
     QPushButton,
     QSplitter,
@@ -135,6 +136,10 @@ class CommitWidget(QFrame):
         self.staged_tree.itemDoubleClicked.connect(lambda item: self.show_file_diff(item, True))
         self.unstaged_tree.itemDoubleClicked.connect(lambda item: self.show_file_diff(item, False))
 
+        # 添加右键菜单支持
+        self.unstaged_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.unstaged_tree.customContextMenuRequested.connect(self._show_unstaged_context_menu)
+
     def showEvent(self, event):
         self.refresh_file_status()
         super().showEvent(event)
@@ -152,6 +157,31 @@ class CommitWidget(QFrame):
     @property
     def parent_window(self):
         return get_main_window_by_parent(self)
+
+    def revert_file(self, file_path: str):
+        """还原文件"""
+        try:
+            # 还原文件修改
+            self.git_manager.repo.git.checkout("--", file_path)
+            self.refresh_file_status()
+        except Exception as e:
+            logging.error(f"还原文件失败：{e}")
+
+    def _show_unstaged_context_menu(self, position):
+        """显示未暂存文件的右键菜单"""
+        item = self.unstaged_tree.itemAt(position)
+        if not item:
+            return
+
+        file_path = item.text(0)
+        menu = QMenu(self)
+
+        # 只有修改过的文件可以还原
+        if item.text(1) == "Modified":
+            revert_action = menu.addAction("Revert")
+            revert_action.triggered.connect(lambda: self.revert_file(file_path))
+
+        menu.exec(self.unstaged_tree.mapToGlobal(position))
 
     def refresh_file_status(self):
         """刷新文件状态显示"""
