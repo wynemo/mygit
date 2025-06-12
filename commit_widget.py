@@ -120,12 +120,10 @@ class CommitWidget(QFrame):
         # 修改按钮区域
         button_box = QDialogButtonBox()
         self.commit_button = button_box.addButton("Commit", QDialogButtonBox.ButtonRole.ActionRole)
-        self.commit_and_push_button = button_box.addButton("Commit & Push", QDialogButtonBox.ButtonRole.ActionRole)
         layout.addWidget(button_box)
 
         # 连接信号
         self.commit_button.clicked.connect(self.accept)
-        self.commit_and_push_button.clicked.connect(self.commit_and_push)
 
         # 初始化 AI 生成器线程
         self.ai_thread = AIGeneratorThread(self)
@@ -371,29 +369,3 @@ class CommitWidget(QFrame):
             logging.exception("提交失败")
             QMessageBox.critical(self, "错误", f"提交失败：{e!s}")
 
-    def commit_and_push(self):
-        """执行提交并推送"""
-        try:
-            # 先执行提交
-            self.accept()
-            if self.result() != QDialog.DialogCode.Accepted:
-                # 如果提交失败，直接返回
-                return
-
-            # 获取当前分支
-            current = self.git_manager.repo.active_branch
-
-            # 执行推送
-            origin = self.git_manager.repo.remote(name="origin")
-            push_info = origin.push(refspec=f"{current.name}:{current.name}")
-
-            # 检查推送结果
-            if push_info[0].flags & push_info[0].ERROR:
-                raise Exception("Push failed")
-            self.parent_window.update_commit_history()
-
-            QMessageBox.information(self, "成功", "推送成功")
-
-        except Exception as e:
-            logging.exception("推送失败")
-            QMessageBox.critical(self, "错误", f"推送失败：{e!s}")
