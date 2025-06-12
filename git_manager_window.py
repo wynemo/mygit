@@ -185,6 +185,8 @@ class GitManagerWindow(QMainWindow):
 
         # 添加到布局
         v_git_and_tab_layout = QVBoxLayout()
+        v_git_and_tab_layout.setContentsMargins(0, 0, 0, 0)
+        v_git_and_tab_layout.setSpacing(0)
         git_and_tab_widget = QWidget()
         git_and_tab_widget.setLayout(v_git_and_tab_layout)
         v_git_and_tab_layout.addWidget(git_widget)
