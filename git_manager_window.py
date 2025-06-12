@@ -1,7 +1,7 @@
 import logging
 import os
 
-from PyQt6.QtCore import QEvent, Qt, pyqtSignal  # Added QEvent and threading
+from PyQt6.QtCore import QEvent, Qt  # Added QEvent and threading
 from PyQt6.QtGui import QGuiApplication, QIcon
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -33,10 +33,6 @@ from workspace_explorer import WorkspaceExplorer
 
 
 class GitManagerWindow(QMainWindow):
-    fetch_requested = pyqtSignal()
-    pull_requested = pyqtSignal()
-    push_requested = pyqtSignal()
-
     def __init__(self):
         super().__init__()
         self.setWindowTitle(self.tr("Git Manager"))
@@ -90,9 +86,6 @@ class GitManagerWindow(QMainWindow):
         self.top_bar.branch_changed.connect(self.on_branch_changed)
         self.top_bar.commit_requested.connect(self.show_commit_dialog)
         self.top_bar.settings_requested.connect(self.show_settings_dialog)
-        self.fetch_requested.connect(self.fetch_repo)
-        self.pull_requested.connect(self.pull_repo)
-        self.push_requested.connect(self.push_repo)
         self.top_bar.toggle_bottom_panel_requested.connect(self.toggle_bottom_widget)
         self.top_bar.toggle_left_panel_requested.connect(self.toggle_left_panel)
 
