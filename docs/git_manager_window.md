@@ -12,19 +12,20 @@
     └── [main_layout] (QVBoxLayout - 主垂直布局)
         │
         ├── [TopBarWidget] (自定义顶部工具栏)
-        │   │ - 提供打开仓库、切换分支、提交、拉取、推送、设置等操作按钮。
-        │   │ - 显示最近打开的仓库列表。
-        │   └── 包含切换底部面板和左侧面板显示/隐藏的按钮。
+        │   │ - 提供打开仓库、切换分支、提交、拉取、推送、设置等操作按钮
+        │   │ - 显示最近打开的仓库列表
+        │   │ - 包含切换底部面板和左侧面板显示/隐藏的按钮
+        │   │ - 提供 Fetch/Pull/Push 操作按钮
         │
         └── [vertical_splitter] (QSplitter - 主垂直分割器)
             │
             ├── [左侧面板分割器] left_panel_splitter (QSplitter)
             │   ├── [SideBarWidget] (自定义侧边栏)
-            │   │   └── 包含工程和提交按钮
-            │   └── [上半部分] workspace_explorer (WorkspaceExplorer)
-            │   │ - 左侧：文件树视图 (FileTreeWidget)，显示当前工作区的文件结构。
-            │   └── 右侧：compare_tab_widget (QTabWidget)，用于在多个标签页中显示文件比较视图 (CompareView)。
-            │       └── 每个标签页标题格式: "文件名 @ commit短哈希"。
+            │   │   └── 包含工程、提交和变更按钮
+            │   └── [WorkspaceExplorer] (工作区浏览器)
+            │       │ - 左侧：文件树视图 (FileTreeWidget)，显示当前工作区的文件结构
+            │       └── 右侧：compare_tab_widget (QTabWidget)，用于在多个标签页中显示文件比较视图 (CompareView)
+            │           └── 每个标签页标题格式: "文件名 @ commit短哈希"
             │
             └── [下半部分] bottom_widget (QWidget - 底部面板，可整体显示/隐藏)
                 │
@@ -32,23 +33,29 @@
                     │
                     └── [horizontal_splitter] (QSplitter - 水平分割器)
                         │
-                        ├── [左侧] tab_widget (QTabWidget - 主功能标签页)
-                        │   ├── 固定标签页 (索引 0): "提交历史" (CommitHistoryView)
-                        │   │   ├── history_list (CustomTreeWidget): 列表形式显示提交记录。
-                        │   │   └── history_graph_list (GitGraphView): 图形化显示提交历史。
-                        │   │       (CommitHistoryView 会根据情况显示列表或图形视图)
-                        │   └── 动态标签页: 用于显示单个文件的提交历史 (FileHistoryView 实例，按需创建)。
+                        ├── [左侧] git_and_tab_widget (QWidget)
+                        │   │
+                        │   └── [v_git_and_tab_layout] (QVBoxLayout)
+                        │       │
+                        │       ├── [git_widget] (QWidget - 包含 Fetch/Pull/Push 按钮)
+                        │       │
+                        │       └── [tab_widget] (QTabWidget - 主功能标签页)
+                        │           ├── 固定标签页 (索引 0): "提交历史" (CommitHistoryView)
+                        │           │   ├── history_list (CustomTreeWidget): 列表形式显示提交记录
+                        │           │   └── history_graph_list (GitGraphView): 图形化显示提交历史
+                        │           │       (CommitHistoryView 会根据情况显示列表或图形视图)
+                        │           └── 动态标签页: 用于显示单个文件的提交历史 (FileHistoryView 实例，按需创建)
                         │
                         ├── [右侧中间区域] right_splitter (QSplitter - 垂直分割器)
                         │   ├── [上部] file_changes_view (FileChangesView)
-                        │   │   └── 显示选定提交中所更改的文件列表。
+                        │   │   └── 显示选定提交中所更改的文件列表
                         │   └── [下部] commit_detail_view (CommitDetailView)
-                        │       └── 显示选定提交的详细信息（作者、日期、消息等）。
+                        │       └── 显示选定提交的详细信息（作者、日期、消息等）
                         │
-                        └── [右侧最外层备用视图] compare_view (CompareView)
-                            └── 当主功能标签页 (tab_widget) 切换到单个文件历史时，此视图会显示，用于对比文件版本。
+                        └── [右侧最外层] compare_view (CompareView)
+                            └── 当主功能标签页 (tab_widget) 切换到单个文件历史时，此视图会显示，用于对比文件版本
                                 (注: WorkspaceExplorer 内的 compare_tab_widget 用于工作区文件与历史版本的对比，
-                                 此处的 compare_view 用于文件历史视图中的版本对比。)
+                                 此处的 compare_view 用于文件历史视图中的版本对比)
 ```
 
 ## 关键功能说明
