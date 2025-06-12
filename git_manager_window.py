@@ -326,6 +326,7 @@ class GitManagerWindow(QMainWindow):
             self.workspace_explorer.set_workspace_path(folder_path)
             self.workspace_explorer.git_manager = self.git_manager
             self.workspace_explorer.file_tree.git_manager = self.git_manager
+            self.setWindowTitle(f"{self.tr('Git Manager')} - {folder_path}")
         else:
             self.commit_history_view.history_list.clear()
             self.notification_widget.show_message("所选文件夹不是有效的 Git 仓库")
