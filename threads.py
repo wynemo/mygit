@@ -93,10 +93,20 @@ class AIGeneratorThread(QThread):
 
         data = {"model": model_name, "messages": messages}
 
-        async with aiohttp.ClientSession() as session, session.post(api_url, headers=headers, json=data) as response:
-            if response.status == 200:
-                result = await response.json()
-                return result["choices"][0]["message"]["content"]
-            else:
-                error_text = await response.text()
-                raise Exception(f"API 调用失败：{response.status} - {error_text}")
+        timeout = aiohttp.ClientTimeout(total=15)  # 15 秒超时
+
+        try:
+            async with (
+                aiohttp.ClientSession(timeout=timeout) as session,
+                session.post(api_url, headers=headers, json=data) as response,
+            ):
+                if response.status == 200:
+                    result = await response.json()
+                    return result["choices"][0]["message"]["content"]
+                else:
+                    error_text = await response.text()
+                    raise Exception(f"API 调用失败：{response.status} - {error_text}")
+        except asyncio.TimeoutError as e:
+            raise Exception("API 调用超时（15 秒）") from e
+        except aiohttp.ClientError as e:
+            raise Exception("API 调用错误") from e
