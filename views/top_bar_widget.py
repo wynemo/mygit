@@ -136,7 +136,7 @@ class TopBarWidget(QWidget):
 
         # --- Settings Button ---
         self.settings_button = QToolButton()
-        # self.settings_button.setIcon(QIcon("icons/settings.svg")) # Assuming settings.svg
+        self.settings_button.setIcon(QIcon("icons/settings.svg"))  # Assuming settings.svg
         self.settings_button.setText("Settings")  # Using text until icon is confirmed
         self.settings_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.settings_button.clicked.connect(self.settings_requested.emit)
