@@ -7,6 +7,7 @@ class SideBarWidget(QWidget):
     project_button_clicked = pyqtSignal()
     commit_button_clicked = pyqtSignal()
     changes_button_clicked = pyqtSignal()
+    search_button_clicked = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -96,6 +97,32 @@ class SideBarWidget(QWidget):
         self.changes_btn.clicked.connect(self._on_changes_clicked)
         layout.addWidget(self.changes_btn)
 
+        # 搜索按钮
+        self.search_btn = QToolButton()
+        self.search_btn.setText("搜索")
+        self.search_btn.setIcon(QIcon("icons/search.svg"))
+        self.search_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+        self.search_btn.setCheckable(True)
+        self.search_btn.setChecked(False)
+        self.search_btn.setStyleSheet("""
+            QToolButton {
+                border: none;
+                background-color: transparent;
+            }
+            QToolButton:hover {
+                background-color: #e0e0e0;
+            }
+            QToolButton:checked {
+                background-color: #2196F3;
+            }
+            QToolButton:checked:!active {
+                background-color: #cccccc;
+            }
+        """)
+        self.search_btn.clicked.connect(self.search_button_clicked.emit)
+        self.search_btn.clicked.connect(self._on_search_clicked)
+        layout.addWidget(self.search_btn)
+
         layout.addStretch()
 
     def focusOutEvent(self, event):
@@ -121,3 +148,11 @@ class SideBarWidget(QWidget):
         self.changes_btn.setChecked(True)
         self.commit_btn.setChecked(False)
         self.project_btn.setChecked(False)
+        self.search_btn.setChecked(False)
+
+    def _on_search_clicked(self):
+        """处理搜索按钮点击事件"""
+        self.search_btn.setChecked(True)
+        self.commit_btn.setChecked(False)
+        self.project_btn.setChecked(False)
+        self.changes_btn.setChecked(False)
