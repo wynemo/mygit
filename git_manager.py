@@ -1,9 +1,9 @@
 import logging
 import os
-import pathlib
-from typing import List, Optional, Set
+from typing import List, Optional
 
 import git
+import git.exc
 import pathspec
 from git import GitCommandError
 
@@ -146,7 +146,14 @@ class GitManager:
         if not self.repo:
             raise Exception("Repository not initialized.")
         try:
-            self.repo.remotes.origin.push()
+            # 检查当前分支是否有上游分支
+            if not self.repo.active_branch.tracking_branch():
+                # 如果没有上游分支，则设置上游分支
+                branch_name = self.repo.active_branch.name
+                self.repo.git.push("--set-upstream", "origin", branch_name)
+            else:
+                # 如果有上游分支，正常推送
+                self.repo.remotes.origin.push()
         except GitCommandError as e:
             error_message = f"Push failed: {e!s}"
             if hasattr(e, "stderr") and e.stderr:
@@ -327,6 +334,47 @@ class GitManager:
             )  # Unknown error occurred while switching branch.
             return f"切换到分支 '{branch_name}' 时发生未知错误。"  # Unknown error occurred while switching to branch.
 
+    def create_and_switch_branch(self, new_branch_name: str, base_branch: Optional[str] = None) -> Optional[str]:
+        """创建新分支并切换到该分支 (cursor 生成)
+
+        参数:
+            new_branch_name: 要创建的新分支名称
+            base_branch: 可选，基于哪个分支创建。如果为None则基于当前分支
+
+        返回:
+            None: 成功
+            str: 失败时的错误信息
+        """
+        if not self.repo:
+            return "仓库未初始化。"
+
+        # 验证分支名称
+        if not new_branch_name or not new_branch_name.strip():
+            return "分支名称不能为空。"
+
+        # 检查分支是否已存在
+        if new_branch_name in [branch.name for branch in self.repo.branches]:
+            return f"分支 '{new_branch_name}' 已存在。"
+
+        try:
+            # 创建新分支
+            if base_branch:
+                self.repo.create_head(new_branch_name, commit=base_branch)
+            else:
+                self.repo.create_head(new_branch_name)
+
+            # 切换到新分支
+            return self.switch_branch(new_branch_name)
+
+        except git.GitCommandError as e:
+            error_msg = f"创建分支 '{new_branch_name}' 失败: {e.stderr.strip() if e.stderr else str(e)}"
+            logging.error(error_msg)
+            return error_msg
+        except Exception as e:
+            error_msg = f"创建分支 '{new_branch_name}' 时发生未知错误: {e!s}"
+            logging.error(error_msg)
+            return error_msg
+
     def _load_gitignore_patterns(self):
         """加载.gitignore文件中的忽略规则"""
         if not self.repo:
@@ -355,3 +403,79 @@ class GitManager:
             return self.ignore_spec.match_file(rel_path)
         except ValueError:
             return False
+
+    def get_folder_commit_history(
+        self, folder_path: str, branch: Optional[str] = None, max_count: int = 50, skip: int = 0
+    ) -> list[dict]:
+        """
+        获取指定文件夹的提交历史。
+
+        参数:
+            folder_path (str): 文件夹的路径，可以是绝对路径或相对于仓库根目录的相对路径。
+            branch (str, optional): 要从中获取历史的分支名称。默认为 None (通常是 HEAD 或所有分支)。
+            max_count (int, optional): 要获取的最大提交数量。默认为 50。
+            skip (int, optional): 要跳过的提交数量 (用于分页)。默认为 0。
+
+        返回:
+            list[dict]: 一个包含提交信息的字典列表，每个字典包含 hash, author, email, date, message。
+                        如果发生错误或没有历史记录，则返回空列表。
+        """
+        if not self.repo:
+            logging.warning("GitManager: 仓库未初始化，无法获取文件夹历史。")
+            return []
+
+        try:
+            # 标准化文件夹路径
+            if os.path.isabs(folder_path):
+                # 如果是绝对路径，计算相对于仓库根目录的路径
+                relative_folder_path = os.path.relpath(folder_path, self.repo.working_dir)
+            else:
+                # 如果已经是相对路径，则直接使用 (确保它是相对于 repo root)
+                # os.path.normpath is important to clean up ".." or "."
+                relative_folder_path = os.path.normpath(folder_path)
+
+            # 确保路径使用操作系统的分隔符，GitPython 通常能处理好
+            # relative_folder_path = relative_folder_path.replace("/", os.sep)
+
+            logging.info(
+                f"GitManager: 获取文件夹 '{relative_folder_path}' 的提交历史 (分支: {branch or '默认'}, 最大数量: {max_count}, 跳过: {skip})."
+            )
+
+            commits_data = []
+            # 使用 iter_commits 获取提交迭代器
+            # `paths` 参数用于指定只关心影响此路径的提交
+            # `rev` 参数用于指定分支或引用
+            commit_iterator = self.repo.iter_commits(
+                rev=branch, paths=relative_folder_path, max_count=max_count, skip=skip
+            )
+
+            for commit in commit_iterator:
+                commits_data.append(
+                    {
+                        "hash": commit.hexsha,
+                        "author": commit.author.name,
+                        "email": commit.author.email,  # 作者邮箱
+                        "date": commit.authored_datetime.strftime("%Y-%m-%d %H:%M:%S"),  # 使用 authored_datetime
+                        "message": commit.summary,  # 简短的提交信息
+                    }
+                )
+
+            if not commits_data:
+                logging.info(f"GitManager: 文件夹 '{relative_folder_path}' 没有找到提交历史。")
+
+            return commits_data
+
+        except git.exc.GitCommandError as e:
+            # 特定 Git 命令错误，例如路径不存在于历史中
+            logging.error(f"GitManager: 获取文件夹 '{folder_path}' 历史时发生 Git 命令错误: {e!s}")
+            return []
+        except ValueError as e:
+            # 可能由 os.path.relpath 等路径操作引起
+            logging.error(f"GitManager: 处理文件夹路径 '{folder_path}' 时发生值错误: {e!s}")
+            return []
+        except Exception:
+            # 其他任何意外错误
+            logging.exception(
+                f"GitManager: 获取文件夹 '{folder_path}' 历史时发生未知错误。"
+            )  # 使用 logging.exception 记录堆栈跟踪
+            return []

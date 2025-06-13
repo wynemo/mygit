@@ -1,7 +1,11 @@
 import asyncio
+from typing import TYPE_CHECKING
 
 import aiohttp
 from PyQt6.QtCore import QThread, pyqtSignal
+
+if TYPE_CHECKING:
+    from git_manager import GitManager
 
 
 class FetchThread(QThread):
@@ -42,7 +46,7 @@ class PushThread(QThread):
 
     finished = pyqtSignal(bool, str)  # (success, error_message)
 
-    def __init__(self, git_manager):
+    def __init__(self, git_manager: "GitManager"):
         super().__init__()
         self.git_manager = git_manager
 

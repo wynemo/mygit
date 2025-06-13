@@ -1,5 +1,8 @@
+import functools  # Added for partial
 import logging
 import os
+import platform
+import subprocess
 import weakref
 from typing import TYPE_CHECKING, Optional
 
@@ -19,10 +22,12 @@ from PyQt6.QtWidgets import (
 )
 
 from commit_widget import CommitWidget
+from components.file_search_widget import FileSearchWidget
 from editors.modified_text_edit import ModifiedTextEdit
 from editors.text_edit import SyncedTextEdit  # Ensure this is present
 from file_changes_view import FileChangesView
 from file_history_view import FileHistoryView
+from folder_history_view import FolderHistoryView  # Import FolderHistoryView
 from syntax_highlighter import CodeHighlighter
 from utils import get_main_window_by_parent
 from utils.language_map import LANGUAGE_MAP
@@ -54,6 +59,10 @@ class WorkspaceExplorer(QWidget):
         # 创建水平分割器
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
 
+        # 创建文件搜索组件
+        self.file_search_widget = FileSearchWidget(self)
+        self.file_search_widget.hide()
+
         # 创建文件树
         self.file_tree = FileTreeWidget(self, git_manager=self.git_manager)  # 传入 self 作为父部件和 git_manager
         self.file_tree.setHeaderLabels(["工作区文件"])
@@ -79,18 +88,20 @@ class WorkspaceExplorer(QWidget):
         self.tab_widget.tabBar().customContextMenuRequested.connect(self.show_tab_context_menu)
 
         # 添加组件到分割器
+        self.splitter.addWidget(self.file_search_widget)
         self.splitter.addWidget(self.file_tree)
         self.splitter.addWidget(self.commit_widget)
         self.splitter.addWidget(self.file_changes_view)
         self.splitter.addWidget(self.tab_widget)
 
         self.commit_widget.hide()  # 初始隐藏
+        self.file_search_widget.hide()  # 初始隐藏
 
         # 连接标签页切换信号
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
 
         # 设置分割器的初始比例
-        self.splitter.setSizes([200, 0, 0, 400])
+        self.splitter.setSizes([0, 200, 0, 0, 400])
 
         # 添加分割器到布局
         layout.addWidget(self.splitter)
@@ -343,33 +354,38 @@ class WorkspaceExplorer(QWidget):
         """显示或隐藏左侧文件树面板"""
         if visible:
             self.file_tree.show()
+            self.file_search_widget.hide()
             self.commit_widget.hide()
             self.file_changes_view.hide()
-            self.splitter.setSizes([200, 0, 0, 400])
+            self.splitter.setSizes([0, 200, 0, 0, 400])
         else:
             self.file_tree.hide()
+            self.file_search_widget.hide()
             self.commit_widget.hide()
             self.file_changes_view.hide()
-            self.splitter.setSizes([0, 0, 0, 1])  # 只显示右侧
+            self.splitter.setSizes([0, 0, 0, 0, 1])  # 只显示右侧
 
     def show_file_tree(self):
         self.file_tree.show()
+        self.file_search_widget.hide()
         self.commit_widget.hide()
         self.file_changes_view.hide()
-        self.splitter.setSizes([200, 0, 0, 400])
+        self.splitter.setSizes([0, 200, 0, 0, 400])
 
     def show_commit_dialog(self):
         """显示提交对话框并隐藏文件树"""
         self.commit_widget.show()
         self.file_tree.hide()
+        self.file_search_widget.hide()
         self.file_changes_view.hide()
-        self.splitter.setSizes([0, 200, 0, 400])
+        self.splitter.setSizes([0, 0, 200, 0, 400])
 
     def show_file_changes_view(self):
         self.file_changes_view.show()
         self.file_tree.hide()
+        self.file_search_widget.hide()
         self.commit_widget.hide()
-        self.splitter.setSizes([0, 0, 200, 400])
+        self.splitter.setSizes([0, 0, 0, 200, 400])
 
     def update_filename_display(self, file_path: str, is_dirty: bool):
         print("update_filename_display", file_path, is_dirty)
@@ -380,6 +396,36 @@ class WorkspaceExplorer(QWidget):
                     self.tab_widget.setTabText(i, f"*{os.path.basename(file_path)}")
                 else:
                     self.tab_widget.setTabText(i, os.path.basename(file_path))
+
+    def show_file_search_widget(self):
+        """显示文件搜索组件"""
+        self.file_search_widget.show()
+        self.file_tree.hide()
+        self.commit_widget.hide()
+        self.file_changes_view.hide()
+        self.splitter.setSizes([200, 0, 0, 0, 400])
+
+    def view_folder_history(self, folder_path: str):
+        """显示文件夹历史视图"""
+        if not folder_path:
+            logging.error("错误：文件夹路径为空，无法查看历史。")
+            return
+
+        main_win = get_main_window_by_parent(self)
+        if not main_win:
+            logging.error("错误：无法获取主窗口实例。")
+            return
+
+        # Create the FolderHistoryView instance
+        # FolderHistoryView gets git_manager from main_win internally
+        folder_history_view = FolderHistoryView(folder_path, self)
+
+        # Add it to the main window's tab widget
+        folder_name = os.path.basename(folder_path.rstrip("/"))
+        tab_title = f"历史: {folder_name}"
+
+        main_win.tab_widget.addTab(folder_history_view, tab_title)
+        main_win.tab_widget.setCurrentIndex(main_win.tab_widget.count() - 1)
 
 
 class FileTreeWidget(QTreeWidget):
@@ -466,12 +512,22 @@ class FileTreeWidget(QTreeWidget):
         # 如果是文件，添加文件特有的菜单项
         if os.path.isfile(file_path):
             # 添加"文件历史"菜单项
-            history_action = context_menu.addAction("文件历史")
+            history_action = context_menu.addAction("文件历史")  # "File History"
             history_action.triggered.connect(lambda: self._show_file_history(file_path))
 
             # 添加"Git Blame"菜单项
-            blame_action = context_menu.addAction("Toggle Git Blame Annotations")
+            blame_action = context_menu.addAction("切换 Git Blame 注释")  # "Toggle Git Blame Annotations"
             blame_action.triggered.connect(lambda: self._toggle_blame_annotation_in_editor(file_path))
+        elif os.path.isdir(file_path):
+            # 添加"文件夹历史"菜单项
+            folder_history_action = context_menu.addAction("查看文件夹历史")  # "View Folder History"
+            # Ensure workspace_explorer is available
+            if self.workspace_explorer:
+                folder_history_action.triggered.connect(
+                    functools.partial(self.workspace_explorer.view_folder_history, file_path)
+                )
+            else:
+                folder_history_action.setEnabled(False)  # Disable if workspace_explorer ref is missing
 
         # 添加"复制相对路径"菜单项（文件和文件夹都适用）
         copy_relative_path_action = context_menu.addAction("复制相对路径")
@@ -480,6 +536,10 @@ class FileTreeWidget(QTreeWidget):
         # 添加"拷贝完整路径"菜单项（文件和文件夹都适用）
         copy_full_path_action = context_menu.addAction("拷贝完整路径")
         copy_full_path_action.triggered.connect(lambda: self._copy_full_path(file_path))
+
+        # 添加"在文件管理器中打开"菜单项（文件和文件夹都适用）
+        open_in_fm_action = context_menu.addAction("在文件管理器中打开")
+        open_in_fm_action.triggered.connect(lambda: self._open_in_file_manager(file_path))
 
         # 只在 git 修改的文件上显示"Revert"菜单项
         workspace_explorer = self.parent()
@@ -685,3 +745,44 @@ class FileTreeWidget(QTreeWidget):
             logging.info(f"已复制完整路径：{file_path}")
         except Exception as e:
             logging.error(f"复制完整路径失败：{e}")
+
+    def _open_in_file_manager(self, file_path: str):
+        """在文件管理器中打开文件或文件夹"""
+        try:
+            # 如果是文件，获取其父目录
+            if os.path.isfile(file_path):
+                dir_path = os.path.dirname(file_path)
+            else:
+                dir_path = file_path
+
+            full_path = os.path.join(self.workspace_explorer.workspace_path, file_path)
+
+            system = platform.system().lower()
+
+            if system == "darwin":  # macOS
+                # 使用 open 命令
+                print("full path", full_path)
+                subprocess.run(["open", "-R", full_path], check=True)
+            elif system == "windows":  # Windows
+                # 使用 explorer 命令
+                subprocess.run(["explorer", "/select,", full_path.replace("/", "\\")], check=True)
+            else:  # Linux and other Unix-like systems
+                # 尝试通用的 xdg-open 命令
+                try:
+                    subprocess.run(["xdg-open", dir_path], check=True)
+                except FileNotFoundError:
+                    # 如果 xdg-open 不存在，尝试其他常见的文件管理器
+                    file_managers = ["nautilus", "dolphin", "thunar", "pcmanfm", "caja"]
+                    for fm in file_managers:
+                        try:
+                            subprocess.run([fm, dir_path], check=True)
+                            break
+                        except FileNotFoundError:
+                            continue
+                    else:
+                        logging.warning("无法找到适合的文件管理器")
+                        return
+
+            logging.info(f"已在文件管理器中打开：{dir_path}")
+        except Exception as e:
+            logging.error(f"在文件管理器中打开失败：{e}")
