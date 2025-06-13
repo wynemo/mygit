@@ -70,7 +70,6 @@ class WorkspaceExplorer(QWidget):
         self.commit_widget = CommitWidget(self)
 
         self.file_changes_view = FileChangesView(self)
-        self.file_changes_view.hide()
         self.file_changes_view.file_selected.connect(get_main_window_by_parent(self).on_file_selected)
         self.file_changes_view.compare_with_working_requested.connect(
             get_main_window_by_parent(self).show_compare_with_working_dialog
@@ -88,20 +87,16 @@ class WorkspaceExplorer(QWidget):
         self.tab_widget.tabBar().customContextMenuRequested.connect(self.show_tab_context_menu)
 
         # 添加组件到分割器
-        self.splitter.addWidget(self.file_search_widget)
         self.splitter.addWidget(self.file_tree)
         self.splitter.addWidget(self.commit_widget)
         self.splitter.addWidget(self.file_changes_view)
+        self.splitter.addWidget(self.file_search_widget)
         self.splitter.addWidget(self.tab_widget)
-
-        self.commit_widget.hide()  # 初始隐藏
-        self.file_search_widget.hide()  # 初始隐藏
 
         # 连接标签页切换信号
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
 
-        # 设置分割器的初始比例
-        self.splitter.setSizes([0, 200, 0, 0, 400])
+        self.show_file_tree()
 
         # 添加分割器到布局
         layout.addWidget(self.splitter)
@@ -353,11 +348,7 @@ class WorkspaceExplorer(QWidget):
     def set_left_panel_visible(self, visible: bool):
         """显示或隐藏左侧文件树面板"""
         if visible:
-            self.file_tree.show()
-            self.file_search_widget.hide()
-            self.commit_widget.hide()
-            self.file_changes_view.hide()
-            self.splitter.setSizes([0, 200, 0, 0, 400])
+            self.show_file_tree()
         else:
             self.file_tree.hide()
             self.file_search_widget.hide()
@@ -370,7 +361,7 @@ class WorkspaceExplorer(QWidget):
         self.file_search_widget.hide()
         self.commit_widget.hide()
         self.file_changes_view.hide()
-        self.splitter.setSizes([0, 200, 0, 0, 400])
+        self.splitter.setSizes([200, 0, 0, 0, 400])
 
     def show_commit_dialog(self):
         """显示提交对话框并隐藏文件树"""
@@ -378,14 +369,14 @@ class WorkspaceExplorer(QWidget):
         self.file_tree.hide()
         self.file_search_widget.hide()
         self.file_changes_view.hide()
-        self.splitter.setSizes([0, 0, 200, 0, 400])
+        self.splitter.setSizes([0, 200, 0, 0, 400])
 
     def show_file_changes_view(self):
         self.file_changes_view.show()
         self.file_tree.hide()
         self.file_search_widget.hide()
         self.commit_widget.hide()
-        self.splitter.setSizes([0, 0, 0, 200, 400])
+        self.splitter.setSizes([0, 0, 200, 0, 400])
 
     def update_filename_display(self, file_path: str, is_dirty: bool):
         print("update_filename_display", file_path, is_dirty)
@@ -403,7 +394,7 @@ class WorkspaceExplorer(QWidget):
         self.file_tree.hide()
         self.commit_widget.hide()
         self.file_changes_view.hide()
-        self.splitter.setSizes([200, 0, 0, 0, 400])
+        self.splitter.setSizes([0, 0, 0, 200, 400])
 
     def view_folder_history(self, folder_path: str):
         """显示文件夹历史视图"""
@@ -422,7 +413,7 @@ class WorkspaceExplorer(QWidget):
 
         # Add it to the main window's tab widget
         folder_name = os.path.basename(folder_path.rstrip("/"))
-        tab_title = f"历史: {folder_name}"
+        tab_title = f"历史：{folder_name}"
 
         main_win.tab_widget.addTab(folder_history_view, tab_title)
         main_win.tab_widget.setCurrentIndex(main_win.tab_widget.count() - 1)
