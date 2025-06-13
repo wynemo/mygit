@@ -10,7 +10,7 @@ from hover_reveal_tree_widget import HoverRevealTreeWidget
 from utils import get_main_window_by_parent
 
 if TYPE_CHECKING:
-    import git
+    pass
 
 
 class FolderHistoryView(QWidget):  # Renamed class
@@ -117,11 +117,7 @@ class FolderHistoryView(QWidget):  # Renamed class
         commit_hash = item.data(0, Qt.ItemDataRole.UserRole)  # Retrieve full hash
         if commit_hash:
             logging.info(f"提交记录被点击: Commit {commit_hash}, 文件夹: {self.folder_path}")
-            # TODO: 通知主窗口显示此提交的详细信息 (commit_hash)
-            # Example: get_main_window().show_commit_details(commit_hash)
-
-            # TODO: 通知主窗口显示此提交中在 folder_path 下的文件变更 (commit_hash, self.folder_path)
-            # Example: get_main_window().show_changes_in_folder_for_commit(commit_hash, self.folder_path)
+            get_main_window_by_parent(self).on_commit_selected(commit_hash)
         else:
             logging.warning("无法获取点击的提交记录哈希值。")
 
@@ -154,14 +150,6 @@ class FolderHistoryView(QWidget):  # Renamed class
         # menu.addAction(compare_action)
         """
 
-        # "显示所有受影响的文件" 菜单项在文件夹上下文中已经是默认行为，或者需要调整
-        # For folder history, this action is implicitly what the main view might show for a commit.
-        # Keeping it for now, but its role might change.
-        show_all_affected_files_action = menu.addAction("显示此提交中受影响的文件")  # Changed to Chinese & clarified
-        show_all_affected_files_action.triggered.connect(
-            partial(self.show_all_affected_files_in_commit, item)
-        )  # Renamed method
-
         menu.exec(self.mapToGlobal(position))
 
     def copy_commit_to_clipboard(self, item):
@@ -170,53 +158,6 @@ class FolderHistoryView(QWidget):  # Renamed class
             QApplication.clipboard().setText(item.text(0))
         else:
             logging.warning("No item selected to copy commit ID")  # Changed print to logging
-
-    def show_all_affected_files_in_commit(self, item):  # Renamed method
-        """显示选定提交中，此文件夹内所有受影响的文件"""  # Updated docstring
-        if not item:
-            logging.warning("未选择任何提交项，无法显示受影响文件。")  # Updated log, in Chinese
-            return
-
-        commit_hash = item.data(0, Qt.ItemDataRole.UserRole)  # Retrieve full hash
-        if not commit_hash:
-            logging.warning("无法获取所选提交的哈希值。")  # Updated log, in Chinese
-            return
-
-        logging.info("右键菜单：显示提交 %s 中文件夹 %s 内受影响的文件。", commit_hash, self.folder_path)
-
-        try:
-            # 获取 git.Commit 对象 (assuming git_manager.repo.commit() is available)
-            commit_object: git.Commit = self.git_manager.repo.commit(commit_hash)
-
-            main_window = get_main_window_by_parent(self)  # Use utility to get main window reliably
-            if not main_window:
-                logging.error("无法获取主窗口实例。")
-                return
-
-            if not hasattr(main_window, "file_changes_view"):
-                logging.error("FileChangesView 在主窗口中未找到。可能需要调整或等待其初始化。")
-                return
-
-            file_changes_view = main_window.file_changes_view
-
-            # 调用 update_changes 方法，传递 commit 对象和 folder_path 作为过滤器
-            # The FileChangesView.update_changes method will need to handle the path_filter argument
-            file_changes_view.update_changes(self.git_manager, commit_object, path_filter=self.folder_path)
-
-            # 切换到显示变更的视图 (e.g., a tab in a QTabWidget)
-            if hasattr(main_window, "side_bar") and hasattr(main_window.side_bar, "changes_btn"):
-                main_window.side_bar.changes_btn.click()  # Simulate click to switch to changes view
-                logging.info("已切换到文件变更视图。")
-            else:
-                logging.warning("无法找到侧边栏变更按钮来自动切换视图。")
-
-        except Exception:
-            logging.exception(
-                "显示提交 %s 中受影响的文件失败 (文件夹: %s)",
-                commit_hash,
-                self.folder_path,
-            )
-            # Optionally, show an error message to the user via a dialog or status bar
 
     def copy_commmit_message_to_clipboard(self, item):
         if item:
