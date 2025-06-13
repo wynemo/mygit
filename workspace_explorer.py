@@ -59,10 +59,6 @@ class WorkspaceExplorer(QWidget):
         # 创建水平分割器
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # 创建文件搜索组件
-        self.file_search_widget = FileSearchWidget(self)
-        self.file_search_widget.hide()
-
         # 创建文件树
         self.file_tree = FileTreeWidget(self, git_manager=self.git_manager)  # 传入 self 作为父部件和 git_manager
         self.file_tree.setHeaderLabels(["工作区文件"])
@@ -85,6 +81,10 @@ class WorkspaceExplorer(QWidget):
 
         self.tab_widget.tabBar().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.tab_widget.tabBar().customContextMenuRequested.connect(self.show_tab_context_menu)
+
+        # 创建文件搜索组件
+        self.file_search_widget = FileSearchWidget(self)
+        self.file_search_widget.hide()
 
         # 添加组件到分割器
         self.splitter.addWidget(self.file_tree)

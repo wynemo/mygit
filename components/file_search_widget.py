@@ -20,6 +20,9 @@ class FileSearchWidget(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setup_ui()
+        if hasattr(parent, "file_tree"):
+            self.setMinimumWidth(parent.file_tree.width())
+            self.setMinimumHeight(parent.file_tree.height())
 
     def setup_ui(self):
         """初始化UI界面"""
@@ -127,4 +130,3 @@ class FileSearchWidget(QFrame):
         main_layout.addWidget(self.open_link)
 
         self.setLayout(main_layout)
-        self.setMinimumWidth(350)
