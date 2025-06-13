@@ -146,7 +146,14 @@ class GitManager:
         if not self.repo:
             raise Exception("Repository not initialized.")
         try:
-            self.repo.remotes.origin.push()
+            # 检查当前分支是否有上游分支
+            if not self.repo.active_branch.tracking_branch():
+                # 如果没有上游分支，则设置上游分支
+                branch_name = self.repo.active_branch.name
+                self.repo.git.push("--set-upstream", "origin", branch_name)
+            else:
+                # 如果有上游分支，正常推送
+                self.repo.remotes.origin.push()
         except GitCommandError as e:
             error_message = f"Push failed: {e!s}"
             if hasattr(e, "stderr") and e.stderr:
