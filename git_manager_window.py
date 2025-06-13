@@ -24,6 +24,7 @@ from components.notification_widget import NotificationWidget
 from dialogs.compare_with_working_dialog import CompareWithWorkingDialog
 from dialogs.settings_dialog import SettingsDialog
 from file_changes_view import FileChangesView
+from folder_history_view import FolderHistoryView
 from git_manager import GitManager
 from settings import Settings
 from threads import FetchThread, PullThread, PushThread  # Import PullThread and PushThread
@@ -548,7 +549,8 @@ class GitManagerWindow(QMainWindow):
 
     def on_tab_changed(self, index):
         """当标签页改变时"""
-        if index == 0:
+        widget = self.tab_widget.widget(index)
+        if index == 0 or isinstance(widget, FolderHistoryView):
             self.compare_view.hide()
             # cursor 生成 - 显示右侧分割器（包含文件变化视图和 commit 详细信息视图）
             right_splitter = self.horizontal_splitter.widget(1)
