@@ -311,17 +311,19 @@ class GitManagerWindow(QMainWindow):
 
     def open_folder(self, folder_path):
         """打开指定的文件夹"""
+        # 关闭所有非提交历史标签页
+        while self.tab_widget.count() > 1:
+            self.tab_widget.removeTab(1)
+
         self.git_manager = GitManager(folder_path)
         if self.git_manager.initialize():
             # 添加到最近文件夹列表
             self.settings.add_recent_folder(folder_path)
-            # self.update_recent_menu() # Now call the TopBarWidget's method
             self.update_recent_menu_on_top_bar()
 
             # 更新 UI
-            # self.update_branches() # Now call the TopBarWidget's method
             self.update_branches_on_top_bar()
-            self.update_commit_history()  # This updates the history view, not branches in top bar
+            self.update_commit_history()
 
             # 更新工作区浏览器
             logging.debug("open_folder, refresh_file_tree")
