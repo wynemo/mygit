@@ -249,8 +249,10 @@ class TopBarWidget(QWidget):
         dialog = NewBranchDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             branch_name = dialog.get_branch_name()
-            git_manager = get_main_window_by_parent(self).git_manager
+            main_window = get_main_window_by_parent(self)
+            git_manager = main_window.git_manager
             git_manager.create_and_switch_branch(branch_name)
+            main_window.update_branches_on_top_bar()
 
 
 if __name__ == "__main__":
