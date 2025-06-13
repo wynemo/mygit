@@ -136,12 +136,14 @@ class SideBarWidget(QWidget):
         self.project_btn.setChecked(True)
         self.commit_btn.setChecked(False)
         self.changes_btn.setChecked(False)
+        self.search_btn.setChecked(False)
 
     def _on_commit_clicked(self):
         """处理提交按钮点击事件"""
         self.commit_btn.setChecked(True)
         self.project_btn.setChecked(False)
         self.changes_btn.setChecked(False)
+        self.search_btn.setChecked(False)
 
     def _on_changes_clicked(self):
         """处理折叠按钮点击事件"""
