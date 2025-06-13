@@ -23,11 +23,41 @@ class CustomTreeWidget(HoverRevealTreeWidget):
         item = self.itemAt(position)
         if not item:
             return
+
         menu = QMenu(self)
+
+        # 添加原有的复制功能
         copy_commit_action = menu.addAction("copy commit")
         copy_commit_action.triggered.connect(partial(self.copy_commit_to_clipboard, item))
         copy_commit_message_action = menu.addAction("copy commit message")
         copy_commit_message_action.triggered.connect(partial(self.copy_commmit_message_to_clipboard, item))
+
+        # 获取父窗口(CommitHistoryView)以访问GitManager
+        parent = self.parent()
+        while parent and not hasattr(parent, "git_manager"):
+            parent = parent.parent()
+
+        if parent and hasattr(parent, "git_manager") and parent.git_manager:
+            git_manager = parent.git_manager
+            current_branch = git_manager.get_default_branch()
+
+            # 从item获取分支信息(假设分支信息在第2列)
+            item_branches = item.text(2).split(", ")
+
+            # 检查item是否属于其他分支
+            if current_branch not in item_branches:
+                # 创建Checkout主菜单项
+                checkout_menu = menu.addMenu("Checkout")
+
+                # 获取所有分支
+                all_branches = git_manager.get_branches()
+
+                # 为每个分支创建子菜单项
+                for branch in all_branches:
+                    if branch != current_branch and branch in item_branches:
+                        action = checkout_menu.addAction(branch)
+                        action.triggered.connect(partial(self._checkout_branch, git_manager, branch))
+
         menu.exec(self.mapToGlobal(position))
 
     def copy_commit_to_clipboard(self, item):
@@ -43,6 +73,14 @@ class CustomTreeWidget(HoverRevealTreeWidget):
             QApplication.clipboard().setText(item.text(1))
         else:
             print("item is None")
+
+    def _checkout_branch(self, git_manager, branch_name):
+        """执行分支切换操作"""
+        error = git_manager.switch_branch(branch_name)
+        if error:
+            print(f"切换分支失败: {error}")
+        else:
+            print(f"已切换到分支: {branch_name}")
 
 
 class MainWindow(QMainWindow):
