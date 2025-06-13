@@ -1,6 +1,8 @@
 import functools  # Added for partial
 import logging
 import os
+import platform
+import subprocess
 import weakref
 from typing import TYPE_CHECKING, Optional
 
@@ -515,6 +517,10 @@ class FileTreeWidget(QTreeWidget):
         copy_full_path_action = context_menu.addAction("拷贝完整路径")
         copy_full_path_action.triggered.connect(lambda: self._copy_full_path(file_path))
 
+        # 添加"在文件管理器中打开"菜单项（文件和文件夹都适用）
+        open_in_fm_action = context_menu.addAction("在文件管理器中打开")
+        open_in_fm_action.triggered.connect(lambda: self._open_in_file_manager(file_path))
+
         # 只在 git 修改的文件上显示"Revert"菜单项
         workspace_explorer = self.parent()
         while workspace_explorer and not isinstance(workspace_explorer, WorkspaceExplorer):
@@ -719,3 +725,44 @@ class FileTreeWidget(QTreeWidget):
             logging.info(f"已复制完整路径：{file_path}")
         except Exception as e:
             logging.error(f"复制完整路径失败：{e}")
+
+    def _open_in_file_manager(self, file_path: str):
+        """在文件管理器中打开文件或文件夹"""
+        try:
+            # 如果是文件，获取其父目录
+            if os.path.isfile(file_path):
+                dir_path = os.path.dirname(file_path)
+            else:
+                dir_path = file_path
+
+            full_path = os.path.join(self.workspace_explorer.workspace_path, file_path)
+
+            system = platform.system().lower()
+
+            if system == "darwin":  # macOS
+                # 使用 open 命令
+                print("full path", full_path)
+                subprocess.run(["open", "-R", full_path], check=True)
+            elif system == "windows":  # Windows
+                # 使用 explorer 命令
+                subprocess.run(["explorer", "/select,", full_path.replace("/", "\\")], check=True)
+            else:  # Linux and other Unix-like systems
+                # 尝试通用的 xdg-open 命令
+                try:
+                    subprocess.run(["xdg-open", dir_path], check=True)
+                except FileNotFoundError:
+                    # 如果 xdg-open 不存在，尝试其他常见的文件管理器
+                    file_managers = ["nautilus", "dolphin", "thunar", "pcmanfm", "caja"]
+                    for fm in file_managers:
+                        try:
+                            subprocess.run([fm, dir_path], check=True)
+                            break
+                        except FileNotFoundError:
+                            continue
+                    else:
+                        logging.warning("无法找到适合的文件管理器")
+                        return
+
+            logging.info(f"已在文件管理器中打开：{dir_path}")
+        except Exception as e:
+            logging.error(f"在文件管理器中打开失败：{e}")
