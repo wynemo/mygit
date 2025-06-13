@@ -3,6 +3,7 @@ import os
 from typing import List, Optional
 
 import git
+import git.exc
 import pathspec
 from git import GitCommandError
 
@@ -326,6 +327,47 @@ class GitManager:
             )  # Unknown error occurred while switching branch.
             return f"切换到分支 '{branch_name}' 时发生未知错误。"  # Unknown error occurred while switching to branch.
 
+    def create_and_switch_branch(self, new_branch_name: str, base_branch: Optional[str] = None) -> Optional[str]:
+        """创建新分支并切换到该分支 (cursor 生成)
+
+        参数:
+            new_branch_name: 要创建的新分支名称
+            base_branch: 可选，基于哪个分支创建。如果为None则基于当前分支
+
+        返回:
+            None: 成功
+            str: 失败时的错误信息
+        """
+        if not self.repo:
+            return "仓库未初始化。"
+
+        # 验证分支名称
+        if not new_branch_name or not new_branch_name.strip():
+            return "分支名称不能为空。"
+
+        # 检查分支是否已存在
+        if new_branch_name in [branch.name for branch in self.repo.branches]:
+            return f"分支 '{new_branch_name}' 已存在。"
+
+        try:
+            # 创建新分支
+            if base_branch:
+                self.repo.create_head(new_branch_name, commit=base_branch)
+            else:
+                self.repo.create_head(new_branch_name)
+
+            # 切换到新分支
+            return self.switch_branch(new_branch_name)
+
+        except git.GitCommandError as e:
+            error_msg = f"创建分支 '{new_branch_name}' 失败: {e.stderr.strip() if e.stderr else str(e)}"
+            logging.error(error_msg)
+            return error_msg
+        except Exception as e:
+            error_msg = f"创建分支 '{new_branch_name}' 时发生未知错误: {e!s}"
+            logging.error(error_msg)
+            return error_msg
+
     def _load_gitignore_patterns(self):
         """加载.gitignore文件中的忽略规则"""
         if not self.repo:
@@ -356,7 +398,7 @@ class GitManager:
             return False
 
     def get_folder_commit_history(
-        self, folder_path: str, branch: str = None, max_count: int = 50, skip: int = 0
+        self, folder_path: str, branch: Optional[str] = None, max_count: int = 50, skip: int = 0
     ) -> list[dict]:
         """
         获取指定文件夹的提交历史。

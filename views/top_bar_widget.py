@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
 )
 
 from components.new_branch_dialog import NewBranchDialog
+from utils import get_main_window_by_parent
 
 
 class RotatingIcon(QLabel):
@@ -68,7 +69,6 @@ class TopBarWidget(QWidget):
     branch_changed = pyqtSignal(str)
     commit_requested = pyqtSignal()
     settings_requested = pyqtSignal()
-    new_branch_requested = pyqtSignal(str)  # cursor 生成
     toggle_bottom_panel_requested = pyqtSignal()
     toggle_left_panel_requested = pyqtSignal()  # 新增信号
 
@@ -248,7 +248,9 @@ class TopBarWidget(QWidget):
         """处理新建分支按钮点击事件"""
         dialog = NewBranchDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            self.new_branch_requested.emit(dialog.get_branch_name())
+            branch_name = dialog.get_branch_name()
+            git_manager = get_main_window_by_parent(self).git_manager
+            git_manager.create_and_switch_branch(branch_name)
 
 
 if __name__ == "__main__":
