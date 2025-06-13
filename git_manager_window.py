@@ -315,6 +315,11 @@ class GitManagerWindow(QMainWindow):
         while self.tab_widget.count() > 1:
             self.tab_widget.removeTab(1)
 
+        # 关闭 workspace_explorer 中的所有标签页
+        if hasattr(self.workspace_explorer, "tab_widget"):
+            while self.workspace_explorer.tab_widget.count() > 0:
+                self.workspace_explorer.tab_widget.removeTab(0)
+
         self.git_manager = GitManager(folder_path)
         if self.git_manager.initialize():
             # 添加到最近文件夹列表
