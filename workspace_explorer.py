@@ -639,6 +639,8 @@ class FileTreeWidget(QTreeWidget):
 
         # 创建文件历史视图
         file_history_view = FileHistoryView(file_path, parent=self)
+        # 设置文件路径属性用于唯一标识
+        file_history_view.setProperty("file_history_path", file_path)
 
         # 在 GitManagerWindow 的 tab_widget 中添加新标签页
         file_name = os.path.basename(file_path)
@@ -646,7 +648,8 @@ class FileTreeWidget(QTreeWidget):
 
         # 检查标签页是否已存在
         for i in range(main_window.tab_widget.count()):
-            if main_window.tab_widget.tabText(i) == tab_title:
+            widget = main_window.tab_widget.widget(i)
+            if main_window.tab_widget.tabText(i) == tab_title and widget.property("file_history_path") == file_path:
                 main_window.tab_widget.setCurrentIndex(i)
                 return
 
