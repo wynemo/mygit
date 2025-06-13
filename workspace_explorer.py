@@ -1,3 +1,4 @@
+import functools  # Added for partial
 import logging
 import os
 import weakref
@@ -23,6 +24,7 @@ from editors.modified_text_edit import ModifiedTextEdit
 from editors.text_edit import SyncedTextEdit  # Ensure this is present
 from file_changes_view import FileChangesView
 from file_history_view import FileHistoryView
+from folder_history_view import FolderHistoryView  # Import FolderHistoryView
 from syntax_highlighter import CodeHighlighter
 from utils import get_main_window_by_parent
 from utils.language_map import LANGUAGE_MAP
@@ -381,6 +383,28 @@ class WorkspaceExplorer(QWidget):
                 else:
                     self.tab_widget.setTabText(i, os.path.basename(file_path))
 
+    def view_folder_history(self, folder_path: str):
+        """显示文件夹历史视图"""
+        if not folder_path:
+            logging.error("错误：文件夹路径为空，无法查看历史。")
+            return
+
+        main_win = get_main_window_by_parent(self)
+        if not main_win:
+            logging.error("错误：无法获取主窗口实例。")
+            return
+
+        # Create the FolderHistoryView instance
+        # FolderHistoryView gets git_manager from main_win internally
+        folder_history_view = FolderHistoryView(folder_path, self)
+
+        # Add it to the main window's tab widget
+        folder_name = os.path.basename(folder_path.rstrip("/"))
+        tab_title = f"历史: {folder_name}"
+
+        main_win.tab_widget.addTab(folder_history_view, tab_title)
+        main_win.tab_widget.setCurrentIndex(main_win.tab_widget.count() - 1)
+
 
 class FileTreeWidget(QTreeWidget):
     def __init__(self, parent=None, git_manager=None):
@@ -466,12 +490,22 @@ class FileTreeWidget(QTreeWidget):
         # 如果是文件，添加文件特有的菜单项
         if os.path.isfile(file_path):
             # 添加"文件历史"菜单项
-            history_action = context_menu.addAction("文件历史")
+            history_action = context_menu.addAction("文件历史")  # "File History"
             history_action.triggered.connect(lambda: self._show_file_history(file_path))
 
             # 添加"Git Blame"菜单项
-            blame_action = context_menu.addAction("Toggle Git Blame Annotations")
+            blame_action = context_menu.addAction("切换 Git Blame 注释")  # "Toggle Git Blame Annotations"
             blame_action.triggered.connect(lambda: self._toggle_blame_annotation_in_editor(file_path))
+        elif os.path.isdir(file_path):
+            # 添加"文件夹历史"菜单项
+            folder_history_action = context_menu.addAction("查看文件夹历史")  # "View Folder History"
+            # Ensure workspace_explorer is available
+            if self.workspace_explorer:
+                folder_history_action.triggered.connect(
+                    functools.partial(self.workspace_explorer.view_folder_history, file_path)
+                )
+            else:
+                folder_history_action.setEnabled(False)  # Disable if workspace_explorer ref is missing
 
         # 添加"复制相对路径"菜单项（文件和文件夹都适用）
         copy_relative_path_action = context_menu.addAction("复制相对路径")

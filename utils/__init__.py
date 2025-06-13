@@ -1,8 +1,11 @@
 import time
 from functools import wraps
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget
+
+if TYPE_CHECKING:
+    from git_manager_window import GitManagerWindow
 
 
 def get_main_window():
@@ -10,7 +13,7 @@ def get_main_window():
     return main_window
 
 
-def get_main_window_by_parent(parent: QWidget) -> Optional[QMainWindow]:
+def get_main_window_by_parent(parent: QWidget) -> Optional["GitManagerWindow"]:
     while parent:
         if isinstance(parent, QMainWindow):
             return parent

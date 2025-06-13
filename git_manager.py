@@ -1,7 +1,6 @@
 import logging
 import os
-import pathlib
-from typing import List, Optional, Set
+from typing import List, Optional
 
 import git
 import pathspec
@@ -355,3 +354,79 @@ class GitManager:
             return self.ignore_spec.match_file(rel_path)
         except ValueError:
             return False
+
+    def get_folder_commit_history(
+        self, folder_path: str, branch: str = None, max_count: int = 50, skip: int = 0
+    ) -> list[dict]:
+        """
+        获取指定文件夹的提交历史。
+
+        参数:
+            folder_path (str): 文件夹的路径，可以是绝对路径或相对于仓库根目录的相对路径。
+            branch (str, optional): 要从中获取历史的分支名称。默认为 None (通常是 HEAD 或所有分支)。
+            max_count (int, optional): 要获取的最大提交数量。默认为 50。
+            skip (int, optional): 要跳过的提交数量 (用于分页)。默认为 0。
+
+        返回:
+            list[dict]: 一个包含提交信息的字典列表，每个字典包含 hash, author, email, date, message。
+                        如果发生错误或没有历史记录，则返回空列表。
+        """
+        if not self.repo:
+            logging.warning("GitManager: 仓库未初始化，无法获取文件夹历史。")
+            return []
+
+        try:
+            # 标准化文件夹路径
+            if os.path.isabs(folder_path):
+                # 如果是绝对路径，计算相对于仓库根目录的路径
+                relative_folder_path = os.path.relpath(folder_path, self.repo.working_dir)
+            else:
+                # 如果已经是相对路径，则直接使用 (确保它是相对于 repo root)
+                # os.path.normpath is important to clean up ".." or "."
+                relative_folder_path = os.path.normpath(folder_path)
+
+            # 确保路径使用操作系统的分隔符，GitPython 通常能处理好
+            # relative_folder_path = relative_folder_path.replace("/", os.sep)
+
+            logging.info(
+                f"GitManager: 获取文件夹 '{relative_folder_path}' 的提交历史 (分支: {branch or '默认'}, 最大数量: {max_count}, 跳过: {skip})."
+            )
+
+            commits_data = []
+            # 使用 iter_commits 获取提交迭代器
+            # `paths` 参数用于指定只关心影响此路径的提交
+            # `rev` 参数用于指定分支或引用
+            commit_iterator = self.repo.iter_commits(
+                rev=branch, paths=relative_folder_path, max_count=max_count, skip=skip
+            )
+
+            for commit in commit_iterator:
+                commits_data.append(
+                    {
+                        "hash": commit.hexsha,
+                        "author": commit.author.name,
+                        "email": commit.author.email,  # 作者邮箱
+                        "date": commit.authored_datetime.strftime("%Y-%m-%d %H:%M:%S"),  # 使用 authored_datetime
+                        "message": commit.summary,  # 简短的提交信息
+                    }
+                )
+
+            if not commits_data:
+                logging.info(f"GitManager: 文件夹 '{relative_folder_path}' 没有找到提交历史。")
+
+            return commits_data
+
+        except git.exc.GitCommandError as e:
+            # 特定 Git 命令错误，例如路径不存在于历史中
+            logging.error(f"GitManager: 获取文件夹 '{folder_path}' 历史时发生 Git 命令错误: {e!s}")
+            return []
+        except ValueError as e:
+            # 可能由 os.path.relpath 等路径操作引起
+            logging.error(f"GitManager: 处理文件夹路径 '{folder_path}' 时发生值错误: {e!s}")
+            return []
+        except Exception:
+            # 其他任何意外错误
+            logging.exception(
+                f"GitManager: 获取文件夹 '{folder_path}' 历史时发生未知错误。"
+            )  # 使用 logging.exception 记录堆栈跟踪
+            return []
