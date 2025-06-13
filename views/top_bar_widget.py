@@ -1,10 +1,11 @@
 import sys
 
 from PyQt6.QtCore import QPoint, QSize, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
+from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap, QPolygon
 from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
+    QDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -13,6 +14,8 @@ from PyQt6.QtWidgets import (
     QToolButton,
     QWidget,
 )
+
+from components.new_branch_dialog import NewBranchDialog
 
 
 class RotatingIcon(QLabel):
@@ -65,6 +68,7 @@ class TopBarWidget(QWidget):
     branch_changed = pyqtSignal(str)
     commit_requested = pyqtSignal()
     settings_requested = pyqtSignal()
+    new_branch_requested = pyqtSignal(str)  # cursor 生成
     toggle_bottom_panel_requested = pyqtSignal()
     toggle_left_panel_requested = pyqtSignal()  # 新增信号
 
@@ -95,6 +99,12 @@ class TopBarWidget(QWidget):
         self.branch_combo.setMinimumWidth(150)
         self.branch_combo.currentTextChanged.connect(self.branch_changed.emit)
         self._layout.addWidget(self.branch_combo)
+
+        # 新建分支按钮
+        self.new_branch_button = QPushButton("+")
+        self.new_branch_button.setToolTip("新建分支")
+        self.new_branch_button.clicked.connect(self._on_new_branch_button_clicked)
+        self._layout.addWidget(self.new_branch_button)
 
         # --- Spinner Label ---
         self.spinner_label = RotatingIcon("icons/spin.png")
@@ -171,9 +181,9 @@ class TopBarWidget(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(QColor("black"))  # Icon color
         if down:
-            points = [QPoint(3, 6), QPoint(8, 11), QPoint(13, 6)]
+            points = QPolygon([QPoint(3, 6), QPoint(8, 11), QPoint(13, 6)])
         else:
-            points = [QPoint(3, 10), QPoint(8, 5), QPoint(13, 10)]
+            points = QPolygon([QPoint(3, 10), QPoint(8, 5), QPoint(13, 10)])
         painter.drawPolyline(points)
         painter.end()
         return QIcon(pixmap)
@@ -187,10 +197,10 @@ class TopBarWidget(QWidget):
         painter.setPen(QColor("black"))
         if visible:
             # 显示时，画一个向左的箭头
-            points = [QPoint(11, 3), QPoint(5, 8), QPoint(11, 13)]
+            points = QPolygon([QPoint(11, 3), QPoint(5, 8), QPoint(11, 13)])
         else:
             # 隐藏时，画一个向右的箭头
-            points = [QPoint(5, 3), QPoint(11, 8), QPoint(5, 13)]
+            points = QPolygon([QPoint(5, 3), QPoint(11, 8), QPoint(5, 13)])
         painter.drawPolyline(points)
         painter.end()
         return QIcon(pixmap)
@@ -233,6 +243,12 @@ class TopBarWidget(QWidget):
 
     def stop_spinning(self):
         self.spinner_label.hide()
+
+    def _on_new_branch_button_clicked(self):
+        """处理新建分支按钮点击事件"""
+        dialog = NewBranchDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.new_branch_requested.emit(dialog.get_branch_name())
 
 
 if __name__ == "__main__":
