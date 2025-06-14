@@ -94,10 +94,10 @@
 100. NewDiffHighlighterEngine 效率有点慢 知道了一个是计算所有行慢 一个是一次性高亮所有行慢 那个 rehighligt 一次性高亮所有行慢
 101. git checkout 功能
 102. git reset 功能
-103. 文件夹历史记录
+103. ~~文件夹历史记录~~
 103. 工程里搜索文件功能
 104. ~~新建分支，提交代码并推送了以后，提交历史里没有刷新~~
-105. 995ecee 看这个提交 差异显示不正常 感觉少一个字符 估计是多行显示的问题  NewDiffHighlighterEngine
+105. ~~995ecee 看这个提交 差异显示不正常 感觉少一个字符 估计是多行显示的问题  NewDiffHighlighterEngine emoji处理的问题~~
 106. 提交历史，CustomTreeWidget - 右键点击 item 如果说是 item 代表的分支与当前分支不一样，显示右键菜单 checkout，然后二级菜单里是可以切换的分支，点击分支就切换;远程分支 merge 功能
 107. ~~文件历史，文件同名的无法打开新标签页~~
 108. ~~切换工程，关闭打开的标签页~~
