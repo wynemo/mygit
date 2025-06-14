@@ -8,6 +8,11 @@ from diff_calculator import DiffChunk
 from syntax_highlighter import PygmentsHighlighterEngine
 
 
+def count_utf16_code_units(s: str) -> int:
+    """Calculates the number of UTF-16 code units for a given Python string."""
+    return len(s.encode("utf-16-le")) // 2  # 每个 UTF-16 单元 2 字节
+
+
 class DiffHighlighterEngine:
     SIMILARITY_THRESHOLD_FOR_DETAILED_DIFF = 0.8
 
@@ -288,13 +293,13 @@ class NewDiffHighlighterEngine:
         # 获取当前块在整个文档中的位置
         current_block = self.highlighter.currentBlock()
         block_start = current_block.position()
-        block_length = len(text)
+        block_length = count_utf16_code_units(text)
 
         # 根据差异列表应用格式
         current_pos = 0
 
         for op, data in self.diff_list:
-            data_length = len(data)
+            data_length = count_utf16_code_units(data)
 
             # 检查这个差异是否与当前块重叠
             if current_pos + data_length > block_start and current_pos < block_start + block_length:
