@@ -6,11 +6,7 @@ from PyQt6.QtGui import QColor, QSyntaxHighlighter, QTextCharFormat
 
 from diff_calculator import DiffChunk
 from syntax_highlighter import PygmentsHighlighterEngine
-
-
-def count_utf16_code_units(s: str) -> int:
-    """Calculates the number of UTF-16 code units for a given Python string."""
-    return len(s.encode("utf-16-le")) // 2  # 每个 UTF-16 单元 2 字节
+from utils import count_utf16_code_units
 
 
 class DiffHighlighterEngine:
