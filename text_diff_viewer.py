@@ -2,7 +2,8 @@ import logging
 from typing import Optional
 
 from PyQt6.QtCore import QPoint
-from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtGui import QColor, QTextCharFormat, QTextCursor
+from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QTextEdit, QVBoxLayout, QWidget
 
 from diff_calculator import DiffCalculator, DiffChunk, DifflibCalculator
 from diff_highlighter import MultiHighlighter
@@ -204,6 +205,24 @@ class DiffViewer(QWidget):
         language = LANGUAGE_MAP.get(file_path.split(".")[-1], "text")
         self.left_edit.highlighter.set_language(language)
         self.right_edit.highlighter.set_language(language)
+
+        if hasattr(self.left_edit.highlighter, "empty_block_numbers"):
+            selections = []
+            for block_number in self.left_edit.highlighter.empty_block_numbers:
+                selection = QTextEdit.ExtraSelection()
+                char_format = QTextCharFormat()
+                char_format.setBackground(QColor(255, 200, 200))  # 浅红色背景
+                char_format.setProperty(QTextCharFormat.Property.FullWidthSelection, True)  # 关键
+                selection.format = char_format
+
+                block = self.left_edit.document().findBlockByNumber(block_number)
+                cursor = QTextCursor(block)
+                cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+
+                selection.cursor = cursor
+                selections.append(selection)
+            if selections:
+                self.left_edit.setExtraSelections(selections)
 
     def _compute_diff(self, left_text: str, right_text: str):
         self.diff_chunks = self.diff_calculator.compute_diff(left_text, right_text)

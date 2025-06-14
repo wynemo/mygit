@@ -214,6 +214,7 @@ class MultiHighlighter(QSyntaxHighlighter):
         self.pygments_engine = PygmentsHighlighterEngine(self)
         self.other_document = other_document
         self.diff_chunks: list[DiffChunk] = []
+        self.empty_block_numbers = set()
 
     def set_language(self, language_name):
         self.pygments_engine.set_language(language_name)
@@ -288,6 +289,7 @@ class NewDiffHighlighterEngine:
 
         # 获取当前块在整个文档中的位置
         current_block = self.highlighter.currentBlock()
+        block_number = current_block.blockNumber()
         block_start = current_block.position()
         block_length = count_utf16_code_units(text)
 
@@ -298,12 +300,12 @@ class NewDiffHighlighterEngine:
             data_length = count_utf16_code_units(data)
 
             # 检查这个差异是否与当前块重叠
-            if current_pos + data_length > block_start and current_pos < block_start + block_length:
+            if current_pos + data_length >= block_start and current_pos < block_start + block_length:
                 # 计算在当前块中的相对位置
                 start_in_block = max(0, current_pos - block_start)
                 end_in_block = min(block_length, current_pos + data_length - block_start)
 
-                if end_in_block > start_in_block:
+                if end_in_block >= start_in_block:
                     format_to_apply = None
 
                     if op == diff_match_patch.diff_match_patch.DIFF_DELETE:
@@ -316,7 +318,12 @@ class NewDiffHighlighterEngine:
                     # format_to_apply = self.equal_format
 
                     if format_to_apply:
-                        self.highlighter.setFormat(start_in_block, end_in_block - start_in_block, format_to_apply)
+                        if format_to_apply == self.deleted_format and not text.strip():
+                            # this is a line deletion, we need to highlight the whole line
+                            if hasattr(self.highlighter, "empty_block_numbers"):
+                                self.highlighter.empty_block_numbers.add(block_number)
+                        else:
+                            self.highlighter.setFormat(start_in_block, end_in_block - start_in_block, format_to_apply)
 
             # 只有在 DELETE 和 EQUAL 时才移动左侧位置，INSERT 和 EQUAL 时才移动右侧位置
             if self.is_left_side:
