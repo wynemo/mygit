@@ -368,4 +368,3 @@ class CommitWidget(QFrame):
         except Exception as e:
             logging.exception("提交失败")
             QMessageBox.critical(self, "错误", f"提交失败：{e!s}")
-
