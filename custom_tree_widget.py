@@ -26,6 +26,7 @@ class CustomTreeWidget(HoverRevealTreeWidget):
             print(f"合并失败：{error}")
         else:
             print(f"成功合并分支：{branch_name}")
+            self.parent().update_history(self.parent().git_manager, self.parent().branch)
 
     def show_context_menu(self, position):
         item = self.itemAt(position)
