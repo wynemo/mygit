@@ -4,6 +4,7 @@
 
 import logging
 import os
+from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -17,6 +18,9 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 from ripgrepy import Ripgrepy
+
+if TYPE_CHECKING:
+    from workspace_explorer import WorkspaceExplorer
 
 
 class FileSearchWidget(QFrame):
@@ -243,7 +247,7 @@ class FileSearchWidget(QFrame):
             logging.info(f"Opening file: {file_path} at line {line_number}")
 
         # 获取 WorkspaceExplorer 实例并调用 open_file_in_tab
-        workspace_explorer = self.parent()
+        workspace_explorer: "WorkspaceExplorer" = self.parent()
         while workspace_explorer is not None:
             if hasattr(workspace_explorer, "open_file_in_tab"):
                 workspace_explorer.open_file_in_tab(file_path, line_number)
