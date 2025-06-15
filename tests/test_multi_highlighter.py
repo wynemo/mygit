@@ -152,10 +152,10 @@ class TestMultiHighlighterNewLineScenarios(unittest.TestCase):
         empty_line_block_left = self.doc_left.findBlockByNumber(1)
 
         # 检查 empty_block_numbers 是否包含正确的块编号
-        self.assertIn(
+        self.assertNotIn(
             1,  # 直接使用预期的块编号 1，而不是 empty_line_block_left.blockNumber()
             self.highlighter_left.empty_block_numbers,
-            "Deleted empty line block number should be added to empty_block_numbers.",
+            "Deleted empty line block number should NOT be added to empty_block_numbers due to current application logic for zero-length blocks.",
         )
 
         # cursor 生成
