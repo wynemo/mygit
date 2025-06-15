@@ -12,7 +12,6 @@ from PyQt6.QtWidgets import (
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
-    QWidget,
 )
 
 
@@ -25,7 +24,7 @@ class FileSearchWidget(QFrame):
             self.setMinimumHeight(parent.file_tree.height())
 
     def setup_ui(self):
-        """初始化UI界面"""
+        """初始化 UI 界面"""
         self.setWindowTitle("File Search")
         self.setStyleSheet("""
             QFrame {
@@ -61,31 +60,62 @@ class FileSearchWidget(QFrame):
         main_layout.setSpacing(8)
 
         # 搜索输入区域
-        search_input_layout = QHBoxLayout()
+        search_input_container = QFrame()
+        search_input_container.setStyleSheet("""
+            QFrame {
+                border: 1px solid #ccc;
+                border-radius: 3px;
+                background-color: white;
+            }
+        """)
+        search_input_layout = QHBoxLayout(search_input_container)
+        search_input_layout.setContentsMargins(0, 0, 0, 0)
+        search_input_layout.setSpacing(0)
+
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search...")
+        self.search_input.setStyleSheet("""
+            QLineEdit {
+                padding: 5px;
+                border: none;
+            }
+        """)
         search_input_layout.addWidget(self.search_input)
 
         # 工具按钮区域
-        tool_buttons_layout = QHBoxLayout()
-        tool_buttons_layout.setSpacing(4)
-
-        self.refresh_button = QPushButton("↻")
-        self.clear_button = QPushButton("×")
-        self.settings_button = QPushButton("⚙")
         self.case_button = QPushButton("Aa")
         self.regex_button = QPushButton(".*")
         self.word_button = QPushButton("ab")
 
-        tool_buttons_layout.addWidget(self.refresh_button)
-        tool_buttons_layout.addWidget(self.clear_button)
-        tool_buttons_layout.addWidget(self.settings_button)
-        tool_buttons_layout.addWidget(self.case_button)
-        tool_buttons_layout.addWidget(self.regex_button)
-        tool_buttons_layout.addWidget(self.word_button)
+        # 设置按钮为可切换状态
+        self.case_button.setCheckable(True)
+        self.regex_button.setCheckable(True)
+        self.word_button.setCheckable(True)
 
-        search_input_layout.addLayout(tool_buttons_layout)
-        main_layout.addLayout(search_input_layout)
+        # 按钮样式
+        button_style = """
+            QPushButton {
+                padding: 5px 8px;
+                min-width: 24px;
+                border: none;
+                background-color: transparent;
+            }
+            QPushButton:checked {
+                background-color: #e0e0e0;
+            }
+            QPushButton:hover {
+                background-color: #f0f0f0;
+            }
+        """
+        self.case_button.setStyleSheet(button_style)
+        self.regex_button.setStyleSheet(button_style)
+        self.word_button.setStyleSheet(button_style)
+
+        search_input_layout.addWidget(self.case_button)
+        search_input_layout.addWidget(self.regex_button)
+        search_input_layout.addWidget(self.word_button)
+
+        main_layout.addWidget(search_input_container)
 
         # 文件过滤区域
         filter_layout = QHBoxLayout()
