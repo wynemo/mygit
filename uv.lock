@@ -263,6 +263,7 @@ dependencies = [
     { name = "pathspec" },
     { name = "pygments" },
     { name = "pyqt6" },
+    { name = "ripgrepy" },
 ]
 
 [package.dev-dependencies]
@@ -278,6 +279,7 @@ requires-dist = [
     { name = "pathspec", specifier = ">=0.12.1" },
     { name = "pygments", specifier = ">=2.19.1" },
     { name = "pyqt6", specifier = ">=6.8.1" },
+    { name = "ripgrepy", specifier = ">=2.1.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -451,6 +453,12 @@ sdist = { url = "https://files.pythonhosted.org/packages/cc/0f/3d63c5f37edca529a
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cb/e7/28010a326ef591e1409daf9d57a47de94156c147ad1befe74d8196d82729/python_lsp_server-1.12.2-py3-none-any.whl", hash = "sha256:750116459449184ba20811167cdf96f91296ae12f1f65ebd975c5c159388111b", size = 74773 },
 ]
+
+[[package]]
+name = "ripgrepy"
+version = "2.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/60/7b/a52523c8fbb34272c2e64154636f4a44ffa31d3e7cdd939e40434ffcacf3/ripgrepy-2.1.0.tar.gz", hash = "sha256:86b8ed6cf99da0bddab3281290078a3c3704c670c109afb37fd884485cf4a720", size = 31598 }
 
 [[package]]
 name = "smmap"

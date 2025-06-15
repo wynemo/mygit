@@ -10,7 +10,8 @@ dependencies = [
     "pathspec>=0.12.1",
     "pygments>=2.19.1",
     "pyqt6>=6.8.1",
-    "diff_match_patch"
+    "diff_match_patch",
+    "ripgrepy>=2.1.0",
 ]
 
 [dependency-groups]
