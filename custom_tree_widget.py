@@ -19,6 +19,14 @@ class CustomTreeWidget(HoverRevealTreeWidget):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
 
+    def _merge_branch(self, git_manager, branch_name):
+        """执行合并分支操作"""
+        error = git_manager.merge_branch(branch_name)
+        if error:
+            print(f"合并失败：{error}")
+        else:
+            print(f"成功合并分支：{branch_name}")
+
     def show_context_menu(self, position):
         item = self.itemAt(position)
         if not item:
@@ -32,21 +40,22 @@ class CustomTreeWidget(HoverRevealTreeWidget):
         copy_commit_message_action = menu.addAction("copy commit message")
         copy_commit_message_action.triggered.connect(partial(self.copy_commmit_message_to_clipboard, item))
 
-        # 获取父窗口(CommitHistoryView)以访问GitManager
+        # 获取父窗口 (CommitHistoryView) 以访问 GitManager
         parent = self.parent()
         while parent and not hasattr(parent, "git_manager"):
             parent = parent.parent()
 
         if parent and hasattr(parent, "git_manager") and parent.git_manager:
             git_manager = parent.git_manager
-            current_branch = git_manager.get_default_branch()
+            repo = git_manager.repo
+            current_branch = repo.active_branch
 
-            # 从item获取分支信息(假设分支信息在第2列)
+            # 从 item 获取分支信息 (假设分支信息在第 2 列)
             item_branches = item.text(2).split(", ")
 
-            # 检查item是否属于其他分支
-            if current_branch not in item_branches:
-                # 创建Checkout主菜单项
+            # 检查 item 是否属于其他分支
+            if current_branch.name not in item_branches:
+                # 创建 Checkout 主菜单项
                 checkout_menu = menu.addMenu("Checkout")
 
                 # 获取所有分支
@@ -54,9 +63,25 @@ class CustomTreeWidget(HoverRevealTreeWidget):
 
                 # 为每个分支创建子菜单项
                 for branch in all_branches:
-                    if branch != current_branch and branch in item_branches:
+                    if branch != current_branch.name and branch in item_branches:
                         action = checkout_menu.addAction(branch)
                         action.triggered.connect(partial(self._checkout_branch, git_manager, branch))
+
+            # 检查是否是远程分支且当前分支跟踪它
+            for branch_name in item_branches:
+                if branch_name.startswith("☁️ origin/"):
+                    remote_branch = branch_name.strip("☁️").lstrip()
+                    try:
+                        # 检查当前分支是否跟踪此远程分支
+                        if (
+                            current_branch.tracking_branch()
+                            and current_branch.tracking_branch().name == remote_branch
+                            and current_branch.commit.hexsha != repo.refs[remote_branch].commit.hexsha
+                        ):
+                            merge_action = menu.addAction(f"Merge {remote_branch}")
+                            merge_action.triggered.connect(partial(self._merge_branch, git_manager, remote_branch))
+                    except Exception as e:
+                        print(f"检查远程分支状态失败：{e}")
 
         menu.exec(self.mapToGlobal(position))
 
@@ -78,9 +103,9 @@ class CustomTreeWidget(HoverRevealTreeWidget):
         """执行分支切换操作"""
         error = git_manager.switch_branch(branch_name)
         if error:
-            print(f"切换分支失败: {error}")
+            print(f"切换分支失败：{error}")
         else:
-            print(f"已切换到分支: {branch_name}")
+            print(f"已切换到分支：{branch_name}")
 
 
 class MainWindow(QMainWindow):

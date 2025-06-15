@@ -35,14 +35,45 @@ class GitManager:
             return None
         return self.repo.active_branch.name
 
-    def get_commit_history(self, branch: str = "master", limit: int = 50, skip: int = 0) -> List[dict]:
-        """获取提交历史 (cursor 生成)"""
+    def get_remote_branches(self) -> List[str]:
+        """获取所有远程分支的完整名称（例如 'origin/main'）"""
+        if not self.repo:
+            return []
+        remote_branches = []
+        for remote in self.repo.remotes:
+            for ref in remote.refs:
+                # 我们只关心分支引用，通常以 'refs/remotes/' 开头，但我们可以直接取名字
+                # ref.name 是完整的引用名称，如 'origin/main'
+                remote_branches.append(ref.name)
+        return remote_branches
+
+    def get_commit_history(
+        self, branch: str = "master", limit: int = 50, skip: int = 0, include_remotes: bool = False
+    ) -> List[dict]:
+        """获取提交历史 (cursor 生成)
+
+        参数：
+            branch: 要获取历史的分支名称（默认为'master'）
+            limit: 返回的最大提交数量（默认为 50）
+            skip: 跳过的提交数量（默认为 0）
+            include_remotes: 是否包含远程分支的提交（默认为 False）
+        """
         if not self.repo:
             return []
 
         try:
-            if not branch:
-                branch = self.repo.active_branch.name
+            revs = []
+            if branch:
+                revs.append(branch)
+
+            if include_remotes:
+                # 获取所有远程分支的名称
+                remote_branches = self.get_remote_branches()
+                revs.extend(remote_branches)
+
+            # 如果没有指定分支且不包含远程分支，则使用当前活动分支
+            if not revs:
+                revs = [self.repo.active_branch.name]
 
             commits = []
             decorations_map = {}
@@ -56,7 +87,8 @@ class GitManager:
                 for ref in remote.refs:
                     decorations_map.setdefault(ref.commit.hexsha, []).append(ref.name)
 
-            for commit in self.repo.iter_commits(branch, max_count=limit, skip=skip):  # cursor 生成
+            # 使用 revs 列表来获取提交
+            for commit in self.repo.iter_commits(revs, max_count=limit, skip=skip):  # cursor 生成
                 message = commit.message.strip().split("\n")[0]
                 decorations = decorations_map.get(commit.hexsha, [])
                 commits.append(
@@ -337,11 +369,11 @@ class GitManager:
     def create_and_switch_branch(self, new_branch_name: str, base_branch: Optional[str] = None) -> Optional[str]:
         """创建新分支并切换到该分支 (cursor 生成)
 
-        参数:
+        参数：
             new_branch_name: 要创建的新分支名称
-            base_branch: 可选，基于哪个分支创建。如果为None则基于当前分支
+            base_branch: 可选，基于哪个分支创建。如果为 None 则基于当前分支
 
-        返回:
+        返回：
             None: 成功
             str: 失败时的错误信息
         """
@@ -367,16 +399,42 @@ class GitManager:
             return self.switch_branch(new_branch_name)
 
         except git.GitCommandError as e:
-            error_msg = f"创建分支 '{new_branch_name}' 失败: {e.stderr.strip() if e.stderr else str(e)}"
+            error_msg = f"创建分支 '{new_branch_name}' 失败：{e.stderr.strip() if e.stderr else str(e)}"
             logging.error(error_msg)
             return error_msg
         except Exception as e:
-            error_msg = f"创建分支 '{new_branch_name}' 时发生未知错误: {e!s}"
+            error_msg = f"创建分支 '{new_branch_name}' 时发生未知错误：{e!s}"
             logging.error(error_msg)
             return error_msg
 
+    def merge_branch(self, branch_name: str) -> Optional[str]:
+        """合并指定分支到当前分支
+
+        参数：
+            branch_name: 要合并的分支名称
+
+        返回：
+            None: 合并成功
+            str: 合并失败时的错误信息
+        """
+        if not self.repo:
+            return "仓库未初始化。"
+
+        try:
+            # 执行合并操作
+            self.repo.git.merge(branch_name)
+            return None
+        except git.GitCommandError as e:
+            error_message = f"合并失败：{e.stderr.strip() if e.stderr else str(e)}"
+            logging.error(error_message)
+            return error_message
+        except Exception as e:
+            error_message = f"合并分支时发生未知错误：{e}"
+            logging.exception(error_message)
+            return error_message
+
     def _load_gitignore_patterns(self):
-        """加载.gitignore文件中的忽略规则"""
+        """加载.gitignore 文件中的忽略规则"""
         if not self.repo:
             return
 
@@ -391,7 +449,7 @@ class GitManager:
         self.ignore_spec = pathspec.PathSpec.from_lines("gitwildmatch", patterns)
 
     def is_ignored(self, path: str) -> bool:
-        """检查路径是否被.gitignore忽略"""
+        """检查路径是否被.gitignore 忽略"""
         if not self.ignore_spec:
             return False
 
@@ -410,13 +468,13 @@ class GitManager:
         """
         获取指定文件夹的提交历史。
 
-        参数:
+        参数：
             folder_path (str): 文件夹的路径，可以是绝对路径或相对于仓库根目录的相对路径。
             branch (str, optional): 要从中获取历史的分支名称。默认为 None (通常是 HEAD 或所有分支)。
             max_count (int, optional): 要获取的最大提交数量。默认为 50。
             skip (int, optional): 要跳过的提交数量 (用于分页)。默认为 0。
 
-        返回:
+        返回：
             list[dict]: 一个包含提交信息的字典列表，每个字典包含 hash, author, email, date, message。
                         如果发生错误或没有历史记录，则返回空列表。
         """
@@ -438,7 +496,7 @@ class GitManager:
             # relative_folder_path = relative_folder_path.replace("/", os.sep)
 
             logging.info(
-                f"GitManager: 获取文件夹 '{relative_folder_path}' 的提交历史 (分支: {branch or '默认'}, 最大数量: {max_count}, 跳过: {skip})."
+                f"GitManager: 获取文件夹 '{relative_folder_path}' 的提交历史 (分支：{branch or '默认'}, 最大数量：{max_count}, 跳过：{skip})."
             )
 
             commits_data = []
@@ -467,11 +525,11 @@ class GitManager:
 
         except git.exc.GitCommandError as e:
             # 特定 Git 命令错误，例如路径不存在于历史中
-            logging.error(f"GitManager: 获取文件夹 '{folder_path}' 历史时发生 Git 命令错误: {e!s}")
+            logging.error(f"GitManager: 获取文件夹 '{folder_path}' 历史时发生 Git 命令错误：{e!s}")
             return []
         except ValueError as e:
             # 可能由 os.path.relpath 等路径操作引起
-            logging.error(f"GitManager: 处理文件夹路径 '{folder_path}' 时发生值错误: {e!s}")
+            logging.error(f"GitManager: 处理文件夹路径 '{folder_path}' 时发生值错误：{e!s}")
             return []
         except Exception:
             # 其他任何意外错误

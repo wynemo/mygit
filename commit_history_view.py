@@ -106,7 +106,7 @@ class CommitHistoryView(QWidget):
             remote_names = ["origin"]
 
         commits = self.git_manager.get_commit_history(
-            self.branch, self.load_batch_size, self.loaded_count
+            self.branch, self.load_batch_size, self.loaded_count, include_remotes=True
         )  # cursor 生成
         for commit in commits:
             item = QTreeWidgetItem(self.history_list)
