@@ -1,4 +1,4 @@
-from PyQt6.QtCore import QRect, Qt
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPalette
 from PyQt6.QtWidgets import (
     QApplication,
@@ -65,34 +65,25 @@ class HoverRevealTreeWidget(QTreeWidget):
 
         label = self._ensure_overlay_label()
         label.setText(full_text)
-        label.adjustSize()  # 根据文本调整大小
+        label.adjustSize()  # 确保 QLabel 尺寸根据内容和样式调整
 
         # 获取单元格在 viewport 中的几何位置
         item_rect = self.visualRect(self.indexFromItem(item, column))
 
         if item_rect.isValid():
-            # 计算理想的宽度，但不超过 treeWidget 本身的宽度
-            preferred_width = label.width() + 5  # 加一点 padding
-            max_width = self.viewport().width() - item_rect.left() - 5
-            display_width = min(preferred_width, max_width)
-
-            # 定位 QLabel
-            # x 坐标与单元格对齐，y 坐标也与单元格对齐
-            # 高度是标签自适应的高度，宽度是计算后的宽度
-            # 我们希望它能覆盖其他列，所以宽度就是标签根据文本内容自适应的宽度
-            label_rect = QRect(item_rect.topLeft(), label.sizeHint())  # 使用标签的推荐大小
-            label_rect.setWidth(min(label.sizeHint().width(), self.viewport().width() - item_rect.left()))
-
-            # 如果文本很长，确保标签不会超出视口太多
-            # x, y 是相对于 viewport 的
             new_x = item_rect.left()
             new_y = item_rect.top()
 
-            # 简单的调整，防止完全遮盖当前行（如果需要，可以调整 y 使其在下方或有偏移）
-            # label.setGeometry(new_x, new_y, label.width(), label.height())
-            # 为了确保它在顶部并且不会被其他单元格的绘制覆盖（理论上，因为它是 viewport 的子控件且后创建）
-            # 并且，确保它的宽度是它所需要的宽度
-            label.setGeometry(new_x, new_y, label.fontMetrics().horizontalAdvance(full_text) + 6, item_rect.height())
+            # 计算浮动标签的最终宽度：取其推荐宽度和视口可用宽度中的最小值
+            # 视口可用宽度 = 视口总宽度 - 标签左侧起始 X 坐标 - 右侧预留边距（例如 5 像素）
+            desired_width = label.sizeHint().width()
+            max_available_width = self.viewport().width() - new_x - 5
+            final_width = min(desired_width, max_available_width)
+
+            # 浮动标签的高度使用其推荐高度，以确保内容完整显示
+            desired_height = label.sizeHint().height()
+
+            label.setGeometry(new_x, new_y, final_width, desired_height)
 
             # 如果原始单元格文本已经被省略，我们才显示 overlay
             font_metrics = self.fontMetrics()  # 或者 item.font(column) 的 fontMetrics
