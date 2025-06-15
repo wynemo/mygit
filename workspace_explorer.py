@@ -227,16 +227,39 @@ class WorkspaceExplorer(QWidget):
         self.refresh_file_tree()
 
     def refresh_file_tree(self):
-        """刷新文件树"""
+        """cursor 生成 - 刷新文件树，保留已展开的文件夹状态"""
         logging.debug("refresh_file_tree")
+
         if self.git_manager and self.git_manager.repo and hasattr(self, "workspace_path"):
             self.all_file_statuses = self.git_manager.get_all_file_statuses()
         else:
             self.all_file_statuses = {"modified": set(), "staged": set(), "untracked": set()}
 
+        # 保存当前展开的文件夹路径
+        expanded_paths = self.file_tree.save_expanded_state()
+
+        # 保存当前高亮的文件路径
+        saved_highlighted_path = None
+        if self.current_highlighted_item:
+            current_item = self.current_highlighted_item()
+            if current_item:
+                saved_highlighted_path = current_item.data(0, Qt.ItemDataRole.UserRole)
+
+        # 在清空文件树之前，将 current_highlighted_item 设置为 None
+        # 避免在文件树清空后，weakref 引用到已删除的 QTreeWidgetItem 对象
+        self.current_highlighted_item = None
+
         self.file_tree.clear()
         if hasattr(self, "workspace_path"):
             self._add_directory_items(self.workspace_path, self.file_tree.invisibleRootItem(), 0)
+
+        # 恢复展开状态
+        if expanded_paths:
+            self.file_tree.restore_expanded_state(expanded_paths)
+
+        # 恢复高亮状态
+        if saved_highlighted_path:
+            self.file_tree.highlight_file_item(saved_highlighted_path)
 
     def _add_directory_items(self, path: str, parent_item_in_tree: QTreeWidgetItem, level: int = 0) -> bool:
         """cursor 生成 - 优先显示目录
@@ -734,9 +757,11 @@ class FileTreeWidget(QTreeWidget):
         # 清除之前的高亮
         parent_workspace_explorer: WorkspaceExplorer = self.get_parent_workspace_explorer()
         if parent_workspace_explorer and parent_workspace_explorer.current_highlighted_item:
+            # 检查 weakref 是否仍然有效
             current_highlighted_item = parent_workspace_explorer.current_highlighted_item()
-            if current_highlighted_item:
+            if current_highlighted_item:  # 只有当引用有效时才清除高亮
                 current_highlighted_item.setForeground(0, self.normal_color)
+            parent_workspace_explorer.current_highlighted_item = None  # 清除旧的引用
 
         # 查找并高亮新项目
         items = self.findItems(os.path.basename(file_path), Qt.MatchFlag.MatchContains | Qt.MatchFlag.MatchRecursive)
@@ -813,3 +838,32 @@ class FileTreeWidget(QTreeWidget):
             logging.info(f"已在文件管理器中打开：{dir_path}")
         except Exception as e:
             logging.error(f"在文件管理器中打开失败：{e}")
+
+    def _get_expanded_paths(self, item: QTreeWidgetItem, expanded_paths: set):
+        """递归获取所有展开的文件夹路径"""
+        for i in range(item.childCount()):
+            child = item.child(i)
+            if child.isExpanded():
+                child_path = child.data(0, Qt.ItemDataRole.UserRole)
+                if child_path and os.path.isdir(child_path):
+                    expanded_paths.add(child_path)
+                    self._get_expanded_paths(child, expanded_paths)
+
+    def save_expanded_state(self) -> set:
+        """保存当前所有展开的文件夹路径"""
+        expanded_paths = set()
+        self._get_expanded_paths(self.invisibleRootItem(), expanded_paths)
+        return expanded_paths
+
+    def _restore_expanded_state(self, item: QTreeWidgetItem, expanded_paths: set):
+        """递归恢复文件夹的展开状态"""
+        for i in range(item.childCount()):
+            child = item.child(i)
+            child_path = child.data(0, Qt.ItemDataRole.UserRole)
+            if child_path and os.path.isdir(child_path) and child_path in expanded_paths:
+                child.setExpanded(True)
+                self._restore_expanded_state(child, expanded_paths)
+
+    def restore_expanded_state(self, expanded_paths: set):
+        """恢复之前保存的文件夹展开状态"""
+        self._restore_expanded_state(self.invisibleRootItem(), expanded_paths)
