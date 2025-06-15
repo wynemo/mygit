@@ -6,7 +6,7 @@ import logging
 import os
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor, QTextCharFormat, QTextCursor
 from PyQt6.QtWidgets import (
     QFrame,
@@ -27,11 +27,16 @@ if TYPE_CHECKING:
 
 class FileSearchWidget(QFrame):
     def __init__(self, parent=None):
+        """cursor 生成"""
         super().__init__(parent)
         self.setup_ui()
         if hasattr(parent, "file_tree"):
             self.setMinimumWidth(parent.file_tree.width())
             self.setMinimumHeight(parent.file_tree.height())
+        self.search_timer = QTimer(self)
+        self.search_timer.setInterval(500)  # 设置延时为 500 毫秒
+        self.search_timer.setSingleShot(True)  # 设置为单次触发
+        self.search_timer.timeout.connect(self.perform_search)
         self.connect_signals()
 
     def setup_ui(self):
@@ -161,8 +166,10 @@ class FileSearchWidget(QFrame):
         self.setLayout(main_layout)
 
     def connect_signals(self):
-        """连接信号与槽"""
-        self.search_input.textChanged.connect(self.perform_search)
+        """cursor 生成
+        连接信号与槽
+        """
+        self.search_input.textChanged.connect(self.start_search_timer)
         self.case_button.toggled.connect(self.perform_search)
         self.regex_button.toggled.connect(self.perform_search)
         self.word_button.toggled.connect(self.perform_search)
@@ -170,6 +177,12 @@ class FileSearchWidget(QFrame):
         self.exclude_input.textChanged.connect(self.perform_search)
         self.result_tree.itemDoubleClicked.connect(self.open_file_from_tree)
         self.open_link.linkActivated.connect(self.open_file_from_tree_current_selection)
+
+    def start_search_timer(self):
+        """cursor 生成
+        启动或重置搜索定时器
+        """
+        self.search_timer.start()
 
     def perform_search(self):
         """执行搜索并更新结果"""
