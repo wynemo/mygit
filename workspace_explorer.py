@@ -4,10 +4,10 @@ import os
 import platform
 import subprocess
 import weakref
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Union
 
 from PyQt6.QtCore import QMimeData, QPoint, Qt
-from PyQt6.QtGui import QAction, QColor, QDrag, QDragEnterEvent, QDropEvent, QIcon
+from PyQt6.QtGui import QAction, QColor, QDrag, QDragEnterEvent, QDropEvent, QIcon, QTextCursor
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -113,13 +113,26 @@ class WorkspaceExplorer(QWidget):
         if os.path.isfile(file_path):
             self.open_file_in_tab(file_path)
 
-    def open_file_in_tab(self, file_path: str):
-        """在新标签页中打开文件"""
+    def open_file_in_tab(self, file_path: str, line_number: Union[int, None] = None):
+        """在新标签页中打开文件，并可选择跳转到指定行号
+        Args:
+            file_path: 文件路径
+            line_number: 可选的行号，如果提供则跳转到该行
+        """
         try:
             # 检查文件是否已经打开
             for i in range(self.tab_widget.count()):
                 if self.tab_widget.widget(i).property("file_path") == file_path:
                     self.tab_widget.setCurrentIndex(i)
+                    if line_number is not None:
+                        text_edit = self.tab_widget.widget(i)
+                        cursor = text_edit.textCursor()
+                        cursor.movePosition(QTextCursor.MoveOperation.Start)
+                        cursor.movePosition(
+                            QTextCursor.MoveOperation.Down, QTextCursor.MoveMode.MoveAnchor, line_number - 1
+                        )
+                        text_edit.setTextCursor(cursor)
+                        text_edit.ensureCursorVisible()
                     return
 
             with open(file_path, "r", encoding="utf-8") as f:
@@ -127,20 +140,27 @@ class WorkspaceExplorer(QWidget):
 
             # 创建新的文本编辑器
             text_edit = ModifiedTextEdit(self)
-            text_edit.setProperty("file_path", file_path)  # Keep for any existing logic relying on property
-            text_edit.file_path = file_path  # Add this for consistency with show_blame
+            text_edit.setProperty("file_path", file_path)
+            text_edit.file_path = file_path
             text_edit.setPlainText(content)
             text_edit.set_editable()
 
             text_edit.highlighter = CodeHighlighter(text_edit.document())
             language = LANGUAGE_MAP.get(file_path.split(".")[-1], "text")
-            print("language is", language, file_path)
             text_edit.highlighter.set_language(language)
 
             # 添加新标签页
             file_name = os.path.basename(file_path)
             self.tab_widget.addTab(text_edit, file_name)
             self.tab_widget.setCurrentWidget(text_edit)
+
+            # 如果提供了行号，跳转到该行
+            if line_number is not None:
+                cursor = text_edit.textCursor()
+                cursor.movePosition(QTextCursor.MoveOperation.Start)
+                cursor.movePosition(QTextCursor.MoveOperation.Down, QTextCursor.MoveMode.MoveAnchor, line_number - 1)
+                text_edit.setTextCursor(cursor)
+                text_edit.ensureCursorVisible()
 
             # Connect blame_annotation_clicked signal to GitManagerWindow handler
             main_git_window = self.parent()

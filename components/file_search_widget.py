@@ -229,14 +229,26 @@ class FileSearchWidget(QFrame):
             self.result_label.setText("Search failed")
 
     def open_file_from_tree(self, item):
-        """双击打开文件"""
+        """双击打开文件，并可选择跳转到指定行号
+        Args:
+            item: 双击的项（文件或行）
+        """
         if item.parent() is None:  # 顶层项（文件）
             file_path = item.text(0).split(" (")[0]
             logging.info(f"Opening file: {file_path}")
+            line_number = None
         else:  # 子项（行）
             file_path = item.parent().text(0).split(" (")[0]
             line_number = int(item.text(0).split(":")[0])
             logging.info(f"Opening file: {file_path} at line {line_number}")
+
+        # 获取 WorkspaceExplorer 实例并调用 open_file_in_tab
+        workspace_explorer = self.parent()
+        while workspace_explorer is not None:
+            if hasattr(workspace_explorer, "open_file_in_tab"):
+                workspace_explorer.open_file_in_tab(file_path, line_number)
+                break
+            workspace_explorer = workspace_explorer.parent()
 
     def open_file_from_tree_current_selection(self):
         """点击链接打开当前选中文件"""
