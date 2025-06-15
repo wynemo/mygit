@@ -54,7 +54,7 @@ class WorkspaceExplorer(QWidget):
         self.refresh_button = QPushButton(QIcon("icons/refresh.svg"), "")
         self.refresh_button.setFixedSize(30, 30)
         self.refresh_button.setToolTip("refresh")
-        self.refresh_button.clicked.connect(self.refresh_file_tree)
+        self.refresh_button.clicked.connect(self._handle_refresh_clicked)
         layout.addWidget(self.refresh_button)  # Add button to layout
 
         # 创建水平分割器
@@ -438,6 +438,18 @@ class WorkspaceExplorer(QWidget):
 
         main_win.tab_widget.addTab(folder_history_view, tab_title)
         main_win.tab_widget.setCurrentIndex(main_win.tab_widget.count() - 1)
+
+    def _handle_refresh_clicked(self):
+        """
+        cursor 生成
+        处理刷新按钮点击事件，同时刷新文件树和提交历史
+        """
+        self.refresh_file_tree()  # 调用原有的刷新文件树方法
+
+        # 刷新提交历史
+        main_window = get_main_window_by_parent(self)
+        if main_window and hasattr(main_window, "update_commit_history"):
+            main_window.update_commit_history()
 
 
 class FileTreeWidget(QTreeWidget):
