@@ -56,7 +56,7 @@ class TestBlameAnnotationClick(unittest.TestCase):
         total_commits = 15
         mock_commits_data = self.generate_mock_commits(total_commits)
 
-        def mock_get_commit_history(branch, limit, skip):
+        def mock_get_commit_history(branch, limit, skip, include_remotes=False):
             return mock_commits_data[skip : skip + limit]
 
         mock_git_manager.get_commit_history.side_effect = mock_get_commit_history
@@ -158,7 +158,7 @@ class TestBlameAnnotationClick(unittest.TestCase):
         total_commits = 8  # e.g. 3 batches: 0-2, 3-5, 6-7
         mock_commits_data = self.generate_mock_commits(total_commits)
 
-        def mock_get_commit_history(branch, limit, skip):
+        def mock_get_commit_history(branch, limit, skip, include_remotes=False):
             return mock_commits_data[skip : skip + limit]
 
         mock_git_manager.get_commit_history.side_effect = mock_get_commit_history
