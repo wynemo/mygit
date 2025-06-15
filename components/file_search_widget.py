@@ -194,7 +194,7 @@ class FileSearchWidget(QFrame):
 
         try:
             rg = Ripgrepy(query_text, path=os.getcwd())
-            if self.case_button.isChecked():
+            if not self.case_button.isChecked():
                 rg.ignore_case()
             if not self.regex_button.isChecked():
                 rg.fixed_strings()
