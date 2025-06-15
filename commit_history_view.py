@@ -199,10 +199,16 @@ class CommitHistoryView(QWidget):
 
             # 检查各列的匹配情况 (0: id, 1: message, 3: author, 4: date)
             show_item = False
-            for col in range(self.history_list.columnCount()):
-                item_text = item.text(col).lower()
-                if self.filter_text in item_text:
-                    show_item = True
-                    break
+            # 检查完整哈希
+            full_hash = item.data(0, Qt.ItemDataRole.UserRole)
+            if full_hash and self.filter_text in full_hash.lower():
+                show_item = True
+
+            if not show_item:  # 如果完整哈希没有匹配，则检查其他列
+                for col in range(self.history_list.columnCount()):
+                    item_text = item.text(col).lower()
+                    if self.filter_text in item_text:
+                        show_item = True
+                        break
 
             item.setHidden(not show_item)
