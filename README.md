@@ -47,6 +47,22 @@ source .venv/bin/activate  # Linux/macOS
 pip install -r requirements.txt
 ```
 
+安装 ripgrepy (可选，不装会影响文件搜索功能)
+ubuntu:
+```bash
+sudo apt-get install ripgrep
+```
+
+mac:
+```bash
+brew install ripgrep
+```
+
+windows:
+```bash
+scoop install ripgrep
+```
+
 ## 使用方法
 
 运行主程序：
