@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
 )
 
 from hover_reveal_tree_widget import HoverRevealTreeWidget
+from utils import get_main_window_by_parent
 
 
 class CustomTreeWidget(HoverRevealTreeWidget):
@@ -23,10 +24,10 @@ class CustomTreeWidget(HoverRevealTreeWidget):
         """执行合并分支操作"""
         error = git_manager.merge_branch(branch_name)
         if error:
-            print(f"合并失败：{error}")
+            get_main_window_by_parent(self).notification_widget.show_message(f"合并失败：{error}")
         else:
-            print(f"成功合并分支：{branch_name}")
             self.parent().update_history(self.parent().git_manager, self.parent().branch)
+            get_main_window_by_parent(self).notification_widget.show_message(f"成功合并分支：{branch_name}")
 
     def show_context_menu(self, position):
         item = self.itemAt(position)
