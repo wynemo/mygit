@@ -119,12 +119,12 @@ class FileSearchWidget(QFrame):
             }
         """
         self.case_button.setStyleSheet(button_style)
-        self.regex_button.setStyleSheet(button_style)
         self.word_button.setStyleSheet(button_style)
+        self.regex_button.setStyleSheet(button_style)
 
         search_input_layout.addWidget(self.case_button)
-        search_input_layout.addWidget(self.regex_button)
         search_input_layout.addWidget(self.word_button)
+        search_input_layout.addWidget(self.regex_button)
 
         main_layout.addWidget(search_input_container)
 
@@ -148,18 +148,6 @@ class FileSearchWidget(QFrame):
         self.result_tree = QTreeWidget()
         self.result_tree.setHeaderHidden(True)
         self.result_tree.setIndentation(15)
-
-        # 添加示例数据用于界面展示
-        file_item1 = QTreeWidgetItem(["src/main.py (3)"])
-        file_item1.addChild(QTreeWidgetItem(["1: import os"]))
-        file_item1.addChild(QTreeWidgetItem(["5: def main():"]))
-        file_item1.addChild(QTreeWidgetItem(["10:     print('Hello')"]))
-
-        file_item2 = QTreeWidgetItem(["utils/helper.py (1)"])
-        file_item2.addChild(QTreeWidgetItem(["7: def helper_function():"]))
-
-        self.result_tree.addTopLevelItem(file_item1)
-        self.result_tree.addTopLevelItem(file_item2)
 
         main_layout.addWidget(self.result_tree)
 
