@@ -773,8 +773,8 @@ class SyncedTextEdit(QPlainTextEdit):
     def paintEvent(self, event):
         super().paintEvent(event)
         painter = QPainter(self.viewport())
-        pen = QPen(QColor("#666666"))
-        pen.setWidth(2)
+        pen = QPen(QColor("#999999"))  # cursor 生成：颜色改为浅灰色
+        pen.setWidth(3)  # cursor 生成：线条变粗
         painter.setPen(pen)
 
         # 获取当前视口的可见区域

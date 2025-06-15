@@ -211,7 +211,7 @@ class DiffViewer(QWidget):
             for block_number in self.left_edit.highlighter.empty_block_numbers:
                 selection = QTextEdit.ExtraSelection()
                 char_format = QTextCharFormat()
-                char_format.setBackground(QColor(255, 200, 200))  # 浅红色背景
+                char_format.setBackground(QColor(220, 220, 220))  # 浅灰色背景
                 char_format.setProperty(QTextCharFormat.Property.FullWidthSelection, True)  # 关键
                 selection.format = char_format
 
