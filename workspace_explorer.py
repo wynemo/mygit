@@ -7,7 +7,7 @@ import weakref
 from typing import TYPE_CHECKING, Optional
 
 from PyQt6.QtCore import QMimeData, QPoint, Qt
-from PyQt6.QtGui import QAction, QColor, QDrag, QDragEnterEvent, QDropEvent
+from PyQt6.QtGui import QAction, QColor, QDrag, QDragEnterEvent, QDropEvent, QIcon
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -51,8 +51,9 @@ class WorkspaceExplorer(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         # 创建刷新按钮
-        self.refresh_button = QPushButton("🔄")
+        self.refresh_button = QPushButton(QIcon("icons/refresh.svg"), "")
         self.refresh_button.setFixedSize(30, 30)
+        self.refresh_button.setToolTip("refresh")
         self.refresh_button.clicked.connect(self.refresh_file_tree)
         layout.addWidget(self.refresh_button)  # Add button to layout
 
