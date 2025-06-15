@@ -7,12 +7,14 @@ import os
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QTextCharFormat, QTextCursor
 from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
+    QTextEdit,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -251,6 +253,23 @@ class FileSearchWidget(QFrame):
         while workspace_explorer is not None:
             if hasattr(workspace_explorer, "open_file_in_tab"):
                 workspace_explorer.open_file_in_tab(file_path, line_number)
+                if line_number is not None:
+                    text_edit = workspace_explorer.tab_widget.currentWidget()
+                    document = text_edit.document()
+                    block = document.findBlockByNumber(line_number - 1)
+                    if not block.isValid():
+                        return
+
+                    selection = QTextEdit.ExtraSelection()
+                    cursor = QTextCursor(block)
+                    selection.cursor = cursor
+                    char_format = QTextCharFormat()
+                    char_format.setBackground(QColor("#ADD8E6"))
+                    char_format.setProperty(QTextCharFormat.Property.FullWidthSelection, True)  # 关键：全宽选择
+                    cursor.movePosition(QTextCursor.MoveOperation.StartOfLine)
+                    cursor.select(QTextCursor.SelectionType.LineUnderCursor)
+                    selection.format = char_format
+                    text_edit.setExtraSelections([selection])
                 break
             workspace_explorer = workspace_explorer.parent()
 
