@@ -2,6 +2,9 @@
 文件搜索组件界面实现
 """
 
+import logging
+import os
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QFrame,
@@ -13,6 +16,7 @@ from PyQt6.QtWidgets import (
     QTreeWidgetItem,
     QVBoxLayout,
 )
+from ripgrepy import Ripgrepy
 
 
 class FileSearchWidget(QFrame):
@@ -22,6 +26,7 @@ class FileSearchWidget(QFrame):
         if hasattr(parent, "file_tree"):
             self.setMinimumWidth(parent.file_tree.width())
             self.setMinimumHeight(parent.file_tree.height())
+        self.connect_signals()
 
     def setup_ui(self):
         """初始化 UI 界面"""
@@ -160,3 +165,81 @@ class FileSearchWidget(QFrame):
         main_layout.addWidget(self.open_link)
 
         self.setLayout(main_layout)
+
+    def connect_signals(self):
+        """连接信号与槽"""
+        self.search_input.textChanged.connect(self.perform_search)
+        self.case_button.toggled.connect(self.perform_search)
+        self.regex_button.toggled.connect(self.perform_search)
+        self.word_button.toggled.connect(self.perform_search)
+        self.include_input.textChanged.connect(self.perform_search)
+        self.exclude_input.textChanged.connect(self.perform_search)
+        self.result_tree.itemDoubleClicked.connect(self.open_file_from_tree)
+        self.open_link.linkActivated.connect(self.open_file_from_tree_current_selection)
+
+    def perform_search(self):
+        """执行搜索并更新结果"""
+        self.result_tree.clear()
+        self.result_label.setText("0 results")
+
+        query_text = self.search_input.text().strip()
+        if not query_text:
+            return
+
+        try:
+            rg = Ripgrepy(query_text, path=os.getcwd())
+            if self.case_button.isChecked():
+                rg.ignore_case()
+            if not self.regex_button.isChecked():
+                rg.fixed_strings()
+            if self.word_button.isChecked():
+                rg.word_regexp()
+
+            include_pattern = self.include_input.text().strip()
+            if include_pattern:
+                rg.glob(include_pattern)
+
+            exclude_pattern = self.exclude_input.text().strip()
+            if exclude_pattern:
+                rg.glob(f"!{exclude_pattern}")
+
+            results = rg.json().run()
+            file_matches = {}
+            total_matches = 0
+
+            for item in results.as_dict:
+                if item["type"] == "match":
+                    file_path = item["data"]["path"]["text"]
+                    line_number = item["data"]["line_number"]
+                    line_text = item["data"]["lines"]["text"]
+                    file_matches.setdefault(file_path, []).append((line_number, line_text))
+                    total_matches += 1
+
+            for file_path, matches in file_matches.items():
+                file_item = QTreeWidgetItem([f"{file_path} ({len(matches)})"])
+                for line_number, line_text in matches:
+                    line_item = QTreeWidgetItem([f"{line_number}: {line_text}"])
+                    file_item.addChild(line_item)
+                self.result_tree.addTopLevelItem(file_item)
+
+            self.result_label.setText(f"{len(file_matches)} files, {total_matches} results")
+
+        except Exception as e:
+            logging.error(f"Search failed: {e}")
+            self.result_label.setText("Search failed")
+
+    def open_file_from_tree(self, item):
+        """双击打开文件"""
+        if item.parent() is None:  # 顶层项（文件）
+            file_path = item.text(0).split(" (")[0]
+            logging.info(f"Opening file: {file_path}")
+        else:  # 子项（行）
+            file_path = item.parent().text(0).split(" (")[0]
+            line_number = int(item.text(0).split(":")[0])
+            logging.info(f"Opening file: {file_path} at line {line_number}")
+
+    def open_file_from_tree_current_selection(self):
+        """点击链接打开当前选中文件"""
+        current_item = self.result_tree.currentItem()
+        if current_item:
+            self.open_file_from_tree(current_item)
