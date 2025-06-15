@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton, QTreeWidgetItem, QVBoxLayout, QWidget
 
 from custom_tree_widget import CustomTreeWidget
@@ -110,7 +110,8 @@ class CommitHistoryView(QWidget):
         )  # cursor 生成
         for commit in commits:
             item = QTreeWidgetItem(self.history_list)
-            item.setText(0, commit["hash"][:7])  # Commit ID
+            item.setText(0, commit["hash"][:7])  # 显示短哈希
+            item.setData(0, Qt.ItemDataRole.UserRole, commit["hash"])  # 存储完整哈希
             item.setText(1, commit["message"])  # Commit Message
 
             decorations = commit.get("decorations", [])
