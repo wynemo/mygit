@@ -1,8 +1,9 @@
 from functools import partial
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QEvent, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication,
+    QLabel,
     QMainWindow,
     QMenu,
     QTreeWidgetItem,
@@ -15,10 +16,45 @@ from utils import get_main_window_by_parent
 
 
 class CustomTreeWidget(HoverRevealTreeWidget):
+    empty_scrolled_signal = pyqtSignal()  # cursor 生成
+    resized = pyqtSignal()  # cursor 生成: 新增 resized 信号
+
     def __init__(self, parent=None):
         super().__init__(parent)
+        # cursor 生成: 添加无数据提示标签
+        self.no_data_label = QLabel("请尝试往下滚动加载更多数据", self.viewport())
+        self.no_data_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.no_data_label.setStyleSheet("color: grey; font-size: 16px;")
+        self.no_data_label.hide()
+
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
+
+        # cursor 生成: 连接 resized 信号
+        self.resized.connect(self._reposition_no_data_label)
+        self.viewport().installEventFilter(self)
+
+    def eventFilter(self, source, event):
+        """捕获 resize 事件并发送 resized 信号"""
+        if source == self.viewport() and event.type() == QEvent.Type.Resize:
+            self.resized.emit()
+        return super().eventFilter(source, event)
+
+    def _reposition_no_data_label(self):
+        """重新定位无数据提示标签，使其居中"""
+        if self.no_data_label.isVisible():
+            self.no_data_label.setGeometry(self.viewport().rect())
+            self.no_data_label.adjustSize()
+
+    def show_no_data_message(self, message):
+        """显示无数据/全部隐藏的提示信息"""
+        self.no_data_label.setText(message)
+        self.no_data_label.show()
+        self._reposition_no_data_label()
+
+    def hide_no_data_message(self):
+        """隐藏无数据/全部隐藏的提示信息"""
+        self.no_data_label.hide()
 
     def _merge_branch(self, git_manager, branch_name):
         """执行合并分支操作"""
@@ -108,6 +144,17 @@ class CustomTreeWidget(HoverRevealTreeWidget):
             print(f"切换分支失败：{error}")
         else:
             print(f"已切换到分支：{branch_name}")
+
+    def wheelEvent(self, event):
+        """重写滚轮事件，当没有有效滚动条时触发信号"""
+        scroll_bar = self.verticalScrollBar()
+
+        # 当滚动条不可见或不可用时触发
+        if not scroll_bar.isVisible() or not scroll_bar.isEnabled() or scroll_bar.value() == scroll_bar.maximum():
+            # if not self.no_data_label.isVisible():
+            self.empty_scrolled_signal.emit()
+
+        super().wheelEvent(event)  # 确保正常滚动行为
 
 
 class MainWindow(QMainWindow):
