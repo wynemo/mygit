@@ -147,7 +147,7 @@ class CustomTreeWidget(HoverRevealTreeWidget):
             print(f"已切换到分支：{branch_name}")
 
     def _compare_commit_with_workspace(self, item):
-        """比较指定提交与工作区的差异，并打印变更的文件列表"""
+        """比较指定提交与工作区的差异，并将变更文件添加到 WorkspaceExplorer.file_tree 中"""
         if not item:
             print("未选中任何提交")
             return
@@ -161,9 +161,17 @@ class CustomTreeWidget(HoverRevealTreeWidget):
             git_manager = parent.git_manager
             changed_files = git_manager.compare_commit_with_workspace(commit_hash)
             if changed_files:
-                print(f"与工作区比较的变更文件（提交 {commit_hash}）：")
-                for file in changed_files:
-                    print(f"- {file}")
+                # 获取 WorkspaceExplorer 实例
+                workspace_explorer = get_main_window_by_parent(self).workspace_explorer
+                if workspace_explorer:
+                    # 清空现有文件树
+                    workspace_explorer.file_changes_view.changes_tree.clear()
+                    # 添加变更文件到 file_changes_view
+                    for file in changed_files:
+                        workspace_explorer.file_changes_view.add_file_to_tree(file.split("/"), "modified")
+                    print(f"已将变更文件添加到工作区文件树（提交 {commit_hash}）")
+                else:
+                    print("未找到 WorkspaceExplorer 实例")
             else:
                 print(f"提交 {commit_hash} 与工作区无差异")
         else:
