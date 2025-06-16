@@ -107,3 +107,4 @@
 112. 工作区过滤文件，快速定位到文件
 113. commit 之间的比较
 114. stash/shelve 功能，AI 告诉我，git statsh 要简单点，似乎这是 git 内置的功能
+115. bug: 检查分支状态失败：No item found with id ''
