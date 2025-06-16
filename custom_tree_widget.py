@@ -1,6 +1,6 @@
 from functools import partial
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -15,6 +15,8 @@ from utils import get_main_window_by_parent
 
 
 class CustomTreeWidget(HoverRevealTreeWidget):
+    empty_scrolled_signal = pyqtSignal()  # cursor 生成
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -108,6 +110,16 @@ class CustomTreeWidget(HoverRevealTreeWidget):
             print(f"切换分支失败：{error}")
         else:
             print(f"已切换到分支：{branch_name}")
+
+    def wheelEvent(self, event):
+        """重写滚轮事件，当没有有效滚动条时触发信号"""
+        scroll_bar = self.verticalScrollBar()
+
+        # 当滚动条不可见或不可用时触发
+        if not scroll_bar.isVisible() or not scroll_bar.isEnabled():
+            self.empty_scrolled_signal.emit()
+
+        super().wheelEvent(event)  # 确保正常滚动行为
 
 
 class MainWindow(QMainWindow):
