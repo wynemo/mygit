@@ -8,6 +8,6 @@ alwaysApply: true
 + 生成的代码，请加上“cursor 生成”或同等的英文的注释，放在类或者函数的 Docstrings 里
 + 这是用 pyqt6 的工程
 + 专注于当前的功能，不要修改无关的代码
-+ logging 不要出现 flake8-logging-format 的情况;logging.exception 不需要记录异常，多余的
++ logging.exception 不需要记录异常，多余的，比如logging.error(f"Failed to compare commit changes with workspace for {commit_hash}: {e}"),正确的方式是 logging.exception("Failed to compare commit changes with workspace")
 + edit the file in small chunks
 
