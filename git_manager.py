@@ -537,3 +537,28 @@ class GitManager:
                 f"GitManager: 获取文件夹 '{folder_path}' 历史时发生未知错误。"
             )  # 使用 logging.exception 记录堆栈跟踪
             return []
+
+    def compare_commit_with_workspace(self, commit_hash: str) -> List[str]:
+        """比较指定提交与工作区的差异，返回变更的文件列表。
+
+        参数：
+            commit_hash: 要比较的提交的哈希值。
+
+        返回：
+            变更的文件路径列表。如果发生错误或没有变更，返回空列表。
+        """
+        if not self.repo:
+            return []
+
+        try:
+            # 使用 `name_only=True` 只返回文件名，不返回具体的差异内容
+            diff_output = self.repo.git.diff(commit_hash, name_only=True)
+            # 按行分割输出，并过滤掉空行
+            changed_files = [line.strip() for line in diff_output.split("\n") if line.strip()]
+            return changed_files
+        except git.GitCommandError as e:
+            logging.error(f"比较提交 {commit_hash} 与工作区失败：{e!s}")
+            return []
+        except Exception as e:
+            logging.error(f"比较提交 {commit_hash} 与工作区时发生未知错误：{e!s}")
+            return []

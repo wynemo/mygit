@@ -78,6 +78,10 @@ class CustomTreeWidget(HoverRevealTreeWidget):
         copy_commit_message_action = menu.addAction("copy commit message")
         copy_commit_message_action.triggered.connect(partial(self.copy_commmit_message_to_clipboard, item))
 
+        # 新增"与工作区比较"菜单项
+        compare_action = menu.addAction("与工作区比较")
+        compare_action.triggered.connect(partial(self._compare_commit_with_workspace, item))
+
         # 获取父窗口 (CommitHistoryView) 以访问 GitManager
         parent = self.parent()
         while parent and not hasattr(parent, "git_manager"):
@@ -141,6 +145,29 @@ class CustomTreeWidget(HoverRevealTreeWidget):
             print(f"切换分支失败：{error}")
         else:
             print(f"已切换到分支：{branch_name}")
+
+    def _compare_commit_with_workspace(self, item):
+        """比较指定提交与工作区的差异，并打印变更的文件列表"""
+        if not item:
+            print("未选中任何提交")
+            return
+
+        commit_hash = item.text(0)  # 假设 commit hash 在第一列
+        parent = self.parent()
+        while parent and not hasattr(parent, "git_manager"):
+            parent = parent.parent()
+
+        if parent and hasattr(parent, "git_manager") and parent.git_manager:
+            git_manager = parent.git_manager
+            changed_files = git_manager.compare_commit_with_workspace(commit_hash)
+            if changed_files:
+                print(f"与工作区比较的变更文件（提交 {commit_hash}）：")
+                for file in changed_files:
+                    print(f"- {file}")
+            else:
+                print(f"提交 {commit_hash} 与工作区无差异")
+        else:
+            print("无法获取 GitManager 实例")
 
     def wheelEvent(self, event):
         """重写滚轮事件，当没有有效滚动条时触发信号"""
