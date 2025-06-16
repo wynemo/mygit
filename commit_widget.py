@@ -1,6 +1,7 @@
 import logging
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -103,7 +104,7 @@ class CommitWidget(QFrame):
         message_header = QHBoxLayout()
         message_header.setContentsMargins(0, 0, 0, 0)
         message_label = QLabel("Commit Message:")
-        self.ai_button = QPushButton("✨")
+        self.ai_button = QPushButton(QIcon("icons/star.svg"), "")
         self.ai_button.setFixedWidth(30)
         self.ai_button.setToolTip("使用 AI 生成提交信息")
         self.ai_button.clicked.connect(self.generate_commit_message)
@@ -283,7 +284,7 @@ class CommitWidget(QFrame):
     def _reset_ai_button(self):
         """重置 AI 按钮状态"""
         self.ai_button.setEnabled(True)
-        self.ai_button.setText("✨")
+        #self.ai_button.setText("✨")
 
     def show_file_diff(self, item, is_staged):
         """显示文件差异"""
