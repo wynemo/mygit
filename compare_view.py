@@ -62,7 +62,7 @@ class CompareView(QWidget):
             # Optionally, log a warning if the main window instance isn't found
             print("Warning: GitManagerWindow instance not found for CompareView signal connections.")
 
-    def show_diff(self, git_manager, commit, file_path):
+    def show_diff(self, git_manager, commit, file_path, other_commit=None):
         """显示文件差异"""
         try:
             parents = commit.parents
@@ -72,6 +72,15 @@ class CompareView(QWidget):
                 current_content = commit.tree[file_path].data_stream.read().decode("utf-8", errors="replace")
             except KeyError:
                 current_content = ""
+
+            if other_commit:
+                other_commit_content = other_commit.tree[file_path].data_stream.read().decode("utf-8", errors="replace")
+                self.diff_viewer.show()
+                self.merge_diff_viewer.hide()
+                self.diff_viewer.set_texts(
+                    other_commit_content, current_content, file_path, other_commit.hexsha, commit.hexsha
+                )
+                return
 
             # 获取父提交的文件内容
             parent_content = ""
