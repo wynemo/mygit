@@ -17,11 +17,11 @@ from utils import get_main_window_by_parent
 
 class CustomTreeWidget(HoverRevealTreeWidget):
     empty_scrolled_signal = pyqtSignal()  # cursor 生成
-    resized = pyqtSignal()  # cursor 生成: 新增 resized 信号
+    resized = pyqtSignal()  # cursor 生成：新增 resized 信号
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        # cursor 生成: 添加无数据提示标签
+        # cursor 生成：添加无数据提示标签
         self.no_data_label = QLabel("请尝试往下滚动加载更多数据", self.viewport())
         self.no_data_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.no_data_label.setStyleSheet("color: grey; font-size: 16px;")
@@ -30,7 +30,7 @@ class CustomTreeWidget(HoverRevealTreeWidget):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
 
-        # cursor 生成: 连接 resized 信号
+        # cursor 生成：连接 resized 信号
         self.resized.connect(self._reposition_no_data_label)
         self.viewport().installEventFilter(self)
 
@@ -108,18 +108,15 @@ class CustomTreeWidget(HoverRevealTreeWidget):
             # 检查是否是远程分支且当前分支跟踪它
             for branch_name in item_branches:
                 if branch_name.startswith("☁️ origin/"):
-                    remote_branch = branch_name.strip("☁️").lstrip()
-                    try:
-                        # 检查当前分支是否跟踪此远程分支
-                        if (
-                            current_branch.tracking_branch()
-                            and current_branch.tracking_branch().name == remote_branch
-                            and current_branch.commit.hexsha != repo.refs[remote_branch].commit.hexsha
-                        ):
-                            merge_action = menu.addAction(f"Merge {remote_branch}")
-                            merge_action.triggered.connect(partial(self._merge_branch, git_manager, remote_branch))
-                    except Exception as e:
-                        print(f"检查远程分支状态失败：{e}")
+                    _branch_name = remote_branch = branch_name.strip("☁️").lstrip()
+                else:
+                    _branch_name = branch_name
+                try:
+                    if current_branch.commit.hexsha != repo.refs[_branch_name].commit.hexsha:
+                        merge_action = menu.addAction(f"Merge {remote_branch}")
+                        merge_action.triggered.connect(partial(self._merge_branch, git_manager, remote_branch))
+                except Exception as e:
+                    print(f"检查分支状态失败：{e}")
 
         menu.exec(self.mapToGlobal(position))
 
