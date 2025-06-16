@@ -116,7 +116,7 @@ class CustomTreeWidget(HoverRevealTreeWidget):
         scroll_bar = self.verticalScrollBar()
 
         # 当滚动条不可见或不可用时触发
-        if not scroll_bar.isVisible() or not scroll_bar.isEnabled():
+        if not scroll_bar.isVisible() or not scroll_bar.isEnabled() or scroll_bar.value() == scroll_bar.maximum():
             self.empty_scrolled_signal.emit()
 
         super().wheelEvent(event)  # 确保正常滚动行为
