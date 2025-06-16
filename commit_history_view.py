@@ -36,7 +36,7 @@ class CommitHistoryView(QWidget):
         # 添加搜索框
         search_layout = QHBoxLayout()
         self.search_edit = QLineEdit()
-        self.search_edit.setPlaceholderText("搜索提交历史...")
+        self.search_edit.setPlaceholderText("当搜索以后，可尝试往下滚动加载更多数据进行搜索...")
         self.search_edit.textChanged.connect(self.filter_history)
         search_layout.addWidget(self.search_edit)
 
@@ -51,8 +51,8 @@ class CommitHistoryView(QWidget):
         layout.addWidget(self.history_label)
 
         # 普通提交历史列表
-        self.history_list = CustomTreeWidget()
-        self.history_list.empty_scrolled_signal.connect(self.load_more_commits)  # cursor 生成
+        self.history_list = CustomTreeWidget(self)
+        self.history_list.empty_scrolled_signal.connect(self.load_more_commits)
         self.history_list.set_hover_reveal_columns({1})  # Enable hover for commit message column
         self.history_list.setHeaderLabels(["提交 ID", "提交信息", "Branches", "作者", "日期"])
         self.history_list.itemClicked.connect(self.on_commit_clicked)
@@ -77,6 +77,9 @@ class CommitHistoryView(QWidget):
         layout.addWidget(self.history_graph_list)
 
         self.history_graph_list.hide()  # 默认隐藏
+
+        # cursor 生成: 初始检查数据状态
+        self._check_and_display_no_data_message()
 
     def update_history(self, git_manager, branch):
         """更新提交历史"""
@@ -192,6 +195,25 @@ class CommitHistoryView(QWidget):
         self.clear_button.setVisible(False)
         self._apply_filter()
 
+    def _check_and_display_no_data_message(self):
+        """检查并显示/隐藏无数据提示信息"""
+        visible_items_count = 0
+        total_items = self.history_list.topLevelItemCount()
+
+        if total_items == 0:
+            self.history_list.show_no_data_message("请尝试往下滚动加载更多数据")
+            return
+
+        for i in range(total_items):
+            item = self.history_list.topLevelItem(i)
+            if not item.isHidden():
+                visible_items_count += 1
+
+        if visible_items_count == 0:
+            self.history_list.show_no_data_message("请尝试往下滚动加载更多数据")
+        else:
+            self.history_list.hide_no_data_message()
+
     def _apply_filter(self):
         """应用过滤逻辑到所有项目"""
         # 遍历所有项目
@@ -217,3 +239,6 @@ class CommitHistoryView(QWidget):
                         break
 
             item.setHidden(not show_item)
+
+        # cursor 生成: 过滤完成后检查数据状态
+        self._check_and_display_no_data_message()
