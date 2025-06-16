@@ -100,8 +100,11 @@ class FileSearchWidget(QFrame):
 
         # 工具按钮区域
         self.case_button = QPushButton("Aa")
+        self.case_button.setToolTip("Toggle case sensitivity")
         self.regex_button = QPushButton(".*")
+        self.regex_button.setToolTip("Toggle regex mode")
         self.word_button = QPushButton("ab")
+        self.word_button.setToolTip("Toggle whole word mode")
 
         # 设置按钮为可切换状态
         self.case_button.setCheckable(True)
