@@ -778,3 +778,19 @@ class GitManagerWindow(QMainWindow):
                     if self.git_manager and self.git_manager.repo:  # Ensure git repo is loaded
                         logging.debug("changeEvent, refresh_file_tree")
                         self.workspace_explorer.refresh_file_tree()
+
+    def keyPressEvent(self, event):
+        """Handle key press events for shortcuts."""
+        # Check for Command + Shift + F (Mac) or Control + Shift + F (Windows/Linux)
+        is_f_key = event.key() == Qt.Key.Key_F
+        is_shift = event.modifiers() & Qt.KeyboardModifier.ShiftModifier
+
+        # Check for Control on Windows/Linux OR Command on Mac
+        is_primary_modifier = (event.modifiers() & Qt.KeyboardModifier.ControlModifier) or (
+            event.modifiers() & Qt.KeyboardModifier.MetaModifier
+        )
+
+        if is_f_key and is_shift and is_primary_modifier:
+            self.side_bar.search_btn.click()
+        else:
+            super().keyPressEvent(event)
