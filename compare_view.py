@@ -62,17 +62,6 @@ class CompareView(QWidget):
             # Optionally, log a warning if the main window instance isn't found
             print("Warning: GitManagerWindow instance not found for CompareView signal connections.")
 
-        # Signal connections for blame_annotation_clicked from SyncedTextEdit instances
-        # are removed from here. The connection is now established in WorkspaceExplorer.open_file_in_tab
-        # directly to GitManagerWindow.handle_blame_click_from_editor when SyncedTextEdit
-        # instances are created for files opened via WorkspaceExplorer.
-        # For SyncedTextEdit instances within DiffViewer/MergeDiffViewer (part of CompareView),
-        # if they are also opened via a mechanism that uses WorkspaceExplorer.open_file_in_tab,
-        # they would be covered. If they are created and managed solely by CompareView/DiffViewer
-        # without going through WorkspaceExplorer's file opening logic, their blame clicks
-        # would not be handled by the new centralized handler unless explicitly connected.
-        # The current task is to remove the CompareView-specific handler and its connections.
-
     def show_diff(self, git_manager, commit, file_path):
         """显示文件差异"""
         try:
