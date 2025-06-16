@@ -556,9 +556,9 @@ class GitManager:
             # 按行分割输出，并过滤掉空行
             changed_files = [line.strip() for line in diff_output.split("\n") if line.strip()]
             return changed_files
-        except git.GitCommandError as e:
-            logging.error(f"比较提交 {commit_hash} 与工作区失败：{e!s}")
+        except git.GitCommandError:
+            logging.exception("比较提交 %s 与工作区失败", commit_hash)
             return []
-        except Exception as e:
-            logging.error(f"比较提交 {commit_hash} 与工作区时发生未知错误：{e!s}")
+        except Exception:
+            logging.exception("比较提交 %s 与工作区时发生未知错误", commit_hash)
             return []
