@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton, QTreeWidgetItem, QVBoxLayout, QWidget
 
 from custom_tree_widget import CustomTreeWidget
@@ -22,6 +22,10 @@ class CommitHistoryView(QWidget):
         self._loading = False  # cursor 生成
         self._all_loaded = False  # cursor 生成
         self.filter_text = ""
+        self.search_timer = QTimer(self)
+        self.search_timer.setInterval(500)  # 设置延时为 500 毫秒
+        self.search_timer.setSingleShot(True)  # 设置为单次触发
+        self.search_timer.timeout.connect(self._apply_filter)
         self.setup_ui()
 
     def setup_ui(self):
@@ -178,7 +182,7 @@ class CommitHistoryView(QWidget):
         """根据输入文本过滤提交历史"""
         self.filter_text = text.strip().lower()
         self.clear_button.setVisible(bool(self.filter_text))
-        self._apply_filter()
+        self.search_timer.start()  # 启动或重启计时器
 
     def clear_search(self):
         """清除搜索框并恢复所有项目"""
