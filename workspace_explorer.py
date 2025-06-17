@@ -74,8 +74,8 @@ class WorkspaceExplorer(QWidget):
         self.search_icon_label.setPixmap(QIcon("icons/search.svg").pixmap(QSize(15, 15)))  # Assuming search.svg
         self.search_box_layout.addWidget(self.search_icon_label)
 
-        self.folder_name_label = QLabel("mygit", self)  # Placeholder text
-        self.folder_name_label.setStyleSheet("color: #000000;")  # Example color
+        self.folder_name_label = QLabel("", self)  # 初始为空字符串
+        self.folder_name_label.setStyleSheet("color: #000000;")
         self.search_box_layout.addWidget(self.folder_name_label)
 
         self.search_box_widget.setStyleSheet("""
@@ -260,6 +260,12 @@ class WorkspaceExplorer(QWidget):
         """设置并加载工作区路径"""
         self.workspace_path = path
         self.refresh_file_tree()
+        self.update_folder_name_label(path)  # 新增：调用更新标签的方法
+
+    def update_folder_name_label(self, path: str):
+        """cursor 生成 - 更新文件夹名称标签的显示"""
+        folder_name = os.path.basename(path)
+        self.folder_name_label.setText(folder_name)
 
     def refresh_file_tree(self):
         """cursor 生成 - 刷新文件树，保留已展开的文件夹状态"""
