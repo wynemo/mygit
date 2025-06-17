@@ -27,9 +27,15 @@
             │   ├── [SideBarWidget] (自定义侧边栏)
             │   │   └── 包含工程、提交和变更按钮
             │   └── [WorkspaceExplorer] (工作区浏览器)
-            │       │ - 左侧：文件树视图 (FileTreeWidget)，显示当前工作区的文件结构
-            │       └── 右侧：compare_tab_widget (QTabWidget)，用于在多个标签页中显示文件比较视图 (CompareView)
-            │           └── 每个标签页标题格式: "文件名 @ commit短哈希"
+            │       │ - 顶部: `QHBoxLayout` 包含刷新按钮和搜索框
+            │       └── 主体: `QSplitter` (水平分割器)，内部包含以下视图 (根据功能切换显示)：
+            │           ├── [FileTreeWidget] (文件树视图): 显示当前工作区的文件结构，支持右键操作
+            │           ├── [CommitWidget] (提交面板): 用于执行 Git 提交操作
+            │           ├── [FileChangesView] (文件变更视图): 显示当前提交的文件修改列表
+            │           ├── [FileSearchWidget] (文件搜索组件): 提供工作区文件搜索功能
+            │           └── [QTabWidget] (文件内容/比较标签页 - 对应 GitManagerWindow 中的 compare_tab_widget):
+            │               └── 用于在新标签页中打开文件内容 (`ModifiedTextEdit`) 或显示文件比较视图 (`CompareView`)。
+            │                   每个文件比较标签页标题格式: "文件名 @ commit短哈希"
             │
             └── [下半部分] bottom_widget (QWidget - 底部面板，可整体显示/隐藏)
                 │
@@ -76,14 +82,19 @@
 
 *   **TopBarWidget**: 作为应用的全局操作入口，负责处理仓库选择、分支切换、执行核心 Git 命令（提交、拉取、推送、抓取）以及打开设置对话框。它还维护最近打开的仓库列表，并提供切换底部面板和左侧面板可见性的功能。
 *   **WorkspaceExplorer**:
-    *   左侧的文件树 (`FileTreeWidget`) 展示当前打开 Git 仓库的工作区文件。用户可以右键点击文件进行特定操作（如查看文件历史、进行 blame）。
-    *   当用户在 `FileChangesView` 中选择一个文件并请求与工作区版本比较，或通过其他方式触发文件对比时，结果会显示在 `WorkspaceExplorer` 右侧的 `compare_tab_widget` 中的新标签页内。
+    *   `WorkspaceExplorer` 内部通过一个 `QSplitter` 管理多个视图区域，这些视图根据用户操作动态显示/隐藏：
+        *   **文件树 (`FileTreeWidget`)**: 左侧的文件树视图，展示当前打开 Git 仓库的工作区文件。用户可以右键点击文件进行特定操作（如查看文件历史、进行 blame）。
+        *   **提交面板 (`CommitWidget`)**: 用于显示暂存区和未暂存区的变更，并提供提交功能。
+        *   **文件变更视图 (`FileChangesView`)**: 用于显示选定提交的文件变更列表。当用户在此视图中选择一个文件并请求与工作区版本比较，或通过其他方式触发文件对比时，结果会显示在 `WorkspaceExplorer` 内的"文件内容/比较标签页"中。
+        *   **文件搜索组件 (`FileSearchWidget`)**: 提供全局文件搜索功能。
+        *   **文件内容/比较标签页 (`QTabWidget` - 对应 `GitManagerWindow` 中的 `compare_tab_widget`)**: 用于在新标签页中打开文件内容 (`ModifiedTextEdit`) 或显示文件比较视图 (`CompareView`)。当用户在 `FileChangesView` 中选择文件或通过文件树双击文件时，文件内容或比较视图将在此标签页中打开。
 *   **主功能标签 (`tab_widget`)**:
-    *   第一个标签页固定为 "提交历史" (`CommitHistoryView`)。此视图可以根据用户选择（如查看所有分支）在传统的列表视图和图形化的提交图之间切换。
-    *   用户可以通过其他操作（如在 `WorkspaceExplorer` 中查看某个文件的历史）动态添加新的标签页，这些标签页通常是 `FileHistoryView` 的实例，专门显示特定文件的版本历史。
-    *   当 `tab_widget` 的当前标签页不是 "提交历史" 时（即显示某个文件的历史），`horizontal_splitter` 最右侧的 `compare_view` 会被激活并显示，用于对比该文件在不同提交之间的差异。而 `right_splitter` (包含 `FileChangesView` 和 `CommitDetailView`) 会被隐藏。反之，当选中 "提交历史" 标签页时，`right_splitter` 显示，`compare_view` 隐藏。
+    *   `GitManagerWindow` 中的主功能标签页，主要包含"提交历史"视图。
+        *   第一个标签页固定为 "提交历史" (`CommitHistoryView`)。此视图可以根据用户选择（如查看所有分支）在传统的列表视图和图形化的提交图之间切换。
+        *   用户可以通过其他操作（如在 `WorkspaceExplorer` 的文件树中选择查看某个文件的历史）动态添加新的标签页，这些标签页通常是 `FileHistoryView` 的实例，专门显示特定文件的版本历史。
+        *   当 `GitManagerWindow` 的主 `tab_widget` 的当前标签页不是 "提交历史" 时（即显示某个文件的历史），`horizontal_splitter` 最右侧的 `compare_view` 会被激活并显示，用于对比该文件在不同提交之间的差异。而 `right_splitter` (包含 `FileChangesView` 和 `CommitDetailView`) 会被隐藏。反之，当选中 "提交历史" 标签页时，`right_splitter` 显示，`compare_view` 隐藏。
 *   **CommitHistoryView**: 当用户在此视图中选择一个提交时，会发出信号，触发 `FileChangesView` 更新显示该提交所修改的文件列表，并触发 `CommitDetailView` 显示该提交的详细元数据。
-*   **FileChangesView**: 用户在此视图中选择一个文件时，可以触发在 `WorkspaceExplorer` 的 `compare_tab_widget` 中打开一个新的比较视图，展示该文件在当前选定提交中的版本与 HEAD 或工作区版本的差异。
+*   **FileChangesView**: 用户在此视图中选择一个文件时，可以触发在 `WorkspaceExplorer` 的"文件内容/比较标签页" (`compare_tab_widget`) 中打开一个新的比较视图，展示该文件在当前选定提交中的版本与 HEAD 或工作区版本的差异。
 
 **状态持久化：**
 
@@ -157,4 +168,3 @@
 
 4.  **异步操作处理**:
     拉取 (`pull`)、推送 (`push`) 和获取 (`fetch`) 操作使用专用线程 (`PullThread`, `PushThread`, `FetchThread`) 执行，避免阻塞 UI 线程。操作完成后会更新 UI 状态并显示通知消息。
-```
