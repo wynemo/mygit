@@ -196,12 +196,6 @@ class TopBarWidget(QWidget):
         # `recent_button` and `open_button` should always be enabled or handled separately.
         # `settings_button` and `toggle_bottom_button` usually always enabled.
 
-    def start_spinning(self):
-        self.spinner_label.show()
-
-    def stop_spinning(self):
-        self.spinner_label.hide()
-
     def _on_new_branch_button_clicked(self):
         """处理新建分支按钮点击事件"""
         dialog = NewBranchDialog(self)

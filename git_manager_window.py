@@ -21,6 +21,7 @@ from commit_detail_view import CommitDetailView
 from commit_history_view import CommitHistoryView
 from compare_view import CompareView
 from components.notification_widget import NotificationWidget
+from components.spin_icons import RotatingLabel
 from dialogs.compare_with_working_dialog import CompareWithWorkingDialog
 from dialogs.settings_dialog import SettingsDialog
 from file_changes_view import FileChangesView
@@ -142,6 +143,11 @@ class GitManagerWindow(QMainWindow):
         self.push_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.push_button.clicked.connect(self.push_repo)
         git_button_layout.addWidget(self.push_button)
+
+        # --- Spinner Label ---
+        self.spinner_label = RotatingLabel("icons/spin.png")
+        self.spinner_label.hide()
+        git_button_layout.addWidget(self.spinner_label)
 
         git_widget = QWidget()
         git_widget.setLayout(git_button_layout)
@@ -599,7 +605,7 @@ class GitManagerWindow(QMainWindow):
             return
 
         if hasattr(self, "top_bar") and self.top_bar:
-            self.top_bar.start_spinning()
+            self.start_spinning()
         QApplication.processEvents()  # Ensure UI updates like spinner start
 
         self.fetch_thread = FetchThread(self.git_manager)
@@ -617,8 +623,7 @@ class GitManagerWindow(QMainWindow):
                 logging.info("Fetch successful.")
                 self.update_commit_history()  # Update history as fetch can update remote-tracking branches
         finally:
-            if hasattr(self, "top_bar") and self.top_bar:
-                self.top_bar.stop_spinning()
+            self.stop_spinning()
             QApplication.processEvents()  # Ensure UI updates like spinner stop
 
     def pull_repo(self):
@@ -628,7 +633,7 @@ class GitManagerWindow(QMainWindow):
 
         # 显示加载动画
         if hasattr(self, "top_bar") and self.top_bar:
-            self.top_bar.start_spinning()
+            self.start_spinning()
             QApplication.processEvents()
 
         # 创建并启动线程
@@ -658,7 +663,7 @@ class GitManagerWindow(QMainWindow):
             # Consider disabling push button via top_bar if no git_manager
             return
         if hasattr(self, "top_bar") and self.top_bar:
-            self.top_bar.start_spinning()
+            self.start_spinning()
             QApplication.processEvents()  # Ensure UI updates
         # 创建并启动线程
         self.push_thread = PushThread(self.git_manager)
@@ -794,3 +799,9 @@ class GitManagerWindow(QMainWindow):
             self.side_bar.search_btn.click()
         else:
             super().keyPressEvent(event)
+
+    def start_spinning(self):
+        self.spinner_label.show()
+
+    def stop_spinning(self):
+        self.spinner_label.hide()
