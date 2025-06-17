@@ -654,7 +654,7 @@ class GitManagerWindow(QMainWindow):
         finally:
             # 停止加载动画
             if hasattr(self, "top_bar") and self.top_bar:
-                self.top_bar.stop_spinning()
+                self.stop_spinning()
             QApplication.processEvents()  # Ensure UI updates
 
     def push_repo(self):
@@ -700,7 +700,7 @@ class GitManagerWindow(QMainWindow):
         finally:
             # 停止加载动画
             if hasattr(self, "top_bar") and self.top_bar:
-                self.top_bar.stop_spinning()
+                self.stop_spinning()
             QApplication.processEvents()  # Ensure UI updates
 
     def handle_blame_click_from_editor(self, commit_hash: str):
