@@ -263,6 +263,7 @@ class WorkspaceExplorer(QWidget):
         self.workspace_path = path
         self.refresh_file_tree()
         self.update_folder_name_label(path)  # 新增：调用更新标签的方法
+        self.search_box_widget.setToolTip(f"搜索 - {self.folder_name_label.text()}")  # 新增 ToolTip
 
     def update_folder_name_label(self, path: str):
         """cursor 生成 - 更新文件夹名称标签的显示"""
