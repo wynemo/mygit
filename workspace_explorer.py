@@ -68,7 +68,8 @@ class WorkspaceExplorer(QWidget):
         self.search_box_widget = QWidget(self)
         self.search_box_layout = QHBoxLayout(self.search_box_widget)
         self.search_box_layout.setContentsMargins(10, 5, 10, 5)
-        self.search_box_layout.setSpacing(5)
+        self.search_box_layout.setSpacing(0)  # 减少间距
+        self.search_box_layout.addStretch(1)  # 添加左侧拉伸
 
         self.search_icon_label = QLabel(self)
         self.search_icon_label.setPixmap(QIcon("icons/search.svg").pixmap(QSize(15, 15)))  # Assuming search.svg
@@ -77,6 +78,7 @@ class WorkspaceExplorer(QWidget):
         self.folder_name_label = QLabel("", self)  # 初始为空字符串
         self.folder_name_label.setStyleSheet("color: #000000;")
         self.search_box_layout.addWidget(self.folder_name_label)
+        self.search_box_layout.addStretch(1)  # 添加右侧拉伸
 
         self.search_box_widget.setStyleSheet("""
             QWidget {
