@@ -6,13 +6,15 @@ import subprocess
 import weakref
 from typing import TYPE_CHECKING, Optional, Union
 
-from PyQt6.QtCore import QMimeData, QPoint, Qt
+from PyQt6.QtCore import QMimeData, QPoint, QSize, Qt
 from PyQt6.QtGui import QAction, QColor, QDrag, QDragEnterEvent, QDropEvent, QIcon, QTextCursor
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
+    QHBoxLayout,
+    QLabel,
     QMenu,
-    QPushButton,  # Added QPushButton
+    QPushButton,
     QSplitter,
     QTabWidget,
     QTreeWidget,
@@ -50,12 +52,45 @@ class WorkspaceExplorer(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
+        # 创建顶部水平布局来放置刷新按钮和搜索框
+        top_bar_buttons_layout = QHBoxLayout()
+        top_bar_buttons_layout.setContentsMargins(0, 0, 0, 0)
+        top_bar_buttons_layout.setSpacing(5)  # Add spacing between elements
+
         # 创建刷新按钮
         self.refresh_button = QPushButton(QIcon("icons/refresh.svg"), "")
         self.refresh_button.setFixedSize(30, 30)
         self.refresh_button.setToolTip("refresh")
         self.refresh_button.clicked.connect(self._handle_refresh_clicked)
-        layout.addWidget(self.refresh_button)  # Add button to layout
+        top_bar_buttons_layout.addWidget(self.refresh_button)  # Add button to top layout
+
+        # --- Search Box ---
+        self.search_box_widget = QWidget(self)
+        self.search_box_layout = QHBoxLayout(self.search_box_widget)
+        self.search_box_layout.setContentsMargins(10, 5, 10, 5)
+        self.search_box_layout.setSpacing(5)
+
+        self.search_icon_label = QLabel(self)
+        self.search_icon_label.setPixmap(QIcon("icons/search.svg").pixmap(QSize(20, 20)))  # Assuming search.svg
+        self.search_box_layout.addWidget(self.search_icon_label)
+
+        self.folder_name_label = QLabel("mygit", self)  # Placeholder text
+        self.folder_name_label.setStyleSheet("color: #6a5acd;")  # Example color
+        self.search_box_layout.addWidget(self.folder_name_label)
+
+        self.search_box_widget.setStyleSheet("""
+            QWidget {
+                background-color: #d8bfd8; /* Light purple */
+                border-radius: 15px; /* Rounded corners */
+            }
+        """)
+        self.search_box_widget.setFixedSize(200, 30)  # Adjust size as needed
+        top_bar_buttons_layout.addWidget(self.search_box_widget)
+
+        top_bar_buttons_layout.addStretch(1)  # Add stretch to push elements to the left
+
+        # 将顶部水平布局添加到主布局
+        layout.addLayout(top_bar_buttons_layout)
 
         # 创建水平分割器
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
