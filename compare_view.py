@@ -1,4 +1,6 @@
 import contextlib
+import logging
+import os
 
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
@@ -62,24 +64,31 @@ class CompareView(QWidget):
             # Optionally, log a warning if the main window instance isn't found
             print("Warning: GitManagerWindow instance not found for CompareView signal connections.")
 
-    def show_diff(self, git_manager, commit, file_path, other_commit=None):
+    def show_diff(self, git_manager, commit, file_path, other_commit=None, is_comparing_with_workspace=False):
         """显示文件差异"""
         try:
             parents = commit.parents
 
             # 获取当前提交的文件内容
             try:
-                current_content = commit.tree[file_path].data_stream.read().decode("utf-8", errors="replace")
+                content = commit.tree[file_path].data_stream.read().decode("utf-8", errors="replace")
             except KeyError:
-                current_content = ""
+                content = ""
 
             if other_commit:
-                other_commit_content = other_commit.tree[file_path].data_stream.read().decode("utf-8", errors="replace")
+                if not is_comparing_with_workspace:
+                    other_commit_content = (
+                        other_commit.tree[file_path].data_stream.read().decode("utf-8", errors="replace")
+                    )
+                else:
+                    # 获取工作区的文件内容
+                    working_file_path = os.path.join(git_manager.repo.working_dir, file_path)
+                    if os.path.exists(working_file_path):
+                        with open(working_file_path, "r", encoding="utf-8", errors="replace") as f:
+                            other_commit_content = f.read()
                 self.diff_viewer.show()
                 self.merge_diff_viewer.hide()
-                self.diff_viewer.set_texts(
-                    other_commit_content, current_content, file_path, other_commit.hexsha, commit.hexsha
-                )
+                self.diff_viewer.set_texts(content, other_commit_content, file_path, commit.hexsha, other_commit.hexsha)
                 return
 
             # 获取父提交的文件内容
@@ -93,9 +102,7 @@ class CompareView(QWidget):
                 self.diff_viewer.show()
                 self.merge_diff_viewer.hide()
                 parent_commit_hash = parents[0].hexsha if parents else None
-                self.diff_viewer.set_texts(
-                    parent_content, current_content, file_path, parent_commit_hash, commit.hexsha
-                )
+                self.diff_viewer.set_texts(parent_content, content, file_path, parent_commit_hash, commit.hexsha)
             else:
                 self.diff_viewer.hide()
                 self.merge_diff_viewer.show()
@@ -109,7 +116,7 @@ class CompareView(QWidget):
                 parent2_commit_hash = parents[1].hexsha  # Assuming parents[1] exists for merge
                 self.merge_diff_viewer.set_texts(
                     parent_content,
-                    current_content,
+                    content,
                     parent2_content,
                     file_path,
                     parent1_commit_hash,
@@ -117,5 +124,5 @@ class CompareView(QWidget):
                     parent2_commit_hash,
                 )
 
-        except Exception as e:
-            print(f"Error displaying file diff: {e}")
+        except Exception:
+            logging.exception("Error displaying file diff")

@@ -442,15 +442,17 @@ class GitManagerWindow(QMainWindow):
         # cursor 生成 - 同时更新 commit 详细信息视图
         self.commit_detail_view.update_commit_detail(self.git_manager, self.current_commit)
 
-    def on_file_selected(self, file_path, commit_hash=None, other_commit_hash=None):
+    def on_file_selected(self, file_path, commit_hash=None, other_commit_hash=None, is_comparing_with_workspace=False):
         """当选择文件时，在 TabWidget 中显示比较视图"""
         _commit = self.git_manager.repo.commit(commit_hash) if commit_hash else self.current_commit
         if not _commit or not self.git_manager:
             return
         other_commit = self.git_manager.repo.commit(other_commit_hash) if other_commit_hash else None
-        self._on_file_selected(file_path, _commit, other_commit=other_commit)
+        self._on_file_selected(
+            file_path, _commit, other_commit=other_commit, is_comparing_with_workspace=is_comparing_with_workspace
+        )
 
-    def _on_file_selected(self, file_path, current_commit, other_commit=None):
+    def _on_file_selected(self, file_path, current_commit, other_commit=None, is_comparing_with_workspace=False):
         # 生成一个唯一的标签页标识符，例如 "commit_hash:file_path"
         # 为简化，我们先用 file_path 作为标题，并检查是否已存在
         # 更健壮的方式是存储一个映射：tab_key -> tab_index
@@ -467,7 +469,13 @@ class GitManagerWindow(QMainWindow):
 
         # 如果不存在，创建新的 CompareView 实例并添加
         compare_view_instance = CompareView(self)
-        compare_view_instance.show_diff(self.git_manager, current_commit, file_path, other_commit=other_commit)
+        compare_view_instance.show_diff(
+            self.git_manager,
+            current_commit,
+            file_path,
+            other_commit=other_commit,
+            is_comparing_with_workspace=is_comparing_with_workspace,
+        )
 
         new_tab_index = self.compare_tab_widget.addTab(compare_view_instance, unique_tab_title)
         self.compare_tab_widget.setCurrentIndex(new_tab_index)

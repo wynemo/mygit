@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from git_manager import GitManager
 from hover_reveal_tree_widget import HoverRevealTreeWidget
 from utils import get_main_window_by_parent
 
@@ -161,7 +162,7 @@ class CustomTreeWidget(HoverRevealTreeWidget):
             parent = parent.parent()
 
         if parent and hasattr(parent, "git_manager") and parent.git_manager:
-            git_manager = parent.git_manager
+            git_manager: "GitManager" = parent.git_manager
             changed_files = git_manager.compare_commit_with_workspace(commit_hash)
             if changed_files:
                 # 获取 WorkspaceExplorer 实例
@@ -172,6 +173,9 @@ class CustomTreeWidget(HoverRevealTreeWidget):
                     # 添加变更文件到 file_changes_view
                     for file in changed_files:
                         workspace_explorer.file_changes_view.add_file_to_tree(file.split("/"), "modified")
+                    workspace_explorer.file_changes_view.commit_hash = commit_hash
+                    workspace_explorer.file_changes_view.other_commit_hash = git_manager.repo.head.commit.hexsha
+                    workspace_explorer.file_changes_view.is_comparing_with_workspace = True
                     print(f"已将变更文件添加到工作区文件树（提交 {commit_hash}）")
                 else:
                     print("未找到 WorkspaceExplorer 实例")

@@ -11,13 +11,15 @@ from PyQt6.QtWidgets import (
 
 
 class FileChangesView(QWidget):
-    file_selected = pyqtSignal(str, str)  # 当选择文件时发出信号
+    file_selected = pyqtSignal(str, str, str, bool)  # 当选择文件时发出信号
     compare_with_working_requested = pyqtSignal(str, str)  # 请求与工作区比较
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setup_ui()
         self.commit_hash = None
+        self.other_commit_hash = None
+        self.is_comparing_with_workspace = False
 
     def setup_ui(self):
         layout = QVBoxLayout()
@@ -107,7 +109,9 @@ class FileChangesView(QWidget):
     def on_file_clicked(self, item):
         """当点击文件时发出信号"""
         if item and item.childCount() == 0:
-            self.file_selected.emit(self.get_full_path(item), self.commit_hash)
+            self.file_selected.emit(
+                self.get_full_path(item), self.commit_hash, self.other_commit_hash, self.is_comparing_with_workspace
+            )
 
     def show_context_menu(self, position):
         """显示右键菜单"""
