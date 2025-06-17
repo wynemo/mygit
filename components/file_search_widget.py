@@ -42,7 +42,8 @@ class FileSearchWidget(QFrame):
     def setup_ui(self):
         """初始化 UI 界面"""
         self.setWindowTitle("File Search")
-        self.setStyleSheet("""
+        self.setStyleSheet(
+            """
             QFrame {
                 background-color: #f8f8f8;
                 border: 1px solid #ddd;
@@ -68,7 +69,8 @@ class FileSearchWidget(QFrame):
                 border-radius: 3px;
                 background-color: white;
             }
-        """)
+        """
+        )
 
         # 主布局
         main_layout = QVBoxLayout(self)
@@ -77,25 +79,29 @@ class FileSearchWidget(QFrame):
 
         # 搜索输入区域
         search_input_container = QFrame()
-        search_input_container.setStyleSheet("""
+        search_input_container.setStyleSheet(
+            """
             QFrame {
                 border: 1px solid #ccc;
                 border-radius: 3px;
                 background-color: white;
             }
-        """)
+        """
+        )
         search_input_layout = QHBoxLayout(search_input_container)
         search_input_layout.setContentsMargins(0, 0, 0, 0)
         search_input_layout.setSpacing(0)
 
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search...")
-        self.search_input.setStyleSheet("""
+        self.search_input.setStyleSheet(
+            """
             QLineEdit {
                 padding: 5px;
                 border: none;
             }
-        """)
+        """
+        )
         search_input_layout.addWidget(self.search_input)
 
         # 工具按钮区域
@@ -159,13 +165,6 @@ class FileSearchWidget(QFrame):
 
         main_layout.addWidget(self.result_tree)
 
-        # Open in editor 链接
-        self.open_link = QLabel("Open in editor")
-        self.open_link.setStyleSheet("color: #0066cc; text-decoration: underline;")
-        self.open_link.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.open_link.setAlignment(Qt.AlignmentFlag.AlignRight)
-        main_layout.addWidget(self.open_link)
-
         self.setLayout(main_layout)
 
     def connect_signals(self):
@@ -179,7 +178,6 @@ class FileSearchWidget(QFrame):
         self.include_input.textChanged.connect(self.perform_search)
         self.exclude_input.textChanged.connect(self.perform_search)
         self.result_tree.itemDoubleClicked.connect(self.open_file_from_tree)
-        self.open_link.linkActivated.connect(self.open_file_from_tree_current_selection)
 
     def start_search_timer(self):
         """cursor 生成
@@ -276,9 +274,3 @@ class FileSearchWidget(QFrame):
                     text_edit.setExtraSelections([selection])
                 break
             workspace_explorer = workspace_explorer.parent()
-
-    def open_file_from_tree_current_selection(self):
-        """点击链接打开当前选中文件"""
-        current_item = self.result_tree.currentItem()
-        if current_item:
-            self.open_file_from_tree(current_item)
