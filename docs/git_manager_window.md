@@ -12,10 +12,14 @@
     └── [main_layout] (QVBoxLayout - 主垂直布局)
         │
         ├── [TopBarWidget] (自定义顶部工具栏)
-        │   │ - 提供打开仓库、切换分支、提交、拉取、推送、设置等操作按钮
-        │   │ - 显示最近打开的仓库列表
-        │   │ - 包含切换底部面板和左侧面板显示/隐藏的按钮
-        │   │ - 提供 Fetch/Pull/Push 操作按钮
+        │   │ - **功能按钮**:
+        │   │   - **Open Folder**: 打开仓库 (触发 `open_folder_requested` 信号)
+        │   │   - **Recent**: 下拉菜单显示最近打开的仓库列表 (通过 `update_recent_menu` 更新)
+        │   │   - **Branch**: 分支选择下拉框 (支持新建分支，通过 `update_branches` 更新)
+        │   │   - **Settings**: 设置按钮 (触发 `settings_requested` 信号)
+        │   │   - **Toggle Bottom Panel**: 切换底部面板显示/隐藏 (动态更新图标)
+        │   │   - **Toggle Left Panel**: 切换左侧面板显示/隐藏 (动态更新图标)
+        │   │ - **状态控制**: 通过 `set_buttons_enabled` 管理依赖仓库的按钮状态
         │
         └── [vertical_splitter] (QSplitter - 主垂直分割器)
             │
