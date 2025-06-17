@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
 )
 
 from components.new_branch_dialog import NewBranchDialog
-from components.spin_icons import RotatingIcon
+from components.spin_icons import RotatingLabel
 from utils import get_main_window_by_parent
 
 
@@ -65,7 +65,7 @@ class TopBarWidget(QWidget):
         self._layout.addWidget(self.new_branch_button)
 
         # --- Spinner Label ---
-        self.spinner_label = RotatingIcon("icons/spin.png")
+        self.spinner_label = RotatingLabel("icons/spin.png")
         self.spinner_label.hide()
         self.layout().addWidget(self.spinner_label)
 

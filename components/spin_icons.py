@@ -1,28 +1,20 @@
-from abc import ABC, abstractmethod
-
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QPainter, QPixmap
 from PyQt6.QtWidgets import QLabel
 
-# 搞个抽象基类， rorate, start stop 三个方法
-# 用python的abc模块实现
 
-
-class RotatingIconBase(ABC):
-    @abstractmethod
+class RotatingIconBase:
     def rotate(self):
         pass
 
-    @abstractmethod
     def start(self):
         pass
 
-    @abstractmethod
     def stop(self):
         pass
 
 
-class RotatingIcon(QLabel):
+class RotatingLabel(QLabel, RotatingIconBase):
     def __init__(self, png_path):
         super().__init__()
         self.target_size = 20  # 你想要的尺寸
@@ -63,3 +55,9 @@ class RotatingIcon(QLabel):
         painter.end()
 
         self.setPixmap(canvas)
+
+    def start(self):
+        self.timer.start()
+
+    def stop(self):
+        self.timer.stop()
