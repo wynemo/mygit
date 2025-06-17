@@ -284,7 +284,7 @@ class CommitWidget(QFrame):
     def _reset_ai_button(self):
         """重置 AI 按钮状态"""
         self.ai_button.setEnabled(True)
-        #self.ai_button.setText("✨")
+        self.ai_button.setIcon(QIcon("icons/star.svg"))
 
     def show_file_diff(self, item, is_staged):
         """显示文件差异"""
