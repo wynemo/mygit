@@ -259,7 +259,7 @@ class CommitWidget(QFrame):
 
             # 禁用 AI 按钮，显示正在生成中
             self.ai_button.setEnabled(False)
-            self.ai_button.setText("⏳")
+            self.ai_button.setIcon(QIcon("icons/hourglass.svg"))
 
             # 准备并启动线程
             self.ai_thread.diff_content = "\n\n".join(diffs)
