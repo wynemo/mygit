@@ -1,64 +1,77 @@
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import QRectF, Qt, QTimer
 from PyQt6.QtGui import QIcon, QPainter, QPixmap
+from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtWidgets import QLabel, QPushButton, QWidget
 
 
 class RotatingAnimationMixin:
     def __init__(self, img_path: str, target_size: int = 20):
         self.target_size = target_size
-        self.original_pixmap = QPixmap(img_path).scaled(
-            self.target_size,
-            self.target_size,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
         self.angle = 0
 
-        # 定时器控制旋转
+        # Determine if file is SVG
+        if img_path.lower().endswith(".svg"):
+            self.is_svg = True
+            self.svg_renderer = QSvgRenderer(img_path)
+            if not self.svg_renderer.isValid():
+                raise ValueError(f"Invalid SVG file: {img_path}")
+        else:
+            self.is_svg = False
+            self.original_pixmap = QPixmap(img_path)
+            if self.original_pixmap.isNull():
+                raise ValueError(f"Failed to load image: {img_path}")
+            self.original_pixmap = self.original_pixmap.scaled(
+                self.target_size,
+                self.target_size,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+
+        # Setup rotation timer
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.rotate)
 
     def get_rotated_pixmap(self):
-        """
-        获取旋转后的图标。
-        """
-        self.angle = (self.angle + 3) % 360
+        """Generate rotated pixmap with smooth rendering for both SVG and bitmap images"""
+        self.angle = (self.angle + 3) % 360  # Increment rotation angle
 
-        # 1. 创建画布
         canvas = QPixmap(self.target_size, self.target_size)
         canvas.fill(Qt.GlobalColor.transparent)
 
-        # 2. 用 QPainter 在中心旋转并绘制
         painter = QPainter(canvas)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
 
-        # 3. 变换原点到中心，然后旋转
         center = self.target_size / 2
         painter.translate(center, center)
         painter.rotate(self.angle)
         painter.translate(-center, -center)
 
-        # 4. 绘制原图
-        painter.drawPixmap(0, 0, self.original_pixmap)
-        painter.end()
+        if self.is_svg:
+            self.svg_renderer.render(painter, QRectF(0, 0, self.target_size, self.target_size))
+        else:
+            painter.drawPixmap(0, 0, self.original_pixmap)
 
+        painter.end()
         return canvas
 
     def rotate(self):
+        """Rotation handler to be implemented by child classes"""
         pass
 
     def start(self):
-        self.timer.start(16)  # 大约 60 FPS
+        """Start rotation animation (~60 FPS)"""
+        self.timer.start(16)
 
     def stop(self):
+        """Stop rotation animation"""
         self.timer.stop()
 
 
 class RotatingLabel(RotatingAnimationMixin, QLabel):
-    def __init__(self, png_path):
+    def __init__(self, img_path: str):
         QLabel.__init__(self)
-        RotatingAnimationMixin.__init__(self, png_path)
+        RotatingAnimationMixin.__init__(self, img_path)
         self.start()
 
     def rotate(self):
