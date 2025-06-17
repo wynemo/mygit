@@ -1,3 +1,4 @@
+import logging
 from functools import partial
 
 from PyQt6.QtCore import QEvent, Qt, pyqtSignal
@@ -112,15 +113,17 @@ class CustomTreeWidget(HoverRevealTreeWidget):
             # 检查是否是远程分支且当前分支跟踪它
             for branch_name in item_branches:
                 if branch_name.startswith("☁️ origin/"):
-                    _branch_name = remote_branch = branch_name.strip("☁️").lstrip()
+                    _branch_name = branch_name.strip("☁️").lstrip()
                 else:
                     _branch_name = branch_name
+                if not _branch_name:
+                    continue
                 try:
                     if current_branch.commit.hexsha != repo.refs[_branch_name].commit.hexsha:
-                        merge_action = menu.addAction(f"Merge {remote_branch}")
-                        merge_action.triggered.connect(partial(self._merge_branch, git_manager, remote_branch))
-                except Exception as e:
-                    print(f"检查分支状态失败：{e}")
+                        merge_action = menu.addAction(f"Merge {_branch_name}")
+                        merge_action.triggered.connect(partial(self._merge_branch, git_manager, _branch_name))
+                except Exception:
+                    logging.exception("检查分支状态失败 item_branches: %s", item_branches)
 
         menu.exec(self.mapToGlobal(position))
 
