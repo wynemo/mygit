@@ -1,7 +1,7 @@
 import logging
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QIcon, QPixmap, QTransform
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -131,6 +131,12 @@ class CommitWidget(QFrame):
         self.ai_thread.finished.connect(self._on_message_generated)
         self.ai_thread.error.connect(self._on_generation_error)
 
+        # 初始化旋转动画相关
+        self._spin_angle = 0
+        self._spin_timer = QTimer(self)
+        self._spin_timer.timeout.connect(self._update_spinning_icon)
+        self._original_spin_pixmap = QPixmap("icons/spin.png")  # 预加载旋转图标的原始图片
+
         # 为两个树形控件添加点击事件处理
         self.staged_tree.itemDoubleClicked.connect(lambda item: self.show_file_diff(item, True))
         self.unstaged_tree.itemDoubleClicked.connect(lambda item: self.show_file_diff(item, False))
@@ -257,9 +263,10 @@ class CommitWidget(QFrame):
                 QMessageBox.warning(self, "警告", "没有已暂存的文件变更")
                 return
 
-            # 禁用 AI 按钮，显示正在生成中
+            # 禁用 AI 按钮，显示正在生成中并启动旋转动画
             self.ai_button.setEnabled(False)
-            self.ai_button.setIcon(QIcon("icons/hourglass.svg"))
+            self._spin_angle = 0  # 重置角度
+            self._spin_timer.start(50)  # 启动定时器，每 50 毫秒更新一次（可调整速度）
 
             # 准备并启动线程
             self.ai_thread.diff_content = "\n\n".join(diffs)
@@ -281,8 +288,16 @@ class CommitWidget(QFrame):
         QMessageBox.critical(self, "错误", f"生成提交信息失败：{error_message!s}")
         self._reset_ai_button()
 
+    def _update_spinning_icon(self):
+        """更新旋转图标"""
+        self._spin_angle = (self._spin_angle + 10) % 360  # 每次旋转 10 度
+        transform = QTransform().rotate(self._spin_angle)
+        rotated_pixmap = self._original_spin_pixmap.transformed(transform)
+        self.ai_button.setIcon(QIcon(rotated_pixmap))
+
     def _reset_ai_button(self):
         """重置 AI 按钮状态"""
+        self._spin_timer.stop()  # 停止定时器
         self.ai_button.setEnabled(True)
         self.ai_button.setIcon(QIcon("icons/star.svg"))
 
