@@ -71,20 +71,20 @@ class WorkspaceExplorer(QWidget):
         self.search_box_layout.setSpacing(5)
 
         self.search_icon_label = QLabel(self)
-        self.search_icon_label.setPixmap(QIcon("icons/search.svg").pixmap(QSize(20, 20)))  # Assuming search.svg
+        self.search_icon_label.setPixmap(QIcon("icons/search.svg").pixmap(QSize(15, 15)))  # Assuming search.svg
         self.search_box_layout.addWidget(self.search_icon_label)
 
         self.folder_name_label = QLabel("mygit", self)  # Placeholder text
-        self.folder_name_label.setStyleSheet("color: #6a5acd;")  # Example color
+        self.folder_name_label.setStyleSheet("color: #000000;")  # Example color
         self.search_box_layout.addWidget(self.folder_name_label)
 
         self.search_box_widget.setStyleSheet("""
             QWidget {
-                background-color: #d8bfd8; /* Light purple */
+                background-color: #D3D3D3; /* 浅灰色 */
                 border-radius: 15px; /* Rounded corners */
             }
         """)
-        self.search_box_widget.setFixedSize(200, 30)  # Adjust size as needed
+        self.search_box_widget.setFixedSize(300, 25)  # Adjust size as needed
         top_bar_buttons_layout.addWidget(self.search_box_widget)
 
         top_bar_buttons_layout.addStretch(1)  # Add stretch to push elements to the left
