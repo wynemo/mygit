@@ -177,6 +177,8 @@ class CustomTreeWidget(HoverRevealTreeWidget):
                     workspace_explorer.file_changes_view.other_commit_hash = git_manager.repo.head.commit.hexsha
                     workspace_explorer.file_changes_view.is_comparing_with_workspace = True
                     print(f"已将变更文件添加到工作区文件树（提交 {commit_hash}）")
+                    # 模拟点击侧边栏的'变更'按钮
+                    get_main_window_by_parent(self).side_bar.changes_btn.click()
                 else:
                     print("未找到 WorkspaceExplorer 实例")
             else:
