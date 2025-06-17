@@ -40,7 +40,7 @@ class TopBarWidget(QWidget):
         self.setLayout(self._layout)
 
         # --- Open Folder Button ---
-        self.open_button = QPushButton("📁 Open Folder")
+        self.open_button = QPushButton(QIcon("icons/folder.svg"), "Open Folder")
         self.open_button.clicked.connect(self.open_folder_requested.emit)
         self._layout.addWidget(self.open_button)
 
