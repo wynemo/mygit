@@ -60,6 +60,7 @@ class TestFileTreeStatusColors(unittest.TestCase):
             mock_get_main.return_value = mock_main_window
 
             self.workspace_explorer = WorkspaceExplorer(git_manager=self.git_manager)
+            self.workspace_explorer._update_file_quick_search_list = Mock()
         # No need to call set_workspace_path here if we do it per test or if setup should reflect an empty state first
 
     def tearDown(self):
