@@ -36,13 +36,14 @@ from utils import get_main_window_by_parent
 from utils.language_map import LANGUAGE_MAP
 
 if TYPE_CHECKING:
+    from git_manager import GitManager
     from git_manager_window import GitManagerWindow
 
 
 class WorkspaceExplorer(QWidget):
     def __init__(self, parent=None, git_manager=None):
         super().__init__(parent)
-        self.git_manager = git_manager
+        self.git_manager: "GitManager" | None = git_manager
         # Initialize all_file_statuses
         self.all_file_statuses = {"modified": set(), "staged": set(), "untracked": set()}
         self.current_highlighted_item = None
@@ -536,12 +537,28 @@ class WorkspaceExplorer(QWidget):
         QWidget.mousePressEvent(self.search_box_widget, event)
 
     def _update_file_quick_search_list(self):
-        """cursor 生成 - 更新文件快速搜索弹窗的文件列表"""
-        if hasattr(self, "workspace_path") and self.workspace_path:
+        """cursor 生成 - 更新文件快速搜索弹窗的文件列表，过滤掉被 .gitignore 忽略的文件和文件夹"""
+        if (
+            hasattr(self, "workspace_path")
+            and self.workspace_path
+            and self.git_manager
+            and hasattr(self.git_manager, "is_ignored")
+        ):
             file_list = []
             for root, dirs, files in os.walk(self.workspace_path):
+                # 过滤被忽略的文件夹
+                dirs[:] = [
+                    d
+                    for d in dirs
+                    if not self.git_manager.is_ignored(
+                        os.path.relpath(os.path.join(root, d), self.git_manager.repo_path)
+                    )
+                ]
+                # 过滤被忽略的文件
                 for f in files:
-                    file_list.append(os.path.join(root, f))
+                    file_path = os.path.join(root, f)
+                    if not self.git_manager.is_ignored(os.path.relpath(file_path, self.git_manager.repo_path)):
+                        file_list.append(file_path)
             self.file_quick_search_popup.set_file_list(file_list)
 
 
