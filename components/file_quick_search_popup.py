@@ -42,8 +42,6 @@ class FileQuickSearchPopup(QFrame):
         self.list_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         layout.addWidget(self.list_widget)
 
-        self.refresh_list()
-
     def set_file_list(self, file_list):
         self.file_list = file_list or []
         self.filtered_files = self.file_list[: self.max_default_files]
