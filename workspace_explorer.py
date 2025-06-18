@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
 )
 
 from commit_widget import CommitWidget
+from components.file_quick_search_popup import FileQuickSearchPopup  # 新增导入
 from components.file_search_widget import FileSearchWidget
 from editors.modified_text_edit import ModifiedTextEdit
 from editors.text_edit import SyncedTextEdit  # Ensure this is present
@@ -72,7 +73,7 @@ class WorkspaceExplorer(QWidget):
         self.search_box_layout.addStretch(1)  # 添加左侧拉伸
 
         self.search_icon_label = QLabel(self)
-        self.search_icon_label.setPixmap(QIcon("icons/search.svg").pixmap(QSize(15, 15)))  # Assuming search.svg
+        self.search_icon_label.setPixmap(QIcon("icons/search.svg").pixmap(QSize(15, 15)))
         self.search_box_layout.addWidget(self.search_icon_label)
 
         self.folder_name_label = QLabel("", self)  # 初始为空字符串
@@ -88,6 +89,12 @@ class WorkspaceExplorer(QWidget):
         """)
         self.search_box_widget.setFixedSize(300, 25)  # Adjust size as needed
         top_bar_buttons_layout.addWidget(self.search_box_widget)
+
+        # 新增：初始化文件快速搜索弹窗组件
+        self.file_quick_search_popup = FileQuickSearchPopup(self)
+        self.file_quick_search_popup.file_selected.connect(self.open_file_in_tab)
+        self._update_file_quick_search_list()
+        self.search_box_widget.mousePressEvent = self._show_file_quick_search_popup_event
 
         top_bar_buttons_layout.addStretch(1)  # Add stretch to push elements to the left
 
@@ -305,6 +312,9 @@ class WorkspaceExplorer(QWidget):
         if saved_highlighted_path:
             self.file_tree.highlight_file_item(saved_highlighted_path)
 
+        # 刷新文件快速搜索弹窗的文件列表
+        self._update_file_quick_search_list()
+
     def _add_directory_items(self, path: str, parent_item_in_tree: QTreeWidgetItem, level: int = 0) -> bool:
         """cursor 生成 - 优先显示目录
         将被.gitignore 忽略的文件/文件夹显示为灰色
@@ -517,6 +527,24 @@ class WorkspaceExplorer(QWidget):
         main_window = get_main_window_by_parent(self)
         if main_window and hasattr(main_window, "update_commit_history"):
             main_window.update_commit_history()
+
+    def _show_file_quick_search_popup_event(self, event):
+        # 只在左键点击时弹出
+        if event.button() == Qt.MouseButton.LeftButton:
+            # 计算弹窗位置（在 search_box_widget 下方）
+            global_pos = self.search_box_widget.mapToGlobal(self.search_box_widget.rect().bottomLeft())
+            self.file_quick_search_popup.show_popup(global_pos)
+        # 继续原有事件处理
+        QWidget.mousePressEvent(self.search_box_widget, event)
+
+    def _update_file_quick_search_list(self):
+        """cursor 生成 - 更新文件快速搜索弹窗的文件列表"""
+        if hasattr(self, "workspace_path") and self.workspace_path:
+            file_list = []
+            for root, dirs, files in os.walk(self.workspace_path):
+                for f in files:
+                    file_list.append(os.path.join(root, f))
+            self.file_quick_search_popup.set_file_list(file_list)
 
 
 class FileTreeWidget(QTreeWidget):
