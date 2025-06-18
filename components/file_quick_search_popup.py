@@ -89,8 +89,8 @@ class FileQuickSearchPopup(QFrame):
         if ref_widget:
             ref_geom = ref_widget.geometry()
             global_pos = ref_widget.mapToGlobal(ref_geom.topLeft())
-            self.setFixedWidth(ref_geom.width() + 40)  # 比 search box 略宽
-            self.move(global_pos.x() - 40, global_pos.y() - 10)  # 左右各多出20像素
+            self.setFixedWidth(ref_geom.width() + 40)
+            self.move(global_pos.x() - 40, global_pos.y() - 10)
         elif pos:
             self.setFixedWidth(360)
             self.move(pos)
