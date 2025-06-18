@@ -81,10 +81,17 @@ class FileQuickSearchPopup(QFrame):
         self.hide()
         super().focusOutEvent(event)
 
-    def show_popup(self, pos=None):
+    def show_popup(self, pos=None, ref_widget=None):
         self.input.clear()
         self.input.setFocus()
         self.refresh_list()
-        if pos:
+        # 如果有参考控件，则宽度与其一致或略宽，且顶部对齐
+        if ref_widget:
+            ref_geom = ref_widget.geometry()
+            global_pos = ref_widget.mapToGlobal(ref_geom.topLeft())
+            self.setFixedWidth(ref_geom.width() + 40)  # 比 search box 略宽
+            self.move(global_pos.x() - 20, global_pos.y())  # 左右各多出20像素
+        elif pos:
+            self.setFixedWidth(360)
             self.move(pos)
         self.show()

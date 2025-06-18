@@ -531,9 +531,8 @@ class WorkspaceExplorer(QWidget):
     def _show_file_quick_search_popup_event(self, event):
         # 只在左键点击时弹出
         if event.button() == Qt.MouseButton.LeftButton:
-            # 计算弹窗位置（在 search_box_widget 下方）
-            global_pos = self.search_box_widget.mapToGlobal(self.search_box_widget.rect().bottomLeft())
-            self.file_quick_search_popup.show_popup(global_pos)
+            # 传递 search_box_widget 作为 ref_widget
+            self.file_quick_search_popup.show_popup(ref_widget=self.search_box_widget)
         # 继续原有事件处理
         QWidget.mousePressEvent(self.search_box_widget, event)
 
