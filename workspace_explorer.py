@@ -538,28 +538,23 @@ class WorkspaceExplorer(QWidget):
 
     def _update_file_quick_search_list(self):
         """cursor 生成 - 更新文件快速搜索弹窗的文件列表，过滤掉被 .gitignore 忽略的文件和文件夹"""
-        if (
-            hasattr(self, "workspace_path")
-            and self.workspace_path
-            and self.git_manager
-            and hasattr(self.git_manager, "is_ignored")
-        ):
-            file_list = []
-            for root, dirs, files in os.walk(self.workspace_path):
-                # 过滤被忽略的文件夹
-                dirs[:] = [
-                    d
-                    for d in dirs
-                    if not self.git_manager.is_ignored(
-                        os.path.relpath(os.path.join(root, d), self.git_manager.repo_path)
-                    )
-                ]
-                # 过滤被忽略的文件
-                for f in files:
-                    file_path = os.path.join(root, f)
-                    if not self.git_manager.is_ignored(os.path.relpath(file_path, self.git_manager.repo_path)):
-                        file_list.append(file_path)
-            self.file_quick_search_popup.set_file_list(file_list)
+        if not self.git_manager:
+            return
+
+        def _is_dir_ignored(path: str) -> bool:
+            _path = os.path.relpath(path, self.git_manager.repo_path)
+            return self.git_manager.is_ignored(_path) or _path == ".git"
+
+        file_list = []
+        for root, dirs, files in os.walk(self.workspace_path):
+            # 过滤被忽略的文件夹
+            dirs[:] = [d for d in dirs if not _is_dir_ignored(os.path.join(root, d))]
+            # 过滤被忽略的文件
+            for f in files:
+                file_path = os.path.join(root, f)
+                if not self.git_manager.is_ignored(os.path.relpath(file_path, self.git_manager.repo_path)):
+                    file_list.append(file_path)
+        self.file_quick_search_popup.set_file_list(file_list)
 
 
 class FileTreeWidget(QTreeWidget):
