@@ -12,7 +12,6 @@ class FileQuickSearchPopup(QFrame):
     def __init__(self, parent=None, file_list=None):
         super().__init__(parent, Qt.WindowType.Popup)
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.FramelessWindowHint)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setMinimumWidth(280)
         self.setStyleSheet("""
@@ -24,6 +23,7 @@ class FileQuickSearchPopup(QFrame):
         """)
         self.file_list = file_list or []
         self.filtered_files = self.file_list.copy()
+        self.max_default_files = 20  # 默认最多显示20个
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
@@ -37,19 +37,20 @@ class FileQuickSearchPopup(QFrame):
 
         self.list_widget = QListWidget(self)
         self.list_widget.itemClicked.connect(self.on_item_clicked)
+        self.list_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         layout.addWidget(self.list_widget)
 
         self.refresh_list()
 
     def set_file_list(self, file_list):
         self.file_list = file_list or []
-        self.filtered_files = self.file_list.copy()
+        self.filtered_files = self.file_list[: self.max_default_files]
         self.refresh_list()
 
     def on_text_changed(self, text):
         text = text.strip().lower()
         if not text:
-            self.filtered_files = self.file_list.copy()
+            self.filtered_files = self.file_list[: self.max_default_files]
         else:
             self.filtered_files = [f for f in self.file_list if text in os.path.basename(f).lower()]
         self.refresh_list()
@@ -57,7 +58,9 @@ class FileQuickSearchPopup(QFrame):
     def refresh_list(self):
         self.list_widget.clear()
         for f in self.filtered_files:
-            item = QListWidgetItem(os.path.basename(f))
+            base = os.path.basename(f)
+            display_name = base if len(base) <= 32 else base[:15] + "..." + base[-12:]
+            item = QListWidgetItem(display_name)
             item.setToolTip(f)
             item.setData(Qt.ItemDataRole.UserRole, f)
             self.list_widget.addItem(item)
