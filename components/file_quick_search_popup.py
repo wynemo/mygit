@@ -1,7 +1,7 @@
 import os
 
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import QFrame, QLineEdit, QListWidget, QListWidgetItem, QVBoxLayout
+from PyQt6.QtWidgets import QFrame, QLabel, QLineEdit, QListWidget, QListWidgetItem, QVBoxLayout
 
 from utils import get_main_window_by_parent
 
@@ -16,12 +16,13 @@ class FileQuickSearchPopup(QFrame):
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.FramelessWindowHint)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setMinimumWidth(280)
+        # qlabel 不要边框
         self.setStyleSheet("""
             QFrame { background: #fff; border: 1px solid #aaa; border-radius: 8px; }
             QLineEdit { border: none; background: #f5f5f5; padding: 4px; border-radius: 4px; }
             QListWidget { border: none; background: transparent; }
-            QListWidget::item { padding: 4px 8px; }
             QListWidget::item:selected { background: #e6f0fa; }
+            QLabel { border: none; }
         """)
         self.file_list = file_list or []
         self.filtered_files = self.file_list.copy()
@@ -73,19 +74,30 @@ class FileQuickSearchPopup(QFrame):
 
             # 获取 f的文件夹 相对于仓库的路径
             relative_path = os.path.relpath(folder_path, git_repo_path)
+            label = None
             if relative_path and relative_path != ".":
-                display_name = f"{base} {relative_path}"
+                # 14px font color black + 11px color gray
+                label = QLabel(
+                    f"<span style='font-size: 14px; color: black;'>{base}</span> <span style='font-size: 11px; color: gray;'>{relative_path}</span>"
+                )
+                label.setTextFormat(Qt.TextFormat.RichText)  # **非常重要：设置文本格式为富文本**
 
+            # todo 后面再说吧
             # 截断长文件名 (原有逻辑可复用或调整)
-            if len(display_name) > 100:
-                display_name = display_name[:50] + "..." + display_name[-12:]
+            # if len(display_name) > 100:
+            #     display_name = display_name[:50] + "..." + display_name[-12:]
 
             item = QListWidgetItem(display_name)
+
             item.setToolTip(f)
+            _font = item.font()
+            _font.setPointSize(14)
+            item.setFont(_font)
             item.setData(Qt.ItemDataRole.UserRole, f)
             self.list_widget.addItem(item)
-        if self.filtered_files:
-            self.list_widget.setCurrentRow(0)
+            if label:
+                item.setSizeHint(label.sizeHint())  # 调整项目高度以适应 Label
+                self.list_widget.setItemWidget(item, label)  # 把 Label 设置为项目的控件
 
     def on_item_clicked(self, item):
         file_path = item.data(Qt.ItemDataRole.UserRole)
