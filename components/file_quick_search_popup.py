@@ -77,7 +77,8 @@ class FileQuickSearchPopup(QFrame):
             if relative_path and relative_path != ".":
                 # 14px font color black + 11px color gray
                 label = QLabel(
-                    f"<span style='font-size: 14px; color: black;'>{base}</span> <span style='font-size: 11px; color: gray;'>{relative_path}</span>"
+                    f"""<span style='font-size: 14px; color: black;'>{base}</span>
+                    <span style='font-size: 11px; color: gray;'>{relative_path}</span>"""
                 )
                 label.setTextFormat(Qt.TextFormat.RichText)  # **非常重要：设置文本格式为富文本**
 
