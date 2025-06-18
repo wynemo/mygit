@@ -3,6 +3,8 @@ import os
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QFrame, QLineEdit, QListWidget, QListWidgetItem, QVBoxLayout
 
+from utils import get_main_window_by_parent
+
 
 class FileQuickSearchPopup(QFrame):
     """cursor 生成 - 悬浮文件快速搜索下拉框组件"""
@@ -58,25 +60,25 @@ class FileQuickSearchPopup(QFrame):
     def refresh_list(self):
         self.list_widget.clear()
 
-        # 步骤 1: 统计 basename 出现频率
-        basename_counts = {}
-        for f_path in self.filtered_files:
-            basename = os.path.basename(f_path)
-            basename_counts[basename] = basename_counts.get(basename, 0) + 1
-
         for f in self.filtered_files:
             base = os.path.basename(f)
             display_name = base
 
-            # 步骤 2: 判断是否需要添加父文件夹信息
-            if basename_counts.get(base, 0) > 1:
-                parent_dir = os.path.basename(os.path.dirname(f))
-                if parent_dir:  # 避免根目录没有父文件夹
-                    display_name = f"{parent_dir}/{base}"
+            # 获取git 仓库路径
+            main_window = get_main_window_by_parent(self)
+            git_repo_path = main_window.git_manager.repo.working_dir
+
+            # 获取 f 的文件夹
+            folder_path = os.path.dirname(f)
+
+            # 获取 f的文件夹 相对于仓库的路径
+            relative_path = os.path.relpath(folder_path, git_repo_path)
+            if relative_path and relative_path != ".":
+                display_name = f"{base} {relative_path}"
 
             # 截断长文件名 (原有逻辑可复用或调整)
-            if len(display_name) > 32:
-                display_name = display_name[:15] + "..." + display_name[-12:]
+            if len(display_name) > 100:
+                display_name = display_name[:50] + "..." + display_name[-12:]
 
             item = QListWidgetItem(display_name)
             item.setToolTip(f)
