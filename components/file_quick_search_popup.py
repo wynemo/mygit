@@ -18,6 +18,7 @@ class FileQuickSearchPopup(QFrame):
         self.setMinimumWidth(280)
         # qlabel 不要边框
         self.setStyleSheet("""
+            QFrame { background: #fff; border: 1px solid #aaa; }
             QLineEdit { border: none; background: #f5f5f5; padding: 4px; border-radius: 4px; }
             QListWidget { border: none; background: transparent; }
             QListWidget::item:selected { background: #e6f0fa; }
