@@ -52,7 +52,9 @@ class FileQuickSearchPopup(QFrame):
         if not text:
             self.filtered_files = self.file_list[: self.max_default_files]
         else:
-            self.filtered_files = [f for f in self.file_list if text in f.lower()]
+            main_window = get_main_window_by_parent(self)
+            git_repo_path = main_window.git_manager.repo.working_dir
+            self.filtered_files = [f for f in self.file_list if text in os.path.relpath(f, git_repo_path).lower()]
         self.refresh_list()
 
     def refresh_list(self):
