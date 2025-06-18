@@ -93,7 +93,6 @@ class WorkspaceExplorer(QWidget):
         # 新增：初始化文件快速搜索弹窗组件
         self.file_quick_search_popup = FileQuickSearchPopup(self)
         self.file_quick_search_popup.file_selected.connect(self.open_file_in_tab)
-        self._update_file_quick_search_list()
         self.search_box_widget.mousePressEvent = self._show_file_quick_search_popup_event
 
         top_bar_buttons_layout.addStretch(1)  # Add stretch to push elements to the left
