@@ -8,7 +8,6 @@ import unittest
 from unittest.mock import Mock, patch
 
 import git  # GitPython
-from PyQt6.QtCore import Qt  # For Qt.GlobalColor if needed
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QApplication
 
@@ -58,6 +57,10 @@ class TestFileTreeStatusColors(unittest.TestCase):
         with patch("workspace_explorer.get_main_window_by_parent") as mock_get_main:
             mock_main_window = Mock()
             mock_main_window.on_file_selected = Mock()
+            # cursor 生成 - 模拟 main_window.git_manager.repo.working_dir
+            mock_main_window.git_manager = Mock()
+            mock_main_window.git_manager.repo = Mock()
+            mock_main_window.git_manager.repo.working_dir = self.repo_path
             mock_get_main.return_value = mock_main_window
 
             self.workspace_explorer = WorkspaceExplorer(git_manager=self.git_manager)
