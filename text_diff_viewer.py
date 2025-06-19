@@ -260,7 +260,7 @@ class DiffViewer(QWidget):
         for chunk in self.actual_diff_chunks:
             # 只为delete和replace类型的chunk创建按钮（这些在左侧有内容）
             if chunk.type in ["delete", "replace"]:
-                button = QPushButton("←")
+                button = QPushButton("→")
                 button.setFixedSize(20, 20)
                 button.setStyleSheet("""
                     QPushButton {
