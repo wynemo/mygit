@@ -17,3 +17,8 @@ class CompareWithWorkingDialog(QDialog):
 
         self.diff_viewer.set_texts(old_content, new_content, file_path, "HEAD", None)
         self.diff_viewer.right_edit.set_editable()
+
+        # cursor 生成：设置可编辑后更新DiffViewer状态并创建还原按钮
+        self.diff_viewer.right_edit_is_editable = True
+        if self.diff_viewer.actual_diff_chunks:
+            self.diff_viewer._create_restore_buttons()

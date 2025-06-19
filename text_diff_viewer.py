@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 
-from PyQt6.QtCore import QPoint
+from PyQt6.QtCore import QPoint, QTimer
 from PyQt6.QtGui import QColor, QTextCharFormat, QTextCursor
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QTextEdit, QVBoxLayout, QWidget
 
@@ -19,6 +19,10 @@ class DiffViewer(QWidget):
         self.setup_ui()
         self._sync_vscroll_lock = False
         self._sync_hscroll_lock = False
+
+        # cursor 生成：添加反向还原按钮相关的属性
+        self.restore_buttons = []  # 存储所有的还原按钮
+        self.right_edit_is_editable = False  # 标记右侧编辑器是否可编辑
 
         # 设置差异计算器，默认为 DifflibCalculator
         self.diff_calculator = diff_calculator or DifflibCalculator()
@@ -189,6 +193,10 @@ class DiffViewer(QWidget):
         # Keeping it here can be redundant but harmless.
         # For clarity, let _compute_diff manage current_diff_index.
         logging.debug("\n=== 设置新的文本进行比较 ===")
+
+        # cursor 生成：检查右侧编辑器是否可编辑
+        self.right_edit_is_editable = not self.right_edit.isReadOnly()
+
         # 先设置文本
         self.left_edit.setPlainText(left_text)
         self.right_edit.setPlainText(right_text)
@@ -239,6 +247,124 @@ class DiffViewer(QWidget):
         self.current_diff_index = -1  # Start before the first diff
         self._update_button_states()  # Initial state for buttons
         # Special handling for enabling "Next" is now within _update_button_states
+
+        # cursor 生成：如果右侧可编辑，创建还原按钮
+        if self.right_edit_is_editable:
+            self._create_restore_buttons()
+
+    def _create_restore_buttons(self):
+        """cursor 生成：为左侧的每个修改块创建还原按钮"""
+        # 清除之前的按钮
+        self._clear_restore_buttons()
+
+        for chunk in self.actual_diff_chunks:
+            # 只为delete和replace类型的chunk创建按钮（这些在左侧有内容）
+            if chunk.type in ["delete", "replace"]:
+                button = QPushButton("←")
+                button.setFixedSize(20, 20)
+                button.setStyleSheet("""
+                    QPushButton {
+                        background-color: #4CAF50;
+                        color: white;
+                        border: none;
+                        border-radius: 10px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover {
+                        background-color: #45a049;
+                    }
+                    QPushButton:pressed {
+                        background-color: #3d8b40;
+                    }
+                """)
+                button.setToolTip("点击将左侧内容还原到右侧")
+
+                # 连接点击事件，传递chunk信息
+                button.clicked.connect(lambda checked, c=chunk: self._restore_chunk_to_right(c))
+
+                # 设置按钮为左侧编辑器的子widget
+                button.setParent(self.left_edit)
+                button.show()
+
+                self.restore_buttons.append(button)
+
+        # 定位按钮
+        self._position_restore_buttons()
+
+    def _clear_restore_buttons(self):
+        """cursor 生成：清除所有还原按钮"""
+        for button in self.restore_buttons:
+            button.deleteLater()
+        self.restore_buttons.clear()
+
+    def _position_restore_buttons(self):
+        """cursor 生成：定位还原按钮到合适的位置"""
+        for i, button in enumerate(self.restore_buttons):
+            # 找到对应的chunk
+            chunk_index = 0
+            for chunk in self.actual_diff_chunks:
+                if chunk.type in ["delete", "replace"]:
+                    if chunk_index == i:
+                        # 计算按钮位置
+                        line_number = chunk.left_start
+                        if line_number < self.left_edit.document().blockCount():
+                            block = self.left_edit.document().findBlockByNumber(line_number)
+                            block_geometry = self.left_edit.blockBoundingGeometry(block)
+                            block_top = block_geometry.translated(self.left_edit.contentOffset()).top()
+
+                            # 将按钮放在左侧编辑器的右边边缘，避免被滚动条遮挡
+                            x = self.left_edit.width() - 45  # 增加更多的边距避免滚动条
+                            y = int(block_top) + 2
+
+                            button.move(x, y)
+                        break
+                    chunk_index += 1
+
+    def _restore_chunk_to_right(self, chunk: DiffChunk):
+        """cursor 生成：将指定chunk的左侧内容还原到右侧"""
+        if not self.right_edit_is_editable:
+            return
+
+        try:
+            # cursor 生成：保存当前的滚动位置
+            left_scroll_value = self.left_edit.verticalScrollBar().value()
+            right_scroll_value = self.right_edit.verticalScrollBar().value()
+
+            # 获取左侧的内容
+            left_lines = self.left_edit.toPlainText().splitlines()
+            right_lines = self.right_edit.toPlainText().splitlines()
+
+            if chunk.type == "delete":
+                # 删除类型：在右侧插入左侧被删除的内容
+                deleted_lines = left_lines[chunk.left_start : chunk.left_end]
+                # 在右侧的对应位置插入
+                right_lines[chunk.right_start : chunk.right_start] = deleted_lines
+
+            elif chunk.type == "replace":
+                # 替换类型：用左侧的内容替换右侧的内容
+                original_lines = left_lines[chunk.left_start : chunk.left_end]
+                right_lines[chunk.right_start : chunk.right_end] = original_lines
+
+            # 更新右侧编辑器的内容
+            new_content = "\n".join(right_lines)
+            self.right_edit.setPlainText(new_content)
+
+            # 保存到磁盘
+            self.right_edit.save_content()
+
+            # 重新计算diff
+            left_text = self.left_edit.toPlainText()
+            right_text = self.right_edit.toPlainText()
+            self._compute_diff(left_text, right_text)
+
+            # cursor 生成：恢复滚动位置
+            self.left_edit.verticalScrollBar().setValue(left_scroll_value)
+            self.right_edit.verticalScrollBar().setValue(right_scroll_value)
+
+            logging.info(f"已还原chunk: {chunk.type}, 左侧行 {chunk.left_start}-{chunk.left_end}")
+
+        except Exception:
+            logging.exception("还原内容时发生错误")
 
     def navigate_to_previous_diff(self):
         logging.info(f"Attempting to navigate to previous diff. Current index: {self.current_diff_index}")
@@ -423,6 +549,10 @@ class DiffViewer(QWidget):
 
             logging.debug("=== %s 滚动事件结束 ===\n", "左侧" if is_left_scroll else "右侧")
 
+            # cursor 生成：滚动后重新定位还原按钮
+            if self.restore_buttons:
+                self._position_restore_buttons()
+
         finally:
             self._sync_vscroll_lock = False
 
@@ -438,6 +568,13 @@ class DiffViewer(QWidget):
             target_edit.horizontalScrollBar().setValue(value)
         finally:
             self._sync_hscroll_lock = False
+
+    def resizeEvent(self, event):
+        """cursor 生成：窗口大小改变时重新定位还原按钮"""
+        super().resizeEvent(event)
+        if self.restore_buttons:
+            # 延迟执行以确保布局完成
+            QTimer.singleShot(10, self._position_restore_buttons)
 
 
 class MergeDiffViewer(DiffViewer):
