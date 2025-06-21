@@ -847,13 +847,7 @@ class GitManagerWindow(QMainWindow):
 
     def changeEvent(self, event: QEvent):
         super().changeEvent(event)
-        if event.type() == QEvent.Type.ActivationChange:
-            if self.isActiveWindow():
-                # print("Window activated, refreshing file tree...") # Optional: for debugging
-                if hasattr(self, "workspace_explorer") and self.workspace_explorer:
-                    if self.git_manager and self.git_manager.repo:  # Ensure git repo is loaded
-                        logging.debug("changeEvent, refresh_file_tree")
-                        self.workspace_explorer.refresh_file_tree()
+        # 移除基于窗口激活的文件树刷新逻辑，因为现在使用文件监控自动刷新
 
     def closeEvent(self, event):
         """Ensure the watchdog observer is stopped on close."""
