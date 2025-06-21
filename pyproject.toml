@@ -12,6 +12,7 @@ dependencies = [
     "pyqt6>=6.8.1",
     "diff_match_patch",
     "ripgrepy>=2.1.0",
+    "watchdog>=6.0.0",
 ]
 
 [dependency-groups]
