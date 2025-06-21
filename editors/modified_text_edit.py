@@ -18,7 +18,7 @@ if typing.TYPE_CHECKING:
 class ModifiedTextEdit(SyncedTextEdit):
     """Inherits from SyncedTextEdit, supports displaying line modification status next to line numbers"""
 
-    # 文件脏状态改变信号 (文件路径, 是否变脏)
+    # 文件脏状态改变信号 (文件路径，是否变脏)
     dirty_status_changed = pyqtSignal(str, bool)
 
     LINE_STATUS_COLORS: typing.ClassVar[dict] = {
@@ -39,7 +39,7 @@ class ModifiedTextEdit(SyncedTextEdit):
         self._update_overview_bar_geometry()
         self.verticalScrollBar().valueChanged.connect(self.overview_bar.update_overview)
 
-        # 设置滚动条为半透明 这样overview_bar能与滚动条绘制在一起
+        # 设置滚动条为半透明 这样 overview_bar 能与滚动条绘制在一起
         # 但样式不是很好看 以后看看怎么弄
         scrollbar = self.verticalScrollBar()
         scrollbar.setStyleSheet("""
@@ -98,14 +98,14 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
             logging.warning(f"Error reading file: {e!s}")
             return
 
-        # 仅当文件实际内容与编辑器当前内容不同时才更新文本,以避免不必要的刷新和光标位置丢失
+        # 仅当文件实际内容与编辑器当前内容不同时才更新文本，以避免不必要的刷新和光标位置丢失
         if new_content != current_content:
             scrollbar = self.verticalScrollBar()
-            # 保存当前滚动条的位置,以便在刷新内容后恢复
+            # 保存当前滚动条的位置，以便在刷新内容后恢复
             stored_value = scrollbar.value()
-            # 设置document的文本
+            # 设置 document 的文本
             self.setPlainText(new_content)
-            # 恢复滚动条位置,避免不必要的滚动到顶部
+            # 恢复滚动条位置，避免不必要的滚动到顶部
             scrollbar.setValue(stored_value)
 
         parent = self.parent()
@@ -191,7 +191,9 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
                 if mod_status:  # Process only when there is a status
                     color = self.LINE_STATUS_COLORS.get(mod_status)
                     if color:  # Ensure the color exists
-                        logging.debug(f"mod_status: {mod_status}, color: {color}", block_line_number)
+                        # logging.debug(
+                        #     "block_line_number %d, mod_status: %s, color: %s", block_line_number, mod_status, color
+                        # )
                         painter.setBrush(color)
                         painter.setPen(Qt.PenStyle.NoPen)
 
