@@ -330,13 +330,13 @@ class GitManagerWindow(QMainWindow):
     def handle_file_change(self, event_type, path, is_directory):
         """Handles detailed file system change events."""
         logging.debug("File change event: %s - %s (%s)", event_type, path, is_directory)
-        self.schedule_refresh()
+        self.schedule_refresh(event_type, path, is_directory)
 
-    def schedule_refresh(self):
+    def schedule_refresh(self, event_type, path, is_directory):
         """Schedules a UI refresh, debouncing multiple requests."""
         self.refresh_timer.start()
 
-    def _throttled_refresh(self):
+    def _throttled_refresh(self, event_type, path, is_directory):
         """The actual refresh method called after a delay."""
         logging.debug("FileSystemWatcher triggered refresh.")
         if self.git_manager and self.git_manager.repo:

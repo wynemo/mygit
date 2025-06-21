@@ -236,6 +236,61 @@ class WorkspaceExplorer(QWidget):
             logging.exception("Error opening file")
             print(f"Error opening file: {e}")
 
+    def handle_file_event(self, file_path: str, event_type: str):
+        """处理文件事件，刷新相应的打开文件
+        Args:
+            file_path: 文件路径
+            event_type: 事件类型，'deleted' 或 'updated'
+        """
+        try:
+            # 遍历所有打开的标签页，找到匹配的文件
+            for i in range(self.tab_widget.count()):
+                tab_widget = self.tab_widget.widget(i)
+                if not tab_widget or not hasattr(tab_widget, "file_path"):
+                    continue
+
+                # 检查文件路径是否匹配
+                if tab_widget.file_path == file_path:
+                    if event_type == "deleted":
+                        # 文件被删除，关闭对应的标签页
+                        self.tab_widget.removeTab(i)
+                        logging.info("文件 %s 已删除，关闭对应标签页", file_path)
+                        break
+                    elif event_type == "updated":
+                        # 文件被更新，重新加载内容
+                        if os.path.exists(file_path):
+                            with open(file_path, "r", encoding="utf-8") as f:
+                                content = f.read()
+
+                            # 保存当前光标位置
+                            cursor = tab_widget.textCursor()
+                            cursor_position = cursor.position()
+
+                            # 更新文本内容
+                            tab_widget.setPlainText(content)
+
+                            # 恢复光标位置（如果可能）
+                            try:
+                                cursor.setPosition(min(cursor_position, len(content)))
+                                tab_widget.setTextCursor(cursor)
+                            except:
+                                pass  # 如果恢复光标位置失败，忽略错误
+
+                            # 重新设置行修改标记
+                            main_git_window = get_main_window_by_parent(self)
+                            if main_git_window and main_git_window.git_manager:
+                                diffs = tab_widget.get_diffs(main_git_window.git_manager)
+                                tab_widget.set_line_modifications(diffs)
+
+                            logging.info("文件 %s 已更新，重新加载内容", file_path)
+                        else:
+                            # 文件不存在，当作删除处理
+                            self.tab_widget.removeTab(i)
+                            logging.info("文件 %s 不存在，关闭对应标签页", file_path)
+                        break
+        except Exception:
+            logging.exception("处理文件事件时出错")
+
     def close_tab(self, index: int):
         """关闭标签页"""
         self.tab_widget.removeTab(index)
