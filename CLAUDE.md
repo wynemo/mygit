@@ -43,6 +43,7 @@ bash check.sh
 - `icons/`: Includes SVG and PNG icon resources.
 - `tests/`: Consists of unit tests and testing data files.
 - `utils/`: Provides helper functions and scripts.
+- `components/`: 组件
 
 ## 注意事项
 
