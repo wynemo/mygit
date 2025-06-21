@@ -17,6 +17,7 @@ This repository is a Python-based Git repository management tool, providing a gr
     ```
 
 2. Create and activate a virtual environment:
+    这个项目使用 uv 管理工程
     no need, uv will create a virtual environment for you
 
 3. Install dependencies:
