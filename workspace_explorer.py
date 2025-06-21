@@ -207,19 +207,8 @@ class WorkspaceExplorer(QWidget):
                 text_edit.ensureCursorVisible()
 
             # Connect blame_annotation_clicked signal to GitManagerWindow handler
-            main_git_window = self.parent()
             handler_name = "handle_blame_click_from_editor"
-            while main_git_window:
-                if hasattr(main_git_window, handler_name):
-                    break  # Found GitManagerWindow with the handler
-                if not hasattr(main_git_window, "parent"):  # Should always exist for QWidget until top
-                    main_git_window = None
-                    break
-                parent_candidate = main_git_window.parent()
-                if parent_candidate == main_git_window:  # Should not happen in typical Qt parentage
-                    main_git_window = None
-                    break
-                main_git_window = parent_candidate
+            main_git_window = get_main_window_by_parent(self)
 
             diffs = text_edit.get_diffs(main_git_window.git_manager)
             text_edit.set_line_modifications(diffs)
