@@ -1,6 +1,6 @@
 import os
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QFrame, QLabel, QLineEdit, QListWidget, QListWidgetItem, QVBoxLayout
 
 from utils import get_main_window_by_parent
@@ -34,6 +34,13 @@ class FileQuickSearchPopup(QFrame):
 
         self.input = QLineEdit(self)
         self.input.setPlaceholderText("输入文件名搜索…")
+        
+        # 添加搜索延时计时器
+        self.search_timer = QTimer(self)
+        self.search_timer.setInterval(500)  # 设置延时为 500 毫秒
+        self.search_timer.setSingleShot(True)  # 设置为单次触发
+        self.search_timer.timeout.connect(self.perform_search)
+        
         self.input.textChanged.connect(self.on_text_changed)
         self.input.returnPressed.connect(self.on_return_pressed)
         layout.addWidget(self.input)
@@ -49,7 +56,15 @@ class FileQuickSearchPopup(QFrame):
         self.refresh_list()
 
     def on_text_changed(self, text):
-        text = text.strip().lower()
+        # 停止之前的计时器
+        self.search_timer.stop()
+        # 保存搜索文本
+        self.search_text = text
+        # 启动计时器
+        self.search_timer.start()
+        
+    def perform_search(self):
+        text = self.search_text.strip().lower()
         if not text:
             self.filtered_files = self.file_list[: self.max_default_files]
         else:
