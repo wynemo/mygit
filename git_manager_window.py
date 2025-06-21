@@ -39,7 +39,7 @@ from workspace_explorer import WorkspaceExplorer
 class GitChangeHandler(FileSystemEventHandler, QObject):
     """Handles file system events from watchdog and signals the main window."""
 
-    refresh_needed = pyqtSignal()
+    file_changed = pyqtSignal(str, str, str)  # (event_type, path, is_directory)
 
     def on_any_event(self, event):
         """
@@ -48,8 +48,13 @@ class GitChangeHandler(FileSystemEventHandler, QObject):
         """
         if ".git" in event.src_path.split(os.sep):
             return
-        logging.debug(f"Watchdog event: {event.event_type} on {event.src_path}")
-        self.refresh_needed.emit()
+
+        event_type = event.event_type
+        path = event.src_path
+        is_directory = "directory" if event.is_directory else "file"
+
+        logging.debug("Watchdog event: %s on %s (%s)", event_type, path, is_directory)
+        self.file_changed.emit(event_type, path, is_directory)
 
 
 class GitManagerWindow(QMainWindow):
@@ -307,7 +312,7 @@ class GitManagerWindow(QMainWindow):
         self.stop_watching_folder()  # Stop any previous observer
 
         event_handler = GitChangeHandler()
-        event_handler.refresh_needed.connect(self.schedule_refresh)
+        event_handler.file_changed.connect(self.handle_file_change)
 
         self.observer = Observer()
         self.observer.schedule(event_handler, folder_path, recursive=True)
@@ -321,6 +326,11 @@ class GitManagerWindow(QMainWindow):
             self.observer.join()  # Wait for the thread to finish
             self.observer = None
             logging.info("Stopped watching folder.")
+
+    def handle_file_change(self, event_type, path, is_directory):
+        """Handles detailed file system change events."""
+        logging.debug("File change event: %s - %s (%s)", event_type, path, is_directory)
+        self.schedule_refresh()
 
     def schedule_refresh(self):
         """Schedules a UI refresh, debouncing multiple requests."""
