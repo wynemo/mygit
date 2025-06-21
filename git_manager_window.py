@@ -317,7 +317,7 @@ class GitManagerWindow(QMainWindow):
         self.observer = Observer()
         self.observer.schedule(event_handler, folder_path, recursive=True)
         self.observer.start()
-        logging.info(f"Started watching folder for changes: {folder_path}")
+        logging.info("Started watching folder for changes: %s", folder_path)
 
     def stop_watching_folder(self):
         """Stops the watchdog observer if it's running."""
