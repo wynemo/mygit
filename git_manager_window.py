@@ -1,7 +1,7 @@
 import logging
 import os
 
-from PyQt6.QtCore import QEvent, Qt  # Added QEvent and threading
+from PyQt6.QtCore import QEvent, QObject, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QGuiApplication, QIcon
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -16,6 +16,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
 
 from commit_detail_view import CommitDetailView
 from commit_history_view import CommitHistoryView
@@ -32,6 +34,22 @@ from threads import FetchThread, PullThread, PushThread  # Import PullThread and
 from views.side_bar_widget import SideBarWidget
 from views.top_bar_widget import TopBarWidget  # Import TopBarWidget
 from workspace_explorer import WorkspaceExplorer
+
+
+class GitChangeHandler(FileSystemEventHandler, QObject):
+    """Handles file system events from watchdog and signals the main window."""
+
+    refresh_needed = pyqtSignal()
+
+    def on_any_event(self, event):
+        """
+        This method is called for any event.
+        We ignore events in the .git directory to prevent loops.
+        """
+        if ".git" in event.src_path.split(os.sep):
+            return
+        logging.debug(f"Watchdog event: {event.event_type} on {event.src_path}")
+        self.refresh_needed.emit()
 
 
 class GitManagerWindow(QMainWindow):
@@ -58,6 +76,13 @@ class GitManagerWindow(QMainWindow):
         self.settings = Settings()
         self.notification_widget = NotificationWidget(self)
         self.bottom_widget_visible = True  # 添加状态标记
+
+        # Watchdog observer for file system changes
+        self.observer = None
+        self.refresh_timer = QTimer(self)
+        self.refresh_timer.setSingleShot(True)
+        self.refresh_timer.setInterval(1000)  # 1-second delay to debounce refreshes
+        self.refresh_timer.timeout.connect(self._throttled_refresh)
 
         # 创建主窗口部件
         main_widget = QWidget()
@@ -277,6 +302,42 @@ class GitManagerWindow(QMainWindow):
         # Ensure notification_widget is initially positioned
         self.reposition_notification_widget()
 
+    def start_watching_folder(self, folder_path):
+        """Starts the watchdog observer for the given folder."""
+        self.stop_watching_folder()  # Stop any previous observer
+
+        event_handler = GitChangeHandler()
+        event_handler.refresh_needed.connect(self.schedule_refresh)
+
+        self.observer = Observer()
+        self.observer.schedule(event_handler, folder_path, recursive=True)
+        self.observer.start()
+        logging.info(f"Started watching folder for changes: {folder_path}")
+
+    def stop_watching_folder(self):
+        """Stops the watchdog observer if it's running."""
+        if self.observer and self.observer.is_alive():
+            self.observer.stop()
+            self.observer.join()  # Wait for the thread to finish
+            self.observer = None
+            logging.info("Stopped watching folder.")
+
+    def schedule_refresh(self):
+        """Schedules a UI refresh, debouncing multiple requests."""
+        self.refresh_timer.start()
+
+    def _throttled_refresh(self):
+        """The actual refresh method called after a delay."""
+        logging.debug("FileSystemWatcher triggered refresh.")
+        if self.git_manager and self.git_manager.repo:
+            # Only refresh if the window is active to avoid unnecessary work
+            if self.isActiveWindow():
+                logging.info("Window is active, refreshing file tree.")
+                self.workspace_explorer.refresh_file_tree()
+            else:
+                logging.info("Window is not active, but refresh.")
+                self.workspace_explorer.refresh_file_tree()
+
     def show_commit_dialog(self):
         """显示提交对话框"""
         if not self.git_manager:
@@ -341,6 +402,7 @@ class GitManagerWindow(QMainWindow):
             self.workspace_explorer.set_workspace_path(folder_path)
             self.workspace_explorer.git_manager = self.git_manager
             self.workspace_explorer.file_tree.git_manager = self.git_manager
+            self.start_watching_folder(folder_path)
             self.setWindowTitle(f"{self.tr('Git Manager')} - {folder_path}")
         else:
             self.commit_history_view.history_list.clear()
@@ -792,6 +854,11 @@ class GitManagerWindow(QMainWindow):
                     if self.git_manager and self.git_manager.repo:  # Ensure git repo is loaded
                         logging.debug("changeEvent, refresh_file_tree")
                         self.workspace_explorer.refresh_file_tree()
+
+    def closeEvent(self, event):
+        """Ensure the watchdog observer is stopped on close."""
+        self.stop_watching_folder()
+        super().closeEvent(event)
 
     def keyPressEvent(self, event):
         """Handle key press events for shortcuts."""
