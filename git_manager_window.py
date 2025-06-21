@@ -330,23 +330,35 @@ class GitManagerWindow(QMainWindow):
     def handle_file_change(self, event_type, path, is_directory):
         """Handles detailed file system change events."""
         logging.debug("File change event: %s - %s (%s)", event_type, path, is_directory)
-        self.schedule_refresh()
+        self.schedule_refresh(event_type, path, is_directory)
 
-    def schedule_refresh(self):
+    def schedule_refresh(self, event_type=None, path=None, is_directory=None):
         """Schedules a UI refresh, debouncing multiple requests."""
+        # 保存参数以便在 _throttled_refresh 中使用
+        self._pending_event_type = event_type
+        self._pending_path = path
+        self._pending_is_directory = is_directory
         self.refresh_timer.start()
 
     def _throttled_refresh(self):
         """The actual refresh method called after a delay."""
+        # 获取保存的参数
+        event_type = getattr(self, "_pending_event_type", None)
+        path = getattr(self, "_pending_path", None)
+        is_directory = getattr(self, "_pending_is_directory", None)
+
         logging.debug("FileSystemWatcher triggered refresh.")
+        logging.debug("Refresh parameters: event_type=%s, path=%s, is_directory=%s", event_type, path, is_directory)
+
         if self.git_manager and self.git_manager.repo:
-            # Only refresh if the window is active to avoid unnecessary work
-            if self.isActiveWindow():
-                logging.info("Window is active, refreshing file tree.")
-                self.workspace_explorer.refresh_file_tree()
-            else:
-                logging.info("Window is not active, but refresh.")
-                self.workspace_explorer.refresh_file_tree()
+            logging.info("Window is active, refreshing file tree.")
+            self.workspace_explorer.refresh_file_tree()
+            self.workspace_explorer.handle_file_event(path, event_type)
+
+        # 清理参数
+        self._pending_event_type = None
+        self._pending_path = None
+        self._pending_is_directory = None
 
     def show_commit_dialog(self):
         """显示提交对话框"""
