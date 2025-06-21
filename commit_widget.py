@@ -201,7 +201,7 @@ class CommitWidget(QFrame):
         unstaged = repo.index.diff(None)
         for diff in unstaged:
             item = QTreeWidgetItem(self.unstaged_tree)
-            logging.info(f"commit_dialog: unstaged file: {diff.a_path}")
+            logging.info("commit_dialog: unstaged file: %s", diff.a_path)
             item.setText(0, diff.a_path)
             item.setText(1, "Modified")
 

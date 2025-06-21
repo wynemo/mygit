@@ -228,13 +228,17 @@ class WorkspaceExplorer(QWidget):
                 try:
                     text_edit.blame_annotation_clicked.connect(getattr(main_git_window, handler_name))
                     logging.info(
-                        f"Connected blame_annotation_clicked from editor for '{file_path}' to {handler_name} in GitManagerWindow."
+                        "Connected blame_annotation_clicked from editor for '%s' to %s in GitManagerWindow.",
+                        file_path,
+                        handler_name,
                     )
                 except Exception as e_connect:
-                    logging.error(f"Failed to connect blame_annotation_clicked for '{file_path}': {e_connect}")
+                    logging.error("Failed to connect blame_annotation_clicked for '%s': %s", file_path, e_connect)
             else:
                 logging.warning(
-                    f"Could not find GitManagerWindow with handler '{handler_name}' for editor '{file_path}'. Blame click will not be handled globally."
+                    "Could not find GitManagerWindow with handler '%s' for editor '%s'. Blame click will not be handled globally.",
+                    handler_name,
+                    file_path,
                 )
 
             text_edit.dirty_status_changed.connect(self.update_filename_display)
@@ -396,12 +400,13 @@ class WorkspaceExplorer(QWidget):
                             elif relative_path in self.all_file_statuses.get("untracked", set()):
                                 tree_item.setForeground(0, QColor(0, 128, 0))  # Green color
                         except ValueError:
-                            logging.debug(f"Cannot get relative path for {item_path} against {self.workspace_path}.")
+                            logging.debug("Cannot get relative path for %s against %s.", item_path, self.workspace_path)
                         except Exception as e_status:
-                            logging.error(f"Error processing file status for {item_path}: {e_status}")
+                            logging.error("Error processing file status for %s: %s", item_path, e_status)
                     else:
                         logging.debug(
-                            f"Workspace path not suitable for file status: {self.workspace_path if hasattr(self, 'workspace_path') else 'Not set'}"
+                            "Workspace path not suitable for file status: %s",
+                            self.workspace_path if hasattr(self, "workspace_path") else "Not set",
                         )
 
                 elif os.path.isdir(item_path):
@@ -413,11 +418,11 @@ class WorkspaceExplorer(QWidget):
                     current_dir_or_descendant_is_modified = True
 
         except FileNotFoundError:
-            logging.warning(f"Directory not found during tree population: {path}.")
+            logging.warning("Directory not found during tree population: %s.", path)
         except PermissionError:
-            logging.warning(f"Permission denied for directory: {path}.")
+            logging.warning("Permission denied for directory: %s.", path)
         except Exception as e:
-            logging.error(f"Error loading directory contents for {path}: {e}")
+            logging.error("Error loading directory contents for %s: %s", path, e)
 
         return current_dir_or_descendant_is_modified
 
@@ -690,7 +695,7 @@ class FileTreeWidget(QTreeWidget):
                     revert_action = context_menu.addAction("Revert")
                     revert_action.triggered.connect(lambda: self.revert_file(file_path))
             except Exception as e:
-                logging.error(f"检查文件状态出错：{e}")
+                logging.error("检查文件状态出错：%s", e)
 
         # 在鼠标位置显示菜单
         context_menu.exec(self.mapToGlobal(position))
@@ -824,7 +829,7 @@ class FileTreeWidget(QTreeWidget):
                 clipboard = QApplication.clipboard()
                 clipboard.setText(relative_path)
             except Exception as e:
-                logging.error(f"复制相对路径失败：{e}")
+                logging.error("复制相对路径失败：%s", e)
         else:
             logging.error("无法获取工作区路径")
 
@@ -876,9 +881,9 @@ class FileTreeWidget(QTreeWidget):
         try:
             clipboard = QApplication.clipboard()
             clipboard.setText(file_path)
-            logging.info(f"已复制完整路径：{file_path}")
+            logging.info("已复制完整路径：%s", file_path)
         except Exception as e:
-            logging.error(f"复制完整路径失败：{e}")
+            logging.error("复制完整路径失败：%s", e)
 
     def _open_in_file_manager(self, file_path: str):
         """在文件管理器中打开文件或文件夹"""
@@ -917,9 +922,9 @@ class FileTreeWidget(QTreeWidget):
                         logging.warning("无法找到适合的文件管理器")
                         return
 
-            logging.info(f"已在文件管理器中打开：{dir_path}")
+            logging.info("已在文件管理器中打开：%s", dir_path)
         except Exception as e:
-            logging.error(f"在文件管理器中打开失败：{e}")
+            logging.error("在文件管理器中打开失败：%s", e)
 
     def _get_expanded_paths(self, item: QTreeWidgetItem, expanded_paths: set):
         """递归获取所有展开的文件夹路径"""

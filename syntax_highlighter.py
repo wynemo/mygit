@@ -30,9 +30,9 @@ class PygmentsHighlighterEngine:
         # 根据语言名称初始化词法分析器和样式 (Initialize lexer and styles based on language name)
         try:
             self.lexer = lexers.get_lexer_by_name(language_name)
-            logging.info(f"词法分析器已设置为：{language_name}")
+            logging.info("词法分析器已设置为：%s", language_name)
         except ClassNotFound:
-            logging.warning(f"未找到语言 '{language_name}' 的词法分析器，将使用纯文本模式。")
+            logging.warning("未找到语言 '%s' 的词法分析器，将使用纯文本模式。", language_name)
             self.lexer = lexers.get_lexer_by_name("text")  # Fallback to plain text
 
         try:
