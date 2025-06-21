@@ -116,7 +116,7 @@ class FolderHistoryView(QWidget):  # Renamed class
         """当用户点击提交记录时触发"""
         commit_hash = item.data(0, Qt.ItemDataRole.UserRole)  # Retrieve full hash
         if commit_hash:
-            logging.info(f"提交记录被点击: Commit {commit_hash}, 文件夹: {self.folder_path}")
+            logging.info("提交记录被点击: Commit %s, 文件夹: %s", commit_hash, self.folder_path)
             get_main_window_by_parent(self).on_commit_selected(commit_hash)
         else:
             logging.warning("无法获取点击的提交记录哈希值。")

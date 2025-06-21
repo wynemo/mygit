@@ -74,7 +74,7 @@ class FileHistoryView(QWidget):
             )
 
             if not log_output.strip():
-                logging.info(f"No commits found for file {relative_path}")
+                logging.info("No commits found for file %s", relative_path)
                 return
 
             # 直接解析并添加到界面，不创建 commit 对象
@@ -222,7 +222,7 @@ class FileHistoryView(QWidget):
                 try:
                     main_window.side_bar.changes_btn.click()
                 except Exception as e:
-                    logging.warning(f"触发 changes_btn 点击失败：{e}")
+                    logging.warning("触发 changes_btn 点击失败：%s", e)
 
         except Exception as e:
             logging.exception("显示所有受影响的文件失败")

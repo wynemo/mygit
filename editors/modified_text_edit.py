@@ -124,7 +124,7 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
         """当文档内容修改状态改变时调用，发出 dirty_status_changed 信号。"""
         if self.file_path:
             self.dirty_status_changed.emit(self.file_path, modified)
-            logging.debug(f"Emitted dirty_status_changed for {self.file_path}: {modified}")
+            logging.debug("Emitted dirty_status_changed for %s: %s", self.file_path, modified)
 
     # </new_method>
 
@@ -233,7 +233,7 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
         # 文件已保存，状态变为未修改
         if self.file_path:  # Ensure file_path is set
             self.dirty_status_changed.emit(self.file_path, False)
-            logging.debug(f"Emitted dirty_status_changed for {self.file_path} (saved): False")
+            logging.debug("Emitted dirty_status_changed for %s (saved): False", self.file_path)
         self.document().setModified(False)
         parent = self.parent()
         while parent and not hasattr(parent, "git_manager"):  # Check parent exists
