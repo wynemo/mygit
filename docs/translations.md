@@ -3,7 +3,7 @@ pyqt6-dev-tools  ubuntu 安装 pylupdate6
 qt6-l10n-tools ubuntu 安装 lrelease
 
 ```bash
-root@c436c3c73206:/app# pylupdate6 git_manager_window.py -ts translations/app_zh_CN.ts
+root@c436c3c73206:/app# pylupdate6 git_manager_window.py workspace_explorer.py views/top_bar_widget.py -ts translations/app_zh_CN.ts
 Summary of changes to translations/app_zh_CN.ts:
     1 new messages were added
     1 existing messages were found
