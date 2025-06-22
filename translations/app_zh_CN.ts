@@ -5,42 +5,42 @@
     <name>FileTreeWidget</name>
     <message>
       <location filename="../workspace_explorer.py" line="693" />
-      <source>文件历史</source>
+      <source>File History</source>
       <translation type="unfinished" />
     </message>
     <message>
       <location filename="../workspace_explorer.py" line="697" />
-      <source>切换 Git Blame 注释</source>
+      <source>Toggle Git Blame Annotations</source>
       <translation type="unfinished" />
     </message>
     <message>
       <location filename="../workspace_explorer.py" line="701" />
-      <source>查看文件夹历史</source>
+      <source>View Folder History</source>
       <translation type="unfinished" />
     </message>
     <message>
       <location filename="../workspace_explorer.py" line="711" />
-      <source>复制相对路径</source>
+      <source>Copy Relative Path</source>
       <translation type="unfinished" />
     </message>
     <message>
       <location filename="../workspace_explorer.py" line="715" />
-      <source>拷贝完整路径</source>
+      <source>Copy Full Path</source>
       <translation type="unfinished" />
     </message>
     <message>
       <location filename="../workspace_explorer.py" line="719" />
-      <source>在文件管理器中打开</source>
+      <source>Open in File Manager</source>
       <translation type="unfinished" />
     </message>
     <message>
       <location filename="../workspace_explorer.py" line="739" />
-      <source>还原</source>
+      <source>Revert</source>
       <translation type="unfinished" />
     </message>
     <message>
       <location filename="../workspace_explorer.py" line="834" />
-      <source>历史</source>
+      <source>History</source>
       <translation type="unfinished" />
     </message>
   </context>
@@ -54,61 +54,111 @@
     </message>
     <message>
       <location filename="../git_manager_window.py" line="208" />
-      <source>commit history</source>
-      <translation>提交历史</translation>
+      <source>Commit History</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../git_manager_window.py" line="393" />
+      <source>Select Git Repository</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../git_manager_window.py" line="431" />
+      <source>Selected folder is not a valid Git repository</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../git_manager_window.py" line="498" />
+      <source>Failed to switch branch</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../git_manager_window.py" line="508" />
+      <source>Successfully switched to branch</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../git_manager_window.py" line="595" />
+      <source>Compare</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../git_manager_window.py" line="716" />
+      <source>Fetch failed</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../git_manager_window.py" line="719" />
+      <source>Fetch successful</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../git_manager_window.py" line="749" />
+      <source>Pull failed</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../git_manager_window.py" line="792" />
+      <source>Push successful</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../git_manager_window.py" line="795" />
+      <source>Push failed</source>
+      <translation type="unfinished" />
     </message>
   </context>
   <context>
     <name>TopBarWidget</name>
     <message>
       <location filename="../views/top_bar_widget.py" line="43" />
-      <source>打开文件夹</source>
+      <source>Open Folder</source>
       <translation type="unfinished" />
     </message>
     <message>
       <location filename="../views/top_bar_widget.py" line="48" />
-      <source>最近</source>
+      <source>Recent</source>
       <translation type="unfinished" />
     </message>
     <message>
       <location filename="../views/top_bar_widget.py" line="54" />
-      <source>分支:</source>
+      <source>Branch:</source>
       <translation type="unfinished" />
     </message>
     <message>
       <location filename="../views/top_bar_widget.py" line="63" />
-      <source>新建分支</source>
+      <source>New Branch</source>
       <translation type="unfinished" />
     </message>
     <message>
       <location filename="../views/top_bar_widget.py" line="83" />
-      <source>设置</source>
+      <source>Settings</source>
       <translation type="unfinished" />
     </message>
     <message>
       <location filename="../views/top_bar_widget.py" line="182" />
       <location filename="../views/top_bar_widget.py" line="99" />
-      <source>隐藏左侧面板</source>
+      <source>Hide Left Panel</source>
       <translation type="unfinished" />
     </message>
     <message>
       <location filename="../views/top_bar_widget.py" line="119" />
-      <source>清除最近</source>
+      <source>Clear Recent</source>
       <translation type="unfinished" />
     </message>
     <message>
       <location filename="../views/top_bar_widget.py" line="171" />
-      <source>隐藏底部面板</source>
+      <source>Hide Bottom Panel</source>
       <translation type="unfinished" />
     </message>
     <message>
       <location filename="../views/top_bar_widget.py" line="175" />
-      <source>显示底部面板</source>
+      <source>Show Bottom Panel</source>
       <translation type="unfinished" />
     </message>
     <message>
       <location filename="../views/top_bar_widget.py" line="186" />
-      <source>显示左侧面板</source>
+      <source>Show Left Panel</source>
       <translation type="unfinished" />
     </message>
   </context>
@@ -116,27 +166,32 @@
     <name>WorkspaceExplorer</name>
     <message>
       <location filename="../workspace_explorer.py" line="65" />
-      <source>刷新</source>
+      <source>Refresh</source>
       <translation type="unfinished" />
     </message>
     <message>
       <location filename="../workspace_explorer.py" line="109" />
-      <source>工作区文件</source>
+      <source>Workspace Files</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../workspace_explorer.py" line="321" />
+      <source>Search</source>
       <translation type="unfinished" />
     </message>
     <message>
       <location filename="../workspace_explorer.py" line="480" />
-      <source>关闭其他标签页</source>
+      <source>Close Other Tabs</source>
       <translation type="unfinished" />
     </message>
     <message>
       <location filename="../workspace_explorer.py" line="484" />
-      <source>关闭所有标签页</source>
+      <source>Close All Tabs</source>
       <translation type="unfinished" />
     </message>
     <message>
       <location filename="../workspace_explorer.py" line="563" />
-      <source>历史</source>
+      <source>History</source>
       <translation type="unfinished" />
     </message>
   </context>
