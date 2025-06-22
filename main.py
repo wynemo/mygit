@@ -7,11 +7,14 @@ from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
 
 from git_manager_window import GitManagerWindow
+from settings import Settings
 
 
 def main():
     app = QApplication(sys.argv)
-    if os.path.exists("translations/app_zh_CN.qm"):
+    settings = Settings()
+    current_language = settings.settings.get("language", "中文")
+    if current_language == "中文" and os.path.exists("translations/app_zh_CN.qm"):
         translator = QTranslator()
         translator.load("translations/app_zh_CN.qm")
         app.installTranslator(translator)
