@@ -390,7 +390,7 @@ class GitManagerWindow(QMainWindow):
 
     def open_folder_dialog(self):
         """打开文件夹选择对话框"""
-        folder_path = QFileDialog.getExistingDirectory(self, "选择 Git 仓库")
+        folder_path = QFileDialog.getExistingDirectory(self, self.tr("选择 Git 仓库"))
         # macos 上 QFileDialog.getExistingDirectory 有时候选择"文件夹对话框" 灰色的 无法打开文件夹
         # 再有 bug 可以考虑用 QFileDialog.Option.DontUseNativeDialog
         # 就是这个没有保存最近打开的文件夹路径 每次都要重新选
@@ -428,7 +428,7 @@ class GitManagerWindow(QMainWindow):
             self.setWindowTitle(f"{self.tr('Git Manager')} - {folder_path}")
         else:
             self.commit_history_view.history_list.clear()
-            self.notification_widget.show_message("所选文件夹不是有效的 Git 仓库")
+            self.notification_widget.show_message(f"{self.tr('所选文件夹不是有效的 Git 仓库')}")
             if hasattr(self, "top_bar"):
                 self.top_bar.set_buttons_enabled(False)  # Disable buttons if repo init fails
 
@@ -495,7 +495,7 @@ class GitManagerWindow(QMainWindow):
 
         if error_message:
             # 切换失败，显示错误通知
-            self.notification_widget.show_message(f"切换分支失败：{error_message}")
+            self.notification_widget.show_message(f"{self.tr('切换分支失败')}：{error_message}")
             # 将分支组合框恢复到实际的活动分支
             actual_active_branch = self.git_manager.get_default_branch()
             if actual_active_branch:
@@ -504,7 +504,7 @@ class GitManagerWindow(QMainWindow):
                 self.top_bar.branch_combo.blockSignals(False)
         else:
             # 切换成功
-            self.notification_widget.show_message(f"成功切换到分支：{branch}")  # 可选：成功提示
+            self.notification_widget.show_message(f"{self.tr('成功切换到分支')}：{branch}")  # 可选：成功提示
             # 更新 UI 组件以反映分支更改
             logging.debug("on_branch_changed, refresh_file_tree")
             self.workspace_explorer.refresh_file_tree()
@@ -589,7 +589,9 @@ class GitManagerWindow(QMainWindow):
 
             # 创建并显示比较对话框
             # todo 这个要改造，看 readme 里的 todo
-            dialog = CompareWithWorkingDialog(f"比较 {file_path}", old_content, new_content, file_path, self)
+            dialog = CompareWithWorkingDialog(
+                f"{self.tr('比较')} {file_path}", old_content, new_content, file_path, self
+            )
             dialog.show()
 
         except Exception:
@@ -709,10 +711,10 @@ class GitManagerWindow(QMainWindow):
         """处理 fetch 操作完成"""
         try:
             if not success and error_message:
-                self.notification_widget.show_message(f"Fetch failed: {error_message}")
+                self.notification_widget.show_message(f"{self.tr('Fetch failed')}：{error_message}")
                 logging.error(f"Fetch failed: {error_message}")
             elif success:
-                self.notification_widget.show_message("Fetch successful.")
+                self.notification_widget.show_message(f"{self.tr('Fetch successful')}.")
                 logging.info("Fetch successful.")
                 self.update_commit_history()  # Update history as fetch can update remote-tracking branches
         finally:
@@ -742,7 +744,7 @@ class GitManagerWindow(QMainWindow):
                 # Optionally show success: self.notification_widget.show_message("Pull successful.")
                 logging.info("Pull successful.")
             elif error_message:  # Only show notification if there's an error message
-                self.notification_widget.show_message(f"Pull failed: {error_message}")
+                self.notification_widget.show_message(f"{self.tr('Pull failed')}：{error_message}")
                 logging.error(f"Pull failed: {error_message}")  # More specific logging
         finally:
             # 停止加载动画
@@ -785,10 +787,10 @@ class GitManagerWindow(QMainWindow):
         try:
             if success:
                 self.update_commit_history()
-                self.notification_widget.show_message("Push successful.")
+                self.notification_widget.show_message(f"{self.tr('Push successful')}.")
                 logging.info("Push successful.")
             elif error_message:  # Only show notification if there's an error message
-                self.notification_widget.show_message(f"Push failed: {error_message}")
+                self.notification_widget.show_message(f"{self.tr('Push failed')}：{error_message}")
                 logging.error(f"Push failed: {error_message}")  # More specific logging
         finally:
             # 停止加载动画
