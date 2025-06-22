@@ -109,6 +109,77 @@
     </message>
   </context>
   <context>
+    <name>SettingsDialog</name>
+    <message>
+      <location filename="../dialogs/settings_dialog.py" line="29" />
+      <source>Language:</source>
+      <translation>语言：</translation>
+    </message>
+    <message>
+      <location filename="../dialogs/settings_dialog.py" line="32" />
+      <source>(requires application restart)</source>
+      <translation>（需要重启应用）</translation>
+    </message>
+    <message>
+      <location filename="../dialogs/settings_dialog.py" line="48" />
+      <source>Font:</source>
+      <translation>字体：</translation>
+    </message>
+    <message>
+      <location filename="../dialogs/settings_dialog.py" line="56" />
+      <source>Font Size:</source>
+      <translation>字体大小：</translation>
+    </message>
+    <message>
+      <location filename="../dialogs/settings_dialog.py" line="65" />
+      <source>Code Style:</source>
+      <translation>代码风格：</translation>
+    </message>
+    <message>
+      <location filename="../dialogs/settings_dialog.py" line="73" />
+      <source>API URL:</source>
+      <translation>API 地址：</translation>
+    </message>
+    <message>
+      <location filename="../dialogs/settings_dialog.py" line="81" />
+      <source>API Secret:</source>
+      <translation>API 密钥：</translation>
+    </message>
+    <message>
+      <location filename="../dialogs/settings_dialog.py" line="88" />
+      <source>Model Name:</source>
+      <translation>模型名称：</translation>
+    </message>
+    <message>
+      <location filename="../dialogs/settings_dialog.py" line="97" />
+      <source>Prompt:</source>
+      <translation>提示词：</translation>
+    </message>
+  </context>
+  <context>
+    <name>SideBarWidget</name>
+    <message>
+      <location filename="../views/side_bar_widget.py" line="24" />
+      <source>Project</source>
+      <translation>项目</translation>
+    </message>
+    <message>
+      <location filename="../views/side_bar_widget.py" line="50" />
+      <source>Commit</source>
+      <translation>提交</translation>
+    </message>
+    <message>
+      <location filename="../views/side_bar_widget.py" line="76" />
+      <source>Changes</source>
+      <translation>变更</translation>
+    </message>
+    <message>
+      <location filename="../views/side_bar_widget.py" line="102" />
+      <source>Search</source>
+      <translation type="unfinished">搜索</translation>
+    </message>
+  </context>
+  <context>
     <name>TopBarWidget</name>
     <message>
       <location filename="../views/top_bar_widget.py" line="43" />

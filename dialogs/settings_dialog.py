@@ -29,7 +29,7 @@ class SettingsDialog(QDialog):
         language_label = QLabel(self.tr("Language:"))
         language_icon_label = QLabel()
         language_icon_label.setPixmap(QIcon("icons/globe.svg").pixmap(16, 16))
-        self.restart_hint_label = QLabel(self.tr("(需要重启应用)"))
+        self.restart_hint_label = QLabel(self.tr("(requires application restart)"))
         self.restart_hint_label.setStyleSheet("color: #666; font-size: 11px;")
         self.restart_hint_label.setVisible(False)
         language_layout.addWidget(language_icon_label)
@@ -37,7 +37,7 @@ class SettingsDialog(QDialog):
         language_layout.addWidget(self.language_combo, 1)
         language_layout.addWidget(self.restart_hint_label)
         layout.addRow(language_layout)
-        
+
         # 连接语言变化信号
         self.language_combo.currentTextChanged.connect(self.on_language_changed)
 

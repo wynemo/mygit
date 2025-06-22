@@ -21,7 +21,7 @@ class SideBarWidget(QWidget):
 
         # 工程按钮
         self.project_btn = QToolButton()
-        self.project_btn.setText("工程")
+        self.project_btn.setText(self.tr("Project"))
         self.project_btn.setIcon(QIcon("icons/project.svg"))
         self.project_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
         self.project_btn.setCheckable(True)
@@ -47,7 +47,7 @@ class SideBarWidget(QWidget):
 
         # 提交按钮
         self.commit_btn = QToolButton()
-        self.commit_btn.setText("提交")
+        self.commit_btn.setText(self.tr("Commit"))
         self.commit_btn.setIcon(QIcon("icons/commit_icon.svg"))
         self.commit_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
         self.commit_btn.setCheckable(True)
@@ -73,7 +73,7 @@ class SideBarWidget(QWidget):
 
         # 变更按钮
         self.changes_btn = QToolButton()
-        self.changes_btn.setText("变更")
+        self.changes_btn.setText(self.tr("Changes"))
         self.changes_btn.setIcon(QIcon("icons/changes.svg"))
         self.changes_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
         self.changes_btn.setCheckable(True)
@@ -99,7 +99,7 @@ class SideBarWidget(QWidget):
 
         # 搜索按钮
         self.search_btn = QToolButton()
-        self.search_btn.setText("搜索")
+        self.search_btn.setText(self.tr("Search"))
         self.search_btn.setIcon(QIcon("icons/search.svg"))
         self.search_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
         self.search_btn.setCheckable(True)
