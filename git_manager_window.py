@@ -205,7 +205,7 @@ class GitManagerWindow(QMainWindow):
         )
         self.tab_widget.setTabsClosable(True)
         self.tab_widget.tabCloseRequested.connect(self.close_tab)
-        self.tab_widget.addTab(self.commit_history_view, self.tr("commit history"))
+        self.tab_widget.addTab(self.commit_history_view, self.tr("Commit History"))
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
 
         # 提交历史标签页，不可关闭
@@ -390,7 +390,7 @@ class GitManagerWindow(QMainWindow):
 
     def open_folder_dialog(self):
         """打开文件夹选择对话框"""
-        folder_path = QFileDialog.getExistingDirectory(self, self.tr("选择 Git 仓库"))
+        folder_path = QFileDialog.getExistingDirectory(self, self.tr("Select Git Repository"))
         # macos 上 QFileDialog.getExistingDirectory 有时候选择"文件夹对话框" 灰色的 无法打开文件夹
         # 再有 bug 可以考虑用 QFileDialog.Option.DontUseNativeDialog
         # 就是这个没有保存最近打开的文件夹路径 每次都要重新选
@@ -428,7 +428,7 @@ class GitManagerWindow(QMainWindow):
             self.setWindowTitle(f"{self.tr('Git Manager')} - {folder_path}")
         else:
             self.commit_history_view.history_list.clear()
-            self.notification_widget.show_message(f"{self.tr('所选文件夹不是有效的 Git 仓库')}")
+            self.notification_widget.show_message(f"{self.tr('Selected folder is not a valid Git repository')}")
             if hasattr(self, "top_bar"):
                 self.top_bar.set_buttons_enabled(False)  # Disable buttons if repo init fails
 
@@ -495,7 +495,7 @@ class GitManagerWindow(QMainWindow):
 
         if error_message:
             # 切换失败，显示错误通知
-            self.notification_widget.show_message(f"{self.tr('切换分支失败')}：{error_message}")
+            self.notification_widget.show_message(f"{self.tr('Failed to switch branch')}：{error_message}")
             # 将分支组合框恢复到实际的活动分支
             actual_active_branch = self.git_manager.get_default_branch()
             if actual_active_branch:
@@ -504,7 +504,9 @@ class GitManagerWindow(QMainWindow):
                 self.top_bar.branch_combo.blockSignals(False)
         else:
             # 切换成功
-            self.notification_widget.show_message(f"{self.tr('成功切换到分支')}：{branch}")  # 可选：成功提示
+            self.notification_widget.show_message(
+                f"{self.tr('Successfully switched to branch')}：{branch}"
+            )  # 可选：成功提示
             # 更新 UI 组件以反映分支更改
             logging.debug("on_branch_changed, refresh_file_tree")
             self.workspace_explorer.refresh_file_tree()
@@ -590,7 +592,7 @@ class GitManagerWindow(QMainWindow):
             # 创建并显示比较对话框
             # todo 这个要改造，看 readme 里的 todo
             dialog = CompareWithWorkingDialog(
-                f"{self.tr('比较')} {file_path}", old_content, new_content, file_path, self
+                f"{self.tr('Compare')} {file_path}", old_content, new_content, file_path, self
             )
             dialog.show()
 
