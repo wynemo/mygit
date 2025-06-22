@@ -62,7 +62,7 @@ class WorkspaceExplorer(QWidget):
         # 创建刷新按钮
         self.refresh_button = QPushButton(QIcon("icons/refresh.svg"), "")
         self.refresh_button.setFixedSize(30, 30)
-        self.refresh_button.setToolTip("refresh")
+        self.refresh_button.setToolTip(self.tr("刷新"))
         self.refresh_button.clicked.connect(self._handle_refresh_clicked)
         top_bar_buttons_layout.addWidget(self.refresh_button)  # Add button to top layout
 
@@ -106,7 +106,7 @@ class WorkspaceExplorer(QWidget):
 
         # 创建文件树
         self.file_tree = FileTreeWidget(self, git_manager=self.git_manager)  # 传入 self 作为父部件和 git_manager
-        self.file_tree.setHeaderLabels(["工作区文件"])
+        self.file_tree.setHeaderLabels([self.tr("工作区文件")])
 
         self.commit_widget = CommitWidget(self)
 
@@ -477,11 +477,11 @@ class WorkspaceExplorer(QWidget):
 
         menu = QMenu(self)
 
-        close_others_action = QAction("关闭其他标签页", self)
+        close_others_action = QAction(self.tr("关闭其他标签页"), self)
         close_others_action.triggered.connect(lambda: self.close_other_tabs(tab_index))
         menu.addAction(close_others_action)
 
-        close_all_action = QAction("关闭所有标签页", self)
+        close_all_action = QAction(self.tr("关闭所有标签页"), self)
         close_all_action.triggered.connect(self.close_all_tabs)
         menu.addAction(close_all_action)
 
@@ -560,7 +560,7 @@ class WorkspaceExplorer(QWidget):
 
         # Add it to the main window's tab widget
         folder_name = os.path.basename(folder_path.rstrip("/"))
-        tab_title = f"历史：{folder_name}"
+        tab_title = f"{self.tr('历史')}：{folder_name}"
 
         main_win.tab_widget.addTab(folder_history_view, tab_title)
         main_win.tab_widget.setCurrentIndex(main_win.tab_widget.count() - 1)
@@ -690,15 +690,15 @@ class FileTreeWidget(QTreeWidget):
         # 如果是文件，添加文件特有的菜单项
         if os.path.isfile(file_path):
             # 添加"文件历史"菜单项
-            history_action = context_menu.addAction("文件历史")  # "File History"
+            history_action = context_menu.addAction(self.tr("文件历史"))  # "File History"
             history_action.triggered.connect(lambda: self._show_file_history(file_path))
 
             # 添加"Git Blame"菜单项
-            blame_action = context_menu.addAction("切换 Git Blame 注释")  # "Toggle Git Blame Annotations"
+            blame_action = context_menu.addAction(self.tr("切换 Git Blame 注释"))  # "Toggle Git Blame Annotations"
             blame_action.triggered.connect(lambda: self._toggle_blame_annotation_in_editor(file_path))
         elif os.path.isdir(file_path):
             # 添加"文件夹历史"菜单项
-            folder_history_action = context_menu.addAction("查看文件夹历史")  # "View Folder History"
+            folder_history_action = context_menu.addAction(self.tr("查看文件夹历史"))  # "View Folder History"
             # Ensure workspace_explorer is available
             if self.workspace_explorer:
                 folder_history_action.triggered.connect(
@@ -708,15 +708,15 @@ class FileTreeWidget(QTreeWidget):
                 folder_history_action.setEnabled(False)  # Disable if workspace_explorer ref is missing
 
         # 添加"复制相对路径"菜单项（文件和文件夹都适用）
-        copy_relative_path_action = context_menu.addAction("复制相对路径")
+        copy_relative_path_action = context_menu.addAction(self.tr("复制相对路径"))
         copy_relative_path_action.triggered.connect(lambda: self._copy_relative_path(file_path))
 
         # 添加"拷贝完整路径"菜单项（文件和文件夹都适用）
-        copy_full_path_action = context_menu.addAction("拷贝完整路径")
+        copy_full_path_action = context_menu.addAction(self.tr("拷贝完整路径"))
         copy_full_path_action.triggered.connect(lambda: self._copy_full_path(file_path))
 
         # 添加"在文件管理器中打开"菜单项（文件和文件夹都适用）
-        open_in_fm_action = context_menu.addAction("在文件管理器中打开")
+        open_in_fm_action = context_menu.addAction(self.tr("在文件管理器中打开"))
         open_in_fm_action.triggered.connect(lambda: self._open_in_file_manager(file_path))
 
         # 只在 git 修改的文件上显示"Revert"菜单项
@@ -736,7 +736,7 @@ class FileTreeWidget(QTreeWidget):
                     or relative_path in workspace_explorer.all_file_statuses.get("staged", set())
                     or relative_path in workspace_explorer.all_file_statuses.get("untracked", set())
                 ):
-                    revert_action = context_menu.addAction("Revert")
+                    revert_action = context_menu.addAction(self.tr("还原"))
                     revert_action.triggered.connect(lambda: self.revert_file(file_path))
             except Exception as e:
                 logging.error("检查文件状态出错：%s", e)
@@ -831,7 +831,7 @@ class FileTreeWidget(QTreeWidget):
 
         # 在 GitManagerWindow 的 tab_widget 中添加新标签页
         file_name = os.path.basename(file_path)
-        tab_title = f"{file_name} 历史"
+        tab_title = f"{file_name} {self.tr('历史')}"
 
         # 检查标签页是否已存在
         for i in range(main_window.tab_widget.count()):
