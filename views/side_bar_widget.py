@@ -1,4 +1,4 @@
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QToolButton, QVBoxLayout, QWidget
 
@@ -15,13 +15,14 @@ class SideBarWidget(QWidget):
         self.setStyleSheet("background-color: #f0f0f0;")
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(10, 10, 0, 10)
+        layout.setContentsMargins(5, 10, 0, 10)
         layout.setSpacing(10)
         self.setLayout(layout)
 
         # 工程按钮
         self.project_btn = QToolButton()
         self.project_btn.setIcon(QIcon("icons/project.svg"))
+        self.project_btn.setIconSize(QSize(24, 24))
         self.project_btn.setToolTip(self.tr("Project"))
         self.project_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.project_btn.setCheckable(True)
@@ -48,6 +49,7 @@ class SideBarWidget(QWidget):
         # 提交按钮
         self.commit_btn = QToolButton()
         self.commit_btn.setIcon(QIcon("icons/commit_icon.svg"))
+        self.commit_btn.setIconSize(QSize(24, 24))
         self.commit_btn.setToolTip(self.tr("Commit"))
         self.commit_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.commit_btn.setCheckable(True)
@@ -74,6 +76,7 @@ class SideBarWidget(QWidget):
         # 变更按钮
         self.changes_btn = QToolButton()
         self.changes_btn.setIcon(QIcon("icons/changes.svg"))
+        self.changes_btn.setIconSize(QSize(24, 24))
         self.changes_btn.setToolTip(self.tr("Changes"))
         self.changes_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.changes_btn.setCheckable(True)
@@ -100,6 +103,7 @@ class SideBarWidget(QWidget):
         # 搜索按钮
         self.search_btn = QToolButton()
         self.search_btn.setIcon(QIcon("icons/search.svg"))
+        self.search_btn.setIconSize(QSize(24, 24))
         self.search_btn.setToolTip(self.tr("Search"))
         self.search_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.search_btn.setCheckable(True)
