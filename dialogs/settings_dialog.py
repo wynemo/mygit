@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QComboBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QTextEdit
 
 if TYPE_CHECKING:
@@ -17,6 +18,18 @@ class SettingsDialog(QDialog):
 
         # 创建布局
         layout = QFormLayout(self)
+
+        # 创建语言选择下拉框
+        self.language_combo = QComboBox()
+        self.language_combo.addItems(["中文", "English"])
+        current_language = self.settings.settings.get("language", "中文")
+        self.language_combo.setCurrentText(current_language)
+        language_layout = QHBoxLayout()
+        language_label = QLabel("语言：")
+        language_label.setPixmap(QIcon("icons/globe.svg").pixmap(16, 16))
+        language_layout.addWidget(language_label)
+        language_layout.addWidget(self.language_combo, 1)
+        layout.addRow(language_layout)
 
         # 创建字体输入文本框（响应式布局）
         self.font_edit = QLineEdit()
@@ -101,6 +114,9 @@ class SettingsDialog(QDialog):
         self.settings.settings["api_secret"] = self.api_secret_edit.text()
         self.settings.settings["model_name"] = self.model_name_edit.text()
         self.settings.settings["prompt"] = self.prompt.toPlainText()
+
+        # 保存语言设置
+        self.settings.settings["language"] = self.language_combo.currentText()
 
         # 保存设置到文件
         self.settings.save_settings()
