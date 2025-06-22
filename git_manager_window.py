@@ -420,7 +420,7 @@ class GitManagerWindow(QMainWindow):
             self.update_commit_history()
 
             # 更新工作区浏览器
-            logging.debug("open_folder, refresh_file_tree")
+            self.workspace_explorer.git_manager = self.git_manager
             self.workspace_explorer.set_workspace_path(folder_path)
             self.workspace_explorer.git_manager = self.git_manager
             self.workspace_explorer.file_tree.git_manager = self.git_manager
