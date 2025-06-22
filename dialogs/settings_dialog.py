@@ -25,7 +25,7 @@ class SettingsDialog(QDialog):
         current_language = self.settings.settings.get("language", "中文")
         self.language_combo.setCurrentText(current_language)
         language_layout = QHBoxLayout()
-        language_label = QLabel("语言：")
+        language_label = QLabel(self.tr("语言："))
         language_icon_label = QLabel()
         language_icon_label.setPixmap(QIcon("icons/globe.svg").pixmap(16, 16))
         language_layout.addWidget(language_icon_label)
@@ -37,7 +37,7 @@ class SettingsDialog(QDialog):
         self.font_edit = QLineEdit()
         self.font_edit.setText(self.settings.get_font_family())
         font_layout = QHBoxLayout()
-        font_layout.addWidget(QLabel("字体："))
+        font_layout.addWidget(QLabel(self.tr("字体：")))
         font_layout.addWidget(self.font_edit, 1)  # 设置拉伸因子
         layout.addRow(font_layout)
 
@@ -45,7 +45,7 @@ class SettingsDialog(QDialog):
         self.font_size_edit = QLineEdit()
         self.font_size_edit.setText(str(self.settings.get_font_size()))
         font_size_layout = QHBoxLayout()
-        font_size_layout.addWidget(QLabel("字体大小："))
+        font_size_layout.addWidget(QLabel(self.tr("字体大小：")))
         font_size_layout.addWidget(self.font_size_edit, 1)
         layout.addRow(font_size_layout)
 
@@ -54,7 +54,7 @@ class SettingsDialog(QDialog):
         self.code_style_combo.addItems(get_all_styles())
         self.code_style_combo.setCurrentText(self.settings.get_code_style())
         code_style_layout = QHBoxLayout()
-        code_style_layout.addWidget(QLabel("代码风格："))
+        code_style_layout.addWidget(QLabel(self.tr("代码风格：")))
         code_style_layout.addWidget(self.code_style_combo, 1)
         layout.addRow(code_style_layout)
 
@@ -62,7 +62,7 @@ class SettingsDialog(QDialog):
         self.api_url_edit = QLineEdit()
         self.api_url_edit.setText(self.settings.settings.get("api_url", ""))
         api_url_layout = QHBoxLayout()
-        api_url_layout.addWidget(QLabel("API URL:"))
+        api_url_layout.addWidget(QLabel(self.tr("API URL:")))
         api_url_layout.addWidget(self.api_url_edit, 1)
         layout.addRow(api_url_layout)
 
@@ -70,14 +70,14 @@ class SettingsDialog(QDialog):
         self.api_secret_edit.setText(self.settings.settings.get("api_secret", ""))
         self.api_secret_edit.setEchoMode(QLineEdit.EchoMode.Password)
         api_secret_layout = QHBoxLayout()
-        api_secret_layout.addWidget(QLabel("API Secret:"))
+        api_secret_layout.addWidget(QLabel(self.tr("API Secret:")))
         api_secret_layout.addWidget(self.api_secret_edit, 1)
         layout.addRow(api_secret_layout)
 
         self.model_name_edit = QLineEdit()
         self.model_name_edit.setText(self.settings.settings.get("model_name", ""))
         model_layout = QHBoxLayout()
-        model_layout.addWidget(QLabel("Model Name:"))
+        model_layout.addWidget(QLabel(self.tr("Model Name:")))
         model_layout.addWidget(self.model_name_edit, 1)
         layout.addRow(model_layout)
 
@@ -86,7 +86,7 @@ class SettingsDialog(QDialog):
             self.settings.settings.get("prompt", "帮我生成 commit 信息，用中文，简洁，使用 Conventional Commits 格式")
         )
         prompt_layout = QHBoxLayout()
-        prompt_layout.addWidget(QLabel("Prompt:"))
+        prompt_layout.addWidget(QLabel(self.tr("Prompt:")))
         prompt_layout.addWidget(self.prompt, 1)
         layout.addRow(prompt_layout)
 
