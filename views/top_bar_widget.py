@@ -40,18 +40,18 @@ class TopBarWidget(QWidget):
         self.setLayout(self._layout)
 
         # --- Open Folder Button ---
-        self.open_button = QPushButton(QIcon("icons/folder.svg"), self.tr("打开文件夹"))
+        self.open_button = QPushButton(QIcon("icons/folder.svg"), self.tr("Open Folder"))
         self.open_button.clicked.connect(self.open_folder_requested.emit)
         self._layout.addWidget(self.open_button)
 
         # --- Recent Folders Button and Menu ---
-        self.recent_button = QPushButton(self.tr("最近"))
+        self.recent_button = QPushButton(self.tr("Recent"))
         self.recent_menu = QMenu(self)
         self.recent_button.setMenu(self.recent_menu)
         self._layout.addWidget(self.recent_button)
 
         # --- Branch Label and Combo Box ---
-        self.branch_label = QLabel(self.tr("分支:"))
+        self.branch_label = QLabel(self.tr("Branch:"))
         self._layout.addWidget(self.branch_label)
         self.branch_combo = QComboBox()
         self.branch_combo.setMinimumWidth(150)
@@ -60,7 +60,7 @@ class TopBarWidget(QWidget):
 
         # 新建分支按钮
         self.new_branch_button = QPushButton("+")
-        self.new_branch_button.setToolTip(self.tr("新建分支"))
+        self.new_branch_button.setToolTip(self.tr("New Branch"))
         self.new_branch_button.clicked.connect(self._on_new_branch_button_clicked)
         self._layout.addWidget(self.new_branch_button)
 
@@ -80,7 +80,7 @@ class TopBarWidget(QWidget):
         # --- Settings Button ---
         self.settings_button = QToolButton()
         self.settings_button.setIcon(QIcon("icons/settings.svg"))  # Assuming settings.svg
-        self.settings_button.setText(self.tr("设置"))  # Using text until icon is confirmed
+        self.settings_button.setText(self.tr("Settings"))  # Using text until icon is confirmed
         self.settings_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.settings_button.clicked.connect(self.settings_requested.emit)
         self._layout.addWidget(self.settings_button)
@@ -96,7 +96,7 @@ class TopBarWidget(QWidget):
         self.toggle_left_panel_button = QToolButton()
         self.toggle_left_panel_button.setCheckable(True)
         self.toggle_left_panel_button.setIcon(self._create_left_panel_icon(True))
-        self.toggle_left_panel_button.setToolTip(self.tr("隐藏左侧面板"))
+        self.toggle_left_panel_button.setToolTip(self.tr("Hide Left Panel"))
         self.toggle_left_panel_button.clicked.connect(self._on_toggle_left_panel)
         self._layout.addWidget(self.toggle_left_panel_button)
 
@@ -116,7 +116,7 @@ class TopBarWidget(QWidget):
             self.recent_menu.addAction(action)
         if recent_folders:
             self.recent_menu.addSeparator()
-        clear_action = QAction(self.tr("清除最近"), self)
+        clear_action = QAction(self.tr("Clear Recent"), self)
         clear_action.triggered.connect(self.clear_recent_folders_requested.emit)
         self.recent_menu.addAction(clear_action)
         self.recent_button.setEnabled(bool(recent_folders))
@@ -168,22 +168,22 @@ class TopBarWidget(QWidget):
         # For example, using up/down arrows from a resource file or drawing them
         if is_panel_visible:
             self.toggle_bottom_button.setIcon(self._create_arrow_icon(down=True))
-            self.toggle_bottom_button.setToolTip(self.tr("隐藏底部面板"))
+            self.toggle_bottom_button.setToolTip(self.tr("Hide Bottom Panel"))
             self.toggle_bottom_button.setChecked(True)
         else:
             self.toggle_bottom_button.setIcon(self._create_arrow_icon(down=False))
-            self.toggle_bottom_button.setToolTip(self.tr("显示底部面板"))
+            self.toggle_bottom_button.setToolTip(self.tr("Show Bottom Panel"))
             self.toggle_bottom_button.setChecked(False)
         self.toggle_bottom_button.setIconSize(QSize(16, 16))
 
     def update_toggle_left_panel_icon(self, is_panel_visible):
         if is_panel_visible:
             self.toggle_left_panel_button.setIcon(self._create_left_panel_icon(True))
-            self.toggle_left_panel_button.setToolTip(self.tr("隐藏左侧面板"))
+            self.toggle_left_panel_button.setToolTip(self.tr("Hide Left Panel"))
             self.toggle_left_panel_button.setChecked(True)
         else:
             self.toggle_left_panel_button.setIcon(self._create_left_panel_icon(False))
-            self.toggle_left_panel_button.setToolTip(self.tr("显示左侧面板"))
+            self.toggle_left_panel_button.setToolTip(self.tr("Show Left Panel"))
             self.toggle_left_panel_button.setChecked(False)
         self.toggle_left_panel_button.setIconSize(QSize(16, 16))
 
