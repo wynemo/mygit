@@ -23,15 +23,23 @@ class SettingsDialog(QDialog):
         self.language_combo = QComboBox()
         self.language_combo.addItems(["中文", "English"])
         current_language = self.settings.settings.get("language", "中文")
+        self.original_language = current_language
         self.language_combo.setCurrentText(current_language)
         language_layout = QHBoxLayout()
         language_label = QLabel(self.tr("Language:"))
         language_icon_label = QLabel()
         language_icon_label.setPixmap(QIcon("icons/globe.svg").pixmap(16, 16))
+        self.restart_hint_label = QLabel(self.tr("(需要重启应用)"))
+        self.restart_hint_label.setStyleSheet("color: #666; font-size: 11px;")
+        self.restart_hint_label.setVisible(False)
         language_layout.addWidget(language_icon_label)
         language_layout.addWidget(language_label)
         language_layout.addWidget(self.language_combo, 1)
+        language_layout.addWidget(self.restart_hint_label)
         layout.addRow(language_layout)
+        
+        # 连接语言变化信号
+        self.language_combo.currentTextChanged.connect(self.on_language_changed)
 
         # 创建字体输入文本框（响应式布局）
         self.font_edit = QLineEdit()
@@ -95,6 +103,10 @@ class SettingsDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addRow(buttons)
+
+    def on_language_changed(self, new_language):
+        """当语言选择发生变化时显示/隐藏重启提醒"""
+        self.restart_hint_label.setVisible(new_language != self.original_language)
 
     def accept(self):
         """当点击确定按钮时保存设置"""
