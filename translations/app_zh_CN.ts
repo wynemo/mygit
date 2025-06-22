@@ -159,24 +159,24 @@
   <context>
     <name>SideBarWidget</name>
     <message>
-      <location filename="../views/side_bar_widget.py" line="24" />
+      <location filename="../views/side_bar_widget.py" line="25" />
       <source>Project</source>
       <translation>项目</translation>
     </message>
     <message>
-      <location filename="../views/side_bar_widget.py" line="50" />
+      <location filename="../views/side_bar_widget.py" line="51" />
       <source>Commit</source>
       <translation>提交</translation>
     </message>
     <message>
-      <location filename="../views/side_bar_widget.py" line="76" />
+      <location filename="../views/side_bar_widget.py" line="77" />
       <source>Changes</source>
       <translation>变更</translation>
     </message>
     <message>
-      <location filename="../views/side_bar_widget.py" line="102" />
+      <location filename="../views/side_bar_widget.py" line="103" />
       <source>Search</source>
-      <translation type="unfinished">搜索</translation>
+      <translation>搜索</translation>
     </message>
   </context>
   <context>
