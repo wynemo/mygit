@@ -40,21 +40,38 @@ class GitChangeHandler(FileSystemEventHandler, QObject):
     """Handles file system events from watchdog and signals the main window."""
 
     file_changed = pyqtSignal(str, str, str)  # (event_type, path, is_directory)
+    git_changed = pyqtSignal(str, str)  # (event_type, path) for git-specific changes
 
     def on_any_event(self, event):
         """
         This method is called for any event.
-        We ignore events in the .git directory to prevent loops.
+        We monitor specific .git directory files to detect git operations.
         """
-        if ".git" in event.src_path.split(os.sep):
-            return
-
         event_type = event.event_type
         path = event.src_path
         is_directory = "directory" if event.is_directory else "file"
 
+        # Check if this is a git-related change we care about
+        if self._is_git_change_of_interest(path):
+            logging.debug("Git watchdog event: %s on %s", event_type, path)
+            self.git_changed.emit(event_type, path)
+            return
+
+        # Ignore other .git directory changes to prevent loops
+        if ".git" in event.src_path.split(os.sep):
+            return
+
         logging.debug("Watchdog event: %s on %s (%s)", event_type, path, is_directory)
         self.file_changed.emit(event_type, path, is_directory)
+
+    def _is_git_change_of_interest(self, path):
+        """Check if the path is a git file we want to monitor for history updates."""
+        git_paths_of_interest = [".git/refs/", ".git/logs/HEAD", ".git/HEAD", ".git/FETCH_HEAD", ".git/ORIG_HEAD"]
+
+        for git_path in git_paths_of_interest:
+            if git_path in path:
+                return True
+        return False
 
 
 class GitManagerWindow(QMainWindow):
@@ -88,6 +105,12 @@ class GitManagerWindow(QMainWindow):
         self.refresh_timer.setSingleShot(True)
         self.refresh_timer.setInterval(1000)  # 1-second delay to debounce refreshes
         self.refresh_timer.timeout.connect(self._throttled_refresh)
+
+        # Git history refresh timer
+        self.git_refresh_timer = QTimer(self)
+        self.git_refresh_timer.setSingleShot(True)
+        self.git_refresh_timer.setInterval(500)  # 0.5-second delay for git changes
+        self.git_refresh_timer.timeout.connect(self._throttled_git_refresh)
 
         # 创建主窗口部件
         main_widget = QWidget()
@@ -313,6 +336,7 @@ class GitManagerWindow(QMainWindow):
 
         event_handler = GitChangeHandler()
         event_handler.file_changed.connect(self.handle_file_change)
+        event_handler.git_changed.connect(self.handle_git_change)
 
         self.observer = Observer()
         self.observer.schedule(event_handler, folder_path, recursive=True)
@@ -332,6 +356,11 @@ class GitManagerWindow(QMainWindow):
         logging.debug("File change event: %s - %s (%s)", event_type, path, is_directory)
         self.schedule_refresh(event_type, path, is_directory)
 
+    def handle_git_change(self, event_type, path):
+        """Handles git-specific file system change events."""
+        logging.debug("Git change event: %s - %s", event_type, path)
+        self.schedule_git_refresh(event_type, path)
+
     def schedule_refresh(self, event_type=None, path=None, is_directory=None):
         """Schedules a UI refresh, debouncing multiple requests."""
         # 保存参数以便在 _throttled_refresh 中使用
@@ -339,6 +368,13 @@ class GitManagerWindow(QMainWindow):
         self._pending_path = path
         self._pending_is_directory = is_directory
         self.refresh_timer.start()
+
+    def schedule_git_refresh(self, event_type=None, path=None):
+        """Schedules a git history refresh, debouncing multiple requests."""
+        # 保存参数以便在 _throttled_git_refresh 中使用
+        self._pending_git_event_type = event_type
+        self._pending_git_path = path
+        self.git_refresh_timer.start()
 
     def _throttled_refresh(self):
         """The actual refresh method called after a delay."""
@@ -359,6 +395,28 @@ class GitManagerWindow(QMainWindow):
         self._pending_event_type = None
         self._pending_path = None
         self._pending_is_directory = None
+
+    def _throttled_git_refresh(self):
+        """The actual git refresh method called after a delay."""
+        # 获取保存的参数
+        event_type = getattr(self, "_pending_git_event_type", None)
+        path = getattr(self, "_pending_git_path", None)
+
+        logging.debug("Git FileSystemWatcher triggered refresh.")
+        logging.debug("Git refresh parameters: event_type=%s, path=%s", event_type, path)
+
+        if self.git_manager and self.git_manager.repo:
+            logging.info("Git change detected, refreshing commit history and branches.")
+            # 更新提交历史
+            self.update_commit_history()
+            # 更新分支列表
+            self.update_branches_on_top_bar()
+            # 刷新工作区状态（可能有新的未跟踪文件等）
+            self.workspace_explorer.refresh_file_tree()
+
+        # 清理参数
+        self._pending_git_event_type = None
+        self._pending_git_path = None
 
     def show_commit_dialog(self):
         """显示提交对话框"""
