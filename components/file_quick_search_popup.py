@@ -34,13 +34,13 @@ class FileQuickSearchPopup(QFrame):
 
         self.input = QLineEdit(self)
         self.input.setPlaceholderText("输入文件名搜索…")
-        
+
         # 添加搜索延时计时器
         self.search_timer = QTimer(self)
         self.search_timer.setInterval(500)  # 设置延时为 500 毫秒
         self.search_timer.setSingleShot(True)  # 设置为单次触发
         self.search_timer.timeout.connect(self.perform_search)
-        
+
         self.input.textChanged.connect(self.on_text_changed)
         self.input.returnPressed.connect(self.on_return_pressed)
         layout.addWidget(self.input)
@@ -62,7 +62,7 @@ class FileQuickSearchPopup(QFrame):
         self.search_text = text
         # 启动计时器
         self.search_timer.start()
-        
+
     def perform_search(self):
         text = self.search_text.strip().lower()
         if not text:
