@@ -88,7 +88,14 @@ class CompareView(QWidget):
                             other_commit_content = f.read()
                 self.diff_viewer.show()
                 self.merge_diff_viewer.hide()
-                self.diff_viewer.set_texts(content, other_commit_content, file_path, commit.hexsha, other_commit.hexsha)
+                self.diff_viewer.set_texts(
+                    content,
+                    other_commit_content,
+                    file_path,
+                    right_file_path=None,
+                    left_commit_hash=commit.hexsha,
+                    right_commit_hash=other_commit.hexsha,
+                )
                 return
 
             # 获取父提交的文件内容
