@@ -19,7 +19,6 @@ class FileChangesView(QWidget):
         self.setup_ui()
         self.commit_hash = None
         self.other_commit_hash = None
-        self.is_comparing_with_workspace = False
 
     def setup_ui(self):
         layout = QVBoxLayout()
@@ -49,12 +48,12 @@ class FileChangesView(QWidget):
                 diff = parent.diff(commit)
                 for change in diff:
                     path_parts = change.b_path.split("/") if change.change_type == "R" else change.a_path.split("/")
-                    self.add_file_to_tree(path_parts, change.change_type, old_path=change.a_path)
+                    self.add_file_to_tree(path_parts, change.change_type, old_path=change.a_path, is_comparing_with_workspace=False)
             else:
                 for item in commit.tree.traverse():
                     if item.type == "blob":
                         path_parts = item.path.split("/")
-                        self.add_file_to_tree(path_parts, "新增")
+                        self.add_file_to_tree(path_parts, "新增", is_comparing_with_workspace=False)
 
             self.changes_tree.expandAll()
             self.changes_tree.resizeColumnToContents(0)
@@ -64,7 +63,7 @@ class FileChangesView(QWidget):
             error_item = QTreeWidgetItem(self.changes_tree)
             error_item.setText(0, f"获取文件变化失败：{e!s}")
 
-    def add_file_to_tree(self, path_parts, status, parent=None, old_path=None):
+    def add_file_to_tree(self, path_parts, status, parent=None, old_path=None, is_comparing_with_workspace=False):
         """递归添加文件到树形结构"""
         if not path_parts:
             return
@@ -89,6 +88,8 @@ class FileChangesView(QWidget):
             found_item.setText(0, current_part)
 
             if len(path_parts) == 1:
+                # 为文件项设置数据
+                found_item.setData(0, Qt.ItemDataRole.UserRole, is_comparing_with_workspace)
                 if status == "R":
                     current_folder = self.get_full_path(parent)
                     found_item.setText(1, f"{old_path} -> {current_folder}/{current_part}")
@@ -96,7 +97,7 @@ class FileChangesView(QWidget):
                     found_item.setText(1, status)
 
         if len(path_parts) > 1:
-            self.add_file_to_tree(path_parts[1:], status, found_item, old_path)
+            self.add_file_to_tree(path_parts[1:], status, found_item, old_path, is_comparing_with_workspace)
 
     def get_full_path(self, item):
         """获取树形项的完整路径"""
@@ -109,8 +110,9 @@ class FileChangesView(QWidget):
     def on_file_clicked(self, item):
         """当点击文件时发出信号"""
         if item and item.childCount() == 0:
+            is_comparing_with_workspace = item.data(0, Qt.ItemDataRole.UserRole) or False
             self.file_selected.emit(
-                self.get_full_path(item), self.commit_hash, self.other_commit_hash, self.is_comparing_with_workspace
+                self.get_full_path(item), self.commit_hash, self.other_commit_hash, is_comparing_with_workspace
             )
 
     def show_context_menu(self, position):
