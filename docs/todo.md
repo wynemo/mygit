@@ -110,5 +110,5 @@
 115. ~~bug: 检查分支状态失败：No item found with id ''~~
 116. ~~通过文件检测的方式来刷新工作区的文件，而不是通过聚焦再来检测，这样其他地方有修改文件也能刷新出来~~
 117. ~~接 116，看能否监控 git 文件夹，主要用于更新提交历史 - 低优先级~~
-118. 文件历史，如果有路径移动的情况，与工作区比较，无法还原改动，报错，无法保存
-119. bug, hash is alwaysy head, none(workingdir) self.diff_viewer.set_texts(old_content, new_content, file_path, "HEAD", None)
+118. ~~文件历史，如果有路径移动的情况，与工作区比较，无法还原改动，报错，无法保存~~
+119. ~~bug, hash is always head, none(workingdir) self.diff_viewer.set_texts(old_content, new_content, file_path, "HEAD", None)~~

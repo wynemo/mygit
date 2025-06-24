@@ -652,7 +652,13 @@ class GitManagerWindow(QMainWindow):
             # 创建并显示比较对话框
             # todo 这个要改造，看 readme 里的 todo
             dialog = CompareWithWorkingDialog(
-                f"{self.tr('Compare')} {file_path}", old_content, new_content, file_path, self
+                f"{self.tr('Compare')} {file_path}",
+                old_content,
+                new_content,
+                commit_hash,
+                old_file_path or file_path,
+                right_file_path=file_path,
+                parent=self,
             )
             dialog.show()
 

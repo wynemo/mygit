@@ -183,8 +183,9 @@ class DiffViewer(QWidget):
         left_text: str,
         right_text: str,
         file_path: str,
-        left_commit_hash: Optional[str],
-        right_commit_hash: Optional[str],
+        right_file_path: str | None = None,
+        left_commit_hash: str | None = None,
+        right_commit_hash: str | None = None,
     ):
         """设置要比较的文本"""
         self.left_edit.clear_highlighted_line()
@@ -204,7 +205,7 @@ class DiffViewer(QWidget):
         # Set file_path and commit_hash for blame functionality
         self.left_edit.file_path = file_path
         self.left_edit.current_commit_hash = left_commit_hash
-        self.right_edit.file_path = file_path
+        self.right_edit.file_path = file_path if right_file_path is None else right_file_path
         self.right_edit.current_commit_hash = right_commit_hash
 
         # 计算差异
@@ -212,6 +213,7 @@ class DiffViewer(QWidget):
 
         language = LANGUAGE_MAP.get(file_path.split(".")[-1], "text")
         self.left_edit.highlighter.set_language(language)
+        language = LANGUAGE_MAP.get(self.right_edit.file_path.split(".")[-1], "text")
         self.right_edit.highlighter.set_language(language)
 
         if hasattr(self.left_edit.highlighter, "empty_block_numbers"):
