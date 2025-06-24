@@ -112,3 +112,4 @@
 117. ~~接 116，看能否监控 git 文件夹，主要用于更新提交历史 - 低优先级~~
 118. ~~文件历史，如果有路径移动的情况，与工作区比较，无法还原改动，报错，无法保存~~
 119. ~~bug, hash is always head, none(workingdir) self.diff_viewer.set_texts(old_content, new_content, file_path, "HEAD", None)~~
+120. 使用 CompareWithWorkingDialog 的地方 换成 CompareView，放到 WorkspaceExplorer.tab_widget 里去
