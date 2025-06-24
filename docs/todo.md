@@ -113,4 +113,4 @@
 118. ~~文件历史，如果有路径移动的情况，与工作区比较，无法还原改动，报错，无法保存~~
 119. ~~bug, hash is always head, none(workingdir) self.diff_viewer.set_texts(old_content, new_content, file_path, "HEAD", None)~~
 120. 使用 CompareWithWorkingDialog 的地方 换成 CompareView，放到 WorkspaceExplorer.tab_widget 里去
-121. self.is_comparing_with_workspace = False 错的 file_changes_view.py:109-115 该放到 item 里去
+121. self.is_comparing_with_workspace = False 错的 file_changes_view.py:109-115 该放到 item 里去 add_file_to_tree 时设置 item 的 data
