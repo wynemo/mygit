@@ -484,6 +484,8 @@ class GitManagerWindow(QMainWindow):
             self.workspace_explorer.file_tree.git_manager = self.git_manager
             self.start_watching_folder(folder_path)
             self.setWindowTitle(f"{self.tr('Git Manager')} - {folder_path}")
+            # 设置工作目录
+            os.chdir(folder_path)
         else:
             self.commit_history_view.history_list.clear()
             self.notification_widget.show_message(f"{self.tr('Selected folder is not a valid Git repository')}")
