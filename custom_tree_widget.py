@@ -149,7 +149,7 @@ class CustomTreeWidget(HoverRevealTreeWidget):
 
         menu.exec(self.mapToGlobal(position))
 
-    def _reset_branch_to_commit(self, item, git_manager, current_branch_name):
+    def _reset_branch_to_commit(self, item, git_manager: "GitManager", current_branch_name):
         if not item:
             return
 
@@ -159,7 +159,7 @@ class CustomTreeWidget(HoverRevealTreeWidget):
         dialog = GitResetDialog(current_branch_name, commit_hash, commit_message, self)
         if dialog.exec():
             mode = dialog.get_selected_mode()
-            # todo add reset_branch
+            # todo test it
             error = git_manager.reset_branch(commit_hash, mode)
             if error:
                 get_main_window_by_parent(self).notification_widget.show_message(f"重置失败：{error}")
