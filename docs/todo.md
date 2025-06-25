@@ -92,7 +92,7 @@
 98. 3-way 比较 修复
 99. ~~多文件的比较，现在只支持一个文件的比较，就是 commit 之间的比较：CustomTreeWidget 增加一个右键菜单 与工作区比较 这个菜单点击 把变更的文件（可能有多个）设置到 workerspace_explorer.file_changes_view 里去 你可以参考 show_all_affected_files~~
 100. NewDiffHighlighterEngine 效率有点慢 知道了一个是计算所有行慢 一个是一次性高亮所有行慢 那个 rehighligt 一次性高亮所有行慢
-101. bug: git checkout 功能 似乎不能签出远程分支
+101. ~~bug: git checkout 功能 似乎不能签出远程分支~~
 102. git reset 功能
 103. ~~文件夹历史记录~~
 103. ~~工程里搜索文件功能~~
