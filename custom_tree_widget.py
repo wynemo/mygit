@@ -185,11 +185,31 @@ class CustomTreeWidget(HoverRevealTreeWidget):
 
     def _checkout_branch(self, git_manager, branch_name):
         """执行分支切换操作"""
+        main_window = get_main_window_by_parent(self)
+        if not main_window:
+            logging.error("无法获取主窗口实例，无法显示通知。")
+            # Fallback to print if main_window is not found
+            error = git_manager.switch_branch(branch_name)
+            if error:
+                print(f"切换分支失败：{error}")
+            else:
+                print(f"已切换到分支：{branch_name}")
+            return
+
         error = git_manager.switch_branch(branch_name)
         if error:
-            print(f"切换分支失败：{error}")
+            main_window.notification_widget.show_message(f"切换分支失败：{error}")
         else:
-            print(f"已切换到分支：{branch_name}")
+            main_window.notification_widget.show_message(f"已成功切换到分支：{branch_name}")
+            # Potentially update UI elements if needed, e.g., branch display in main window
+            if hasattr(main_window, "update_branches_on_top_bar"):
+                main_window.update_branches_on_top_bar()
+            if hasattr(main_window, "update_commit_history"):
+                main_window.update_commit_history()
+            if hasattr(main_window, "workspace_explorer") and hasattr(
+                main_window.workspace_explorer, "refresh_file_tree"
+            ):
+                main_window.workspace_explorer.refresh_file_tree()
 
     def _compare_commit_with_workspace(self, item):
         """比较指定提交与工作区的差异，并将变更文件添加到 WorkspaceExplorer.file_tree 中"""
