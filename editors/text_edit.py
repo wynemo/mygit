@@ -248,9 +248,9 @@ class SyncedTextEdit(QPlainTextEdit):
         """设置指定行范围的背景为淡蓝色"""
         self.clear_block_background()  # 先清除之前的背景
 
-        if start_line < 0 or start_line >= self.document().blockCount():
+        if start_line < 0 or start_line > self.document().blockCount():
             return
-        if end_line < 0 or end_line >= self.document().blockCount():
+        if end_line < 0 or end_line > self.document().blockCount():
             return
         if start_line > end_line:
             return
