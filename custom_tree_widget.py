@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from components.git_reset_dialog import GitResetDialog
 from git_manager import GitManager
 from hover_reveal_tree_widget import HoverRevealTreeWidget
 from utils import get_main_window_by_parent
@@ -94,6 +95,12 @@ class CustomTreeWidget(HoverRevealTreeWidget):
             repo = git_manager.repo
             current_branch = repo.active_branch
 
+            # 添加 "Reset current branch to here" 菜单项
+            reset_action = menu.addAction("reset current branch to here")
+            reset_action.triggered.connect(
+                partial(self._reset_branch_to_commit, item, git_manager, current_branch.name)
+            )
+
             # 从 item 获取分支信息 (假设分支信息在第 2 列)
             item_branches = item.text(2).split(", ")
 
@@ -141,6 +148,26 @@ class CustomTreeWidget(HoverRevealTreeWidget):
                     logging.exception("检查分支状态失败 item_branches: %s", item_branches)
 
         menu.exec(self.mapToGlobal(position))
+
+    def _reset_branch_to_commit(self, item, git_manager, current_branch_name):
+        if not item:
+            return
+
+        commit_hash = item.text(0)
+        commit_message = item.text(1)
+
+        dialog = GitResetDialog(current_branch_name, commit_hash, commit_message, self)
+        if dialog.exec():
+            mode = dialog.get_selected_mode()
+            # todo add reset_branch
+            error = git_manager.reset_branch(commit_hash, mode)
+            if error:
+                get_main_window_by_parent(self).notification_widget.show_message(f"重置失败：{error}")
+            else:
+                self.parent().update_history(self.parent().git_manager, self.parent().branch)
+                get_main_window_by_parent(self).notification_widget.show_message(
+                    f"成功将分支 {current_branch_name} 重置到 {commit_hash[:7]}"
+                )
 
     def copy_commit_to_clipboard(self, item):
         if item:
