@@ -181,6 +181,13 @@ class CommitWidget(QFrame):
             revert_action = menu.addAction("Revert")
             revert_action.triggered.connect(lambda: self.revert_file(file_path))
 
+        open_action = menu.addAction("在工作区打开")
+        open_action.triggered.connect(
+            lambda: self.parent_window.workspace_explorer.open_file_in_tab(
+                f"{self.git_manager.repo.working_dir}/{file_path}"
+            )
+        )
+
         menu.exec(self.unstaged_tree.mapToGlobal(position))
 
     def refresh_file_status(self):
