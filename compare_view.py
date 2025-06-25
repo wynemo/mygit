@@ -109,7 +109,9 @@ class CompareView(QWidget):
                 self.diff_viewer.show()
                 self.merge_diff_viewer.hide()
                 parent_commit_hash = parents[0].hexsha if parents else None
-                self.diff_viewer.set_texts(parent_content, content, file_path, parent_commit_hash, commit.hexsha)
+                self.diff_viewer.set_texts(
+                    parent_content, content, file_path, file_path, parent_commit_hash, commit.hexsha
+                )
             else:
                 self.diff_viewer.hide()
                 self.merge_diff_viewer.show()
