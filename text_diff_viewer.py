@@ -63,6 +63,8 @@ class DiffViewer(QWidget):
             # Clear previous highlights
             self.left_edit.clear_highlighted_line()
             self.right_edit.clear_highlighted_line()
+            self.left_edit.clear_block_background()
+            self.right_edit.clear_block_background()
 
             # Set new highlights based on the chunk type
             # left_target_line and right_target_line are what the view will be scrolled to.
@@ -75,6 +77,8 @@ class DiffViewer(QWidget):
                 # Left editor highlights the line it's scrolled to (left_target_line, typically line before insertion).
                 if chunk.right_start < self.right_edit.document().blockCount():  # Check line validity
                     self.right_edit.set_highlighted_line(chunk.right_start)
+                    # 设置右侧代码块背景
+                    self.right_edit.set_block_background(chunk.right_start, chunk.right_end)
                 if left_target_line < self.left_edit.document().blockCount():  # Check line validity
                     self.left_edit.set_highlighted_line(left_target_line)
             elif chunk.type == "delete":
@@ -82,14 +86,20 @@ class DiffViewer(QWidget):
                 # Right editor highlights the line it's scrolled to (right_target_line, typically line before deletion).
                 if chunk.left_start < self.left_edit.document().blockCount():  # Check line validity
                     self.left_edit.set_highlighted_line(chunk.left_start)
+                    # 设置左侧代码块背景
+                    self.left_edit.set_block_background(chunk.left_start, chunk.left_end)
                 if right_target_line < self.right_edit.document().blockCount():  # Check line validity
                     self.right_edit.set_highlighted_line(right_target_line)
             elif chunk.type == "replace":  # <--- This line is changed
                 # Content modified in both. Both editors highlight start of modified block.
                 if chunk.left_start < self.left_edit.document().blockCount():  # Check line validity
                     self.left_edit.set_highlighted_line(chunk.left_start)
+                    # 设置左侧代码块背景
+                    self.left_edit.set_block_background(chunk.left_start, chunk.left_end)
                 if chunk.right_start < self.right_edit.document().blockCount():  # Check line validity
                     self.right_edit.set_highlighted_line(chunk.right_start)
+                    # 设置右侧代码块背景
+                    self.right_edit.set_block_background(chunk.right_start, chunk.right_end)
 
             self.left_edit.scroll_to_line(left_target_line)
             self.right_edit.scroll_to_line(right_target_line)
@@ -177,6 +187,8 @@ class DiffViewer(QWidget):
         # Clear any initial highlights
         self.left_edit.clear_highlighted_line()
         self.right_edit.clear_highlighted_line()
+        self.left_edit.clear_block_background()
+        self.right_edit.clear_block_background()
 
     def set_texts(
         self,
@@ -190,6 +202,8 @@ class DiffViewer(QWidget):
         """设置要比较的文本"""
         self.left_edit.clear_highlighted_line()
         self.right_edit.clear_highlighted_line()
+        self.left_edit.clear_block_background()
+        self.right_edit.clear_block_background()
         # self.current_diff_index = -1 # This is already handled in _compute_diff, which is called shortly after.
         # Keeping it here can be redundant but harmless.
         # For clarity, let _compute_diff manage current_diff_index.
@@ -376,10 +390,12 @@ class DiffViewer(QWidget):
             logging.exception("还原内容时发生错误")
 
     def navigate_to_previous_diff(self):
-        logging.info(f"Attempting to navigate to previous diff. Current index: {self.current_diff_index}")
+        logging.info("Attempting to navigate to previous diff. Current index: %d", self.current_diff_index)
         if not self.actual_diff_chunks:
             self.left_edit.clear_highlighted_line()
             self.right_edit.clear_highlighted_line()
+            self.left_edit.clear_block_background()
+            self.right_edit.clear_block_background()
             logging.info("No actual diffs to navigate. Cleared highlights.")
             return
         if self.current_diff_index > 0:
@@ -399,10 +415,12 @@ class DiffViewer(QWidget):
         self._update_button_states()
 
     def navigate_to_next_diff(self):
-        logging.info(f"Attempting to navigate to next diff. Current index: {self.current_diff_index}")
+        logging.info("Attempting to navigate to next diff. Current index: %d", self.current_diff_index)
         if not self.actual_diff_chunks:
             self.left_edit.clear_highlighted_line()
             self.right_edit.clear_highlighted_line()
+            self.left_edit.clear_block_background()
+            self.right_edit.clear_block_background()
             logging.info("No actual diffs to navigate. Cleared highlights.")
             return
         if self.current_diff_index < len(self.actual_diff_chunks) - 1:
