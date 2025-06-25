@@ -64,32 +64,85 @@ class DiffViewer(QWidget):
             self.left_edit.clear_highlighted_line()
             self.right_edit.clear_highlighted_line()
 
-            # Set new highlights based on the chunk type
-            # left_target_line and right_target_line are what the view will be scrolled to.
-            # Highlighting these lines provides a consistent UX with the scroll position.
-            # For the side that has the actual content of the change (e.g., right side for "insert", left side for "delete"),
-            # we highlight the start of that content block.
+            # 定义背景高亮颜色
+            highlight_color = QColor("lightblue")
 
+            # 创建 QTextEdit.ExtraSelection 列表
+            left_selections = []
+            right_selections = []
+
+            # 高亮整个差异块
             if chunk.type == "insert":
-                # Content added to right. Right editor highlights start of new block (chunk.right_start).
-                # Left editor highlights the line it's scrolled to (left_target_line, typically line before insertion).
-                if chunk.right_start < self.right_edit.document().blockCount():  # Check line validity
-                    self.right_edit.set_highlighted_line(chunk.right_start)
-                if left_target_line < self.left_edit.document().blockCount():  # Check line validity
+                # 右侧插入
+                for i in range(chunk.right_start, chunk.right_end):
+                    selection = QTextEdit.ExtraSelection()
+                    selection.format.setBackground(highlight_color)
+                    block = self.right_edit.document().findBlockByNumber(i)
+                    if block.isValid():
+                        selection.cursor = QTextCursor(block)
+                        selection.cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+                        right_selections.append(selection)
+                # 左侧对应空行 (如果适用)
+                # 通常左侧的 left_start 到 left_end 是一个空范围，或者指向插入点
+                # 为了视觉一致性，可以在左侧对应行进行标记，但此处主要高亮实际内容
+                if left_target_line < self.left_edit.document().blockCount():
                     self.left_edit.set_highlighted_line(left_target_line)
+
             elif chunk.type == "delete":
-                # Content removed from left. Left editor highlights start of removed block (chunk.left_start).
-                # Right editor highlights the line it's scrolled to (right_target_line, typically line before deletion).
-                if chunk.left_start < self.left_edit.document().blockCount():  # Check line validity
-                    self.left_edit.set_highlighted_line(chunk.left_start)
-                if right_target_line < self.right_edit.document().blockCount():  # Check line validity
+                # 左侧删除
+                for i in range(chunk.left_start, chunk.left_end):
+                    selection = QTextEdit.ExtraSelection()
+                    selection.format.setBackground(highlight_color)
+                    block = self.left_edit.document().findBlockByNumber(i)
+                    if block.isValid():
+                        selection.cursor = QTextCursor(block)
+                        selection.cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+                        left_selections.append(selection)
+                # 右侧对应空行 (如果适用)
+                if right_target_line < self.right_edit.document().blockCount():
                     self.right_edit.set_highlighted_line(right_target_line)
-            elif chunk.type == "replace":  # <--- This line is changed
-                # Content modified in both. Both editors highlight start of modified block.
-                if chunk.left_start < self.left_edit.document().blockCount():  # Check line validity
-                    self.left_edit.set_highlighted_line(chunk.left_start)
-                if chunk.right_start < self.right_edit.document().blockCount():  # Check line validity
-                    self.right_edit.set_highlighted_line(chunk.right_start)
+
+            elif chunk.type == "replace":
+                # 两侧都有修改
+                for i in range(chunk.left_start, chunk.left_end):
+                    selection = QTextEdit.ExtraSelection()
+                    selection.format.setBackground(highlight_color)
+                    block = self.left_edit.document().findBlockByNumber(i)
+                    if block.isValid():
+                        selection.cursor = QTextCursor(block)
+                        selection.cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+                        left_selections.append(selection)
+
+                for i in range(chunk.right_start, chunk.right_end):
+                    selection = QTextEdit.ExtraSelection()
+                    selection.format.setBackground(highlight_color)
+                    block = self.right_edit.document().findBlockByNumber(i)
+                    if block.isValid():
+                        selection.cursor = QTextCursor(block)
+                        selection.cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+                        right_selections.append(selection)
+
+            # 应用高亮
+            self.left_edit.setExtraSelections(left_selections)
+            self.right_edit.setExtraSelections(right_selections)
+
+            # 原有的行号旁边高亮逻辑可以保留，或者根据新背景高亮调整
+            # 为了避免冲突或冗余，暂时注释掉原有的 set_highlighted_line 调用
+            # if chunk.type == "insert":
+            #     if chunk.right_start < self.right_edit.document().blockCount():
+            #         self.right_edit.set_highlighted_line(chunk.right_start) #  行号旁高亮
+            #     if left_target_line < self.left_edit.document().blockCount():
+            #         self.left_edit.set_highlighted_line(left_target_line) # 行号旁高亮
+            # elif chunk.type == "delete":
+            #     if chunk.left_start < self.left_edit.document().blockCount():
+            #         self.left_edit.set_highlighted_line(chunk.left_start) # 行号旁高亮
+            #     if right_target_line < self.right_edit.document().blockCount():
+            #         self.right_edit.set_highlighted_line(right_target_line) # 行号旁高亮
+            # elif chunk.type == "replace":
+            #     if chunk.left_start < self.left_edit.document().blockCount():
+            #         self.left_edit.set_highlighted_line(chunk.left_start) # 行号旁高亮
+            #     if chunk.right_start < self.right_edit.document().blockCount():
+            #         self.right_edit.set_highlighted_line(chunk.right_start) # 行号旁高亮
 
             self.left_edit.scroll_to_line(left_target_line)
             self.right_edit.scroll_to_line(right_target_line)
