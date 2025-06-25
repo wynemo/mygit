@@ -48,7 +48,9 @@ class FileChangesView(QWidget):
                 diff = parent.diff(commit)
                 for change in diff:
                     path_parts = change.b_path.split("/") if change.change_type == "R" else change.a_path.split("/")
-                    self.add_file_to_tree(path_parts, change.change_type, old_path=change.a_path, is_comparing_with_workspace=False)
+                    self.add_file_to_tree(
+                        path_parts, change.change_type, old_path=change.a_path, is_comparing_with_workspace=False
+                    )
             else:
                 for item in commit.tree.traverse():
                     if item.type == "blob":
