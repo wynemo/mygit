@@ -113,6 +113,8 @@ class CustomTreeWidget(HoverRevealTreeWidget):
                 if checkout_target_name.startswith("☁️ origin/"):
                     checkout_target_name = checkout_target_name.strip("☁️").lstrip().split("/", 1)[1]
 
+                if checkout_target_name == "HEAD":
+                    continue
                 # 仅当不是当前分支时才显示
                 if checkout_target_name != current_branch.name:
                     action = checkout_menu.addAction(branch_name_str)
@@ -184,7 +186,9 @@ class CustomTreeWidget(HoverRevealTreeWidget):
                     workspace_explorer.file_changes_view.changes_tree.clear()
                     # 添加变更文件到 file_changes_view
                     for file in changed_files:
-                        workspace_explorer.file_changes_view.add_file_to_tree(file.split("/"), "modified", is_comparing_with_workspace=True)
+                        workspace_explorer.file_changes_view.add_file_to_tree(
+                            file.split("/"), "modified", is_comparing_with_workspace=True
+                        )
                     workspace_explorer.file_changes_view.commit_hash = commit_hash
                     workspace_explorer.file_changes_view.other_commit_hash = git_manager.repo.head.commit.hexsha
                     print(f"已将变更文件添加到工作区文件树（提交 {commit_hash}）")
