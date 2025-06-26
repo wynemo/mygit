@@ -182,7 +182,7 @@ class DiffViewer(QWidget):
         self,
         left_text: str,
         right_text: str,
-        file_path: str,
+        left_file_path: str, # Changed from file_path
         right_file_path: str | None = None,
         left_commit_hash: str | None = None,
         right_commit_hash: str | None = None,
@@ -190,31 +190,37 @@ class DiffViewer(QWidget):
         """设置要比较的文本"""
         self.left_edit.clear_highlighted_line()
         self.right_edit.clear_highlighted_line()
-        # self.current_diff_index = -1 # This is already handled in _compute_diff, which is called shortly after.
-        # Keeping it here can be redundant but harmless.
-        # For clarity, let _compute_diff manage current_diff_index.
         logging.debug("\n=== 设置新的文本进行比较 ===")
 
-        # cursor 生成：检查右侧编辑器是否可编辑
-        self.right_edit_is_editable = not self.right_edit.isReadOnly()
+        # If right_commit_hash is None, it implies comparison with working directory, so right side is editable.
+        self.right_edit.set_editable(right_commit_hash is None)
+        self.right_edit_is_editable = (right_commit_hash is None)
+
 
         # 先设置文本
         self.left_edit.setPlainText(left_text)
         self.right_edit.setPlainText(right_text)
 
         # Set file_path and commit_hash for blame functionality
-        self.left_edit.file_path = file_path
+        self.left_edit.file_path = left_file_path # Use new parameter name
         self.left_edit.current_commit_hash = left_commit_hash
-        self.right_edit.file_path = file_path if right_file_path is None else right_file_path
+        self.right_edit.file_path = right_file_path if right_file_path is not None else left_file_path # Use new parameter name or fallback
         self.right_edit.current_commit_hash = right_commit_hash
+
 
         # 计算差异
         self._compute_diff(left_text, right_text)
 
-        language = LANGUAGE_MAP.get(file_path.split(".")[-1], "text")
-        self.left_edit.highlighter.set_language(language)
-        language = LANGUAGE_MAP.get(self.right_edit.file_path.split(".")[-1], "text")
-        self.right_edit.highlighter.set_language(language)
+        # Determine language for highlighting
+        # Use left_file_path for left editor
+        language_left = LANGUAGE_MAP.get(left_file_path.split(".")[-1], "text")
+        self.left_edit.highlighter.set_language(language_left)
+
+        # Use right_file_path (or fallback to left_file_path) for right editor
+        actual_right_file_path_for_lang = right_file_path if right_file_path is not None else left_file_path
+        language_right = LANGUAGE_MAP.get(actual_right_file_path_for_lang.split(".")[-1], "text")
+        self.right_edit.highlighter.set_language(language_right)
+
 
         if hasattr(self.left_edit.highlighter, "empty_block_numbers"):
             selections = []
@@ -625,10 +631,10 @@ class MergeDiffViewer(DiffViewer):
 
     def set_texts(
         self,
-        parent1_text: str,
-        result_text: str,
-        parent2_text: str,
-        file_path: str,
+        parent1_text: str, # Renamed from old parameter name
+        result_text: str,  # Renamed from old parameter name
+        parent2_text: str, # Renamed from old parameter name
+        file_path: str,    # This is the common file_path for all three
         parent1_commit_hash: Optional[str],
         result_commit_hash: Optional[str],
         parent2_commit_hash: Optional[str],
@@ -641,6 +647,7 @@ class MergeDiffViewer(DiffViewer):
         self.parent2_edit.setPlainText(parent2_text)
 
         # Set file_path and commit_hash for blame functionality
+        # All three views point to the same file_path in a merge scenario
         self.parent1_edit.file_path = file_path
         self.parent1_edit.current_commit_hash = parent1_commit_hash
         self.result_edit.file_path = file_path
@@ -648,10 +655,19 @@ class MergeDiffViewer(DiffViewer):
         self.parent2_edit.file_path = file_path
         self.parent2_edit.current_commit_hash = parent2_commit_hash
 
-        # 计算差异
-        self._compute_diffs(parent1_text, result_text, parent2_text)
+        # Set language for highlighting (same for all three in merge view)
+        language = LANGUAGE_MAP.get(file_path.split(".")[-1], "text")
+        if self.parent1_edit.highlighter: # Check if highlighter exists
+            self.parent1_edit.highlighter.set_language(language)
+        if self.result_edit.highlighter: # Check if highlighter exists
+            self.result_edit.highlighter.set_language(language)
+        if self.parent2_edit.highlighter: # Check if highlighter exists
+            self.parent2_edit.highlighter.set_language(language)
 
-    def _compute_diffs(self, parent1_text: str, result_text: str, parent2_text: str):
+        # 计算差异
+        self._compute_diffs(parent1_text, result_text, parent2_text) # Pass renamed params
+
+    def _compute_diffs(self, parent1_text: str, result_text: str, parent2_text: str): # Update params here too
         """计算三个文本之间的差异"""
         # 计算 parent1 和 result 的差异
         self.parent1_chunks = self.diff_calculator.compute_diff(parent1_text, result_text)

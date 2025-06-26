@@ -172,7 +172,9 @@ class CustomTreeWidget(HoverRevealTreeWidget):
                     workspace_explorer.file_changes_view.changes_tree.clear()
                     # 添加变更文件到 file_changes_view
                     for file in changed_files:
-                        workspace_explorer.file_changes_view.add_file_to_tree(file.split("/"), "modified", is_comparing_with_workspace=True)
+                        workspace_explorer.file_changes_view.add_file_to_tree(
+                            file.split("/"), "modified", is_comparing_with_workspace=True
+                        )
                     workspace_explorer.file_changes_view.commit_hash = commit_hash
                     workspace_explorer.file_changes_view.other_commit_hash = git_manager.repo.head.commit.hexsha
                     print(f"已将变更文件添加到工作区文件树（提交 {commit_hash}）")

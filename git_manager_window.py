@@ -24,7 +24,7 @@ from commit_history_view import CommitHistoryView
 from compare_view import CompareView
 from components.notification_widget import NotificationWidget
 from components.spin_icons import RotatingLabel
-from dialogs.compare_with_working_dialog import CompareWithWorkingDialog
+# from dialogs.compare_with_working_dialog import CompareWithWorkingDialog # Removed
 from dialogs.settings_dialog import SettingsDialog
 from file_changes_view import FileChangesView
 from folder_history_view import FolderHistoryView
@@ -634,36 +634,57 @@ class GitManagerWindow(QMainWindow):
     #         widget_to_close.deleteLater() # 确保 Qt 对象被正确删除
 
     def show_compare_with_working_dialog(self, file_path, commit_hash=None, old_file_path=None):
-        """显示与工作区比较的对话框"""
+        """在 WorkspaceExplorer 的新标签页中显示与工作区比较的视图"""
         try:
             _commit = self.git_manager.repo.commit(commit_hash) if commit_hash else self.current_commit
+            if not _commit:
+                logging.error("No commit selected for comparison.")
+                self.notification_widget.show_message(self.tr("No commit selected for comparison."))
+                return
 
-            # 获取历史版本的文件内容
-            old_content = _commit.tree[old_file_path or file_path].data_stream.read().decode("utf-8", errors="replace")
+            # 使用 old_file_path (如果提供，用于重命名文件的情况) 或 file_path
+            path_in_commit = old_file_path or file_path
+            tab_title = f"{self.tr('Compare')} {os.path.basename(file_path)} vs Local"
+            unique_tab_key = f"compare_local:{commit_hash[:7]}:{file_path}"
 
-            # 获取工作区的文件内容
-            working_file_path = os.path.join(self.git_manager.repo.working_dir, file_path)
-            if os.path.exists(working_file_path):
-                with open(working_file_path, "r", encoding="utf-8", errors="replace") as f:
-                    new_content = f.read()
-            else:
-                new_content = ""
+            # 检查是否已存在具有相同唯一键的标签页
+            for i in range(self.workspace_explorer.tab_widget.count()):
+                tab_widget_at_i = self.workspace_explorer.tab_widget.widget(i)
+                if hasattr(tab_widget_at_i, 'property') and tab_widget_at_i.property("unique_key") == unique_tab_key:
+                    self.workspace_explorer.tab_widget.setCurrentIndex(i)
+                    return
 
-            # 创建并显示比较对话框
-            # todo 这个要改造，看 readme 里的 todo
-            dialog = CompareWithWorkingDialog(
-                f"{self.tr('Compare')} {file_path}",
-                old_content,
-                new_content,
-                commit_hash,
-                old_file_path or file_path,
-                right_file_path=file_path,
-                parent=self,
+            # 创建新的 CompareView 实例
+            compare_view_instance = CompareView(self.workspace_explorer) # Parent can be workspace_explorer
+            compare_view_instance.setProperty("unique_key", unique_tab_key)
+            compare_view_instance.setProperty("file_path", file_path) # Store for reference if needed
+
+            # is_comparing_with_workspace=True tells show_diff to get current content from workspace
+            compare_view_instance.show_diff(
+                git_manager=self.git_manager,
+                commit=_commit, # This is the historical commit
+                file_path=path_in_commit, # Path in the historical commit
+                other_commit=None, # No other commit, we compare with working dir
+                is_comparing_with_workspace=True
             )
-            dialog.show()
+            # The right side (working directory) should be editable.
+            # DiffViewer's right_edit is made editable by default if right_commit_hash is None in set_texts
+            # which is the case when is_comparing_with_workspace is True.
+            # We might need to explicitly make it editable if the default behavior changes.
+            # For now, assuming DiffViewer handles this.
+            # If CompareView's right_edit is not directly accessible, DiffViewer inside it needs to set editable.
+            # Looking at compare_view.py, it uses DiffViewer.
+            # Looking at text_diff_viewer.py DiffViewer.set_texts, if right_commit_hash is None, it calls right_edit.set_editable(True)
+            # This is exactly what we need.
+
+            new_tab_index = self.workspace_explorer.tab_widget.addTab(compare_view_instance, tab_title)
+            self.workspace_explorer.tab_widget.setCurrentIndex(new_tab_index)
+            # Ensure the workspace explorer is visible if it was hidden
+            self.workspace_explorer.show_file_tree() # Or a more generic show method if available
 
         except Exception:
             logging.exception("比较文件失败")
+            self.notification_widget.show_message(f"{self.tr('Failed to compare file')}: {file_path}")
 
     def save_splitter_state(self):
         """保存所有分割器的状态"""
