@@ -45,7 +45,7 @@ def get_language_icon(file_name: str) -> QIcon:
     # 获取文件扩展名
     file_ext = file_name.split(".")[-1].lower() if "." in file_name else ""
 
-    # 从LANGUAGE_MAP获取语言类型
+    # 从 LANGUAGE_MAP 获取语言类型
     language = LANGUAGE_MAP.get(file_ext, "text")
 
     # 获取图标文件名

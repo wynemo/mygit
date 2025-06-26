@@ -20,7 +20,7 @@ LANGUAGE_MAP = {
     "cpp": "cpp",
     "c++": "cpp",
     "go": "go",
-    "rust": "rust",
+    "rs": "rust",
     "kotlin": "kotlin",
     "swift": "swift",
     "dart": "dart",
