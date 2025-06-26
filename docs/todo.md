@@ -116,3 +116,4 @@
 121. ~~self.is_comparing_with_workspace = False 错的 file_changes_view.py:109-115 该放到 item 里去 add_file_to_tree 时设置 item 的 data~~
 122. ~~侧边栏 搜索 加上快捷键提示~~
 123. https://lucide.dev/icons/?search=git git 图标使用这个
+124. https://github.com/devicons/devicon/ 程序语言的图标用这个
