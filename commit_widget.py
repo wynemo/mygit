@@ -1,7 +1,7 @@
 import logging
 
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QIcon, QPixmap, QTransform
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -341,7 +341,7 @@ class CommitWidget(QFrame):
                     new_content = f"Error reading file: {e!s}"
 
             # 设置差异内容
-            diff_viewer.set_texts(old_content, new_content, file_path, "HEAD", None)
+            diff_viewer.set_texts(old_content, new_content, file_path, file_path, "HEAD", None)
             diff_viewer.right_edit.set_editable()
 
             # 显示对话框
