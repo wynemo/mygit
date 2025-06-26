@@ -588,4 +588,4 @@ class GitManager:
             return f"重置到 {commit_hash} 失败: {e.stderr.strip() if e.stderr else str(e)}"
         except Exception:
             logging.exception("重置分支时发生未知错误")
-            return "重置分支时发生未知错误"}
+            return "重置分支时发生未知错误"
