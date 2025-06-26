@@ -33,8 +33,8 @@ from file_history_view import FileHistoryView
 from folder_history_view import FolderHistoryView  # Import FolderHistoryView
 from syntax_highlighter import CodeHighlighter
 from utils import get_main_window_by_parent
+from utils.language_icons import get_folder_icon, get_language_icon
 from utils.language_map import LANGUAGE_MAP
-from utils.language_icons import get_language_icon, get_folder_icon
 
 if TYPE_CHECKING:
     from git_manager import GitManager
@@ -196,7 +196,9 @@ class WorkspaceExplorer(QWidget):
 
             # 添加新标签页
             file_name = os.path.basename(file_path)
-            self.tab_widget.addTab(text_edit, file_name)
+            tab_index = self.tab_widget.addTab(text_edit, file_name)
+            # 为标签页设置语言图标
+            self.tab_widget.setTabIcon(tab_index, get_language_icon(file_name))
             self.tab_widget.setCurrentWidget(text_edit)
 
             # 如果提供了行号，跳转到该行
@@ -535,10 +537,13 @@ class WorkspaceExplorer(QWidget):
         for i in range(self.tab_widget.count()):
             tab = self.tab_widget.widget(i)
             if isinstance(tab, ModifiedTextEdit) and tab.file_path == file_path:
+                file_name = os.path.basename(file_path)
                 if is_dirty:
-                    self.tab_widget.setTabText(i, f"*{os.path.basename(file_path)}")
+                    self.tab_widget.setTabText(i, f"*{file_name}")
                 else:
-                    self.tab_widget.setTabText(i, os.path.basename(file_path))
+                    self.tab_widget.setTabText(i, file_name)
+                # 确保图标仍然显示
+                self.tab_widget.setTabIcon(i, get_language_icon(file_name))
 
     def show_file_search_widget(self):
         """显示文件搜索组件"""
