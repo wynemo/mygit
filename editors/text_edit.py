@@ -11,6 +11,7 @@ from PyQt6.QtGui import (
     QMouseEvent,
     QPainter,
     QPen,
+    QTextCharFormat,
     QTextCursor,
     QTextDocument,
 )
@@ -224,6 +225,9 @@ class SyncedTextEdit(QPlainTextEdit):
         self.find_dialog_instance = None  # Initialize find_dialog_instance
         self.search_highlights = []  # Initialize search_highlights
 
+        # 初始化代码块背景高亮
+        self.block_background_selections = []
+
     # get_blame_color method removed
 
     def set_highlighted_line(self, line_number: int):
@@ -239,6 +243,46 @@ class SyncedTextEdit(QPlainTextEdit):
         self.highlighted_line_number = -1
         if hasattr(self, "line_number_area") and self.line_number_area:
             self.line_number_area.update()
+
+    def set_block_background(self, start_line: int, end_line: int):
+        """设置指定行范围的背景为淡蓝色"""
+        self.clear_block_background()  # 先清除之前的背景
+
+        if start_line < 0 or start_line > self.document().blockCount():
+            return
+        if end_line < 0 or end_line > self.document().blockCount():
+            return
+        if start_line > end_line:
+            return
+
+        # 为指定的行范围创建背景选择
+        for line_num in range(start_line, end_line):
+            if line_num >= self.document().blockCount():
+                break
+
+            block = self.document().findBlockByNumber(line_num)
+            if block.isValid():
+                selection = QTextEdit.ExtraSelection()
+                char_format = QTextCharFormat()
+                char_format.setBackground(QColor(173, 216, 230))  # 淡蓝色 (LightBlue)
+                char_format.setProperty(QTextCharFormat.Property.FullWidthSelection, True)
+                selection.format = char_format
+
+                cursor = QTextCursor(block)
+                cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+                selection.cursor = cursor
+
+                self.block_background_selections.append(selection)
+
+        # 合并搜索高亮和块背景选择
+        all_selections = self.search_highlights + self.block_background_selections
+        self.setExtraSelections(all_selections)
+
+    def clear_block_background(self):
+        """清除代码块背景高亮"""
+        self.block_background_selections.clear()
+        # 只保留搜索高亮
+        self.setExtraSelections(self.search_highlights)
 
     def open_find_dialog(self):
         cursor = self.textCursor()
@@ -315,7 +359,6 @@ class SyncedTextEdit(QPlainTextEdit):
         """Finds text in the editor and highlights it if found, with wrap-around functionality."""
         # Clear previous highlights
         self.search_highlights.clear()
-        self.setExtraSelections([])
 
         flags = QTextDocument.FindFlag(0)
         if direction == "previous":
@@ -335,7 +378,10 @@ class SyncedTextEdit(QPlainTextEdit):
             selection.cursor = self.textCursor()  # Cursor is already at the found selection
             selection.format.setBackground(QColor("#ADD8E6"))  # Light blue
             self.search_highlights.append(selection)
-            self.setExtraSelections(self.search_highlights)
+
+            # 合并搜索高亮和块背景选择
+            all_selections = self.search_highlights + self.block_background_selections
+            self.setExtraSelections(all_selections)
             return True
 
         logging.info(f"'{search_text}' not found in {self.objectName()} at initial position. Attempting wrap-around.")
@@ -359,7 +405,10 @@ class SyncedTextEdit(QPlainTextEdit):
             selection.cursor = self.textCursor()
             selection.format.setBackground(QColor("#ADD8E6"))
             self.search_highlights.append(selection)
-            self.setExtraSelections(self.search_highlights)
+
+            # 合并搜索高亮和块背景选择
+            all_selections = self.search_highlights + self.block_background_selections
+            self.setExtraSelections(all_selections)
             return True
 
         # 完全未找到
@@ -369,7 +418,8 @@ class SyncedTextEdit(QPlainTextEdit):
     def clear_search_highlights(self):
         """Clears all search-related highlights from the editor."""
         self.search_highlights.clear()
-        self.setExtraSelections([])
+        # 只保留块背景选择
+        self.setExtraSelections(self.block_background_selections)
         logging.debug(f"Search highlights cleared for {self.objectName()}")
 
     def scroll_to_line(self, line_number: int):

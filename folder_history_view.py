@@ -67,7 +67,6 @@ class FolderHistoryView(QWidget):  # Renamed class
             # [{'hash': '...', 'message': '...', 'author': '...', 'date': datetime_obj}, ...]
             # This method needs to be implemented in git_manager.py
             commits = self.git_manager.get_folder_commit_history(self.folder_path)
-            print("commits", commits)
 
             if not commits:
                 item = QTreeWidgetItem()

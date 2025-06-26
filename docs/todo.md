@@ -92,7 +92,7 @@
 98. 3-way 比较 修复
 99. ~~多文件的比较，现在只支持一个文件的比较，就是 commit 之间的比较：CustomTreeWidget 增加一个右键菜单 与工作区比较 这个菜单点击 把变更的文件（可能有多个）设置到 workerspace_explorer.file_changes_view 里去 你可以参考 show_all_affected_files~~
 100. NewDiffHighlighterEngine 效率有点慢 知道了一个是计算所有行慢 一个是一次性高亮所有行慢 那个 rehighligt 一次性高亮所有行慢
-101. git checkout 功能
+101. ~~bug: git checkout 功能 似乎不能签出远程分支~~
 102. git reset 功能
 103. ~~文件夹历史记录~~
 103. ~~工程里搜索文件功能~~
@@ -114,3 +114,6 @@
 119. ~~bug, hash is always head, none(workingdir) self.diff_viewer.set_texts(old_content, new_content, file_path, "HEAD", None)~~
 120. 使用 CompareWithWorkingDialog 的地方 换成 CompareView，放到 WorkspaceExplorer.tab_widget 里去
 121. ~~self.is_comparing_with_workspace = False 错的 file_changes_view.py:109-115 该放到 item 里去 add_file_to_tree 时设置 item 的 data~~
+122. ~~侧边栏 搜索 加上快捷键提示~~
+123. https://lucide.dev/icons/?search=git git 图标使用这个
+124. https://github.com/devicons/devicon/ 程序语言的图标用这个

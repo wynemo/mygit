@@ -118,19 +118,41 @@ python main.py
 - `todo.txt`: 待办事项文本文件
 
 ### 目录
+- `components/`: 包含各种UI组件
+    - `__init__.py`
+    - `file_quick_search_popup.py`: 文件快速搜索弹窗
+    - `file_search_widget.py`: 文件搜索控件
+    - `find_dialog.py`: 查找对话框
+    - `new_branch_dialog.py`: 新建分支对话框
+    - `notification_widget.py`: 通知控件
+    - `spin_icons.py`: 旋转图标资源
 - `dialogs/`: 包含各种对话框组件
     - `__init__.py`
     - `compare_with_working_dialog.py`: 与工作区比较对话框
     - `settings_dialog.py`: 设置对话框
+- `docs/`: 包含项目文档和说明
+    - `git_manager_window.md`: Git 管理器窗口的 Markdown 文档
+    - `readme.txt`: 额外的说明文件
+    - `todo.md`: 待办事项 Markdown 文件
+    - `todo.txt`: 待办事项文本文件
+    - `translations.md`: 翻译相关文档
 - `editors/`: 包含文本编辑器相关组件
     - `__init__.py`
     - `modified_text_edit.py`: 修改版文本编辑器
     - `text_edit.py`: 文本编辑器组件 (集成行号、语法高亮等功能)
-- `icons/`: 包含各种 SVG 和 PNG 图标资源
-- `tests/`: 包含单元测试和测试数据文件
+- `icons/`: 包含各种 SVG 和 PNG 图标资源 (此目录文件较多，不一一列出)
+- `tests/`: 包含单元测试和测试数据文件 (此目录文件较多，不一一列出)
+- `translations/`: 包含应用翻译文件
+    - `app_zh_CN.qm`: 中文翻译的 QM 文件
+    - `app_zh_CN.ts`: 中文翻译的 TS 文件
 - `utils/`: 包含工具函数和辅助脚本
     - `__init__.py`
     - `language_map.py`: 语言名称到文件扩展名的映射
+    - `translator.py`: 翻译加载和管理工具
+- `views/`: 包含主要的视图组件
+    - `__init__.py`
+    - `side_bar_widget.py`: 侧边栏控件
+    - `top_bar_widget.py`: 顶部栏控件
 
 ## 配置设置
 

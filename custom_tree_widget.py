@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from components.git_reset_dialog import GitResetDialog
 from git_manager import GitManager
 from hover_reveal_tree_widget import HoverRevealTreeWidget
 from utils import get_main_window_by_parent
@@ -94,22 +95,42 @@ class CustomTreeWidget(HoverRevealTreeWidget):
             repo = git_manager.repo
             current_branch = repo.active_branch
 
+            # 添加 "Reset current branch to here" 菜单项
+            reset_action = menu.addAction("reset current branch to here")
+            reset_action.triggered.connect(
+                partial(self._reset_branch_to_commit, item, git_manager, current_branch.name)
+            )
+
             # 从 item 获取分支信息 (假设分支信息在第 2 列)
             item_branches = item.text(2).split(", ")
 
-            # 检查 item 是否属于其他分支
-            if current_branch.name not in item_branches:
-                # 创建 Checkout 主菜单项
-                checkout_menu = menu.addMenu("Checkout")
+            # 创建 Checkout 菜单，并为关联的每个分支添加入口
+            checkout_menu = menu.addMenu("Checkout")
+            checkout_action_added = False
 
-                # 获取所有分支
-                all_branches = git_manager.get_branches()
+            for branch_name_str in item_branches:
+                branch_name_str = branch_name_str.strip()
+                if not branch_name_str:
+                    continue
 
-                # 为每个分支创建子菜单项
-                for branch in all_branches:
-                    if branch != current_branch.name and branch in item_branches:
-                        action = checkout_menu.addAction(branch)
-                        action.triggered.connect(partial(self._checkout_branch, git_manager, branch))
+                # 提取用于 checkout 的分支名
+                # 对于 "☁️ origin/feature", 我们需要 "feature"。git checkout 会自动创建本地分支并跟踪远程分支。
+                # 对于 "main", 我们需要 "main"。
+                checkout_target_name = branch_name_str
+                if checkout_target_name.startswith("☁️ origin/"):
+                    checkout_target_name = checkout_target_name.strip("☁️").lstrip().split("/", 1)[1]
+
+                if checkout_target_name == "HEAD":
+                    continue
+                # 仅当不是当前分支时才显示
+                if checkout_target_name != current_branch.name:
+                    action = checkout_menu.addAction(branch_name_str)
+                    action.triggered.connect(partial(self._checkout_branch, git_manager, checkout_target_name))
+                    checkout_action_added = True
+
+            # 如果没有可切换的分支，则移除 "Checkout" 菜单
+            if not checkout_action_added:
+                menu.removeAction(checkout_menu.menuAction())
 
             # 检查是否是远程分支且当前分支跟踪它
             for branch_name in item_branches:
@@ -128,6 +149,26 @@ class CustomTreeWidget(HoverRevealTreeWidget):
 
         menu.exec(self.mapToGlobal(position))
 
+    def _reset_branch_to_commit(self, item, git_manager: "GitManager", current_branch_name):
+        if not item:
+            return
+
+        commit_hash = item.text(0)
+        commit_message = item.text(1)
+
+        dialog = GitResetDialog(current_branch_name, commit_hash, commit_message, self)
+        if dialog.exec():
+            mode = dialog.get_selected_mode()
+            # todo test it
+            error = git_manager.reset_branch(commit_hash, mode)
+            if error:
+                get_main_window_by_parent(self).notification_widget.show_message(f"重置失败：{error}")
+            else:
+                self.parent().update_history(self.parent().git_manager, self.parent().branch)
+                get_main_window_by_parent(self).notification_widget.show_message(
+                    f"成功将分支 {current_branch_name} 重置到 {commit_hash[:7]}"
+                )
+
     def copy_commit_to_clipboard(self, item):
         if item:
             print("commit is", item.text(0))
@@ -144,11 +185,31 @@ class CustomTreeWidget(HoverRevealTreeWidget):
 
     def _checkout_branch(self, git_manager, branch_name):
         """执行分支切换操作"""
+        main_window = get_main_window_by_parent(self)
+        if not main_window:
+            logging.error("无法获取主窗口实例，无法显示通知。")
+            # Fallback to print if main_window is not found
+            error = git_manager.switch_branch(branch_name)
+            if error:
+                print(f"切换分支失败：{error}")
+            else:
+                print(f"已切换到分支：{branch_name}")
+            return
+
         error = git_manager.switch_branch(branch_name)
         if error:
-            print(f"切换分支失败：{error}")
+            main_window.notification_widget.show_message(f"切换分支失败：{error}")
         else:
-            print(f"已切换到分支：{branch_name}")
+            main_window.notification_widget.show_message(f"已成功切换到分支：{branch_name}")
+            # Potentially update UI elements if needed, e.g., branch display in main window
+            if hasattr(main_window, "update_branches_on_top_bar"):
+                main_window.update_branches_on_top_bar()
+            if hasattr(main_window, "update_commit_history"):
+                main_window.update_commit_history()
+            if hasattr(main_window, "workspace_explorer") and hasattr(
+                main_window.workspace_explorer, "refresh_file_tree"
+            ):
+                main_window.workspace_explorer.refresh_file_tree()
 
     def _compare_commit_with_workspace(self, item):
         """比较指定提交与工作区的差异，并将变更文件添加到 WorkspaceExplorer.file_tree 中"""

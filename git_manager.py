@@ -277,8 +277,8 @@ class GitManager:
             # diff_item.a_path is the path in the index
             # diff_item.b_path is the path in the working directory (for new/renamed files)
             # For simple modifications, a_path and b_path are often the same.
-            # For deleted files in working dir, a_path is the path, b_path is None.
-            # For new files in working dir (should be caught by untracked_files if not added),
+            # For deleted files in workdir, a_path is the path, b_path is None.
+            # For new files in workdir (should be caught by untracked_files if not added),
             # this diff won't typically show them unless they were part of complex staging.
             for diff_item in self.repo.index.diff(None):
                 # If a file is renamed, a_path is old, b_path is new.
@@ -534,7 +534,7 @@ class GitManager:
         except Exception:
             # 其他任何意外错误
             logging.exception(
-                f"GitManager: 获取文件夹 '{folder_path}' 历史时发生未知错误。"
+                f"GitManager: 获取文件夹 '{folder_path}' 历史时发生未知错误."
             )  # 使用 logging.exception 记录堆栈跟踪
             return []
 
@@ -562,3 +562,30 @@ class GitManager:
         except Exception:
             logging.exception("比较提交 %s 与工作区时发生未知错误", commit_hash)
             return []
+
+    def reset_branch(self, commit_hash: str, mode: str) -> Optional[str]:
+        """重置当前分支到指定的提交。
+
+        参数：
+            commit_hash: 目标提交的哈希值。
+            mode: 重置模式 ('soft', 'mixed', 'hard')。
+
+        返回：
+            None: 成功。
+            str: 失败时的错误信息。
+        """
+        if not self.repo:
+            return "仓库未初始化。"
+
+        if mode not in ["soft", "mixed", "hard"]:
+            return f"无效的重置模式: {mode}"
+
+        try:
+            self.repo.git.reset(commit_hash, f"--{mode}")
+            return None
+        except git.GitCommandError as e:
+            logging.exception("重置到 %s 失败", commit_hash)
+            return f"重置到 {commit_hash} 失败: {e.stderr.strip() if e.stderr else str(e)}"
+        except Exception:
+            logging.exception("重置分支时发生未知错误")
+            return "重置分支时发生未知错误"

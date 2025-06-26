@@ -104,7 +104,7 @@ class SideBarWidget(QWidget):
         self.search_btn = QToolButton()
         self.search_btn.setIcon(QIcon("icons/search.svg"))
         self.search_btn.setIconSize(QSize(24, 24))
-        self.search_btn.setToolTip(self.tr("Search"))
+        self.search_btn.setToolTip(self.tr("Search") + " (Ctrl/Cmd+Shift+F)")
         self.search_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.search_btn.setCheckable(True)
         self.search_btn.setChecked(False)

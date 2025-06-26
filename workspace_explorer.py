@@ -34,6 +34,7 @@ from folder_history_view import FolderHistoryView  # Import FolderHistoryView
 from syntax_highlighter import CodeHighlighter
 from utils import get_main_window_by_parent
 from utils.language_map import LANGUAGE_MAP
+from utils.language_icons import get_language_icon, get_folder_icon
 
 if TYPE_CHECKING:
     from git_manager import GitManager
@@ -394,6 +395,8 @@ class WorkspaceExplorer(QWidget):
                 tree_item = QTreeWidgetItem(parent_item_in_tree)
                 tree_item.setText(0, item_name)
                 tree_item.setData(0, Qt.ItemDataRole.UserRole, item_path)
+                # 设置文件夹图标
+                tree_item.setIcon(0, get_folder_icon())
 
                 # 检查是否被.gitignore 忽略
                 if self.git_manager and self.git_manager.is_ignored(item_path):
@@ -423,6 +426,8 @@ class WorkspaceExplorer(QWidget):
                 tree_item = QTreeWidgetItem(parent_item_in_tree)
                 tree_item.setText(0, item_name)
                 tree_item.setData(0, Qt.ItemDataRole.UserRole, item_path)
+                # 根据文件扩展名设置语言图标
+                tree_item.setIcon(0, get_language_icon(item_name))
 
                 # 检查是否被.gitignore 忽略
                 if self.git_manager and self.git_manager.is_ignored(item_path):
