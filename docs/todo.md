@@ -117,4 +117,4 @@
 122. ~~侧边栏 搜索 加上快捷键提示~~
 123. https://lucide.dev/icons/?search=git git 图标使用这个
 124. ~~https://github.com/devicons/devicon/ 程序语言的图标用这个~~ 加了几个语言 后面再说
-125. 
+125. FileQuickSearchPopup file_list 有可能为空
