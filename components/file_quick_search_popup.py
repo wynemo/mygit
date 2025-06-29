@@ -27,6 +27,7 @@ class FileQuickSearchPopup(QFrame):
         self.file_list = file_list or []
         self.filtered_files = self.file_list.copy()
         self.max_default_files = 20  # 默认最多显示 20 个
+        self._init_file_list = False
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
@@ -143,6 +144,11 @@ class FileQuickSearchPopup(QFrame):
         super().focusOutEvent(event)
 
     def show_popup(self, pos=None, ref_widget=None):
+        if not self._init_file_list:
+            main_window = get_main_window_by_parent(self)
+            main_window.workspace_explorer._update_file_quick_search_list()
+            if self.file_list:
+                self._init_file_list = True
         self.input.clear()
         self.input.setFocus()
         self.refresh_list()
