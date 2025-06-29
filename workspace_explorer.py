@@ -33,6 +33,7 @@ from file_history_view import FileHistoryView
 from folder_history_view import FolderHistoryView  # Import FolderHistoryView
 from syntax_highlighter import CodeHighlighter
 from utils import get_main_window_by_parent
+from utils.file_index_manager import FileIndexManager
 from utils.language_icons import get_folder_icon, get_language_icon
 from utils.language_map import LANGUAGE_MAP
 
@@ -48,6 +49,11 @@ class WorkspaceExplorer(QWidget):
         # Initialize all_file_statuses
         self.all_file_statuses = {"modified": set(), "staged": set(), "untracked": set()}
         self.current_highlighted_item = None
+        
+        # 初始化文件索引管理器
+        self.file_index_manager = FileIndexManager()
+        self._index_initialized = False
+        
         self.setup_ui()
 
     def setup_ui(self):
@@ -596,24 +602,41 @@ class WorkspaceExplorer(QWidget):
         QWidget.mousePressEvent(self.search_box_widget, event)
 
     def _update_file_quick_search_list(self):
-        """cursor 生成 - 更新文件快速搜索弹窗的文件列表，过滤掉被 .gitignore 忽略的文件和文件夹"""
+        """更新文件快速搜索弹窗的文件列表，使用索引管理器提供高效搜索"""
         if not self.git_manager:
             return
-
-        def _is_dir_ignored(path: str) -> bool:
-            _path = os.path.relpath(path, self.git_manager.repo_path)
-            return self.git_manager.is_ignored(_path) or _path == ".git"
-
-        file_list = []
-        for root, dirs, files in os.walk(self.workspace_path):
-            # 过滤被忽略的文件夹
-            dirs[:] = [d for d in dirs if not _is_dir_ignored(os.path.join(root, d))]
-            # 过滤被忽略的文件
-            for f in files:
-                file_path = os.path.join(root, f)
-                if not self.git_manager.is_ignored(os.path.relpath(file_path, self.git_manager.repo_path)):
-                    file_list.append(file_path)
+        
+        if not self._index_initialized:
+            # 首次构建索引
+            self._build_initial_index()
+            self._index_initialized = True
+        
+        # 直接从索引获取文件列表
+        file_list = self.file_index_manager.get_all_files()
         self.file_quick_search_popup.set_file_list(file_list)
+    
+    def _build_initial_index(self):
+        """异步构建初始索引"""
+        import threading
+        
+        def build_worker():
+            def _is_dir_ignored(path: str) -> bool:
+                _path = os.path.relpath(path, self.git_manager.repo_path)
+                return self.git_manager.is_ignored(_path) or _path == ".git"
+            
+            for root, dirs, files in os.walk(self.workspace_path):
+                # 过滤被忽略的文件夹
+                dirs[:] = [d for d in dirs if not _is_dir_ignored(os.path.join(root, d))]
+                # 过滤被忽略的文件
+                for f in files:
+                    file_path = os.path.join(root, f)
+                    if not self.git_manager.is_ignored(os.path.relpath(file_path, self.git_manager.repo_path)):
+                        self.file_index_manager.add_file(file_path, self.workspace_path)
+        
+        # 在后台线程中执行
+        thread = threading.Thread(target=build_worker)
+        thread.daemon = True
+        thread.start()
 
 
 class FileTreeWidget(QTreeWidget):

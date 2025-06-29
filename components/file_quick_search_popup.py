@@ -64,13 +64,22 @@ class FileQuickSearchPopup(QFrame):
         self.search_timer.start()
 
     def perform_search(self):
-        text = self.search_text.strip().lower()
+        """使用索引管理器进行高效搜索"""
+        text = self.search_text.strip()
         if not text:
             self.filtered_files = self.file_list[: self.max_default_files]
         else:
+            # 使用索引管理器进行搜索
             main_window = get_main_window_by_parent(self)
-            git_repo_path = main_window.git_manager.repo.working_dir
-            self.filtered_files = [f for f in self.file_list if text in os.path.relpath(f, git_repo_path).lower()]
+            if (hasattr(main_window, 'workspace_explorer') and 
+                main_window.workspace_explorer and 
+                hasattr(main_window.workspace_explorer, 'file_index_manager')):
+                search_results = main_window.workspace_explorer.file_index_manager.search_files(text, max_results=50)
+                self.filtered_files = search_results
+            else:
+                # 回退到原始搜索方法
+                git_repo_path = main_window.git_manager.repo.working_dir
+                self.filtered_files = [f for f in self.file_list if text.lower() in os.path.relpath(f, git_repo_path).lower()]
         self.refresh_list()
 
     def refresh_list(self):

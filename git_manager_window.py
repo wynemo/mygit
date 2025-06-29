@@ -354,7 +354,31 @@ class GitManagerWindow(QMainWindow):
     def handle_file_change(self, event_type, path, is_directory):
         """Handles detailed file system change events."""
         logging.debug("File change event: %s - %s (%s)", event_type, path, is_directory)
+        
+        # 更新文件索引管理器
+        if hasattr(self, 'workspace_explorer') and self.workspace_explorer:
+            self._handle_file_index_update(event_type, path, is_directory)
+        
         self.schedule_refresh(event_type, path, is_directory)
+    
+    def _handle_file_index_update(self, event_type, path, is_directory):
+        """处理文件变更，更新索引"""
+        if is_directory == "directory":
+            return  # 忽略目录变更
+        
+        try:
+            if event_type == 'created':
+                self.workspace_explorer.file_index_manager.add_file(path, self.workspace_explorer.workspace_path)
+            elif event_type == 'deleted':
+                self.workspace_explorer.file_index_manager.remove_file(path)
+            elif event_type == 'modified':
+                self.workspace_explorer.file_index_manager.update_file(path, self.workspace_explorer.workspace_path)
+            elif event_type == 'moved':
+                # 处理文件移动 - 这需要源路径和目标路径
+                # watchdog 的 moved 事件会有 dest_path 属性
+                pass
+        except Exception:
+            logging.exception("更新文件索引时出错")
 
     def handle_git_change(self, event_type, path):
         """Handles git-specific file system change events."""
