@@ -32,6 +32,7 @@ from file_changes_view import FileChangesView
 from file_history_view import FileHistoryView
 from folder_history_view import FolderHistoryView  # Import FolderHistoryView
 from syntax_highlighter import CodeHighlighter
+from threads import FileIndexThread
 from utils import get_main_window_by_parent
 from utils.file_index_manager import FileIndexManager
 from utils.language_icons import get_folder_icon, get_language_icon
@@ -614,29 +615,27 @@ class WorkspaceExplorer(QWidget):
         # 直接从索引获取文件列表
         file_list = self.file_index_manager.get_all_files()
         self.file_quick_search_popup.set_file_list(file_list)
-    
+
     def _build_initial_index(self):
         """异步构建初始索引"""
-        import threading
-        
-        def build_worker():
-            def _is_dir_ignored(path: str) -> bool:
-                _path = os.path.relpath(path, self.git_manager.repo_path)
-                return self.git_manager.is_ignored(_path) or _path == ".git"
-            
-            for root, dirs, files in os.walk(self.workspace_path):
-                # 过滤被忽略的文件夹
-                dirs[:] = [d for d in dirs if not _is_dir_ignored(os.path.join(root, d))]
-                # 过滤被忽略的文件
-                for f in files:
-                    file_path = os.path.join(root, f)
-                    if not self.git_manager.is_ignored(os.path.relpath(file_path, self.git_manager.repo_path)):
-                        self.file_index_manager.add_file(file_path, self.workspace_path)
-        
-        # 在后台线程中执行
-        thread = threading.Thread(target=build_worker)
-        thread.daemon = True
-        thread.start()
+        # 创建并启动文件索引线程
+        self.index_thread = FileIndexThread(
+            self.workspace_path, self.git_manager, self.file_index_manager
+        )
+        self.index_thread.finished.connect(self._on_index_finished)
+        self.index_thread.error.connect(self._on_index_error)
+        self.index_thread.start()
+
+    def _on_index_finished(self):
+        """索引建立完成后的回调"""
+        logging.info("文件索引建立完成")
+        # 可以在这里触发一次文件列表的更新
+        file_list = self.file_index_manager.get_all_files()
+        self.file_quick_search_popup.set_file_list(file_list)
+
+    def _on_index_error(self, error_message):
+        """索引建立出错的回调"""
+        logging.error("建立文件索引时出错: %s", error_message)
 
 
 class FileTreeWidget(QTreeWidget):

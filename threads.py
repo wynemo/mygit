@@ -1,4 +1,5 @@
 import asyncio
+import os
 from typing import TYPE_CHECKING
 
 import aiohttp
@@ -114,3 +115,42 @@ class AIGeneratorThread(QThread):
             raise Exception("API 调用超时（15 秒）") from e
         except aiohttp.ClientError as e:
             raise Exception("API 调用错误") from e
+
+
+class FileIndexThread(QThread):
+    """用于在后台建立文件索引的线程"""
+
+    finished = pyqtSignal()  # 索引建立完成信号
+    error = pyqtSignal(str)  # 错误信号
+
+    def __init__(self, workspace_path, git_manager, file_index_manager, parent=None):
+        super().__init__(parent)
+        self.workspace_path = workspace_path
+        self.git_manager = git_manager
+        self.file_index_manager = file_index_manager
+
+    def run(self):
+        """在后台线程中执行索引建立"""
+        try:
+            def _is_dir_ignored(path: str) -> bool:
+                # 确保路径是相对的
+                if os.path.isabs(path):
+                    _path = os.path.relpath(path, self.git_manager.repo_path)
+                else:
+                    _path = path
+                return self.git_manager.is_ignored(_path) or _path.startswith(".git")
+
+            for root, dirs, files in os.walk(self.workspace_path, topdown=True):
+                # 过滤被忽略的文件夹
+                # 使用索引和切片来修改 dirs
+                dirs[:] = [d for d in dirs if not _is_dir_ignored(os.path.join(root, d))]
+
+                for f in files:
+                    file_path = os.path.join(root, f)
+                    # 确保文件路径是相对的
+                    relative_file_path = os.path.relpath(file_path, self.git_manager.repo_path)
+                    if not self.git_manager.is_ignored(relative_file_path):
+                        self.file_index_manager.add_file(file_path, self.workspace_path)
+            self.finished.emit()
+        except Exception as e:
+            self.error.emit(str(e))
