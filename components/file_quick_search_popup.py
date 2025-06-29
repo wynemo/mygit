@@ -26,7 +26,7 @@ class FileQuickSearchPopup(QFrame):
         """)
         self.file_list = file_list or []
         self.filtered_files = self.file_list.copy()
-        self.max_default_files = 20  # 默认最多显示20个
+        self.max_default_files = 20  # 默认最多显示 20 个
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
@@ -71,15 +71,19 @@ class FileQuickSearchPopup(QFrame):
         else:
             # 使用索引管理器进行搜索
             main_window = get_main_window_by_parent(self)
-            if (hasattr(main_window, 'workspace_explorer') and 
-                main_window.workspace_explorer and 
-                hasattr(main_window.workspace_explorer, 'file_index_manager')):
+            if (
+                hasattr(main_window, "workspace_explorer")
+                and main_window.workspace_explorer
+                and hasattr(main_window.workspace_explorer, "file_index_manager")
+            ):
                 search_results = main_window.workspace_explorer.file_index_manager.search_files(text, max_results=50)
                 self.filtered_files = search_results
             else:
                 # 回退到原始搜索方法
                 git_repo_path = main_window.git_manager.repo.working_dir
-                self.filtered_files = [f for f in self.file_list if text.lower() in os.path.relpath(f, git_repo_path).lower()]
+                self.filtered_files = [
+                    f for f in self.file_list if text.lower() in os.path.relpath(f, git_repo_path).lower()
+                ]
         self.refresh_list()
 
     def refresh_list(self):
@@ -89,14 +93,14 @@ class FileQuickSearchPopup(QFrame):
             base = os.path.basename(f)
             display_name = base
 
-            # 获取git 仓库路径
+            # 获取 git 仓库路径
             main_window = get_main_window_by_parent(self)
             git_repo_path = main_window.git_manager.repo.working_dir
 
             # 获取 f 的文件夹
             folder_path = os.path.dirname(f)
 
-            # 获取 f的文件夹 相对于仓库的路径
+            # 获取 f 的文件夹 相对于仓库的路径
             relative_path = os.path.relpath(folder_path, git_repo_path)
             label = None
             if relative_path and relative_path != ".":
