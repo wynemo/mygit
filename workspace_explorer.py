@@ -635,7 +635,7 @@ class WorkspaceExplorer(QWidget):
 
     def _on_index_error(self, error_message):
         """索引建立出错的回调"""
-        logging.error("建立文件索引时出错: %s", error_message)
+        logging.exception("建立文件索引时出错")
 
 
 class FileTreeWidget(QTreeWidget):

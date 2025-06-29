@@ -133,12 +133,8 @@ class FileIndexThread(QThread):
         """在后台线程中执行索引建立"""
         try:
             def _is_dir_ignored(path: str) -> bool:
-                # 确保路径是相对的
-                if os.path.isabs(path):
-                    _path = os.path.relpath(path, self.git_manager.repo_path)
-                else:
-                    _path = path
-                return self.git_manager.is_ignored(_path) or _path.startswith(".git")
+                relative_path = os.path.relpath(path, self.git_manager.repo_path)
+                return self.git_manager.is_ignored(relative_path) or relative_path.startswith(".git")
 
             for root, dirs, files in os.walk(self.workspace_path, topdown=True):
                 # 过滤被忽略的文件夹
