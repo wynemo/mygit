@@ -50,11 +50,11 @@ class WorkspaceExplorer(QWidget):
         # Initialize all_file_statuses
         self.all_file_statuses = {"modified": set(), "staged": set(), "untracked": set()}
         self.current_highlighted_item = None
-        
+
         # 初始化文件索引管理器
         self.file_index_manager = FileIndexManager()
         self._index_initialized = False
-        
+
         self.setup_ui()
 
     def setup_ui(self):
@@ -606,12 +606,12 @@ class WorkspaceExplorer(QWidget):
         """更新文件快速搜索弹窗的文件列表，使用索引管理器提供高效搜索"""
         if not self.git_manager:
             return
-        
+
         if not self._index_initialized:
             # 首次构建索引
             self._build_initial_index()
             self._index_initialized = True
-        
+
         # 直接从索引获取文件列表
         file_list = self.file_index_manager.get_all_files()
         self.file_quick_search_popup.set_file_list(file_list)
@@ -619,9 +619,7 @@ class WorkspaceExplorer(QWidget):
     def _build_initial_index(self):
         """异步构建初始索引"""
         # 创建并启动文件索引线程
-        self.index_thread = FileIndexThread(
-            self.workspace_path, self.git_manager, self.file_index_manager
-        )
+        self.index_thread = FileIndexThread(self.workspace_path, self.git_manager, self.file_index_manager)
         self.index_thread.finished.connect(self._on_index_finished)
         self.index_thread.error.connect(self._on_index_error)
         self.index_thread.start()

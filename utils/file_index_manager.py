@@ -15,8 +15,9 @@ MIN_SUBSTRING_LENGTH = 2
 
 class TrieNode:
     """前缀树节点"""
+
     def __init__(self):
-        self.children: Dict[str, 'TrieNode'] = {}
+        self.children: Dict[str, "TrieNode"] = {}
         self.file_paths: Set[str] = set()  # 存储匹配此前缀的文件路径
         self.is_end = False
 
@@ -26,12 +27,12 @@ class FileIndexManager:
 
     def __init__(self):
         self.index = {
-            'files': {},                    # 文件详情: {path: {name, relative_path, mtime}}
-            'name_trie': TrieNode(),       # 文件名前缀树索引
-            'path_trie': TrieNode(),       # 路径前缀树索引
-            'fuzzy_map': defaultdict(set), # 模糊匹配映射
-            'last_updated': 0,             # 最后更新时间戳
-            'is_building': False           # 是否正在构建索引
+            "files": {},  # 文件详情: {path: {name, relative_path, mtime}}
+            "name_trie": TrieNode(),  # 文件名前缀树索引
+            "path_trie": TrieNode(),  # 路径前缀树索引
+            "fuzzy_map": defaultdict(set),  # 模糊匹配映射
+            "last_updated": 0,  # 最后更新时间戳
+            "is_building": False,  # 是否正在构建索引
         }
         self.search_cache = {}  # LRU缓存搜索结果
         self.cache_size = 100
@@ -49,22 +50,18 @@ class FileIndexManager:
             relative_path = os.path.relpath(file_path, base_path) if base_path else file_path
 
             # 更新文件详情
-            self.index['files'][file_path] = {
-                'name': filename,
-                'relative_path': relative_path,
-                'mtime': stat.st_mtime
-            }
+            self.index["files"][file_path] = {"name": filename, "relative_path": relative_path, "mtime": stat.st_mtime}
 
             # 添加到文件名前缀树
-            self._add_to_trie(self.index['name_trie'], filename.lower(), file_path)
+            self._add_to_trie(self.index["name_trie"], filename.lower(), file_path)
 
             # 添加到路径前缀树
-            self._add_to_trie(self.index['path_trie'], relative_path.lower(), file_path)
+            self._add_to_trie(self.index["path_trie"], relative_path.lower(), file_path)
 
             # 构建模糊匹配映射
             self._build_fuzzy_mapping(filename.lower(), file_path)
 
-            self.index['last_updated'] = time.time()
+            self.index["last_updated"] = time.time()
 
             # 清空搜索缓存
             self.search_cache.clear()
@@ -74,27 +71,27 @@ class FileIndexManager:
 
     def remove_file(self, file_path: str) -> None:
         """从索引中移除文件"""
-        if file_path not in self.index['files']:
+        if file_path not in self.index["files"]:
             return
 
         try:
-            file_info = self.index['files'][file_path]
-            filename = file_info['name']
-            relative_path = file_info['relative_path']
+            file_info = self.index["files"][file_path]
+            filename = file_info["name"]
+            relative_path = file_info["relative_path"]
 
             # 从文件名前缀树移除
-            self._remove_from_trie(self.index['name_trie'], filename.lower(), file_path)
+            self._remove_from_trie(self.index["name_trie"], filename.lower(), file_path)
 
             # 从路径前缀树移除
-            self._remove_from_trie(self.index['path_trie'], relative_path.lower(), file_path)
+            self._remove_from_trie(self.index["path_trie"], relative_path.lower(), file_path)
 
             # 从模糊匹配映射移除
             self._remove_fuzzy_mapping(filename.lower(), file_path)
 
             # 删除文件记录
-            del self.index['files'][file_path]
+            del self.index["files"][file_path]
 
-            self.index['last_updated'] = time.time()
+            self.index["last_updated"] = time.time()
 
             # 清空搜索缓存
             self.search_cache.clear()
@@ -104,14 +101,14 @@ class FileIndexManager:
 
     def update_file(self, file_path: str, base_path: str | None = None) -> None:
         """更新文件在索引中的信息"""
-        if file_path in self.index['files']:
+        if file_path in self.index["files"]:
             self.remove_file(file_path)
         self.add_file(file_path, base_path)
 
     def search_files(self, query: str, max_results: int = 50) -> List[str]:
         """多层次搜索策略"""
         if not query:
-            return list(self.index['files'].keys())[:max_results]
+            return list(self.index["files"].keys())[:max_results]
 
         # 检查缓存
         cache_key = f"{query}_{max_results}"
@@ -122,10 +119,10 @@ class FileIndexManager:
         results = []
 
         # 1. 精确文件名前缀匹配（最高权重）
-        exact_matches = self._search_by_prefix(query_lower, self.index['name_trie'])
+        exact_matches = self._search_by_prefix(query_lower, self.index["name_trie"])
 
         # 2. 路径前缀匹配（中等权重）
-        path_matches = self._search_by_prefix(query_lower, self.index['path_trie'])
+        path_matches = self._search_by_prefix(query_lower, self.index["path_trie"])
 
         # 3. 模糊匹配（最低权重）
         fuzzy_matches = self._fuzzy_search(query_lower)
@@ -143,22 +140,22 @@ class FileIndexManager:
 
     def get_all_files(self) -> List[str]:
         """获取所有文件路径列表"""
-        return list(self.index['files'].keys())
+        return list(self.index["files"].keys())
 
     def get_file_count(self) -> int:
         """获取索引中的文件数量"""
-        return len(self.index['files'])
+        return len(self.index["files"])
 
     def clear_index(self) -> None:
         """清空索引"""
         with self._update_lock:
             self.index = {
-                'files': {},
-                'name_trie': TrieNode(),
-                'path_trie': TrieNode(),
-                'fuzzy_map': defaultdict(set),
-                'last_updated': 0,
-                'is_building': False
+                "files": {},
+                "name_trie": TrieNode(),
+                "path_trie": TrieNode(),
+                "fuzzy_map": defaultdict(set),
+                "last_updated": 0,
+                "is_building": False,
             }
             self.search_cache.clear()
 
@@ -174,6 +171,7 @@ class FileIndexManager:
 
     def _remove_from_trie(self, trie_root: TrieNode, text: str, file_path: str) -> None:
         """从前缀树移除文本"""
+
         def _remove_recursive(node: TrieNode, text: str, index: int) -> bool:
             if index == len(text):
                 node.is_end = False
@@ -192,8 +190,7 @@ class FileIndexManager:
 
             child_node.file_paths.discard(file_path)
 
-            return (len(node.children) == 0 and not node.is_end and
-                   len(node.file_paths) == 0 and node != trie_root)
+            return len(node.children) == 0 and not node.is_end and len(node.file_paths) == 0 and node != trie_root
 
         _remove_recursive(trie_root, text, 0)
 
@@ -214,7 +211,7 @@ class FileIndexManager:
             for j in range(i + 1, min(i + 4, len(filename) + 1)):  # 限制子字符串长度
                 substring = filename[i:j]
                 if len(substring) >= MIN_SUBSTRING_LENGTH:  # 只索引长度>=2的子字符串
-                    self.index['fuzzy_map'][substring].add(file_path)
+                    self.index["fuzzy_map"][substring].add(file_path)
 
     def _remove_fuzzy_mapping(self, filename: str, file_path: str) -> None:
         """移除模糊匹配映射"""
@@ -222,9 +219,9 @@ class FileIndexManager:
             for j in range(i + 1, min(i + 4, len(filename) + 1)):
                 substring = filename[i:j]
                 if len(substring) >= MIN_SUBSTRING_LENGTH:
-                    self.index['fuzzy_map'][substring].discard(file_path)
-                    if not self.index['fuzzy_map'][substring]:
-                        del self.index['fuzzy_map'][substring]
+                    self.index["fuzzy_map"][substring].discard(file_path)
+                    if not self.index["fuzzy_map"][substring]:
+                        del self.index["fuzzy_map"][substring]
 
     def _fuzzy_search(self, query: str) -> Set[str]:
         """模糊搜索"""
@@ -233,23 +230,24 @@ class FileIndexManager:
 
         matches = set()
         for i in range(len(query) - 1):
-            substring = query[i:i + 2]
-            if substring in self.index['fuzzy_map']:
+            substring = query[i : i + 2]
+            if substring in self.index["fuzzy_map"]:
                 if not matches:
-                    matches = self.index['fuzzy_map'][substring].copy()
+                    matches = self.index["fuzzy_map"][substring].copy()
                 else:
-                    matches &= self.index['fuzzy_map'][substring]
+                    matches &= self.index["fuzzy_map"][substring]
 
         return matches
 
-    def _rank_and_dedupe(self, exact_matches: Set[str], path_matches: Set[str],
-                        fuzzy_matches: Set[str], query: str) -> List[str]:
+    def _rank_and_dedupe(
+        self, exact_matches: Set[str], path_matches: Set[str], fuzzy_matches: Set[str], query: str
+    ) -> List[str]:
         """智能排序和去重"""
         scored_files = []
         all_matches = exact_matches | path_matches | fuzzy_matches
 
         for file_path in all_matches:
-            if file_path not in self.index['files']:
+            if file_path not in self.index["files"]:
                 continue
 
             match_type = self._get_match_type(file_path, exact_matches, path_matches, fuzzy_matches)
@@ -261,23 +259,24 @@ class FileIndexManager:
 
         return [file_path for _, file_path in scored_files]
 
-    def _get_match_type(self, file_path: str, exact_matches: Set[str],
-                       path_matches: Set[str], fuzzy_matches: Set[str]) -> str:
+    def _get_match_type(
+        self, file_path: str, exact_matches: Set[str], path_matches: Set[str], fuzzy_matches: Set[str]
+    ) -> str:
         """获取匹配类型"""
         if file_path in exact_matches:
-            return 'exact'
+            return "exact"
         elif file_path in path_matches:
-            return 'path'
+            return "path"
         elif file_path in fuzzy_matches:
-            return 'fuzzy'
-        return 'unknown'
+            return "fuzzy"
+        return "unknown"
 
     def _calculate_score(self, file_path: str, query: str, match_type: str) -> float:
         """计算文件匹配分数"""
         score = 0.0
 
         # 匹配类型权重
-        type_weights = {'exact': 100, 'path': 80, 'fuzzy': 60}
+        type_weights = {"exact": 100, "path": 80, "fuzzy": 60}
         score += type_weights.get(match_type, 0)
 
         # 文件名匹配优于路径匹配
@@ -294,8 +293,8 @@ class FileIndexManager:
         score -= depth * 2
 
         # 最近修改时间权重
-        file_info = self.index['files'].get(file_path, {})
-        mtime = file_info.get('mtime', 0)
+        file_info = self.index["files"].get(file_path, {})
+        mtime = file_info.get("mtime", 0)
         age_bonus = max(0, 10 - (time.time() - mtime) / 86400)  # 10天内的文件有加分
         score += age_bonus
 
