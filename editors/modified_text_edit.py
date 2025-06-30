@@ -79,7 +79,7 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
         """Handle the event when the widget gains focus."""
         super().focusInEvent(event)
         if self.document().isModified():
-            print("文档有未保存的修改，不刷新")
+            logging.debug("文档有未保存的修改，不刷新")
             return
 
         # 高亮文件树中的对应文件
@@ -87,15 +87,15 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
         while parent and not hasattr(parent, "file_tree"):
             parent = parent.parent()
         if parent and hasattr(parent, "file_tree"):
-            print(f"in focusInEvent highlight_file_item: {self.file_path}")
+            logging.debug("in focusInEvent highlight_file_item: %s", self.file_path)
             parent.file_tree.highlight_file_item(self.file_path)
 
         current_content = self.toPlainText()
         try:
             with open(self.file_path, "r", encoding="utf-8") as f:
                 new_content = f.read()
-        except Exception as e:
-            logging.warning(f"Error reading file: {e!s}")
+        except Exception:
+            logging.exception("Error reading file")
             return
 
         # 仅当文件实际内容与编辑器当前内容不同时才更新文本，以避免不必要的刷新和光标位置丢失
