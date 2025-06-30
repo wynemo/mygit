@@ -250,8 +250,14 @@ class CommitWidget(QFrame):
         if selected_items:
             item = selected_items[0]
             file_path = item.text(0)
+            file_status = item.text(1)
             try:
-                self.git_manager.repo.index.add([file_path])
+                if file_status == "Deleted":
+                    # 对于删除的文件，使用 remove 方法暂存删除操作
+                    self.git_manager.repo.index.remove([file_path])
+                else:
+                    # 对于其他状态的文件，使用 add 方法
+                    self.git_manager.repo.index.add([file_path])
                 self.refresh_file_status()
             except Exception:
                 logging.exception("无法暂存文件")
