@@ -176,8 +176,8 @@ class CommitWidget(QFrame):
         file_path = item.text(0)
         menu = QMenu(self)
 
-        # 只有修改过的文件可以还原
-        if item.text(1) == "Modified":
+        # 只有修改过的文件可以还原，删除的文件不能还原
+        if item.text(1) in ["Modified", "Added"]:
             revert_action = menu.addAction("Revert")
             revert_action.triggered.connect(lambda: self.revert_file(file_path))
 
@@ -201,16 +201,38 @@ class CommitWidget(QFrame):
         staged = repo.index.diff("HEAD")
         for diff in staged:
             item = QTreeWidgetItem(self.staged_tree)
-            item.setText(0, diff.a_path)
-            item.setText(1, "Modified")
+            item.setText(0, diff.a_path or diff.b_path)
+
+            # 根据变更类型设置状态
+            if diff.change_type == "A":
+                item.setText(1, "Added")
+            elif diff.change_type == "D":
+                item.setText(1, "Deleted")
+            elif diff.change_type == "M":
+                item.setText(1, "Modified")
+            elif diff.change_type == "R":
+                item.setText(1, "Renamed")
+            else:
+                item.setText(1, "Modified")
 
         # 获取未暂存的文件
         unstaged = repo.index.diff(None)
         for diff in unstaged:
             item = QTreeWidgetItem(self.unstaged_tree)
             logging.info("commit_dialog: unstaged file: %s", diff.a_path)
-            item.setText(0, diff.a_path)
-            item.setText(1, "Modified")
+            item.setText(0, diff.a_path or diff.b_path)
+
+            # 根据变更类型设置状态
+            if diff.change_type == "A":
+                item.setText(1, "Added")
+            elif diff.change_type == "D":
+                item.setText(1, "Deleted")
+            elif diff.change_type == "M":
+                item.setText(1, "Modified")
+            elif diff.change_type == "R":
+                item.setText(1, "Renamed")
+            else:
+                item.setText(1, "Modified")
 
         # 获取未跟踪的文件
         untracked = repo.untracked_files
