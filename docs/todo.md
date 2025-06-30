@@ -119,3 +119,4 @@
 124. ~~https://github.com/devicons/devicon/ 程序语言的图标用这个~~ 加了几个语言 后面再说
 125. ~~FileQuickSearchPopup file_list 有可能为空~~
 126. ~~workspace_explorer.py 里面直接使用 threading 考虑用 Qthread~~
+127. 切换项目 FileQuickSearchPopup 里面文件没有更新 也就是索引没有更新 workspace_explorer.file_index_manager
