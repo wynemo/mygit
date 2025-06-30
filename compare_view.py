@@ -67,6 +67,37 @@ class CompareView(QWidget):
     def show_diff(self, git_manager, commit, file_path, other_commit=None, is_comparing_with_workspace=False):
         """显示文件差异"""
         try:
+            # 处理与工作区比较的情况
+            if is_comparing_with_workspace:
+                # 获取提交中的文件内容（左侧）
+                try:
+                    commit_content = commit.tree[file_path].data_stream.read().decode("utf-8", errors="replace")
+                except KeyError:
+                    commit_content = ""
+
+                # 获取工作区的文件内容（右侧）
+                working_file_path = os.path.join(git_manager.repo.working_dir, file_path)
+                if os.path.exists(working_file_path):
+                    with open(working_file_path, "r", encoding="utf-8", errors="replace") as f:
+                        workspace_content = f.read()
+                else:
+                    workspace_content = ""
+
+                self.diff_viewer.show()
+                self.merge_diff_viewer.hide()
+                self.diff_viewer.set_texts(
+                    commit_content,
+                    workspace_content,
+                    file_path,
+                    right_file_path=file_path,
+                    left_commit_hash=commit.hexsha,
+                    right_commit_hash=None,  # 工作区没有提交哈希
+                )
+
+                # 启用右侧编辑器，允许编辑工作区文件
+                self.diff_viewer.right_edit.set_editable()
+                return
+
             parents = commit.parents
 
             # 获取当前提交的文件内容
@@ -76,16 +107,7 @@ class CompareView(QWidget):
                 content = ""
 
             if other_commit:
-                if not is_comparing_with_workspace:
-                    other_commit_content = (
-                        other_commit.tree[file_path].data_stream.read().decode("utf-8", errors="replace")
-                    )
-                else:
-                    # 获取工作区的文件内容
-                    working_file_path = os.path.join(git_manager.repo.working_dir, file_path)
-                    if os.path.exists(working_file_path):
-                        with open(working_file_path, "r", encoding="utf-8", errors="replace") as f:
-                            other_commit_content = f.read()
+                other_commit_content = other_commit.tree[file_path].data_stream.read().decode("utf-8", errors="replace")
                 self.diff_viewer.show()
                 self.merge_diff_viewer.hide()
                 self.diff_viewer.set_texts(

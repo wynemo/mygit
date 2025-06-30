@@ -24,7 +24,6 @@ from commit_history_view import CommitHistoryView
 from compare_view import CompareView
 from components.notification_widget import NotificationWidget
 from components.spin_icons import RotatingLabel
-from dialogs.compare_with_working_dialog import CompareWithWorkingDialog
 from dialogs.settings_dialog import SettingsDialog
 from file_changes_view import FileChangesView
 from folder_history_view import FolderHistoryView
@@ -661,30 +660,13 @@ class GitManagerWindow(QMainWindow):
         """显示与工作区比较的对话框"""
         try:
             _commit = self.git_manager.repo.commit(commit_hash) if commit_hash else self.current_commit
+            if not _commit or not self.git_manager:
+                return
 
-            # 获取历史版本的文件内容
-            old_content = _commit.tree[old_file_path or file_path].data_stream.read().decode("utf-8", errors="replace")
-
-            # 获取工作区的文件内容
-            working_file_path = os.path.join(self.git_manager.repo.working_dir, file_path)
-            if os.path.exists(working_file_path):
-                with open(working_file_path, "r", encoding="utf-8", errors="replace") as f:
-                    new_content = f.read()
-            else:
-                new_content = ""
-
-            # 创建并显示比较对话框
-            # todo 这个要改造，看 readme 里的 todo
-            dialog = CompareWithWorkingDialog(
-                f"{self.tr('Compare')} {file_path}",
-                old_content,
-                new_content,
-                commit_hash,
-                old_file_path or file_path,
-                right_file_path=file_path,
-                parent=self,
+            # 调用 _on_file_selected 方法，传递 is_comparing_with_workspace=True
+            self._on_file_selected(
+                old_file_path or file_path, _commit, other_commit=None, is_comparing_with_workspace=True
             )
-            dialog.show()
 
         except Exception:
             logging.exception("比较文件失败")
