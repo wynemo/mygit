@@ -164,8 +164,8 @@ class CommitWidget(QFrame):
             # 还原文件修改
             self.git_manager.repo.git.checkout("--", file_path)
             self.refresh_file_status()
-        except Exception as e:
-            logging.error(f"还原文件失败：{e}")
+        except Exception:
+            logging.exception("还原文件 %s 失败", file_path)
 
     def _show_unstaged_context_menu(self, position):
         """显示未暂存文件的右键菜单"""
@@ -199,25 +199,48 @@ class CommitWidget(QFrame):
 
         # 获取暂存的文件
         staged = repo.index.diff("HEAD")
+        CHANGE_TYPE_MAP = {
+            "A": "新增",
+            "D": "删除",
+            "M": "修改",
+            "R": "重命名",
+            "T": "类型变更",
+            "U": "未合并",
+            "C": "复制",
+        }
         for diff in staged:
             item = QTreeWidgetItem(self.staged_tree)
-            item.setText(0, diff.a_path)
-            item.setText(1, "Modified")
+            # For renames/copies, a_path is old, b_path is new. We display new path.
+            # For deletions, b_path is None. We display a_path.
+            # For additions, a_path is None. We display b_path.
+            # For modifications, a_path and b_path are typically the same.
+            display_path = diff.b_path if diff.change_type in ('A', 'R', 'C') and diff.b_path else diff.a_path
+            item.setText(0, display_path)
+            status_char = diff.change_type
+            # For renamed files, status_char can be e.g. 'R100' (100% similarity)
+            # We only care about the first letter.
+            status_description = CHANGE_TYPE_MAP.get(status_char[0], "未知")
+            item.setText(1, status_description)
 
         # 获取未暂存的文件
         unstaged = repo.index.diff(None)
         for diff in unstaged:
             item = QTreeWidgetItem(self.unstaged_tree)
-            logging.info("commit_dialog: unstaged file: %s", diff.a_path)
-            item.setText(0, diff.a_path)
-            item.setText(1, "Modified")
+            # Similar logic for path display as above
+            display_path = diff.b_path if diff.change_type in ('A', 'R', 'C') and diff.b_path else diff.a_path
+            item.setText(0, display_path)
+            status_char = diff.change_type
+            status_description = CHANGE_TYPE_MAP.get(status_char[0], "未知")
+            item.setText(1, status_description)
+            logging.info("commit_dialog: unstaged file: %s, status: %s", display_path, status_description)
+
 
         # 获取未跟踪的文件
         untracked = repo.untracked_files
         for file_path in untracked:
             item = QTreeWidgetItem(self.unstaged_tree)
             item.setText(0, file_path)
-            item.setText(1, "Untracked")
+            item.setText(1, "未跟踪") # Explicitly "Untracked" in Chinese
 
     def get_commit_message(self):
         return self.message_edit.toPlainText()
@@ -232,7 +255,7 @@ class CommitWidget(QFrame):
                 self.git_manager.repo.index.add([file_path])
                 self.refresh_file_status()
             except Exception as e:
-                print(f"无法暂存文件：{e!s}")
+                logging.error("无法暂存文件 %s: %s", file_path, e, exc_info=True)
 
     def unstage_selected_file(self):
         """取消暂存选中的文件"""
@@ -244,7 +267,7 @@ class CommitWidget(QFrame):
                 self.git_manager.repo.git.reset("HEAD", file_path)
                 self.refresh_file_status()
             except Exception as e:
-                print(f"无法取消暂存文件：{e!s}")
+                logging.error("无法取消暂存文件 %s: %s", file_path, e, exc_info=True)
 
     def generate_commit_message(self):
         """生成提交信息"""
@@ -311,37 +334,76 @@ class CommitWidget(QFrame):
             layout.addWidget(diff_viewer)
 
             # 获取文件内容
+            file_status = item.text(1) # "新增", "删除", "修改", etc.
+
             if is_staged:
                 # 对于暂存区文件，比较 HEAD 和暂存区
-                try:
-                    old_content = repo.git.show(f"HEAD:{file_path}")
-                except:
-                    # 如果是新文件，HEAD 中没有内容
+                # old_content is from HEAD
+                if file_status == "新增": # File is in index, not in HEAD
                     old_content = ""
-                new_content = repo.git.show(f":{file_path}")  # 暂存区内容
-            # 对于未暂存文件，比较暂存区和工作区
-            elif item.text(1) == "Untracked":
-                # 未跟踪文件，显示空内容和当前文件内容
-                old_content = ""
-                try:
-                    with open(f"{repo.working_dir}/{file_path}", "r", encoding="utf-8") as f:
-                        new_content = f.read()
-                except Exception as e:
-                    new_content = f"Error reading file: {e!s}"
-            else:
-                # 已修改文件，比较暂存区和工作区
-                try:
-                    old_content = repo.git.show(f":{file_path}")  # 暂存区内容
-                except:
+                else:
+                    try:
+                        old_content = repo.git.show(f"HEAD:{file_path}")
+                    except git.exc.GitCommandError: # Should not happen if status is not "新增"
+                        old_content = "" # Fallback
+
+                # new_content is from Index
+                if file_status == "删除": # File is in HEAD, not in index
+                    new_content = ""
+                else:
+                    try:
+                        new_content = repo.git.show(f":{file_path}")  # Index content
+                    except git.exc.GitCommandError: # Should not happen if status is not "删除"
+                        new_content = "" # Fallback
+            else: # Unstaged files - comparing Index and Working Directory
+                # old_content is from Index
+                if file_status == "未跟踪": # File is in Workdir, not in Index
                     old_content = ""
-                try:
-                    with open(f"{repo.working_dir}/{file_path}", "r", encoding="utf-8") as f:
-                        new_content = f.read()
-                except Exception as e:
-                    new_content = f"Error reading file: {e!s}"
+                elif file_status == "新增": # This case implies file was added to index, then removed from workdir before commit? Or a state mismatch.
+                                        # More likely "新增" appears for files added to index, viewed via staged.
+                                        # For unstaged, "未跟踪" is for new files.
+                                        # If truly "新增" in unstaged, it implies an odd state. For safety:
+                    old_content = "" # Assuming it means new compared to empty index state for this path.
+                else: # "修改" or "删除" from working directory compared to Index
+                    try:
+                        old_content = repo.git.show(f":{file_path}")  # Index content
+                    except git.exc.GitCommandError: # File not in index (e.g. deleted from index then modified in workdir? Unlikely for "修改" status)
+                        old_content = ""
+
+                # new_content is from Working Directory
+                if file_status == "删除": # File is in Index, but deleted from Workdir
+                    new_content = ""
+                else: # "修改" in Workdir, or "未跟踪" (new file in Workdir)
+                    try:
+                        full_file_path = f"{repo.working_dir}/{file_path}"
+                        if os.path.exists(full_file_path):
+                            with open(full_file_path, "r", encoding="utf-8") as f:
+                                new_content = f.read()
+                        else: # File does not exist in workdir, e.g. if status was "删除"
+                            new_content = ""
+                    except FileNotFoundError:
+                        new_content = "" # Explicitly empty for deleted file
+                    except Exception as e:
+                        logging.warning("读取工作目录文件 %s 失败: %s", file_path, e)
+                        new_content = f"读取文件错误: {e!s}"
 
             # 设置差异内容
-            diff_viewer.set_texts(old_content, new_content, file_path, file_path, "HEAD", None)
+            # Left side (old_content) is HEAD for staged, Index for unstaged.
+            # Right side (new_content) is Index for staged, Working Directory for unstaged.
+            left_commit_label = "HEAD" if is_staged else "索引"
+            right_commit_label = "索引" if is_staged else "工作区"
+
+            if file_status == "新增" and is_staged: # Staged Add (HEAD vs Index)
+                left_commit_label = "空白" # Comparing empty with Index
+            elif file_status == "删除" and is_staged: # Staged Delete (HEAD vs Index)
+                right_commit_label = "空白" # Comparing HEAD with empty
+            elif file_status == "未跟踪": # Unstaged Untracked (Index vs Workdir) - Index is effectively empty for this path
+                left_commit_label = "空白"
+            elif file_status == "删除" and not is_staged: # Unstaged Delete (Index vs Workdir)
+                right_commit_label = "空白"
+
+
+            diff_viewer.set_texts(old_content, new_content, file_path, file_path, left_commit_label, right_commit_label)
             diff_viewer.right_edit.set_editable()
 
             # 显示对话框

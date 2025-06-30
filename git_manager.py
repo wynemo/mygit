@@ -102,7 +102,7 @@ class GitManager:
                 )
             return commits
         except Exception as e:
-            print(f"获取提交历史失败：{e!s}")
+            logging.warning("获取提交历史失败: %s", e, exc_info=True)
             return []
 
     def get_blame_data(self, file_path: str, commit_hash: str = "HEAD") -> List[dict]:
@@ -139,9 +139,9 @@ class GitManager:
             return blame_data
         except git.GitCommandError:  # Catch specific error for file not found or not tracked
             return []
-        except Exception as e:
+        except Exception:
             logging.exception("获取 blame 信息失败")
-            print(f"获取 blame 信息失败：{e!s}")
+            # print(f"获取 blame 信息失败：{e!s}") # Redundant with logging.exception
             return []
 
     def fetch(self):
@@ -151,13 +151,14 @@ class GitManager:
         try:
             self.repo.remotes.origin.fetch()
         except GitCommandError as e:
-            error_message = f"Fetch failed: {e!s}"
-            if hasattr(e, "stderr") and e.stderr:
-                error_message += f"\nDetails: {e.stderr.strip()}"
-            raise Exception(error_message)
+            details = e.stderr.strip() if hasattr(e, "stderr") and e.stderr else ""
+            # The exception message already contains e.stdout, e.stderr, etc.
+            # Re-raising with a custom message might lose some of that context from GitCommandError
+            # logging.error("Fetch failed: %s. Details: %s", e, details) # Log here if not re-raising specific info
+            raise Exception(f"Fetch failed: {e!s}{'. Details: ' + details if details else ''}")
         except Exception as e:
-            # Catch any other unexpected errors
-            raise Exception(f"An unexpected error occurred during fetch: {e!s}")
+            logging.exception("An unexpected error occurred during fetch")
+            raise Exception(f"An unexpected error occurred during fetch: {e!s}") # Keep original exception type for user
 
     def pull(self):
         """拉取仓库"""
@@ -166,11 +167,10 @@ class GitManager:
         try:
             self.repo.remotes.origin.pull()
         except GitCommandError as e:
-            error_message = f"Pull failed: {e!s}"
-            if hasattr(e, "stderr") and e.stderr:
-                error_message += f"\nDetails: {e.stderr.strip()}"
-            raise Exception(error_message)
+            details = e.stderr.strip() if hasattr(e, "stderr") and e.stderr else ""
+            raise Exception(f"Pull failed: {e!s}{'. Details: ' + details if details else ''}")
         except Exception as e:
+            logging.exception("An unexpected error occurred during pull")
             raise Exception(f"An unexpected error occurred during pull: {e!s}")
 
     def push(self):
@@ -187,11 +187,10 @@ class GitManager:
                 # 如果有上游分支，正常推送
                 self.repo.remotes.origin.push()
         except GitCommandError as e:
-            error_message = f"Push failed: {e!s}"
-            if hasattr(e, "stderr") and e.stderr:
-                error_message += f"\nDetails: {e.stderr.strip()}"
-            raise Exception(error_message)
+            details = e.stderr.strip() if hasattr(e, "stderr") and e.stderr else ""
+            raise Exception(f"Push failed: {e!s}{'. Details: ' + details if details else ''}")
         except Exception as e:
+            logging.exception("An unexpected error occurred during push")
             raise Exception(f"An unexpected error occurred during push: {e!s}")
 
     def get_file_status(self, file_path: str) -> str:
@@ -245,10 +244,10 @@ class GitManager:
                 return "normal"  # If not in untracked, modified, or staged, assume normal.
 
         except git.GitCommandError as e:
-            print(f"Git command error while getting file status for {file_path}: {e!s}")
+            logging.error("Git command error while getting file status for %s: %s", file_path, e)
             return "unknown"
-        except Exception as e:
-            print(f"Error getting file status for {file_path}: {e!s}")
+        except Exception:
+            logging.exception("Error getting file status for %s", file_path)
             return "unknown"
 
     def get_all_file_statuses(self) -> dict[str, set[str]]:
@@ -316,11 +315,11 @@ class GitManager:
             # This is consistent with how `git status` reports such states.
 
         except git.GitCommandError as e:
-            print(f"Git command error while getting all file statuses: {e!s}")
+            logging.error("Git command error while getting all file statuses: %s", e)
             # Return whatever statuses were collected, or empty if error was early
             return statuses  # Or re-initialize to empty: {"modified": set(), "staged": set(), "untracked": set()}
-        except Exception as e:
-            print(f"Error getting all file statuses: {e!s}")
+        except Exception:
+            logging.exception("Error getting all file statuses")
             return statuses  # Or re-initialize to empty
 
         return statuses
@@ -353,17 +352,15 @@ class GitManager:
             self.repo.git.checkout(branch_name)
             return None
         except git.GitCommandError as e:
-            logging.error(f"切换分支 {branch_name} 失败：{e!s}")  # Failed to switch branch
+            logging.error("切换分支 %s 失败: %s", branch_name, e)  # Failed to switch branch
             # 提供更具体的错误信息
             if "did not match any file(s) known to git" in str(e):
                 return f"分支 '{branch_name}' 不存在。"  # Branch does not exist.
             elif "Your local changes to the following files would be overwritten by checkout" in str(e):
                 return "切换分支会覆盖本地未提交的更改，请先提交或贮藏。"  # Switching branches would overwrite local uncommitted changes.
             return f"切换到分支 '{branch_name}' 失败：{e.stderr.strip() if e.stderr else e!s}"  # Failed to switch to branch.
-        except Exception as e:
-            logging.error(
-                f"切换分支 {branch_name} 时发生未知错误：{e!s}"
-            )  # Unknown error occurred while switching branch.
+        except Exception as e: # Keep the f-string for the return message to user
+            logging.exception("切换分支 %s 时发生未知错误", branch_name)
             return f"切换到分支 '{branch_name}' 时发生未知错误。"  # Unknown error occurred while switching to branch.
 
     def create_and_switch_branch(self, new_branch_name: str, base_branch: Optional[str] = None) -> Optional[str]:
@@ -399,13 +396,12 @@ class GitManager:
             return self.switch_branch(new_branch_name)
 
         except git.GitCommandError as e:
-            error_msg = f"创建分支 '{new_branch_name}' 失败：{e.stderr.strip() if e.stderr else str(e)}"
-            logging.error(error_msg)
-            return error_msg
+            err_details = e.stderr.strip() if hasattr(e, 'stderr') and e.stderr else str(e)
+            logging.error("创建分支 '%s' 失败: %s", new_branch_name, err_details)
+            return f"创建分支 '{new_branch_name}' 失败：{err_details}"
         except Exception as e:
-            error_msg = f"创建分支 '{new_branch_name}' 时发生未知错误：{e!s}"
-            logging.error(error_msg)
-            return error_msg
+            logging.exception("创建分支 '%s' 时发生未知错误", new_branch_name)
+            return f"创建分支 '{new_branch_name}' 时发生未知错误：{e!s}"
 
     def merge_branch(self, branch_name: str) -> Optional[str]:
         """合并指定分支到当前分支
@@ -425,13 +421,12 @@ class GitManager:
             self.repo.git.merge(branch_name)
             return None
         except git.GitCommandError as e:
-            error_message = f"合并失败：{e.stderr.strip() if e.stderr else str(e)}"
-            logging.error(error_message)
-            return error_message
-        except Exception as e:
-            error_message = f"合并分支时发生未知错误：{e}"
-            logging.exception(error_message)
-            return error_message
+            err_details = e.stderr.strip() if hasattr(e, 'stderr') and e.stderr else str(e)
+            logging.error("合并分支 %s 失败: %s", branch_name, err_details)
+            return f"合并失败：{err_details}"
+        except Exception:
+            logging.exception("合并分支 %s 时发生未知错误", branch_name)
+            return f"合并分支时发生未知错误" # Removed {e} as logging.exception captures it
 
     def _load_gitignore_patterns(self):
         """加载.gitignore 文件中的忽略规则"""

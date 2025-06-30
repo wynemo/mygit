@@ -242,9 +242,9 @@ class WorkspaceExplorer(QWidget):
 
             text_edit.dirty_status_changed.connect(self.update_filename_display)
 
-        except Exception as e:
+        except Exception:
             logging.exception("Error opening file")
-            print(f"Error opening file: {e}")
+            # print(f"Error opening file: {e}") # Replaced by logging.exception
 
     def handle_file_event(self, file_path: str, event_type: str):
         """处理文件事件，刷新相应的打开文件
@@ -1002,8 +1002,8 @@ class FileTreeWidget(QTreeWidget):
                         return
 
             logging.info("已在文件管理器中打开：%s", dir_path)
-        except Exception as e:
-            logging.error("在文件管理器中打开失败：%s", e)
+        except Exception:
+            logging.exception("在文件管理器中打开失败") # Removed %s, e as it's now part of exception log
 
     def _get_expanded_paths(self, item: QTreeWidgetItem, expanded_paths: set):
         """递归获取所有展开的文件夹路径"""
