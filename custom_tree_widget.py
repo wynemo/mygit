@@ -13,8 +13,8 @@ from PyQt6.QtWidgets import (
 )
 
 from components.git_reset_dialog import GitResetDialog
+from components.hover_reveal_tree_widget import HoverRevealTreeWidget
 from git_manager import GitManager
-from hover_reveal_tree_widget import HoverRevealTreeWidget
 from utils import get_main_window_by_parent
 
 

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QApplication, QLabel, QMenu, QTreeWidgetItem, QVBoxLayout, QWidget
 
-from hover_reveal_tree_widget import HoverRevealTreeWidget
+from components.hover_reveal_tree_widget import HoverRevealTreeWidget
 from utils import get_main_window
 
 if TYPE_CHECKING:
