@@ -340,6 +340,8 @@ class CommitWidget(QFrame):
             layout.addWidget(diff_viewer)
 
             # 获取文件内容
+            file_status = item.text(1)
+
             if is_staged:
                 # 对于暂存区文件，比较 HEAD 和暂存区
                 try:
@@ -347,9 +349,17 @@ class CommitWidget(QFrame):
                 except Exception:
                     # 如果是新文件，HEAD 中没有内容
                     old_content = ""
-                new_content = repo.git.show(f":{file_path}")  # 暂存区内容
+
+                if file_status == "Deleted":
+                    # 暂存区删除的文件，新内容为空
+                    new_content = ""
+                else:
+                    try:
+                        new_content = repo.git.show(f":{file_path}")  # 暂存区内容
+                    except Exception:
+                        new_content = ""
             # 对于未暂存文件，比较暂存区和工作区
-            elif item.text(1) == "Untracked":
+            elif file_status == "Untracked":
                 # 未跟踪文件，显示空内容和当前文件内容
                 old_content = ""
                 try:
@@ -358,6 +368,13 @@ class CommitWidget(QFrame):
                 except Exception:
                     logging.exception("读取文件失败")
                     new_content = "Error reading file"
+            elif file_status == "Deleted":
+                # 工作区删除的文件，新内容为空，旧内容从暂存区获取
+                try:
+                    old_content = repo.git.show(f":{file_path}")  # 暂存区内容
+                except Exception:
+                    old_content = ""
+                new_content = ""
             else:
                 # 已修改文件，比较暂存区和工作区
                 try:
