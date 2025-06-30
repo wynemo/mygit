@@ -2,6 +2,8 @@ import os
 
 from PyQt6.QtGui import QIcon
 
+from settings import ICONS_FOLDER
+
 from .language_map import LANGUAGE_MAP
 
 # 语言图标映射，将语言类型映射到图标文件名
@@ -52,11 +54,11 @@ def get_language_icon(file_name: str) -> QIcon:
     icon_filename = LANGUAGE_ICON_MAP.get(language, "file.svg")
 
     # 构建图标文件路径
-    icon_path = os.path.join("icons", "languages", icon_filename)
+    icon_path = os.path.join(ICONS_FOLDER, "languages", icon_filename)
 
     # 如果图标文件不存在，使用默认图标
     if not os.path.exists(icon_path):
-        icon_path = os.path.join("icons", "languages", "file.svg")
+        icon_path = os.path.join(ICONS_FOLDER, "languages", "file.svg")
         # 如果默认图标也不存在，返回空图标
         if not os.path.exists(icon_path):
             return QIcon()
@@ -71,7 +73,7 @@ def get_folder_icon() -> QIcon:
     Returns:
         QIcon: 文件夹图标
     """
-    icon_path = os.path.join("icons", "folder.svg")
+    icon_path = os.path.join(ICONS_FOLDER, "folder.svg")
     if os.path.exists(icon_path):
         return QIcon(icon_path)
     return QIcon()

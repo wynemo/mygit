@@ -111,3 +111,6 @@ BLAME_COLOR_PALETTE = [
     QColor(235, 235, 255),  # lightest blue
     QColor(255, 255, 255),  # white
 ]
+
+# icons folder
+ICONS_FOLDER = os.path.join(os.path.dirname(__file__), "icons")
