@@ -164,8 +164,8 @@ class CommitWidget(QFrame):
             # 还原文件修改
             self.git_manager.repo.git.checkout("--", file_path)
             self.refresh_file_status()
-        except Exception as e:
-            logging.error(f"还原文件失败：{e}")
+        except Exception:
+            logging.exception("还原文件失败")
 
     def _show_unstaged_context_menu(self, position):
         """显示未暂存文件的右键菜单"""
@@ -231,8 +231,8 @@ class CommitWidget(QFrame):
             try:
                 self.git_manager.repo.index.add([file_path])
                 self.refresh_file_status()
-            except Exception as e:
-                print(f"无法暂存文件：{e!s}")
+            except Exception:
+                logging.exception("无法暂存文件")
 
     def unstage_selected_file(self):
         """取消暂存选中的文件"""
@@ -243,8 +243,8 @@ class CommitWidget(QFrame):
             try:
                 self.git_manager.repo.git.reset("HEAD", file_path)
                 self.refresh_file_status()
-            except Exception as e:
-                print(f"无法取消暂存文件：{e!s}")
+            except Exception:
+                logging.exception("无法取消暂存文件")
 
     def generate_commit_message(self):
         """生成提交信息"""
@@ -303,6 +303,7 @@ class CommitWidget(QFrame):
 
             # 创建差异查看对话框
             diff_dialog = QDialog(self)
+            diff_dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
             diff_dialog.setWindowTitle(f"文件差异 - {file_path}")
             diff_dialog.resize(800, 600)
 
@@ -315,7 +316,7 @@ class CommitWidget(QFrame):
                 # 对于暂存区文件，比较 HEAD 和暂存区
                 try:
                     old_content = repo.git.show(f"HEAD:{file_path}")
-                except:
+                except Exception:
                     # 如果是新文件，HEAD 中没有内容
                     old_content = ""
                 new_content = repo.git.show(f":{file_path}")  # 暂存区内容
@@ -326,19 +327,21 @@ class CommitWidget(QFrame):
                 try:
                     with open(f"{repo.working_dir}/{file_path}", "r", encoding="utf-8") as f:
                         new_content = f.read()
-                except Exception as e:
-                    new_content = f"Error reading file: {e!s}"
+                except Exception:
+                    logging.exception("读取文件失败")
+                    new_content = "Error reading file"
             else:
                 # 已修改文件，比较暂存区和工作区
                 try:
                     old_content = repo.git.show(f":{file_path}")  # 暂存区内容
-                except:
+                except Exception:
                     old_content = ""
                 try:
                     with open(f"{repo.working_dir}/{file_path}", "r", encoding="utf-8") as f:
                         new_content = f.read()
-                except Exception as e:
-                    new_content = f"Error reading file: {e!s}"
+                except Exception:
+                    logging.exception("读取文件失败")
+                    new_content = "Error reading file"
 
             # 设置差异内容
             diff_viewer.set_texts(old_content, new_content, file_path, file_path, "HEAD", None)
@@ -347,9 +350,9 @@ class CommitWidget(QFrame):
             # 显示对话框
             diff_dialog.show()
 
-        except Exception as e:
+        except Exception:
             logging.exception("显示文件差异失败")
-            QMessageBox.critical(self, "错误", f"显示文件差异失败：{e!s}")
+            QMessageBox.critical(self, "错误", "显示文件差异失败")
 
     def accept(self):
         """处理确认操作"""
@@ -362,7 +365,7 @@ class CommitWidget(QFrame):
 
             # 检查是否有暂存的文件
             staged = self.git_manager.repo.index.diff("HEAD")
-            if not staged:
+            if not list(staged):
                 QMessageBox.warning(self, "警告", "没有暂存的文件")
                 return
 
@@ -375,6 +378,6 @@ class CommitWidget(QFrame):
             # clear commit message
             self.message_edit.clear()
 
-        except Exception as e:
+        except Exception:
             logging.exception("提交失败")
-            QMessageBox.critical(self, "错误", f"提交失败：{e!s}")
+            QMessageBox.critical(self, "错误", "提交失败")
