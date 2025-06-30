@@ -326,6 +326,11 @@ class WorkspaceExplorer(QWidget):
     def set_workspace_path(self, path):
         """设置并加载工作区路径"""
         self.workspace_path = path
+
+        # 重置文件索引状态，确保切换项目时重新构建索引
+        self._index_initialized = False
+        self.file_index_manager.clear()  # 清空旧索引
+
         self.refresh_file_tree()
         self.update_folder_name_label(path)  # 新增：调用更新标签的方法
         self.search_box_widget.setToolTip(f"{self.tr('Search')} - {self.folder_name_label.text()}")  # 新增 ToolTip

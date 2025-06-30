@@ -132,6 +132,7 @@ class FileIndexThread(QThread):
     def run(self):
         """在后台线程中执行索引建立"""
         try:
+
             def _is_dir_ignored(path: str) -> bool:
                 relative_path = os.path.relpath(path, self.git_manager.repo_path)
                 return self.git_manager.is_ignored(relative_path) or relative_path.startswith(".git")

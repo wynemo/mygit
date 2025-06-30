@@ -159,6 +159,10 @@ class FileIndexManager:
             }
             self.search_cache.clear()
 
+    def clear(self) -> None:
+        """清空所有索引数据（clear_index的别名）"""
+        self.clear_index()
+
     def _add_to_trie(self, trie_root: TrieNode, text: str, file_path: str) -> None:
         """添加文本到前缀树"""
         node = trie_root
