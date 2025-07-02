@@ -635,6 +635,11 @@ class MergeDiffViewer(DiffViewer):
         self.result_edit.horizontalScrollBar().valueChanged.connect(lambda val: self._sync_hscroll(val, "result"))
         self.parent2_edit.horizontalScrollBar().valueChanged.connect(lambda val: self._sync_hscroll(val, "parent2"))
 
+        # 添加差异高亮器
+        self.parent1_edit.highlighter = MultiHighlighter(self.parent1_edit.document(), "parent1_edit", self.result_edit.document())
+        self.result_edit.highlighter = MultiHighlighter(self.result_edit.document(), "result_edit", None)
+        self.parent2_edit.highlighter = MultiHighlighter(self.parent2_edit.document(), "parent2_edit", self.result_edit.document())
+
         # 添加到布局
         layout.addWidget(self.parent1_edit)
         layout.addWidget(self.result_edit)
@@ -667,9 +672,9 @@ class MergeDiffViewer(DiffViewer):
         self.parent2_edit.current_commit_hash = parent2_commit_hash
 
         # 计算差异
-        self._compute_diffs(parent1_text, result_text, parent2_text)
+        self._compute_diffs(parent1_text, result_text, parent2_text, file_path)
 
-    def _compute_diffs(self, parent1_text: str, result_text: str, parent2_text: str):
+    def _compute_diffs(self, parent1_text: str, result_text: str, parent2_text: str, file_path: str):
         """计算三个文本之间的差异"""
         # 计算 parent1 和 result 的差异
         self.parent1_chunks = self.diff_calculator.compute_diff(parent1_text, result_text)
@@ -740,6 +745,12 @@ class MergeDiffViewer(DiffViewer):
             result_chunks.append(current_chunk)
 
         self.result_edit.highlighter.set_diff_chunks(result_chunks)
+
+        # 设置语法高亮语言
+        language = LANGUAGE_MAP.get(file_path.split(".")[-1], "text")
+        self.parent1_edit.highlighter.set_language(language)
+        self.result_edit.highlighter.set_language(language)
+        self.parent2_edit.highlighter.set_language(language)
 
     def _on_scroll(self, value, source: str):
         """处理滚动同步

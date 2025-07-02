@@ -260,6 +260,19 @@ class NewDiffHighlighterEngine:
         self.equal_format.setBackground(QColor(255, 255, 255))  # 白色背景
         self.equal_format.setForeground(QColor(0, 0, 0))  # 黑色文字
 
+        # 三向合并的差异格式
+        self.conflict_format = QTextCharFormat()
+        self.conflict_format.setBackground(QColor(255, 200, 255))  # 紫色背景 - 冲突
+        self.conflict_format.setForeground(QColor(150, 0, 150))  # 深紫色文字
+
+        self.parent1_diff_format = QTextCharFormat()
+        self.parent1_diff_format.setBackground(QColor(255, 235, 200))  # 浅橙色背景
+        self.parent1_diff_format.setForeground(QColor(150, 100, 0))  # 深橙色文字
+
+        self.parent2_diff_format = QTextCharFormat()
+        self.parent2_diff_format.setBackground(QColor(200, 235, 255))  # 浅蓝色背景
+        self.parent2_diff_format.setForeground(QColor(0, 100, 150))  # 深蓝色文字
+
     def set_diff_chunks(self, chunks):
         self.diff_chunks = chunks
 
@@ -284,12 +297,45 @@ class NewDiffHighlighterEngine:
 
     def highlightBlock(self, text: str):
         """重写高亮方法"""
-        # if not self.diff_list:
-        #     return
-
-        # 获取当前块在整个文档中的位置
         current_block = self.highlighter.currentBlock()
         block_number = current_block.blockNumber()
+        
+        # 首先处理基于差异块的高亮（用于三向合并）
+        for chunk in self.diff_chunks:
+            # 根据编辑器类型选择正确的范围检查
+            if self.editor_type in ["right", "parent2_edit", "result_edit"]:
+                chunk_contains_block = chunk.right_start <= block_number < chunk.right_end
+            else:  # left, parent1_edit
+                chunk_contains_block = chunk.left_start <= block_number < chunk.left_end
+                
+            if chunk_contains_block:
+                format_to_apply = None
+                
+                if chunk.type == "conflict":
+                    format_to_apply = self.conflict_format
+                elif chunk.type == "parent1_diff":
+                    format_to_apply = self.parent1_diff_format
+                elif chunk.type == "parent2_diff":
+                    format_to_apply = self.parent2_diff_format
+                elif chunk.type == "delete" and self.is_left_side:
+                    format_to_apply = self.deleted_format
+                elif chunk.type == "insert" and self.is_right_side:
+                    format_to_apply = self.inserted_format
+                elif chunk.type == "replace":
+                    if self.is_left_side:
+                        format_to_apply = self.deleted_format
+                    else:
+                        format_to_apply = self.inserted_format
+                
+                if format_to_apply:
+                    self.highlighter.setFormat(0, len(text), format_to_apply)
+                    return
+
+        # 如果没有基于差异块的高亮，继续使用diff_match_patch的逻辑
+        if not self.diff_list:
+            return
+
+        # 获取当前块在整个文档中的位置
         block_start = current_block.position()
         block_length = count_utf16_code_units(text)
 
