@@ -635,6 +635,16 @@ class MergeDiffViewer(DiffViewer):
         self.result_edit.horizontalScrollBar().valueChanged.connect(lambda val: self._sync_hscroll(val, "result"))
         self.parent2_edit.horizontalScrollBar().valueChanged.connect(lambda val: self._sync_hscroll(val, "parent2"))
 
+        # 显式设置 MultiHighlighter，以避免 SyncedTextEdit 中的默认 DiffHighlighter 引发错误
+        # result_edit 继续使用默认的 DiffHighlighter，因为其 editor_type="result_edit" 会在 DiffHighlighterEngine 中提前返回，从而避免错误
+        self.parent1_edit.highlighter = MultiHighlighter(
+            self.parent1_edit.document(), "parent1_edit", self.result_edit.document()
+        )
+        self.parent2_edit.highlighter = MultiHighlighter(
+            self.parent2_edit.document(), "parent2_edit", self.result_edit.document()
+        )
+        # self.result_edit.highlighter 将由 SyncedTextEdit.setObjectName 自动创建为 DiffHighlighter
+
         # 添加到布局
         layout.addWidget(self.parent1_edit)
         layout.addWidget(self.result_edit)
@@ -677,10 +687,15 @@ class MergeDiffViewer(DiffViewer):
         self.parent2_chunks = self.diff_calculator.compute_diff(result_text, parent2_text)
 
         # 设置高亮
+        # parent1_edit 和 parent2_edit 现在使用 MultiHighlighter, 需要调用 set_texts
         self.parent1_edit.highlighter.set_diff_chunks(self.parent1_chunks)
-        self.parent2_edit.highlighter.set_diff_chunks(self.parent2_chunks)
+        self.parent1_edit.highlighter.set_texts(parent1_text, result_text)
 
-        # 为 result 编辑器创建转换后的差异块
+        self.parent2_edit.highlighter.set_diff_chunks(self.parent2_chunks)
+        self.parent2_edit.highlighter.set_texts(result_text, parent2_text)
+
+
+        # 为 result 编辑器创建转换后的差异块 (result_edit 仍使用 DiffHighlighter)
         result_chunks = []
 
         # 获取 result 中的所有行
