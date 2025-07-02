@@ -120,6 +120,6 @@
 125. ~~FileQuickSearchPopup file_list 有可能为空~~
 126. ~~workspace_explorer.py 里面直接使用 threading 考虑用 Qthread~~
 127. ~~切换项目 FileQuickSearchPopup 里面文件没有更新 也就是索引没有更新 workspace_explorer.file_index_manager~~
-128. 文件删除在提交的时候，看不出是删除了，查看差异的时候表现得不对，提示文件找不到; 同时，对于 git 删除的文件，提示无法暂存：[Errno 2] No such file or directory: 'dialogs/compare_with_working_dialog.py'
+128. ~~文件删除在提交的时候，看不出是删除了，查看差异的时候表现得不对，提示文件找不到; 同时，对于 git 删除的文件，提示无法暂存：[Errno 2] No such file or directory: 'dialogs/compare_with_working_dialog.py'~~
 129. ~~有内存泄漏问题 https://github.com/bloomberg/memray 使用这个来排查下 很值得怀疑 _update_file_quick_search_list 最近加的索引的功能~~
-130. 工作区文件右键菜单添加“文件历史”选项
+130. ~~工作区文件右键菜单添加“文件历史”选项~~
