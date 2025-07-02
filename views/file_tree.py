@@ -17,7 +17,6 @@ from PyQt6.QtWidgets import (
 )
 
 from editors.text_edit import SyncedTextEdit  # Ensure this is present
-from utils import get_main_window_by_parent
 from views.file_history_view import FileHistoryView
 
 if TYPE_CHECKING:
@@ -280,7 +279,7 @@ class FileTreeWidget(QTreeWidget):
     def highlight_file_item(self, file_path: str):
         """高亮显示指定的文件项"""
         # 清除之前的高亮
-        parent_workspace_explorer: WorkspaceExplorer = get_main_window_by_parent(self).workspace_explorer
+        parent_workspace_explorer: WorkspaceExplorer = self.workspace_explorer
         if parent_workspace_explorer and parent_workspace_explorer.current_highlighted_item:
             # 检查 weakref 是否仍然有效
             current_highlighted_item = parent_workspace_explorer.current_highlighted_item()
