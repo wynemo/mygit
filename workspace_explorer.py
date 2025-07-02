@@ -487,6 +487,17 @@ class WorkspaceExplorer(QWidget):
 
         menu = QMenu(self)
 
+        # 获取当前标签页对应的文件路径
+        current_widget = self.tab_widget.widget(tab_index)
+        file_path = current_widget.property("file_path") if current_widget else None
+
+        # 如果有文件路径，添加 File History 菜单项
+        if file_path:
+            file_history_action = QAction(self.tr("File History"), self)
+            file_history_action.triggered.connect(lambda: self.file_tree._show_file_history(file_path))
+            menu.addAction(file_history_action)
+            menu.addSeparator()
+
         close_others_action = QAction(self.tr("Close Other Tabs"), self)
         close_others_action.triggered.connect(lambda: self.close_other_tabs(tab_index))
         menu.addAction(close_others_action)
