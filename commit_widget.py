@@ -198,7 +198,7 @@ class CommitWidget(QFrame):
         repo = self.git_manager.repo
 
         # 获取暂存的文件
-        staged = repo.index.diff("HEAD")
+        staged = repo.head.commit.diff()
         for diff in staged:
             item = QTreeWidgetItem(self.staged_tree)
             item.setText(0, diff.a_path or diff.b_path)
