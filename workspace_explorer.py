@@ -29,7 +29,6 @@ from components.file_search_widget import FileSearchWidget
 from editors.modified_text_edit import ModifiedTextEdit
 from editors.text_edit import SyncedTextEdit  # Ensure this is present
 from file_changes_view import FileChangesView
-from file_history_view import FileHistoryView
 from folder_history_view import FolderHistoryView  # Import FolderHistoryView
 from syntax_highlighter import CodeHighlighter
 from threads import FileIndexThread
@@ -37,6 +36,7 @@ from utils import get_main_window_by_parent
 from utils.file_index_manager import FileIndexManager
 from utils.language_icons import get_folder_icon, get_language_icon
 from utils.language_map import LANGUAGE_MAP
+from views.file_history_view import FileHistoryView
 
 if TYPE_CHECKING:
     from git_manager import GitManager
