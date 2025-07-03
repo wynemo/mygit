@@ -274,20 +274,15 @@ class NewDiffHighlighterEngine:
         self.diff_list = self.dmp.diff_main(left_text, right_text)
         self.dmp.diff_cleanupSemantic(self.diff_list)
 
-        # 触发重新高亮
-        # self.highlighter.rehighlight()
-
     def set_merge_texts(self, left_text: str, right_text: str, result_text: str):
         """设置要对比的文本"""
         # 计算差异
         self.diff_list = self.dmp.diff_main(left_text, result_text)
-        diff_list = self.dmp.diff_main(right_text, result_text)
+        self.other_diff_list = self.dmp.diff_main(right_text, result_text)
         # merge the two lists
-        self.diff_list.extend(diff_list)
+        # self.diff_list.extend(diff_list)
         self.dmp.diff_cleanupSemantic(self.diff_list)
-
-        # 触发重新高亮
-        # self.highlighter.rehighlight()
+        self.dmp.diff_cleanupSemantic(self.other_diff_list)
 
     # left side property
     @property
@@ -305,8 +300,12 @@ class NewDiffHighlighterEngine:
 
     def highlightBlock(self, text: str):
         """重写高亮方法"""
-        # if not self.diff_list:
-        #     return
+        self._highlightBlock(text, self.diff_list)
+        if hasattr(self, "other_diff_list"):
+            self._highlightBlock(text, self.other_diff_list)
+
+    def _highlightBlock(self, text: str, diff_list):
+        """重写高亮方法"""
 
         # 获取当前块在整个文档中的位置
         current_block = self.highlighter.currentBlock()
@@ -317,7 +316,7 @@ class NewDiffHighlighterEngine:
         # 根据差异列表应用格式
         current_pos = 0
 
-        for op, data in self.diff_list:
+        for op, data in diff_list:
             data_length = count_utf16_code_units(data)
 
             # 检查这个差异是否与当前块重叠
