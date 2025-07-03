@@ -1,8 +1,8 @@
 import logging
 from typing import Optional
 
-from PyQt6.QtCore import QPoint, QTimer
-from PyQt6.QtGui import QColor, QTextCharFormat, QTextCursor
+from PyQt6.QtCore import QPoint, Qt, QTimer
+from PyQt6.QtGui import QColor, QKeyEvent, QTextCharFormat, QTextCursor
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QTextEdit, QVBoxLayout, QWidget
 
 from diff_calculator import DiffCalculator, DiffChunk, DifflibCalculator
@@ -537,7 +537,7 @@ class DiffViewer(QWidget):
         # 确保滚动值在有效范围内
         return max(0, min(target_scroll, target_max))
 
-    def _on_scroll(self, value, is_left_scroll: bool):
+    def _on_scroll(self, _value, is_left_scroll: bool):
         """统一处理滚动事件
         Args:
             value: 滚动条的值
@@ -609,11 +609,25 @@ class MergeDiffViewer(DiffViewer):
         super().__init__(diff_calculator)
         self.parent1_chunks = []
         self.parent2_chunks = []
+        self.merge_actual_diff_chunks = []  # 三向比较的实际差异块
+        self.merge_current_diff_index = -1  # 当前差异块索引
 
     def setup_ui(self):
-        layout = QHBoxLayout()
-        layout.setSpacing(0)
-        layout.setContentsMargins(0, 0, 0, 0)
+        # 按钮布局
+        button_layout = QHBoxLayout()
+        self.merge_prev_diff_button = QPushButton("Previous Change")
+        self.merge_next_diff_button = QPushButton("Next Change")
+        self.merge_prev_diff_button.setEnabled(False)
+        self.merge_next_diff_button.setEnabled(False)
+        self.merge_prev_diff_button.clicked.connect(self.navigate_to_previous_merge_diff)
+        self.merge_next_diff_button.clicked.connect(self.navigate_to_next_merge_diff)
+        button_layout.addWidget(self.merge_prev_diff_button)
+        button_layout.addWidget(self.merge_next_diff_button)
+
+        # 编辑器布局
+        editor_layout = QHBoxLayout()
+        editor_layout.setSpacing(0)
+        editor_layout.setContentsMargins(0, 0, 0, 0)
 
         # 创建三个编辑器：parent1, result, parent2
         self.parent1_edit = SyncedTextEdit()
@@ -646,11 +660,19 @@ class MergeDiffViewer(DiffViewer):
         self.result_edit.highlighter = MultiHighlighter(self.result_edit.document(), "result_edit", None)
         # self.result_edit.highlighter 将由 SyncedTextEdit.setObjectName 自动创建为 DiffHighlighter
 
-        # 添加到布局
-        layout.addWidget(self.parent1_edit)
-        layout.addWidget(self.result_edit)
-        layout.addWidget(self.parent2_edit)
-        self.setLayout(layout)
+        # 添加到编辑器布局
+        editor_layout.addWidget(self.parent1_edit)
+        editor_layout.addWidget(self.result_edit)
+        editor_layout.addWidget(self.parent2_edit)
+
+        # 主布局
+        main_layout = QVBoxLayout()
+        main_layout.addLayout(button_layout)
+        main_layout.addLayout(editor_layout)
+        self.setLayout(main_layout)
+
+        # 设置焦点策略，以便接收键盘事件
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
     def set_texts(
         self,
@@ -766,7 +788,190 @@ class MergeDiffViewer(DiffViewer):
         self.result_edit.highlighter.set_diff_chunks(result_chunks)
         self.result_edit.highlighter.set_merge_texts(parent1_text, parent2_text, result_text)
 
-    def _on_scroll(self, value, source: str):
+        # 计算合并的差异块用于导航
+        self.merge_actual_diff_chunks = []
+
+        # 将所有非 equal 类型的差异块合并到一个列表中
+        all_diff_chunks = []
+
+        # 添加 parent1 的差异块
+        for chunk in self.parent1_chunks:
+            if chunk.type != "equal":
+                all_diff_chunks.append(("parent1", chunk))
+
+        # 添加 parent2 的差异块
+        for chunk in self.parent2_chunks:
+            if chunk.type != "equal":
+                all_diff_chunks.append(("parent2", chunk))
+
+        # 按行号排序（使用 right 侧的行号，因为都是相对于 result 的）
+        all_diff_chunks.sort(key=lambda x: x[1].right_start)
+
+        # 去重和合并相邻的差异块
+        current_chunk = None
+        for source, chunk in all_diff_chunks:
+            if current_chunk is None:
+                current_chunk = {
+                    "start": chunk.right_start,
+                    "end": chunk.right_end,
+                    "sources": [source]
+                }
+            elif chunk.right_start <= current_chunk["end"]:
+                # 相邻或重叠的差异块，合并
+                current_chunk["end"] = max(current_chunk["end"], chunk.right_end)
+                if source not in current_chunk["sources"]:
+                    current_chunk["sources"].append(source)
+            else:
+                # 不相邻的差异块，保存当前块并开始新块
+                self.merge_actual_diff_chunks.append(current_chunk)
+                current_chunk = {
+                    "start": chunk.right_start,
+                    "end": chunk.right_end,
+                    "sources": [source]
+                }
+
+        if current_chunk:
+            self.merge_actual_diff_chunks.append(current_chunk)
+
+        # 重置当前差异块索引
+        self.merge_current_diff_index = -1
+        self._update_merge_button_states()
+
+        logging.info("三向比较实际差异块数量: %d", len(self.merge_actual_diff_chunks))
+
+    def _update_merge_button_states(self):
+        """更新三向比较导航按钮状态"""
+        num_actual_diffs = len(self.merge_actual_diff_chunks)
+        prev_enabled = self.merge_current_diff_index > 0
+        next_enabled = self.merge_current_diff_index < num_actual_diffs - 1
+
+        # 特殊情况：初始加载时，如果有差异块，current_diff_index 为 -1
+        if self.merge_current_diff_index == -1 and num_actual_diffs > 0:
+            next_enabled = True  # 允许"Next"到达第一个差异块
+
+        self.merge_prev_diff_button.setEnabled(prev_enabled)
+        self.merge_next_diff_button.setEnabled(next_enabled)
+
+        logging.info(
+            "更新三向比较按钮状态: num_actual_diffs=%d, current_diff_index=%d -> "
+            "Prev button enabled: %s, Next button enabled: %s",
+            num_actual_diffs,
+            self.merge_current_diff_index,
+            prev_enabled,
+            next_enabled
+        )
+
+    def navigate_to_previous_merge_diff(self):
+        """导航到上一个三向比较差异块"""
+        logging.info("尝试导航到上一个三向比较差异块. 当前索引: %d", self.merge_current_diff_index)
+        if not self.merge_actual_diff_chunks:
+            self._clear_merge_highlights()
+            logging.info("没有三向比较差异块可导航。清除高亮。")
+            return
+        if self.merge_current_diff_index > 0:
+            self.merge_current_diff_index -= 1
+            logging.info("导航到上一个三向比较差异块. 新索引: %d", self.merge_current_diff_index)
+            self._scroll_to_current_merge_diff()
+        else:
+            logging.info("已经是第一个三向比较差异块或没有差异块可导航。")
+        self._update_merge_button_states()
+
+    def navigate_to_next_merge_diff(self):
+        """导航到下一个三向比较差异块"""
+        logging.info("尝试导航到下一个三向比较差异块. 当前索引: %d", self.merge_current_diff_index)
+        if not self.merge_actual_diff_chunks:
+            self._clear_merge_highlights()
+            logging.info("没有三向比较差异块可导航。清除高亮。")
+            return
+        if self.merge_current_diff_index < len(self.merge_actual_diff_chunks) - 1:
+            self.merge_current_diff_index += 1
+            logging.info("导航到下一个三向比较差异块. 新索引: %d", self.merge_current_diff_index)
+            self._scroll_to_current_merge_diff()
+        else:
+            logging.info("已经是最后一个三向比较差异块或没有差异块可导航。")
+        self._update_merge_button_states()
+
+    def _clear_merge_highlights(self):
+        """清除三向比较中的所有高亮"""
+        if hasattr(self, 'parent1_edit'):
+            self.parent1_edit.clear_highlighted_line()
+            self.parent1_edit.clear_block_background()
+        if hasattr(self, 'result_edit'):
+            self.result_edit.clear_highlighted_line()
+            self.result_edit.clear_block_background()
+        if hasattr(self, 'parent2_edit'):
+            self.parent2_edit.clear_highlighted_line()
+            self.parent2_edit.clear_block_background()
+
+    def _scroll_to_current_merge_diff(self):
+        """滚动到当前三向比较差异块"""
+        if 0 <= self.merge_current_diff_index < len(self.merge_actual_diff_chunks):
+            chunk = self.merge_actual_diff_chunks[self.merge_current_diff_index]
+            logging.info(
+                "滚动到三向比较差异块索引 %d: 行 %d-%d, 来源: %s",
+                self.merge_current_diff_index,
+                chunk["start"],
+                chunk["end"],
+                chunk["sources"]
+            )
+
+            # 清除之前的高亮
+            self._clear_merge_highlights()
+
+            # 设置新的高亮
+            target_line = chunk["start"]
+
+            # 高亮 result 编辑器中的差异块
+            if target_line < self.result_edit.document().blockCount():
+                self.result_edit.set_highlighted_line(target_line)
+                self.result_edit.set_block_background(target_line, chunk["end"])
+
+            # 根据来源高亮相应的父版本编辑器
+            if "parent1" in chunk["sources"]:
+                # 找到对应的 parent1 差异块
+                for p1_chunk in self.parent1_chunks:
+                    if (p1_chunk.type != "equal" and
+                        p1_chunk.right_start <= target_line < p1_chunk.right_end):
+                        if p1_chunk.left_start < self.parent1_edit.document().blockCount():
+                            self.parent1_edit.set_highlighted_line(p1_chunk.left_start)
+                            self.parent1_edit.set_block_background(p1_chunk.left_start, p1_chunk.left_end)
+                        break
+
+            if "parent2" in chunk["sources"]:
+                # 找到对应的 parent2 差异块
+                for p2_chunk in self.parent2_chunks:
+                    if (p2_chunk.type != "equal" and
+                        p2_chunk.left_start <= target_line < p2_chunk.left_end):
+                        if p2_chunk.right_start < self.parent2_edit.document().blockCount():
+                            self.parent2_edit.set_highlighted_line(p2_chunk.right_start)
+                            self.parent2_edit.set_block_background(p2_chunk.right_start, p2_chunk.right_end)
+                        break
+
+            # 滚动所有编辑器到目标行
+            self.parent1_edit.scroll_to_line(target_line)
+            self.result_edit.scroll_to_line(target_line)
+            self.parent2_edit.scroll_to_line(target_line)
+
+            logging.info("已滚动所有编辑器到行 %d", target_line)
+        else:
+            logging.warning(
+                "跳过滚动: merge_current_diff_index=%d, num_merge_actual_diffs=%d",
+                self.merge_current_diff_index,
+                len(self.merge_actual_diff_chunks)
+            )
+
+    def keyPressEvent(self, event: QKeyEvent):
+        """处理键盘事件，添加上下键导航支持"""
+        if event.key() == Qt.Key.Key_Up:
+            self.navigate_to_previous_merge_diff()
+            event.accept()
+        elif event.key() == Qt.Key.Key_Down:
+            self.navigate_to_next_merge_diff()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
+
+    def _on_scroll(self, _value, source: str):
         """处理滚动同步
         Args:
             value: 滚动条的值
