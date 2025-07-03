@@ -764,7 +764,7 @@ class MergeDiffViewer(DiffViewer):
             result_chunks.append(current_chunk)
 
         self.result_edit.highlighter.set_diff_chunks(result_chunks)
-        self.result_edit.highlighter.set_texts(result_text, result_text)
+        self.result_edit.highlighter.set_merge_texts(parent1_text, parent2_text, result_text)
 
     def _on_scroll(self, value, source: str):
         """处理滚动同步

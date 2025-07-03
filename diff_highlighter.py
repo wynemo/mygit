@@ -230,6 +230,11 @@ class MultiHighlighter(QSyntaxHighlighter):
             self.diff_engine.set_texts(left_text, right_text)
             self.rehighlight()
 
+    def set_merge_texts(self, left_text: str, right_text: str, result_text: str):
+        if hasattr(self.diff_engine, "set_merge_texts"):
+            self.diff_engine.set_merge_texts(left_text, right_text, result_text)
+            self.rehighlight()
+
     def highlightBlock(self, text):
         self.pygments_engine.highlightBlock(text)
         self.diff_engine.highlightBlock(text)
@@ -272,6 +277,18 @@ class NewDiffHighlighterEngine:
         # 触发重新高亮
         # self.highlighter.rehighlight()
 
+    def set_merge_texts(self, left_text: str, right_text: str, result_text: str):
+        """设置要对比的文本"""
+        # 计算差异
+        self.diff_list = self.dmp.diff_main(left_text, result_text)
+        diff_list = self.dmp.diff_main(right_text, result_text)
+        # merge the two lists
+        self.diff_list.extend(diff_list)
+        self.dmp.diff_cleanupSemantic(self.diff_list)
+
+        # 触发重新高亮
+        # self.highlighter.rehighlight()
+
     # left side property
     @property
     def is_left_side(self):
@@ -281,6 +298,10 @@ class NewDiffHighlighterEngine:
     @property
     def is_right_side(self):
         return self.editor_type in ["right", "parent2_edit"]
+
+    @property
+    def is_result_side(self):
+        return self.editor_type == "result_edit"
 
     def highlightBlock(self, text: str):
         """重写高亮方法"""
@@ -309,7 +330,7 @@ class NewDiffHighlighterEngine:
                     format_to_apply = None
 
                     if op == diff_match_patch.diff_match_patch.DIFF_DELETE:
-                        if self.is_left_side:
+                        if self.is_left_side or self.is_result_side:
                             format_to_apply = self.deleted_format
                     elif op == diff_match_patch.diff_match_patch.DIFF_INSERT:
                         if not self.is_left_side:
