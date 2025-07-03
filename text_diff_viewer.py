@@ -679,6 +679,15 @@ class MergeDiffViewer(DiffViewer):
         # 计算差异
         self._compute_diffs(parent1_text, result_text, parent2_text)
 
+        # 设置语法高亮语言
+        language = LANGUAGE_MAP.get(file_path.split(".")[-1], "text")
+        if hasattr(self.parent1_edit.highlighter, "set_language"):
+            self.parent1_edit.highlighter.set_language(language)
+        if hasattr(self.parent2_edit.highlighter, "set_language"):
+            self.parent2_edit.highlighter.set_language(language)
+        if hasattr(self.result_edit.highlighter, "set_language"):
+            self.result_edit.highlighter.set_language(language)
+
     def _compute_diffs(self, parent1_text: str, result_text: str, parent2_text: str):
         """计算三个文本之间的差异"""
         # 计算 parent1 和 result 的差异
@@ -693,7 +702,6 @@ class MergeDiffViewer(DiffViewer):
 
         self.parent2_edit.highlighter.set_diff_chunks(self.parent2_chunks)
         self.parent2_edit.highlighter.set_texts(result_text, parent2_text)
-
 
         # 为 result 编辑器创建转换后的差异块 (result_edit 仍使用 DiffHighlighter)
         result_chunks = []
