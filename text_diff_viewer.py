@@ -635,15 +635,15 @@ class MergeDiffViewer(DiffViewer):
         self.result_edit.horizontalScrollBar().valueChanged.connect(lambda val: self._sync_hscroll(val, "result"))
         self.parent2_edit.horizontalScrollBar().valueChanged.connect(lambda val: self._sync_hscroll(val, "parent2"))
 
-        # 显式设置 MultiHighlighter，以避免 SyncedTextEdit 中的默认 DiffHighlighter 引发错误
-        # result_edit 继续使用默认的 DiffHighlighter，因为其 editor_type="result_edit" 会在 DiffHighlighterEngine 中提前返回，从而避免错误
+        # parent1_edit and parent2_edit will use MultiHighlighter.
+        # result_edit will continue to use the default DiffHighlighter from SyncedTextEdit.
         self.parent1_edit.highlighter = MultiHighlighter(
-            self.parent1_edit.document(), "parent1_edit", self.result_edit.document()
+            self.parent1_edit.document(), "parent1_edit", other_document=self.result_edit.document()
         )
         self.parent2_edit.highlighter = MultiHighlighter(
-            self.parent2_edit.document(), "parent2_edit", self.result_edit.document()
+            self.parent2_edit.document(), "parent2_edit", other_document=self.result_edit.document()
         )
-        # self.result_edit.highlighter 将由 SyncedTextEdit.setObjectName 自动创建为 DiffHighlighter
+        # self.result_edit.highlighter is automatically created by SyncedTextEdit as DiffHighlighter.
 
         # 添加到布局
         layout.addWidget(self.parent1_edit)
@@ -693,17 +693,25 @@ class MergeDiffViewer(DiffViewer):
         # 计算 parent1 和 result 的差异
         self.parent1_chunks = self.diff_calculator.compute_diff(parent1_text, result_text)
         # 计算 result 和 parent2 的差异
-        self.parent2_chunks = self.diff_calculator.compute_diff(result_text, parent2_text)
+        # Note: For parent2_edit, we are comparing parent2_text (as "left") with result_text (as "right")
+        # This is because we want to see what's in parent2_text that's different from result_text.
+        # The NewDiffHighlighterEngine for parent2_edit will be configured to highlight insertions from parent2_text
+        # and deletions from result_text.
+        self.parent2_chunks = self.diff_calculator.compute_diff(parent2_text, result_text) # Adjusted order for parent2
 
         # 设置高亮
-        # parent1_edit 和 parent2_edit 现在使用 MultiHighlighter, 需要调用 set_texts
+        # parent1_edit (compares parent1_text as left, result_text as right)
         self.parent1_edit.highlighter.set_diff_chunks(self.parent1_chunks)
         self.parent1_edit.highlighter.set_texts(parent1_text, result_text)
 
+        # parent2_edit (compares parent2_text as left, result_text as right)
         self.parent2_edit.highlighter.set_diff_chunks(self.parent2_chunks)
-        self.parent2_edit.highlighter.set_texts(result_text, parent2_text)
+        self.parent2_edit.highlighter.set_texts(parent2_text, result_text) # Adjusted order
 
         # 为 result 编辑器创建转换后的差异块 (result_edit 仍使用 DiffHighlighter)
+        # The logic for result_edit remains the same, using parent1_chunks (parent1 vs result)
+        # and the original calculation of parent2 vs result for its highlighting.
+        original_parent2_chunks_for_result = self.diff_calculator.compute_diff(result_text, parent2_text)
         result_chunks = []
 
         # 获取 result 中的所有行
@@ -723,12 +731,14 @@ class MergeDiffViewer(DiffViewer):
                 for i in range(chunk.right_start, chunk.right_end):
                     line_status[i][0] = False
 
-        # 处理 parent2 的差异
-        for chunk in self.parent2_chunks:
+        # 处理 parent2 的差异 (using original_parent2_chunks_for_result for result_edit logic)
+        for chunk in original_parent2_chunks_for_result: # Use the correctly ordered chunks for result_edit
             if chunk.type != "equal":
                 # 标记这些行与 parent2 不同
+                # Here, chunk.left_start refers to result_text lines
                 for i in range(chunk.left_start, chunk.left_end):
-                    line_status[i][1] = False
+                    if i < len(result_lines): # Ensure index is within bounds
+                        line_status[i][1] = False
 
         # 根据行状态创建差异块
         current_chunk = None

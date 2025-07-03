@@ -274,13 +274,20 @@ class NewDiffHighlighterEngine:
 
     # left side property
     @property
-    def is_left_side(self):
+    def is_left_side_of_comparison(self):
+        """This editor shows the 'left' side of a two-way diff."""
         return self.editor_type in ["left", "parent1_edit"]
 
-    # right side property
     @property
-    def is_right_side(self):
-        return self.editor_type in ["right", "parent2_edit"]
+    def is_right_side_of_comparison(self):
+        """This editor shows the 'right' side of a two-way diff."""
+        # For 3-way diff, parent2_edit compares parent2_text (as left) vs result_text (as right).
+        # So, when editor_type is "parent2_edit", it's acting as the "left" side of its specific comparison.
+        # However, the highlighting rules for parent2_edit (what it shows from parent2_text)
+        # are similar to what a "right" pane would show (insertions relative to result_text).
+        # This logic is handled directly in highlightBlock.
+        return self.editor_type == "right"
+
 
     def highlightBlock(self, text: str):
         """重写高亮方法"""
@@ -309,25 +316,71 @@ class NewDiffHighlighterEngine:
                     format_to_apply = None
 
                     if op == diff_match_patch.diff_match_patch.DIFF_DELETE:
-                        if self.is_left_side:
+                        # Highlight deletions if:
+                        # 1. We are in a standard "left" editor (2-way diff)
+                        # 2. We are in "parent1_edit" (3-way diff, parent1 vs result)
+                        # parent2_edit compares parent2_text (left) vs result_text (right),
+                        # so a DIFF_DELETE means text is in parent2_text but not in result_text.
+                        # This should NOT be highlighted as a deletion in parent2_edit, but rather as an insertion from parent2's perspective if we were highlighting result_edit.
+                        # The current setup for parent2_edit is to show parent2_text and highlight its additions relative to result_text.
+                        if self.editor_type == "left" or self.editor_type == "parent1_edit":
                             format_to_apply = self.deleted_format
                     elif op == diff_match_patch.diff_match_patch.DIFF_INSERT:
-                        if not self.is_left_side:
+                        # Highlight insertions if:
+                        # 1. We are in a standard "right" editor (2-way diff)
+                        # 2. We are in "parent2_edit" (3-way diff, parent2 vs result)
+                        #    parent2_edit is comparing parent2_text (as left) with result_text (as right).
+                        #    A DIFF_INSERT means text is in result_text but not in parent2_text.
+                        #    This means parent2_text *lacks* this text compared to result.
+                        #    However, the set_texts for parent2_edit was (parent2_text, result_text).
+                        #    So, an "insert" means it's in result_text, not in parent2_text.
+                        #    We want to highlight text that *is* in parent2_text but *not* in result_text.
+                        #    This corresponds to a DIFF_DELETE when diffing (parent2, result).
+                        #    Let's adjust:
+                        #    - If editor is "right", it's text from right_text not in left_text. Highlight.
+                        #    - If editor is "parent2_edit", it's text from result_text not in parent2_text. DO NOT Highlight.
+                        if self.editor_type == "right": # Standard 2-way diff "right" pane
                             format_to_apply = self.inserted_format
-                    # else:  # DIFF_EQUAL
-                    # format_to_apply = self.equal_format
+                        # For parent2_edit, we highlight what's in parent2_text but not in result_text.
+                        # This is a DIFF_DELETE when (parent2_text, result_text) is diffed.
+                        # So, the condition for parent2_edit is handled by the DIFF_DELETE block.
+                        # The logic for parent2_edit to show "insertions" (text unique to parent2)
+                        # will actually come from DIFF_DELETE ops when (parent2_text, result_text) are inputs to diff_main.
+                        # And we'll use self.inserted_format for it.
+
+                    # Special handling for parent2_edit:
+                    # It compares parent2_text (as "left" input to diff) vs result_text (as "right" input to diff).
+                    # We want to highlight text that is IN parent2_text but NOT IN result_text.
+                    # This is a DIFF_DELETE operation from dmp.
+                    # We should style it as an "insertion" from parent2's perspective.
+                    if self.editor_type == "parent2_edit" and op == diff_match_patch.diff_match_patch.DIFF_DELETE:
+                        format_to_apply = self.inserted_format
+
 
                     if format_to_apply:
-                        if format_to_apply == self.deleted_format and not text.strip():
-                            # this is a line deletion, we need to highlight the whole line
+                        if format_to_apply == self.deleted_format and not text.strip() and (self.editor_type == "left" or self.editor_type == "parent1_edit"):
+                            if hasattr(self.highlighter, "empty_block_numbers"):
+                                self.highlighter.empty_block_numbers.add(block_number)
+                        elif format_to_apply == self.inserted_format and not text.strip() and self.editor_type == "parent2_edit":
+                             # Represent whole line addition in parent2_edit as a highlighted empty block if text is empty
                             if hasattr(self.highlighter, "empty_block_numbers"):
                                 self.highlighter.empty_block_numbers.add(block_number)
                         else:
                             self.highlighter.setFormat(start_in_block, end_in_block - start_in_block, format_to_apply)
 
-            # 只有在 DELETE 和 EQUAL 时才移动左侧位置，INSERT 和 EQUAL 时才移动右侧位置
-            if self.is_left_side:
+            # Determine how to advance current_pos based on the editor type and operation
+            if self.editor_type == "left" or self.editor_type == "parent1_edit":
+                # These editors display the "left" text of their comparison.
+                # Advance position if op is DELETE or EQUAL (part of left text).
                 if op != diff_match_patch.diff_match_patch.DIFF_INSERT:
                     current_pos += data_length
-            elif op != diff_match_patch.diff_match_patch.DIFF_DELETE:
-                current_pos += data_length
+            elif self.editor_type == "right":
+                # This editor displays the "right" text of its comparison.
+                # Advance position if op is INSERT or EQUAL (part of right text).
+                if op != diff_match_patch.diff_match_patch.DIFF_DELETE:
+                    current_pos += data_length
+            elif self.editor_type == "parent2_edit":
+                # This editor displays parent2_text, which was the "left" input to its diff.
+                # Advance position if op is DELETE or EQUAL.
+                if op != diff_match_patch.diff_match_patch.DIFF_INSERT:
+                    current_pos += data_length
