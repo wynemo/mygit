@@ -112,7 +112,7 @@
 117. ~~接 116，看能否监控 git 文件夹，主要用于更新提交历史 - 低优先级~~
 118. ~~文件历史，如果有路径移动的情况，与工作区比较，无法还原改动，报错，无法保存~~
 119. ~~bug, hash is always head, none(workingdir) self.diff_viewer.set_texts(old_content, new_content, file_path, "HEAD", None)~~
-120. 使用 CompareWithWorkingDialog 的地方 换成 CompareView，放到 WorkspaceExplorer.tab_widget 里去
+120. ~~使用 CompareWithWorkingDialog 的地方 换成 CompareView，放到 WorkspaceExplorer.tab_widget 里去~~
 121. ~~self.is_comparing_with_workspace = False 错的 file_changes_view.py:109-115 该放到 item 里去 add_file_to_tree 时设置 item 的 data~~
 122. ~~侧边栏 搜索 加上快捷键提示~~
 123. https://lucide.dev/icons/?search=git git 图标使用这个
@@ -123,4 +123,4 @@
 128. ~~文件删除在提交的时候，看不出是删除了，查看差异的时候表现得不对，提示文件找不到; 同时，对于 git 删除的文件，提示无法暂存：[Errno 2] No such file or directory: 'dialogs/compare_with_working_dialog.py'~~
 129. ~~有内存泄漏问题 https://github.com/bloomberg/memray 使用这个来排查下 很值得怀疑 _update_file_quick_search_list 最近加的索引的功能~~
 130. ~~工作区文件右键菜单添加“文件历史”选项~~
-131. 3-way 比较 - 上下键导航
+131. ~~3-way 比较 - 上下键导航~~
