@@ -643,6 +643,7 @@ class MergeDiffViewer(DiffViewer):
         self.parent2_edit.highlighter = MultiHighlighter(
             self.parent2_edit.document(), "parent2_edit", self.result_edit.document()
         )
+        self.result_edit.highlighter = MultiHighlighter(self.result_edit.document(), "result_edit", None)
         # self.result_edit.highlighter 将由 SyncedTextEdit.setObjectName 自动创建为 DiffHighlighter
 
         # 添加到布局
@@ -763,6 +764,7 @@ class MergeDiffViewer(DiffViewer):
             result_chunks.append(current_chunk)
 
         self.result_edit.highlighter.set_diff_chunks(result_chunks)
+        self.result_edit.highlighter.set_texts(result_text, result_text)
 
     def _on_scroll(self, value, source: str):
         """处理滚动同步
