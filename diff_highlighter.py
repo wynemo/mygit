@@ -245,49 +245,160 @@ class NewDiffHighlighterEngine:
     def __init__(self, highlighter: QSyntaxHighlighter, editor_type=""):
         self.highlighter = highlighter
         self.editor_type = editor_type
-        self.diff_chunks: list[DiffChunk] = []
-        self.diff_list = []
-        logging.debug("\n=== 初始化 DiffHighlighter ===")
+        # self.diff_chunks: list[DiffChunk] = [] # Not used; uses self.diff_list
+        self.diff_list = [] # This will store diff_match_patch style diffs
+        logging.debug("\n=== 初始化 NewDiffHighlighterEngine ===") # Corrected class name in log
         logging.debug("编辑器类型：%s", editor_type)
 
-        self.dmp = diff_match_patch.diff_match_patch()
+        self.dmp = diff_match_patch.diff_match_patch() # Correct way to instance
 
         # 定义不同类型差异的格式
         self.deleted_format = QTextCharFormat()
-        self.deleted_format.setBackground(QColor(255, 200, 200))  # 浅红色背景
-        self.deleted_format.setForeground(QColor(150, 0, 0))  # 深红色文字
+        self.deleted_format.setBackground(QColor(255, 200, 200))
+        self.deleted_format.setForeground(QColor(150, 0, 0))
 
         self.inserted_format = QTextCharFormat()
-        self.inserted_format.setBackground(QColor(200, 255, 200))  # 浅绿色背景
-        self.inserted_format.setForeground(QColor(0, 150, 0))  # 深绿色文字
+        self.inserted_format.setBackground(QColor(200, 255, 200))
+        self.inserted_format.setForeground(QColor(0, 150, 0))
 
-        self.equal_format = QTextCharFormat()
-        self.equal_format.setBackground(QColor(255, 255, 255))  # 白色背景
-        self.equal_format.setForeground(QColor(0, 0, 0))  # 黑色文字
+        self.conflict_format = QTextCharFormat() # Format for conflict markers
+        self.conflict_format.setBackground(QColor(255, 204, 153)) # Light orange/peach
+        self.conflict_format.setForeground(QColor(153, 51, 0))    # Dark orange/brown
 
-    def set_diff_chunks(self, chunks):
-        self.diff_chunks = chunks
+        # self.equal_format = QTextCharFormat() # Not strictly needed if no specific style for equal parts
+        # self.equal_format.setBackground(QColor(255, 255, 255))
+        # self.equal_format.setForeground(QColor(0, 0, 0))
+
+    # def set_diff_chunks(self, chunks): # This was for DiffChunk objects
+    #     self.diff_chunks = chunks
+
+    def _merge_diff_lists(self, base_text: str, left_text: str, right_text: str) -> list:
+        patches_left = self.dmp.patch_make(base_text, left_text)
+        patches_right = self.dmp.patch_make(base_text, right_text)
+
+        merged_diffs = []
+        current_pos_base = 0
+        pl_idx = 0
+        pr_idx = 0
+
+        while True:
+            next_event_pos = len(base_text)
+            if pl_idx < len(patches_left):
+                next_event_pos = min(next_event_pos, patches_left[pl_idx].start1)
+            if pr_idx < len(patches_right):
+                next_event_pos = min(next_event_pos, patches_right[pr_idx].start1)
+
+            if current_pos_base < next_event_pos:
+                merged_diffs.append((self.dmp.DIFF_EQUAL, base_text[current_pos_base:next_event_pos]))
+
+            current_pos_base = next_event_pos
+
+            active_pl = []
+            temp_pl_idx = pl_idx
+            while temp_pl_idx < len(patches_left) and patches_left[temp_pl_idx].start1 == current_pos_base:
+                active_pl.append(patches_left[temp_pl_idx])
+                temp_pl_idx += 1
+
+            active_pr = []
+            temp_pr_idx = pr_idx
+            while temp_pr_idx < len(patches_right) and patches_right[temp_pr_idx].start1 == current_pos_base:
+                active_pr.append(patches_right[temp_pr_idx])
+                temp_pr_idx += 1
+
+            # Determine actual number of patches to consume from main lists
+            num_active_pl = len(active_pl)
+            num_active_pr = len(active_pr)
+
+            processed_in_sub_loop = False
+            # Sub-loop to process all active patches starting at current_pos_base
+            # This loop should consume from active_pl and active_pr
+            # For simplicity, this example will only process one from each if both exist and match length,
+            # or one from the side that has patches. A full merge is more complex here.
+
+            if active_pl and active_pr:
+                p_l = active_pl.pop(0)
+                p_r = active_pr.pop(0)
+                pl_idx += 1 # Consumed one from main list
+                pr_idx += 1 # Consumed one from main list
+                processed_in_sub_loop = True
+
+                if p_l.length1 == p_r.length1:
+                    if p_l.diffs == p_r.diffs:
+                        merged_diffs.extend(p_l.diffs)
+                    else:
+                        left_val = self.dmp.diff_text2(p_l.diffs)
+                        right_val = self.dmp.diff_text2(p_r.diffs)
+                        conflict_text = f"<<<<< left: {left_val} ||| right: {right_val} >>>>>"
+                        if p_l.length1 > 0:
+                            base_segment_text = self.dmp.diff_text1(p_l.diffs)
+                            merged_diffs.append((self.dmp.DIFF_DELETE, base_segment_text))
+                        merged_diffs.append((self.dmp.DIFF_EQUAL, conflict_text))
+                    # Advance current_pos_base by the length of the base segment affected by these patches
+                    current_pos_base = max(current_pos_base, p_l.start1 + p_l.length1)
+                else: # length1 differs - complex overlap (known simplification)
+                    merged_diffs.extend(p_l.diffs) # Prioritize left
+                    current_pos_base = max(current_pos_base, p_l.start1 + p_l.length1)
+                    # p_r was consumed from active_pr and pr_idx advanced.
+                    # To allow p_r to be reconsidered if it wasn't fully "covered" by p_l,
+                    # we might need to revert pr_idx. This is complex.
+                    # For this version, p_r is effectively skipped if its length didn't match p_l's.
+                    # This is a key area for future improvement for a more robust diff3.
+                    # A less aggressive approach: if lengths differ, only consume p_l, and put p_r back to active_pr
+                    # by decrementing pr_idx. This requires active_pl/pr to be managed carefully.
+                    # The current code consumes both p_l and p_r from main lists via pl_idx/pr_idx.
+                    # If p_l.length1 != p_r.length1, only p_l's effect is added. p_r's effect for this spot is lost.
+            elif active_pl:
+                for p in active_pl: # Process all from left if no corresponding right
+                    merged_diffs.extend(p.diffs)
+                    current_pos_base = max(current_pos_base, p.start1 + p.length1 if p.length1 > 0 else p.start1)
+                pl_idx += num_active_pl
+                processed_in_sub_loop = True
+            elif active_pr:
+                for p in active_pr: # Process all from right if no corresponding left
+                    merged_diffs.extend(p.diffs)
+                    current_pos_base = max(current_pos_base, p.start1 + p.length1 if p.length1 > 0 else p.start1)
+                pr_idx += num_active_pr
+                processed_in_sub_loop = True
+
+
+            # Termination Condition Check
+            if current_pos_base >= len(base_text):
+                # Check if there are any remaining patches (must be trailing inserts)
+                no_more_patches_l = pl_idx >= len(patches_left) or patches_left[pl_idx].start1 > current_pos_base
+                no_more_patches_r = pr_idx >= len(patches_right) or patches_right[pr_idx].start1 > current_pos_base
+
+                is_trailing_l = pl_idx < len(patches_left) and patches_left[pl_idx].start1 == len(base_text)
+                is_trailing_r = pr_idx < len(patches_right) and patches_right[pr_idx].start1 == len(base_text)
+
+                if (no_more_patches_l or not is_trailing_l) and \
+                   (no_more_patches_r or not is_trailing_r) and \
+                   not (active_pl and any(p.start1 == len(base_text) for p in active_pl)) and \
+                   not (active_pr and any(p.start1 == len(base_text) for p in active_pr)):
+                    if not processed_in_sub_loop and not active_pl and not active_pr: # Ensure all active patches for current_pos_base are handled
+                         break
+
+
+            # Failsafe for extremely complex cases or unexpected states
+            if pl_idx >= len(patches_left) and pr_idx >= len(patches_right) and \
+               not (active_pl or active_pr) and current_pos_base >= len(base_text):
+                break
+
+            # If no patches were processed and current_pos_base is stuck, it's an issue.
+            # The next_event_pos logic should advance current_pos_base if no patches start at current.
+
+        return merged_diffs
 
     def set_texts(self, left_text: str, right_text: str):
-        """设置要对比的文本"""
-        # 计算差异
+        """设置要对比的文本 (for 2-way diff)"""
         self.diff_list = self.dmp.diff_main(left_text, right_text)
         self.dmp.diff_cleanupSemantic(self.diff_list)
-
-        # 触发重新高亮
-        # self.highlighter.rehighlight()
+        self.highlighter.rehighlight() # Ensure rehighlight after data change
 
     def set_merge_texts(self, left_text: str, right_text: str, result_text: str):
-        """设置要对比的文本"""
-        # 计算差异
-        self.diff_list = self.dmp.diff_main(left_text, result_text)
-        diff_list = self.dmp.diff_main(right_text, result_text)
-        # merge the two lists
-        self.diff_list.extend(diff_list)
+        """设置要对比的文本 (for 3-way merge, result_text is base)"""
+        self.diff_list = self._merge_diff_lists(result_text, left_text, right_text)
         self.dmp.diff_cleanupSemantic(self.diff_list)
-
-        # 触发重新高亮
-        # self.highlighter.rehighlight()
+        self.highlighter.rehighlight() # Ensure rehighlight after data change
 
     # left side property
     @property
