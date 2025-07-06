@@ -26,10 +26,10 @@ from components.notification_widget import NotificationWidget
 from components.spin_icons import RotatingLabel
 from dialogs.settings_dialog import SettingsDialog
 from file_changes_view import FileChangesView
-from folder_history_view import FolderHistoryView
 from git_manager import GitManager
 from settings import Settings
 from threads import FetchThread, PullThread, PushThread  # Import PullThread and PushThread
+from views.folder_history_view import FolderHistoryView
 from views.side_bar_widget import SideBarWidget
 from views.top_bar_widget import TopBarWidget  # Import TopBarWidget
 from workspace_explorer import WorkspaceExplorer
