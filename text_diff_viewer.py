@@ -1,8 +1,8 @@
 import logging
 from typing import Optional
 
-from PyQt6.QtCore import QPoint, QTimer, Qt # Added Qt
-from PyQt6.QtGui import QColor, QTextCharFormat, QTextCursor, QKeyEvent # Added QKeyEvent
+from PyQt6.QtCore import QPoint, Qt, QTimer  # Added Qt
+from PyQt6.QtGui import QColor, QKeyEvent, QTextCharFormat, QTextCursor  # Added QKeyEvent
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QTextEdit, QVBoxLayout, QWidget
 
 from diff_calculator import DiffCalculator, DiffChunk, DifflibCalculator
@@ -609,9 +609,9 @@ class MergeDiffViewer(DiffViewer):
         super().__init__(diff_calculator)
         self.parent1_chunks = []
         self.parent2_chunks = []
-        self.merged_actual_diff_chunks = [] # For navigation across all 3 panes
-        self.current_merged_diff_index = -1 # Index for merged navigation
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus) # Allow MergeDiffViewer to receive focus
+        self.merged_actual_diff_chunks = []  # For navigation across all 3 panes
+        self.current_merged_diff_index = -1  # Index for merged navigation
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # Allow MergeDiffViewer to receive focus
 
     def setup_ui(self):
         # layout = QHBoxLayout() # Original layout variable, not used now for main structure
@@ -739,30 +739,43 @@ class MergeDiffViewer(DiffViewer):
         for chunk in self.parent1_chunks:
             if chunk.type != "equal":
                 for i in range(chunk.right_start, chunk.right_end):
-                    if i < len(result_lines): line_status[i][0] = False
+                    if i < len(result_lines):
+                        line_status[i][0] = False
         for chunk in self.parent2_chunks:
             if chunk.type != "equal":
                 for i in range(chunk.left_start, chunk.left_end):
-                    if i < len(result_lines): line_status[i][1] = False
+                    if i < len(result_lines):
+                        line_status[i][1] = False
 
         current_highlight_chunk = None
         for line_num, (in_parent1, in_parent2) in line_status.items():
             chunk_type = None
-            if not in_parent1 and not in_parent2: chunk_type = "conflict"
-            elif not in_parent1: chunk_type = "parent1_diff"
-            elif not in_parent2: chunk_type = "parent2_diff"
+            if not in_parent1 and not in_parent2:
+                chunk_type = "conflict"
+            elif not in_parent1:
+                chunk_type = "parent1_diff"
+            elif not in_parent2:
+                chunk_type = "parent2_diff"
 
             if chunk_type:
                 if current_highlight_chunk is None or current_highlight_chunk.type != chunk_type:
-                    if current_highlight_chunk: result_chunks_for_highlighting.append(current_highlight_chunk)
-                    current_highlight_chunk = DiffChunk(type=chunk_type, left_start=line_num, left_end=line_num + 1, right_start=line_num, right_end=line_num + 1)
+                    if current_highlight_chunk:
+                        result_chunks_for_highlighting.append(current_highlight_chunk)
+                    current_highlight_chunk = DiffChunk(
+                        type=chunk_type,
+                        left_start=line_num,
+                        left_end=line_num + 1,
+                        right_start=line_num,
+                        right_end=line_num + 1,
+                    )
                 else:
                     current_highlight_chunk.left_end = line_num + 1
                     current_highlight_chunk.right_end = line_num + 1
             elif current_highlight_chunk:
                 result_chunks_for_highlighting.append(current_highlight_chunk)
                 current_highlight_chunk = None
-        if current_highlight_chunk: result_chunks_for_highlighting.append(current_highlight_chunk)
+        if current_highlight_chunk:
+            result_chunks_for_highlighting.append(current_highlight_chunk)
 
         self.result_edit.highlighter.set_diff_chunks(result_chunks_for_highlighting)
         self.result_edit.highlighter.set_merge_texts(parent1_text, parent2_text, result_text)
@@ -773,15 +786,19 @@ class MergeDiffViewer(DiffViewer):
         for chunk in self.parent1_chunks:
             if chunk.type != "equal":
                 # For P1 vs R diffs, primary sort key is result_start (chunk.right_start)
-                self.merged_actual_diff_chunks.append({'origin': 'p1_result', 'chunk': chunk, 'sort_key': chunk.right_start})
+                self.merged_actual_diff_chunks.append(
+                    {"origin": "p1_result", "chunk": chunk, "sort_key": chunk.right_start}
+                )
 
         for chunk in self.parent2_chunks:
             if chunk.type != "equal":
                 # For R vs P2 diffs, primary sort key is result_start (chunk.left_start)
-                self.merged_actual_diff_chunks.append({'origin': 'result_p2', 'chunk': chunk, 'sort_key': chunk.left_start})
+                self.merged_actual_diff_chunks.append(
+                    {"origin": "result_p2", "chunk": chunk, "sort_key": chunk.left_start}
+                )
 
         # Sort all diffs based on their starting line in the result pane
-        self.merged_actual_diff_chunks.sort(key=lambda x: x['sort_key'])
+        self.merged_actual_diff_chunks.sort(key=lambda x: x["sort_key"])
 
         # Remove duplicate diffs that might occur if a change in Result affects both P1 and P2 identically
         # This is a simple deduplication. More sophisticated logic might be needed if chunks can overlap partially.
@@ -799,11 +816,10 @@ class MergeDiffViewer(DiffViewer):
             # lines in the result view and have compatible types, consider merging or picking one.
             # For now, we'll keep them and let navigation step through them.
             # The sorting should already group related changes.
-            pass # No explicit deduplication for now, sorting is the primary organization
+            pass  # No explicit deduplication for now, sorting is the primary organization
 
         self.current_merged_diff_index = -1
         self._update_merged_button_states()
-
 
     def _update_merged_button_states(self):
         num_actual_diffs = len(self.merged_actual_diff_chunks)
@@ -821,7 +837,10 @@ class MergeDiffViewer(DiffViewer):
         )
 
     def navigate_to_previous_merged_diff(self):
-        logging.info("MergeDiffViewer: Attempting to navigate to previous merged diff. Current index: %d", self.current_merged_diff_index)
+        logging.info(
+            "MergeDiffViewer: Attempting to navigate to previous merged diff. Current index: %d",
+            self.current_merged_diff_index,
+        )
         if not self.merged_actual_diff_chunks:
             # Clear highlights on all three panes
             self.parent1_edit.clear_highlighted_line()
@@ -835,14 +854,19 @@ class MergeDiffViewer(DiffViewer):
 
         if self.current_merged_diff_index > 0:
             self.current_merged_diff_index -= 1
-            logging.info(f"MergeDiffViewer: Navigating to previous merged diff. New index: {self.current_merged_diff_index}")
+            logging.info(
+                f"MergeDiffViewer: Navigating to previous merged diff. New index: {self.current_merged_diff_index}"
+            )
             self._scroll_to_current_merged_diff()
         else:
             logging.info("MergeDiffViewer: Already at the first merged diff or no diffs to navigate back to.")
         self._update_merged_button_states()
 
     def navigate_to_next_merged_diff(self):
-        logging.info("MergeDiffViewer: Attempting to navigate to next merged diff. Current index: %d", self.current_merged_diff_index)
+        logging.info(
+            "MergeDiffViewer: Attempting to navigate to next merged diff. Current index: %d",
+            self.current_merged_diff_index,
+        )
         if not self.merged_actual_diff_chunks:
             # Clear highlights on all three panes
             self.parent1_edit.clear_highlighted_line()
@@ -856,7 +880,9 @@ class MergeDiffViewer(DiffViewer):
 
         if self.current_merged_diff_index < len(self.merged_actual_diff_chunks) - 1:
             self.current_merged_diff_index += 1
-            logging.info(f"MergeDiffViewer: Navigating to next merged diff. New index: {self.current_merged_diff_index}")
+            logging.info(
+                f"MergeDiffViewer: Navigating to next merged diff. New index: {self.current_merged_diff_index}"
+            )
             self._scroll_to_current_merged_diff()
         else:
             logging.info("MergeDiffViewer: Already at the last merged diff or no diffs to navigate forward to.")
@@ -868,8 +894,8 @@ class MergeDiffViewer(DiffViewer):
             return
 
         merged_chunk_item = self.merged_actual_diff_chunks[self.current_merged_diff_index]
-        origin = merged_chunk_item['origin']
-        chunk = merged_chunk_item['chunk'] # This is the original DiffChunk
+        origin = merged_chunk_item["origin"]
+        chunk = merged_chunk_item["chunk"]  # This is the original DiffChunk
 
         logging.info(
             f"MergeDiffViewer: Scrolling to diff chunk index {self.current_merged_diff_index}: "
@@ -886,23 +912,23 @@ class MergeDiffViewer(DiffViewer):
         # These are 0-indexed
         p1_target_line, res_target_line, p2_target_line = -1, -1, -1
 
-        if origin == 'p1_result': # Parent1 vs Result
+        if origin == "p1_result":  # Parent1 vs Result
             p1_scroll_to = chunk.left_start
             res_scroll_to = chunk.right_start
             # p2_scroll_to will be synced by _on_scroll based on result_edit's scroll
 
             # Highlighting for P1 vs Result
-            if chunk.type == "insert": # Insert in Result (right side of p1_result diff)
+            if chunk.type == "insert":  # Insert in Result (right side of p1_result diff)
                 self.result_edit.set_highlighted_line(chunk.right_start)
                 self.result_edit.set_block_background(chunk.right_start, chunk.right_end)
                 # Left (P1) has a "gap", scroll to line before insertion if possible
-                p1_scroll_to = max(0, chunk.left_start -1) if chunk.left_start > 0 else 0
+                p1_scroll_to = max(0, chunk.left_start - 1) if chunk.left_start > 0 else 0
                 self.parent1_edit.set_highlighted_line(p1_scroll_to)
-            elif chunk.type == "delete": # Delete in Result (means content present in P1 is missing in Result)
+            elif chunk.type == "delete":  # Delete in Result (means content present in P1 is missing in Result)
                 self.parent1_edit.set_highlighted_line(chunk.left_start)
                 self.parent1_edit.set_block_background(chunk.left_start, chunk.left_end)
                 # Right (Result) has a "gap", scroll to line before deletion
-                res_scroll_to = max(0, chunk.right_start -1) if chunk.right_start > 0 else 0
+                res_scroll_to = max(0, chunk.right_start - 1) if chunk.right_start > 0 else 0
                 self.result_edit.set_highlighted_line(res_scroll_to)
             elif chunk.type == "replace":
                 self.parent1_edit.set_highlighted_line(chunk.left_start)
@@ -914,19 +940,19 @@ class MergeDiffViewer(DiffViewer):
             self.result_edit.scroll_to_line(res_scroll_to)
             # self.parent2_edit will be synced via _on_scroll triggered by result_edit
 
-        elif origin == 'result_p2': # Result vs Parent2
-            res_scroll_to = chunk.left_start # Result is left side of result_p2 diff
+        elif origin == "result_p2":  # Result vs Parent2
+            res_scroll_to = chunk.left_start  # Result is left side of result_p2 diff
             p2_scroll_to = chunk.right_start  # Parent2 is right side of result_p2 diff
             # p1_scroll_to will be synced by _on_scroll based on result_edit's scroll
 
             # Highlighting for Result vs Parent2
-            if chunk.type == "insert": # Insert in Parent2 (right side of result_p2 diff)
+            if chunk.type == "insert":  # Insert in Parent2 (right side of result_p2 diff)
                 self.parent2_edit.set_highlighted_line(chunk.right_start)
                 self.parent2_edit.set_block_background(chunk.right_start, chunk.right_end)
                 # Left (Result) has a "gap"
                 res_scroll_to = max(0, chunk.left_start - 1) if chunk.left_start > 0 else 0
                 self.result_edit.set_highlighted_line(res_scroll_to)
-            elif chunk.type == "delete": # Delete in Parent2 (means content present in Result is missing in P2)
+            elif chunk.type == "delete":  # Delete in Parent2 (means content present in Result is missing in P2)
                 self.result_edit.set_highlighted_line(chunk.left_start)
                 self.result_edit.set_block_background(chunk.left_start, chunk.left_end)
                 # Right (P2) has a "gap"
@@ -951,9 +977,7 @@ class MergeDiffViewer(DiffViewer):
         # One of the explicit scrolls (e.g. self.result_edit.scroll_to_line) will trigger
         # the _on_scroll logic which will then sync the other panes.
 
-        logging.info(
-            f"MergeDiffViewer: Called scroll_to_line for relevant editors."
-        )
+        logging.info("MergeDiffViewer: Called scroll_to_line for relevant editors.")
 
     def keyPressEvent(self, event: QKeyEvent):
         """Handle key presses for navigation."""
@@ -972,7 +996,6 @@ class MergeDiffViewer(DiffViewer):
             # The actual text editing key events are handled by the SyncedTextEdit instances.
             # So, we call QWidget's keyPressEvent.
             super().keyPressEvent(event)
-
 
     def _on_scroll(self, value, source: str):
         """处理滚动同步
