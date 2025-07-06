@@ -720,6 +720,7 @@ class GitManagerWindow(QMainWindow):
     def show_settings_dialog(self):
         """显示设置对话框"""
         dialog = SettingsDialog(self)
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         dialog.show()
 
     def close_tab(self, index):
