@@ -258,14 +258,22 @@ QPlainTextEdit QScrollBar::handle:vertical:pressed {
         else:
             try:
                 old_content = repo.git.show(f":{relative_path}")  # 暂存区内容
-            except:
+            except Exception:
                 old_content = ""
-            if not new_content:
+                logging.exception("Error getting old content")
+            if new_content is None:
                 try:
                     with open(self.file_path, "r", encoding="utf-8") as f:
                         new_content = f.read()
-                except Exception as e:
-                    new_content = f"Error reading file: {e!s}"
+                except Exception:
+                    logging.exception("Error reading file")
+                    new_content = "Error reading file"
+
+            # 编辑器可能会在文件末尾添加一个多余的换行符
+            # 如果新内容只是旧内容加上一个换行符，我们视它们为相同，以避免误报
+            if new_content == old_content + "\n":
+                new_content = old_content
+
             diffs = DifflibCalculator().get_diff(old_content, new_content)
         return diffs
 
