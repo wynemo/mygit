@@ -53,6 +53,12 @@ class TopBarWidget(QWidget):
         # --- Branch Label and Combo Box ---
         self.branch_label = QLabel(self.tr("Branch:"))
         self._layout.addWidget(self.branch_label)
+
+        # 分支图标
+        self.branch_icon = QLabel()
+        self.branch_icon.setPixmap(QIcon("icons/git_branch.svg").pixmap(16, 16))
+        self._layout.addWidget(self.branch_icon)
+
         self.branch_combo = QComboBox()
         self.branch_combo.setMinimumWidth(150)
         self.branch_combo.currentTextChanged.connect(self.branch_changed.emit)
