@@ -47,9 +47,6 @@ class CommitHistoryView(QWidget):
         search_layout.addWidget(self.clear_button)
         layout.addLayout(search_layout)
 
-        self.history_label = QLabel("提交历史：")
-        layout.addWidget(self.history_label)
-
         # 普通提交历史列表
         self.history_list = CustomTreeWidget(self)
         self.history_list.empty_scrolled_signal.connect(self.load_more_commits)
