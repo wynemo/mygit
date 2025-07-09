@@ -198,6 +198,7 @@ class WorkspaceExplorer(QWidget):
             # 为标签页设置语言图标
             self.tab_widget.setTabIcon(tab_index, get_language_icon(file_name))
             self.tab_widget.setCurrentWidget(text_edit)
+            self.tab_widget.setTabToolTip(tab_index, file_path)
 
             # 如果提供了行号，跳转到该行
             if line_number is not None:
