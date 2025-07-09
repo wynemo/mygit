@@ -400,6 +400,7 @@ class WorkspaceExplorer(QWidget):
                 tree_item = QTreeWidgetItem(parent_item_in_tree)
                 tree_item.setText(0, item_name)
                 tree_item.setData(0, Qt.ItemDataRole.UserRole, item_path)
+                tree_item.setToolTip(0, item_path)  # cursor生成 - 设置tooltip显示完整路径
                 # 设置文件夹图标
                 tree_item.setIcon(0, get_folder_icon())
 
@@ -431,6 +432,7 @@ class WorkspaceExplorer(QWidget):
                 tree_item = QTreeWidgetItem(parent_item_in_tree)
                 tree_item.setText(0, item_name)
                 tree_item.setData(0, Qt.ItemDataRole.UserRole, item_path)
+                tree_item.setToolTip(0, item_path)  # cursor生成 - 设置tooltip显示完整路径
                 # 根据文件扩展名设置语言图标
                 tree_item.setIcon(0, get_language_icon(item_name))
 
