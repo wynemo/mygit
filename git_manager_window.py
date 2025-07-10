@@ -761,10 +761,6 @@ class GitManagerWindow(QMainWindow):
                 # 文件历史标签页：左侧1/3，右侧隐藏，对比视图占据剩余空间
                 self.horizontal_splitter.setSizes([left_panel_width, 0, total_width - left_panel_width])
 
-    # def update_toggle_button_icon(self): # Removed, logic moved to TopBarWidget
-    #     """更新切换按钮的图标 - This method is now in TopBarWidget"""
-    #     pass
-
     def toggle_bottom_widget(self):
         """切换底部面板的显示状态"""
         self.bottom_widget_visible = not self.bottom_widget_visible
