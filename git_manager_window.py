@@ -734,16 +734,32 @@ class GitManagerWindow(QMainWindow):
     def on_tab_changed(self, index):
         """当标签页改变时"""
         widget = self.tab_widget.widget(index)
+        right_splitter = self.horizontal_splitter.widget(1)
+
         if index == 0 or isinstance(widget, FolderHistoryView):
             self.compare_view.hide()
             # cursor 生成 - 显示右侧分割器（包含文件变化视图和 commit 详细信息视图）
-            right_splitter = self.horizontal_splitter.widget(1)
             right_splitter.show()
         else:
             self.compare_view.show()
             # cursor 生成 - 隐藏右侧分割器
-            right_splitter = self.horizontal_splitter.widget(1)
             right_splitter.hide()
+
+        # 确保提交历史和文件历史有相同的宽度
+        # 保存当前的分割器大小比例，以便在切换标签时保持一致
+        current_sizes = self.horizontal_splitter.sizes()
+        min_widgets_count = 2
+        if len(current_sizes) >= min_widgets_count:
+            # 计算左侧面板应该占据的固定宽度
+            total_width = sum(current_sizes)
+            left_panel_width = total_width // 3  # 固定为总宽度的1/3
+
+            if index == 0 or isinstance(widget, FolderHistoryView):
+                # 提交历史标签页：左侧1/3，右侧2/3
+                self.horizontal_splitter.setSizes([left_panel_width, total_width - left_panel_width, 0])
+            else:
+                # 文件历史标签页：左侧1/3，右侧隐藏，对比视图占据剩余空间
+                self.horizontal_splitter.setSizes([left_panel_width, 0, total_width - left_panel_width])
 
     # def update_toggle_button_icon(self): # Removed, logic moved to TopBarWidget
     #     """更新切换按钮的图标 - This method is now in TopBarWidget"""
