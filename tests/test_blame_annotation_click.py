@@ -128,7 +128,10 @@ class TestBlameAnnotationClick(unittest.TestCase):
         # 6. Verify Commit Selection
         current_item = window.commit_history_view.history_list.currentItem()
         self.assertIsNotNone(current_item, "No item selected after blame click")
-        self.assertEqual(current_item.text(0), short_target_hash, "Incorrect commit selected")
+        # 检查 UserRole 中的哈希前缀，因为 text(0) 现在是提交消息
+        self.assertTrue(
+            current_item.data(0, Qt.ItemDataRole.UserRole).startswith(short_target_hash), "Incorrect commit selected"
+        )
 
         expected_loaded_count = initial_load_batch_size * 2
         self.assertEqual(
@@ -228,7 +231,10 @@ class TestBlameAnnotationClick(unittest.TestCase):
         # 6. Verify Commit Selection
         current_item = window.commit_history_view.history_list.currentItem()
         self.assertIsNotNone(current_item, "No item selected after blame click")
-        self.assertEqual(current_item.text(0), short_target_hash, "Incorrect commit selected")
+        # 检查 UserRole 中的哈希前缀，因为 text(0) 现在是提交消息
+        self.assertTrue(
+            current_item.data(0, Qt.ItemDataRole.UserRole).startswith(short_target_hash), "Incorrect commit selected"
+        )
 
         # All commits should now be loaded
         self.assertEqual(
