@@ -13,14 +13,5 @@
         },
         "editor.formatOnSave": true,
         "editor.defaultFormatter": "charliermarsh.ruff"
-    },
-    "python.languageServer": "Default",
-    //frontend shit
-    "npm.packageManager": "pnpm",
-    "[typescriptreact]": {
-        "editor.defaultFormatter": "biomejs.biome"
-    },
-    "[typescript]": {
-        "editor.defaultFormatter": "biomejs.biome"
-    },
+    }
 }
