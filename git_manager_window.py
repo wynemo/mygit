@@ -903,35 +903,43 @@ class GitManagerWindow(QMainWindow):
         found_item = None
 
         # Initial search
+        # 初始搜索：遍历当前已加载的提交项
         for i in range(history_list.topLevelItemCount()):
             item = history_list.topLevelItem(i)
-            if item and item.text(0) == short_hash_to_find:
-                found_item = item
-                break
+            if item:
+                # 从 UserRole 获取完整哈希值进行比较
+                full_hash_in_item = item.data(0, Qt.ItemDataRole.UserRole)
+                if full_hash_in_item and full_hash_in_item.startswith(short_hash_to_find):
+                    found_item = item
+                    break
 
         # If not found and not all commits are loaded, try loading more
+        # 如果未找到且并非所有提交都已加载，则尝试加载更多
         if not found_item and not self.commit_history_view._all_loaded:
             logging.info(
                 "GitManagerWindow: Commit %s not found initially, attempting to load more commits.",
                 short_hash_to_find,
             )
             while not found_item and not self.commit_history_view._all_loaded:
-                self.commit_history_view.load_more_commits()
+                self.commit_history_view.load_more_commits()  # 加载更多批次的提交
                 # Re-search after loading more
+                # 重新搜索（包括新加载的项）
                 for i in range(history_list.topLevelItemCount()):
                     item = history_list.topLevelItem(i)
-                    if item and item.text(0) == short_hash_to_find:
-                        found_item = item
-                        break
+                    if item:
+                        full_hash_in_item = item.data(0, Qt.ItemDataRole.UserRole)
+                        if full_hash_in_item and full_hash_in_item.startswith(short_hash_to_find):
+                            found_item = item
+                            break  # 找到后跳出内部循环
                 if found_item:
                     logging.info("GitManagerWindow: Found commit %s after loading more.", short_hash_to_find)
-                    break
+                    break  # 找到后跳出外部 while 循环
                 if self.commit_history_view._all_loaded:
                     logging.info(
                         "GitManagerWindow: All commits loaded, but commit %s still not found.",
                         short_hash_to_find,
                     )
-                    break
+                    break  # 如果所有提交已加载但仍未找到，则跳出循环
 
         if found_item:
             history_list.setCurrentItem(found_item)
