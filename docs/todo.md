@@ -124,3 +124,4 @@
 129. ~~有内存泄漏问题 https://github.com/bloomberg/memray 使用这个来排查下 很值得怀疑 _update_file_quick_search_list 最近加的索引的功能~~
 130. ~~工作区文件右键菜单添加“文件历史”选项~~
 131. ~~3-way 比较 - 上下键导航~~
+132. 文件历史移除“提交id”
