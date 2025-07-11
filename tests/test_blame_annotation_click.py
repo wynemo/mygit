@@ -1,10 +1,9 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
 
-# CommitHistoryView is used by GitManagerWindow, but we directly interact with window.commit_history_view
-# from commit_history_view import CommitHistoryView
 from git_manager import GitManager
 
 # Application imports
