@@ -50,15 +50,14 @@ class CommitHistoryView(QWidget):
         # 普通提交历史列表
         self.history_list = CustomTreeWidget(self)
         self.history_list.empty_scrolled_signal.connect(self.load_more_commits)
-        self.history_list.set_hover_reveal_columns({1})  # Enable hover for commit message column
-        self.history_list.setHeaderLabels(["提交 ID", "提交信息", "Branches", "作者", "日期"])
+        self.history_list.set_hover_reveal_columns({0})  # Enable hover for commit message column
+        self.history_list.setHeaderLabels(["提交信息", "Branches", "作者", "日期"])
         self.history_list.itemClicked.connect(self.on_commit_clicked)
         self.history_list.currentItemChanged.connect(self.on_current_item_changed)
-        self.history_list.setColumnWidth(0, 80)  # Hash
-        self.history_list.setColumnWidth(1, 200)  # Message
-        self.history_list.setColumnWidth(2, 150)  # Branches
-        self.history_list.setColumnWidth(3, 100)  # Author
-        self.history_list.setColumnWidth(4, 150)  # Date
+        self.history_list.setColumnWidth(0, 200)  # Message
+        self.history_list.setColumnWidth(1, 150)  # Branches
+        self.history_list.setColumnWidth(2, 100)  # Author
+        self.history_list.setColumnWidth(3, 150)  # Date
         layout.addWidget(self.history_list)
 
         # 滚动到底部自动加载更多，cursor 生成
@@ -114,9 +113,8 @@ class CommitHistoryView(QWidget):
         )  # cursor 生成
         for commit in commits:
             item = QTreeWidgetItem(self.history_list)
-            item.setText(0, commit["hash"][:7])  # 显示短哈希
             item.setData(0, Qt.ItemDataRole.UserRole, commit["hash"])  # 存储完整哈希
-            item.setText(1, commit["message"])  # Commit Message
+            item.setText(0, commit["message"])  # Commit Message
 
             decorations = commit.get("decorations", [])
             processed_decorations = []
@@ -132,10 +130,10 @@ class CommitHistoryView(QWidget):
                 else:
                     processed_decorations.append(ref_name)
             decoration_text = ", ".join(processed_decorations)
-            item.setText(2, decoration_text)  # Branches (new column)
+            item.setText(1, decoration_text)  # Branches
 
-            item.setText(3, commit["author"])  # Author (index shifted)
-            item.setText(4, commit["date"])  # Date (index shifted)
+            item.setText(2, commit["author"])  # Author
+            item.setText(3, commit["date"])  # Date
         self.loaded_count += len(commits)  # cursor 生成
         if len(commits) < self.load_batch_size:  # 没有更多了
             self._all_loaded = True  # cursor 生成
@@ -156,10 +154,8 @@ class CommitHistoryView(QWidget):
         commit_hash = ""
         if isinstance(item_or_sha, QTreeWidgetItem):
             # Clicked from the QTreeWidget (history_list)
-            # The first column (index 0) is the commit hash (shortened)
-            # The second column (index 1) also could be used if the first is empty,
-            # but typically the short hash is in column 0.
-            commit_hash = item_or_sha.text(0)
+            # Get the full hash from UserRole data
+            commit_hash = item_or_sha.data(0, Qt.ItemDataRole.UserRole)
         elif isinstance(item_or_sha, str):
             # Clicked from the GitGraphView (history_graph_list)
             # The argument is already the commit SHA (full or short)
@@ -173,8 +169,8 @@ class CommitHistoryView(QWidget):
 
     def on_current_item_changed(self, current: QTreeWidgetItem, previous: QTreeWidgetItem):
         if current:
-            print(current.text(1))
-            self.history_list.show_full_text_for_item(current, 1)
+            print(current.text(0))
+            self.history_list.show_full_text_for_item(current, 0)
         else:
             self.history_list.hide_overlay()
 

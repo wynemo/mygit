@@ -97,8 +97,8 @@ class CustomTreeWidget(HoverRevealTreeWidget):
                 partial(self._reset_branch_to_commit, item, git_manager, current_branch.name)
             )
 
-            # 从 item 获取分支信息 (假设分支信息在第 2 列)
-            item_branches = item.text(2).split(", ")
+            # 从 item 获取分支信息 (假设分支信息在第 1 列)
+            item_branches = item.text(1).split(", ")
 
             # 创建 Checkout 菜单，并为关联的每个分支添加入口
             checkout_menu = menu.addMenu("Checkout")
@@ -149,8 +149,8 @@ class CustomTreeWidget(HoverRevealTreeWidget):
         if not item:
             return
 
-        commit_hash = item.text(0)
-        commit_message = item.text(1)
+        commit_hash = item.data(0, Qt.ItemDataRole.UserRole)
+        commit_message = item.text(0)
 
         dialog = GitResetDialog(current_branch_name, commit_hash, commit_message, self)
         if dialog.exec():
@@ -167,15 +167,19 @@ class CustomTreeWidget(HoverRevealTreeWidget):
 
     def copy_commit_to_clipboard(self, item):
         if item:
-            print("commit is", item.text(0))
-            QApplication.clipboard().setText(item.text(0))
+            full_hash = item.data(0, Qt.ItemDataRole.UserRole)
+            if full_hash:
+                print("commit is", full_hash)
+                QApplication.clipboard().setText(full_hash)
+            else:
+                print("no hash data found")
         else:
             print("item is None")
 
     def copy_commmit_message_to_clipboard(self, item):
         if item:
-            print("commit is", item.text(0))
-            QApplication.clipboard().setText(item.text(1))
+            print("commit message is", item.text(0))
+            QApplication.clipboard().setText(item.text(0))
         else:
             print("item is None")
 
@@ -213,7 +217,7 @@ class CustomTreeWidget(HoverRevealTreeWidget):
             print("未选中任何提交")
             return
 
-        commit_hash = item.text(0)  # 假设 commit hash 在第一列
+        commit_hash = item.data(0, Qt.ItemDataRole.UserRole)  # 从 UserRole 数据获取完整 hash
         parent = self.parent()
         while parent and not hasattr(parent, "git_manager"):
             parent = parent.parent()
