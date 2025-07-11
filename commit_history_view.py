@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton, QTreeWidgetItem, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QHBoxLayout, QLineEdit, QPushButton, QTreeWidgetItem, QVBoxLayout, QWidget
 
 from custom_tree_widget import CustomTreeWidget
 from git_graph_view import GitGraphView
@@ -69,7 +69,6 @@ class CommitHistoryView(QWidget):
 
         # 图形化提交历史
         self.history_graph_list = GitGraphView()
-        # self.history_graph_list.setHeaderLabels(["提交图", "提交 ID", "提交信息", "作者", "日期"])
         self.history_graph_list.commit_item_clicked.connect(self.on_commit_clicked)
         layout.addWidget(self.history_graph_list)
 
