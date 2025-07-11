@@ -17,7 +17,7 @@ class CommitHistoryView(QWidget):
         super().__init__(parent)
         self.loaded_count = 0  # cursor 生成
         self.load_batch_size = 50  # cursor 生成
-        self.git_manager: GitManager = None  # cursor 生成
+        self.git_manager: GitManager | None = None  # cursor 生成
         self.branch = None  # cursor 生成
         self._loading = False  # cursor 生成
         self._all_loaded = False  # cursor 生成
