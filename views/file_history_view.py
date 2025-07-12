@@ -43,12 +43,11 @@ class FileHistoryView(QWidget):
 
         self.history_list = HoverRevealTreeWidget()
         self.history_list.set_hover_reveal_columns({1})
-        self.history_list.setHeaderLabels(["提交 ID", "提交信息", "作者", "日期"])
+        self.history_list.setHeaderLabels(["提交信息", "作者", "日期"])
         self.history_list.itemClicked.connect(self.on_commit_clicked)
-        self.history_list.setColumnWidth(0, 80)  # Hash
-        self.history_list.setColumnWidth(1, 200)  # Message
-        self.history_list.setColumnWidth(2, 100)  # Author
-        self.history_list.setColumnWidth(3, 150)  # Date
+        self.history_list.setColumnWidth(0, 200)  # Message
+        self.history_list.setColumnWidth(1, 100)  # Author
+        self.history_list.setColumnWidth(2, 150)  # Date
         layout.addWidget(self.history_list)
 
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -103,27 +102,25 @@ class FileHistoryView(QWidget):
                             print(f"文件{status_map.get(line[0], line[0])}: {parts[1]}")
                             _file_path = parts[1]
                     self.history_list.topLevelItem(self.history_list.topLevelItemCount() - 1).setData(
-                        3, 256, _file_path
+                        2, 256, _file_path
                     )
                     continue
 
                 commit_hash, author_name, timestamp_str, message = parts
 
                 item = QTreeWidgetItem()
-                # 提交 ID, 短哈希
-                item.setText(0, commit_hash[:7])
                 # 提交信息
-                item.setText(1, message)
+                item.setText(0, message)
                 # 作者
-                item.setText(2, author_name)
+                item.setText(1, author_name)
                 # 日期
                 try:
                     commit_date = datetime.fromtimestamp(int(timestamp_str))
-                    item.setText(3, commit_date.strftime("%Y-%m-%d %H:%M:%S"))
+                    item.setText(2, commit_date.strftime("%Y-%m-%d %H:%M:%S"))
                 except (ValueError, OSError):
-                    item.setText(3, "Invalid Date")
+                    item.setText(2, "Invalid Date")
 
-                # 存储完整哈希值用于后续操作
+                # 存储完整哈希值用于后续操作（存储在第0列的data中）
                 item.setData(0, 256, commit_hash)
 
                 self.history_list.addTopLevelItem(item)
@@ -139,7 +136,7 @@ class FileHistoryView(QWidget):
         # 需要改为在右侧显示文件变化
         # 根据拿到的文件路径 commit 信息 这个 GitManagerWindow.compare_view 需要对改动进行显示
         commit_hash = item.data(0, 256)  # Qt.ItemDataRole.UserRole = 256
-        file_path = item.data(3, 256)
+        file_path = item.data(2, 256)
         if commit_hash:
             # 尝试在主窗口的标签页中打开比较视图
             main_window = self.window()
@@ -166,7 +163,7 @@ class FileHistoryView(QWidget):
         relative_path = os.path.relpath(self.file_path, repo_path)
         print("relative_path", relative_path, item.data(3, 256))
         compare_action.triggered.connect(
-            lambda: self.compare_with_working_requested.emit(relative_path, item.text(0), item.data(3, 256))
+            lambda: self.compare_with_working_requested.emit(relative_path, item.data(0, 256)[:7], item.data(2, 256))
         )
         menu.addAction(compare_action)
 
@@ -178,8 +175,9 @@ class FileHistoryView(QWidget):
 
     def copy_commit_to_clipboard(self, item):
         if item:
-            print("commit is", item.text(0))
-            QApplication.clipboard().setText(item.text(0))
+            commit_hash = item.data(0, 256)
+            print("commit is", commit_hash)
+            QApplication.clipboard().setText(commit_hash)
         else:
             print("item is None")
 
@@ -230,7 +228,7 @@ class FileHistoryView(QWidget):
 
     def copy_commmit_message_to_clipboard(self, item):
         if item:
-            print("commit is", item.text(0))
-            QApplication.clipboard().setText(item.text(1))
+            print("commit message is", item.text(0))
+            QApplication.clipboard().setText(item.text(0))
         else:
             print("item is None")
