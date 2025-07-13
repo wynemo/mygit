@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
 class FileChangesView(QWidget):
     file_selected = pyqtSignal(str, str, str, bool)  # 当选择文件时发出信号
     compare_with_working_requested = pyqtSignal(str, str)  # 请求与工作区比较
+    edit_file_requested = pyqtSignal(str)  # 请求编辑文件
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -122,9 +123,17 @@ class FileChangesView(QWidget):
         item = self.changes_tree.itemAt(position)
         if item and item.childCount() == 0:
             menu = QMenu()
+
+            # 添加与工作区比较选项
             compare_action = QAction("与工作区比较", self)
             compare_action.triggered.connect(
                 lambda: self.compare_with_working_requested.emit(self.get_full_path(item), self.commit_hash)
             )
             menu.addAction(compare_action)
+
+            # 添加编辑源文件选项
+            edit_action = QAction("编辑源文件", self)
+            edit_action.triggered.connect(lambda: self.edit_file_requested.emit(self.get_full_path(item)))
+            menu.addAction(edit_action)
+
             menu.exec(self.changes_tree.viewport().mapToGlobal(position))

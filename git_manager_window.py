@@ -237,6 +237,7 @@ class GitManagerWindow(QMainWindow):
         self.commit_history_view.commit_selected.connect(self.on_commit_selected)
         self.file_changes_view.file_selected.connect(self.on_file_selected)
         self.file_changes_view.compare_with_working_requested.connect(self.show_compare_with_working_dialog)
+        self.file_changes_view.edit_file_requested.connect(self.on_edit_file_requested)
 
         # 创建右侧垂直分割器，用于放置文件变化视图和 commit 详细信息视图
         right_splitter = QSplitter(Qt.Orientation.Vertical)
@@ -359,6 +360,18 @@ class GitManagerWindow(QMainWindow):
             self._handle_file_index_update(event_type, path, is_directory)
 
         self.schedule_refresh(event_type, path, is_directory)
+
+    def on_edit_file_requested(self, file_path):
+        """处理编辑文件请求"""
+        try:
+            # 构建完整文件路径
+            full_path = os.path.join(self.git_manager.repo.working_dir, file_path)
+            if os.path.exists(full_path):
+                self.workspace_explorer.open_file_in_tab(full_path)
+            else:
+                logging.warning("File not found: %s", full_path)
+        except Exception:
+            logging.exception("Error opening file for editing: %s", file_path)
 
     def _handle_file_index_update(self, event_type, path, is_directory):
         """处理文件变更，更新索引"""
