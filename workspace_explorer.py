@@ -114,6 +114,7 @@ class WorkspaceExplorer(QWidget):
         self.file_changes_view.compare_with_working_requested.connect(
             get_main_window_by_parent(self).show_compare_with_working_dialog
         )
+        self.file_changes_view.edit_file_requested.connect(self.open_file_in_tab)
 
         # 创建标签页组件
         self.tab_widget = QTabWidget()
