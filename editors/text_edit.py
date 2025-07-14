@@ -175,6 +175,10 @@ class LineNumberArea(QWidget):
 
         super().mousePressEvent(event)
 
+    def wheelEvent(self, event):
+        """处理滚轮事件，将其转发给编辑器"""
+        self.editor.wheelEvent(event)
+
 
 class SyncedTextEdit(QPlainTextEdit):
     blame_annotation_clicked = pyqtSignal(str)
