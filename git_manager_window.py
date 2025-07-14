@@ -485,10 +485,6 @@ class GitManagerWindow(QMainWindow):
     def open_folder_dialog(self):
         """打开文件夹选择对话框"""
         folder_path = QFileDialog.getExistingDirectory(self, self.tr("Select Git Repository"))
-        # macos 上 QFileDialog.getExistingDirectory 有时候选择"文件夹对话框" 灰色的 无法打开文件夹
-        # 再有 bug 可以考虑用 QFileDialog.Option.DontUseNativeDialog
-        # 就是这个没有保存最近打开的文件夹路径 每次都要重新选
-        # 极有可能与输入法有关 error messaging the mach port for IMKCFRunLoopWakeUpReliable
         if folder_path:
             self.open_folder(folder_path)
 
