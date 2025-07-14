@@ -552,8 +552,8 @@ class SyncedTextEdit(QPlainTextEdit):
                     author_name = display_annotation.get("author_name", "Unknown Author")
                     committed_date = display_annotation.get("committed_date", "Unknown Date")
 
-                    # Use short hash for display string
-                    display_string = f"{commit_hash_full[:7]} {author_name} {committed_date}"
+                    # Display only author and date, no git hash
+                    display_string = f"{author_name} {committed_date}"
                     display_annotation["_display_string"] = display_string
 
                     calculated_width = self.fontMetrics().horizontalAdvance(display_string)
