@@ -53,7 +53,6 @@ class DiffHighlighterEngine:
             logging.debug("左侧范围：%d-%d", chunk.left_start, chunk.left_end)
             logging.debug("右侧范围：%d-%d", chunk.right_start, chunk.right_end)
         self.diff_chunks = chunks
-        self.highlighter.rehighlight()
 
     def highlightBlock(self, text):
         """高亮当前文本块"""
@@ -200,7 +199,6 @@ class DiffHighlighter(QSyntaxHighlighter):
 
     def set_diff_chunks(self, chunks):
         self.engine.set_diff_chunks(chunks)
-        self.rehighlight()
 
     def highlightBlock(self, text):
         self.engine.highlightBlock(text)
@@ -223,17 +221,14 @@ class MultiHighlighter(QSyntaxHighlighter):
     def set_diff_chunks(self, chunks):
         self.diff_engine.set_diff_chunks(chunks)
         self.diff_chunks = chunks
-        self.rehighlight()
 
     def set_texts(self, left_text: str, right_text: str):
         if hasattr(self.diff_engine, "set_texts"):
             self.diff_engine.set_texts(left_text, right_text)
-            self.rehighlight()
 
     def set_merge_texts(self, left_text: str, right_text: str, result_text: str):
         if hasattr(self.diff_engine, "set_merge_texts"):
             self.diff_engine.set_merge_texts(left_text, right_text, result_text)
-            self.rehighlight()
 
     def highlightBlock(self, text):
         self.pygments_engine.highlightBlock(text)
@@ -247,6 +242,8 @@ class NewDiffHighlighterEngine:
         self.editor_type = editor_type
         self.diff_chunks: list[DiffChunk] = []
         self.diff_list = []
+        self.other_diff_list = []
+        self._diff_cache = {}  # 缓存计算结果
         logging.debug("\n=== 初始化 DiffHighlighter ===")
         logging.debug("编辑器类型：%s", editor_type)
 
@@ -267,12 +264,14 @@ class NewDiffHighlighterEngine:
 
     def set_diff_chunks(self, chunks):
         self.diff_chunks = chunks
+        self._diff_cache.clear()  # 清除缓存
 
     def set_texts(self, left_text: str, right_text: str):
         """设置要对比的文本"""
         # 计算差异
         self.diff_list = self.dmp.diff_main(left_text, right_text)
         self.dmp.diff_cleanupSemantic(self.diff_list)
+        self._diff_cache.clear()  # 清除缓存
 
     def set_merge_texts(self, left_text: str, right_text: str, result_text: str):
         """设置要对比的文本"""
@@ -283,6 +282,7 @@ class NewDiffHighlighterEngine:
         # self.diff_list.extend(diff_list)
         self.dmp.diff_cleanupSemantic(self.diff_list)
         self.dmp.diff_cleanupSemantic(self.other_diff_list)
+        self._diff_cache.clear()  # 清除缓存
 
     # left side property
     @property
@@ -313,7 +313,16 @@ class NewDiffHighlighterEngine:
         block_start = current_block.position()
         block_length = count_utf16_code_units(text)
 
-        # 根据差异列表应用格式
+        # 使用缓存优化性能
+        cache_key = (block_number, id(diff_list))
+        if cache_key in self._diff_cache:
+            cached_formats = self._diff_cache[cache_key]
+            for start_pos, length, format_obj in cached_formats:
+                self.highlighter.setFormat(start_pos, length, format_obj)
+            return
+
+        # 计算并缓存结果
+        formats_to_apply = []
         current_pos = 0
 
         for op, data in diff_list:
@@ -343,7 +352,7 @@ class NewDiffHighlighterEngine:
                             if hasattr(self.highlighter, "empty_block_numbers"):
                                 self.highlighter.empty_block_numbers.add(block_number)
                         else:
-                            self.highlighter.setFormat(start_in_block, end_in_block - start_in_block, format_to_apply)
+                            formats_to_apply.append((start_in_block, end_in_block - start_in_block, format_to_apply))
 
             # 只有在 DELETE 和 EQUAL 时才移动左侧位置，INSERT 和 EQUAL 时才移动右侧位置
             if self.is_left_side:
@@ -351,3 +360,16 @@ class NewDiffHighlighterEngine:
                     current_pos += data_length
             elif op != diff_match_patch.diff_match_patch.DIFF_DELETE:
                 current_pos += data_length
+
+        # 缓存结果 (限制缓存大小以避免内存泄漏)
+        if len(self._diff_cache) > 1000:  # 限制缓存大小
+            # 清理最老的一半缓存
+            keys_to_remove = list(self._diff_cache.keys())[:500]
+            for key in keys_to_remove:
+                del self._diff_cache[key]
+
+        self._diff_cache[cache_key] = formats_to_apply
+
+        # 应用格式
+        for start_pos, length, format_obj in formats_to_apply:
+            self.highlighter.setFormat(start_pos, length, format_obj)
