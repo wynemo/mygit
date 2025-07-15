@@ -106,6 +106,7 @@ class WorkspaceExplorer(QWidget):
         # 创建文件树
         self.file_tree = FileTreeWidget(self, git_manager=self.git_manager)  # 传入 self 作为父部件和 git_manager
         self.file_tree.setHeaderLabels([self.tr("Workspace Files")])
+        self.file_tree.setMinimumWidth(180)  # 设置最小宽度保护
 
         self.commit_widget = CommitWidget(self)
 
@@ -119,6 +120,7 @@ class WorkspaceExplorer(QWidget):
         # 创建标签页组件
         self.tab_widget = QTabWidget()
         self.tab_widget.setTabsClosable(True)
+        self.tab_widget.setMinimumWidth(300)  # 设置最小宽度
         self.tab_widget.tabCloseRequested.connect(self.close_tab)
         self.tab_widget.setAcceptDrops(True)
         self.tab_widget.dragEnterEvent = self.tab_drag_enter_event
@@ -140,6 +142,13 @@ class WorkspaceExplorer(QWidget):
 
         # 连接标签页切换信号
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
+
+        # 设置拉伸因子
+        self.splitter.setStretchFactor(0, 0)  # file_tree 不拉伸
+        self.splitter.setStretchFactor(1, 0)  # commit_widget 不拉伸
+        self.splitter.setStretchFactor(2, 0)  # file_changes_view 不拉伸
+        self.splitter.setStretchFactor(3, 0)  # file_search_widget 不拉伸
+        self.splitter.setStretchFactor(4, 1)  # tab_widget 可拉伸
 
         self.show_file_tree()
 
@@ -533,7 +542,7 @@ class WorkspaceExplorer(QWidget):
         self.file_search_widget.hide()
         self.commit_widget.hide()
         self.file_changes_view.hide()
-        self.splitter.setSizes([200, 0, 0, 0, 400])
+        self.splitter.setSizes([1, 0, 0, 0, 2])  # 使用比例而非固定像素值
 
     def show_commit_dialog(self):
         """显示提交对话框并隐藏文件树"""
@@ -541,14 +550,14 @@ class WorkspaceExplorer(QWidget):
         self.file_tree.hide()
         self.file_search_widget.hide()
         self.file_changes_view.hide()
-        self.splitter.setSizes([0, 200, 0, 0, 400])
+        self.splitter.setSizes([0, 1, 0, 0, 2])  # 使用比例而非固定像素值
 
     def show_file_changes_view(self):
         self.file_changes_view.show()
         self.file_tree.hide()
         self.file_search_widget.hide()
         self.commit_widget.hide()
-        self.splitter.setSizes([0, 0, 200, 0, 400])
+        self.splitter.setSizes([0, 0, 1, 0, 2])  # 使用比例而非固定像素值
 
     def update_filename_display(self, file_path: str, is_dirty: bool):
         print("update_filename_display", file_path, is_dirty)
@@ -569,7 +578,7 @@ class WorkspaceExplorer(QWidget):
         self.file_tree.hide()
         self.commit_widget.hide()
         self.file_changes_view.hide()
-        self.splitter.setSizes([0, 0, 0, 200, 400])
+        self.splitter.setSizes([0, 0, 0, 1, 2])  # 使用比例而非固定像素值
 
     def view_folder_history(self, folder_path: str):
         """显示文件夹历史视图"""
