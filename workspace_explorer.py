@@ -106,7 +106,7 @@ class WorkspaceExplorer(QWidget):
         # 创建文件树
         self.file_tree = FileTreeWidget(self, git_manager=self.git_manager)  # 传入 self 作为父部件和 git_manager
         self.file_tree.setHeaderLabels([self.tr("Workspace Files")])
-        self.file_tree.setMinimumWidth(180)  # 设置最小宽度保护
+        self.file_tree.setMinimumWidth(250)  # 设置最小宽度保护
 
         self.commit_widget = CommitWidget(self)
 
@@ -542,7 +542,7 @@ class WorkspaceExplorer(QWidget):
         self.file_search_widget.hide()
         self.commit_widget.hide()
         self.file_changes_view.hide()
-        self.splitter.setSizes([1, 0, 0, 0, 2])  # 使用比例而非固定像素值
+        self.splitter.setSizes([2, 0, 0, 0, 3])  # 增加file_tree初始宽度比例
 
     def show_commit_dialog(self):
         """显示提交对话框并隐藏文件树"""
