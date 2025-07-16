@@ -979,6 +979,7 @@ class GitManagerWindow(QMainWindow):
 
     def closeEvent(self, event):
         """Ensure the watchdog observer is stopped on close."""
+        self.save_splitter_state()
         self.stop_watching_folder()
         super().closeEvent(event)
 
