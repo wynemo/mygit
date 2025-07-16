@@ -111,6 +111,7 @@ class WorkspaceExplorer(QWidget):
         self.commit_widget = CommitWidget(self)
 
         self.file_changes_view = FileChangesView(self)
+        self.file_changes_view.setMinimumWidth(300)  # 设置最小宽度
         self.file_changes_view.file_selected.connect(get_main_window_by_parent(self).on_file_selected)
         self.file_changes_view.compare_with_working_requested.connect(
             get_main_window_by_parent(self).show_compare_with_working_dialog
@@ -557,7 +558,7 @@ class WorkspaceExplorer(QWidget):
         self.file_tree.hide()
         self.file_search_widget.hide()
         self.commit_widget.hide()
-        self.splitter.setSizes([0, 0, 1, 0, 2])  # 使用比例而非固定像素值
+        self.splitter.setSizes([0, 0, 2, 0, 3])  # 增加file_changes_view的宽度比例
 
     def update_filename_display(self, file_path: str, is_dirty: bool):
         print("update_filename_display", file_path, is_dirty)
