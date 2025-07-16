@@ -25,6 +25,14 @@ class Settings:
             "font_family": "Courier New",  # 默认字体
             "font_size": 12,  # 默认字体大小
             "code_style": "friendly",  # 代码风格设置
+            "splitter_state": None,  # 分割器状态
+            "panel_widths": {  # 各面板的宽度设置
+                "file_tree": 250,
+                "commit_widget": 300,
+                "file_changes_view": 350,
+                "file_search_widget": 300,
+                "tab_widget": 400
+            },
         }
 
         # 加载已有设置
@@ -103,6 +111,35 @@ class Settings:
         """设置代码风格"""
         self.settings["code_style"] = code_style
         self.save_settings()
+    
+    def save_splitter_state(self, sizes):
+        """保存分割器状态"""
+        self.settings["splitter_state"] = sizes
+        self.save_settings()
+    
+    def get_splitter_state(self):
+        """获取分割器状态"""
+        return self.settings.get("splitter_state")
+    
+    def save_panel_widths(self, panel_widths):
+        """保存各面板的宽度设置"""
+        self.settings["panel_widths"].update(panel_widths)
+        self.save_settings()
+    
+    def get_panel_widths(self):
+        """获取各面板的宽度设置"""
+        return self.settings.get("panel_widths", {
+            "file_tree": 250,
+            "commit_widget": 300,
+            "file_changes_view": 350,
+            "file_search_widget": 300,
+            "tab_widget": 400
+        })
+    
+    def get_panel_width(self, panel_name):
+        """获取指定面板的宽度"""
+        panel_widths = self.get_panel_widths()
+        return panel_widths.get(panel_name, 300)
 
 
 BLAME_COLOR_PALETTE = [
