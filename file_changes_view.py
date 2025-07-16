@@ -1,3 +1,5 @@
+import logging
+
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
@@ -62,9 +64,10 @@ class FileChangesView(QWidget):
             self.changes_tree.resizeColumnToContents(0)
             self.changes_tree.resizeColumnToContents(1)
 
-        except Exception as e:
+        except Exception:
+            logging.exception("获取文件变化失败")
             error_item = QTreeWidgetItem(self.changes_tree)
-            error_item.setText(0, f"获取文件变化失败：{e!s}")
+            error_item.setText(0, "获取文件变化失败")
 
     def add_file_to_tree(self, path_parts, status, parent=None, old_path=None, is_comparing_with_workspace=False):
         """递归添加文件到树形结构"""
