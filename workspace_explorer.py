@@ -223,6 +223,10 @@ class WorkspaceExplorer(QWidget):
             handler_name = "handle_blame_click_from_editor"
             main_git_window = get_main_window_by_parent(self)
 
+            if not main_git_window.git_manager:
+                logging.error("GitManager not found.")
+                return
+
             diffs = text_edit.get_diffs(main_git_window.git_manager)
             text_edit.set_line_modifications(diffs)
 
