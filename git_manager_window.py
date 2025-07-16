@@ -20,7 +20,6 @@ from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 from commit_detail_view import CommitDetailView
-from commit_history_view import CommitHistoryView
 from compare_view import CompareView
 from components.notification_widget import NotificationWidget
 from components.spin_icons import RotatingLabel
@@ -29,6 +28,7 @@ from file_changes_view import FileChangesView
 from git_manager import GitManager
 from settings import Settings
 from threads import FetchThread, PullThread, PushThread  # Import PullThread and PushThread
+from views.commit_history_view import CommitHistoryView
 from views.folder_history_view import FolderHistoryView
 from views.side_bar_widget import SideBarWidget
 from views.top_bar_widget import TopBarWidget  # Import TopBarWidget
