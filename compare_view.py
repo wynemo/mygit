@@ -2,21 +2,19 @@ import contextlib
 import logging
 import os
 
-from PyQt6.QtWidgets import QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QPushButton, QStackedWidget, QVBoxLayout, QWidget
 
 from text_diff_viewer import DiffViewer, MergeDiffViewer
-
-# SyncedTextEdit is used within DiffViewer and MergeDiffViewer,
-# its blame_annotation_clicked signal will be connected from instances of these viewers.
+from unified_diff_viewer import UnifiedDiffViewer
 
 
 class CompareView(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.left_text = ""
+        self.right_text = ""
+        self.file_path = ""
         self.setup_ui()
-
-    # _on_blame_annotation_clicked method is removed as its functionality is now centralized
-    # in GitManagerWindow.handle_blame_click_from_editor
 
     def setup_ui(self):
         from git_manager_window import GitManagerWindow
@@ -25,14 +23,21 @@ class CompareView(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
 
+        self.view_mode_button = QPushButton("切换到统一视图")
+        self.view_mode_button.clicked.connect(self.toggle_view_mode)
+        layout.addWidget(self.view_mode_button)
+
+        self.stacked_widget = QStackedWidget()
+        layout.addWidget(self.stacked_widget)
+
         self.diff_viewer = DiffViewer()
+        self.unified_diff_viewer = UnifiedDiffViewer()
         self.merge_diff_viewer = MergeDiffViewer()
-        self.merge_diff_viewer.hide()
 
-        layout.addWidget(self.diff_viewer)
-        layout.addWidget(self.merge_diff_viewer)
+        self.stacked_widget.addWidget(self.diff_viewer)
+        self.stacked_widget.addWidget(self.unified_diff_viewer)
+        self.stacked_widget.addWidget(self.merge_diff_viewer)
 
-        # Find GitManagerWindow instance to connect the signal
         parent_widget = self.parent()
         git_manager_window_instance = None
         while parent_widget:
@@ -42,15 +47,12 @@ class CompareView(QWidget):
             parent_widget = parent_widget.parent()
 
         if git_manager_window_instance:
-            # Connect signals for DiffViewer
             self.diff_viewer.left_edit.blame_annotation_clicked.connect(
                 git_manager_window_instance.handle_blame_click_from_editor
             )
             self.diff_viewer.right_edit.blame_annotation_clicked.connect(
                 git_manager_window_instance.handle_blame_click_from_editor
             )
-
-            # Connect signals for MergeDiffViewer
             self.merge_diff_viewer.parent1_edit.blame_annotation_clicked.connect(
                 git_manager_window_instance.handle_blame_click_from_editor
             )
@@ -61,46 +63,48 @@ class CompareView(QWidget):
                 git_manager_window_instance.handle_blame_click_from_editor
             )
         else:
-            # Optionally, log a warning if the main window instance isn't found
-            print("Warning: GitManagerWindow instance not found for CompareView signal connections.")
+            logging.warning("GitManagerWindow instance not found for CompareView signal connections.")
+
+    def toggle_view_mode(self):
+        current_index = self.stacked_widget.currentIndex()
+        if current_index == 0:
+            self.stacked_widget.setCurrentIndex(1)
+            self.view_mode_button.setText("切换到并排视图")
+            self.unified_diff_viewer.set_texts(self.left_text, self.right_text, self.file_path)
+        elif current_index == 1:
+            self.stacked_widget.setCurrentIndex(0)
+            self.view_mode_button.setText("切换到统一视图")
+            self.diff_viewer.set_texts(self.left_text, self.right_text, self.file_path)
 
     def show_diff(self, git_manager, commit, file_path, other_commit=None, is_comparing_with_workspace=False):
         """显示文件差异"""
         try:
-            # 处理与工作区比较的情况
+            self.file_path = file_path
             if is_comparing_with_workspace:
-                # 获取提交中的文件内容（左侧）
                 try:
-                    commit_content = commit.tree[file_path].data_stream.read().decode("utf-8", errors="replace")
+                    self.left_text = commit.tree[file_path].data_stream.read().decode("utf-8", errors="replace")
                 except KeyError:
-                    commit_content = ""
-
-                # 获取工作区的文件内容（右侧）
+                    self.left_text = ""
                 working_file_path = os.path.join(git_manager.repo.working_dir, file_path)
                 if os.path.exists(working_file_path):
                     with open(working_file_path, "r", encoding="utf-8", errors="replace") as f:
-                        workspace_content = f.read()
+                        self.right_text = f.read()
                 else:
-                    workspace_content = ""
-
-                self.diff_viewer.show()
-                self.merge_diff_viewer.hide()
+                    self.right_text = ""
                 self.diff_viewer.set_texts(
-                    commit_content,
-                    workspace_content,
+                    self.left_text,
+                    self.right_text,
                     file_path,
                     right_file_path=file_path,
                     left_commit_hash=commit.hexsha,
-                    right_commit_hash=None,  # 工作区没有提交哈希
+                    right_commit_hash=None,
                 )
-
-                # 启用右侧编辑器，允许编辑工作区文件
                 self.diff_viewer.right_edit.set_editable()
+                self.stacked_widget.setCurrentWidget(self.diff_viewer)
+                self.view_mode_button.setVisible(True)
                 return
 
             parents = commit.parents
-
-            # 获取当前提交的文件内容
             try:
                 content = commit.tree[file_path].data_stream.read().decode("utf-8", errors="replace")
             except KeyError:
@@ -108,43 +112,42 @@ class CompareView(QWidget):
 
             if other_commit:
                 other_commit_content = other_commit.tree[file_path].data_stream.read().decode("utf-8", errors="replace")
-                self.diff_viewer.show()
-                self.merge_diff_viewer.hide()
+                self.left_text = content
+                self.right_text = other_commit_content
                 self.diff_viewer.set_texts(
-                    content,
-                    other_commit_content,
+                    self.left_text,
+                    self.right_text,
                     file_path,
                     right_file_path=None,
                     left_commit_hash=commit.hexsha,
                     right_commit_hash=other_commit.hexsha,
                 )
+                self.stacked_widget.setCurrentWidget(self.diff_viewer)
+                self.view_mode_button.setVisible(True)
                 return
 
-            # 获取父提交的文件内容
             parent_content = ""
             if parents:
                 with contextlib.suppress(KeyError):
                     parent_content = parents[0].tree[file_path].data_stream.read().decode("utf-8", errors="replace")
 
-            # 根据父提交数量选择显示模式
             if len(parents) <= 1:
-                self.diff_viewer.show()
-                self.merge_diff_viewer.hide()
+                self.left_text = parent_content
+                self.right_text = content
                 parent_commit_hash = parents[0].hexsha if parents else None
                 self.diff_viewer.set_texts(
-                    parent_content, content, file_path, file_path, parent_commit_hash, commit.hexsha
+                    self.left_text, self.right_text, file_path, file_path, parent_commit_hash, commit.hexsha
                 )
+                self.stacked_widget.setCurrentWidget(self.diff_viewer)
+                self.view_mode_button.setVisible(True)
             else:
-                self.diff_viewer.hide()
-                self.merge_diff_viewer.show()
-
-                # 获取第二个父提交的内容
+                self.stacked_widget.setCurrentWidget(self.merge_diff_viewer)
+                self.view_mode_button.setVisible(False)
                 parent2_content = ""
                 with contextlib.suppress(KeyError):
                     parent2_content = parents[1].tree[file_path].data_stream.read().decode("utf-8", errors="replace")
-
-                parent1_commit_hash = parents[0].hexsha  # Assuming parents[0] exists for merge
-                parent2_commit_hash = parents[1].hexsha  # Assuming parents[1] exists for merge
+                parent1_commit_hash = parents[0].hexsha
+                parent2_commit_hash = parents[1].hexsha
                 self.merge_diff_viewer.set_texts(
                     parent_content,
                     content,
@@ -154,6 +157,5 @@ class CompareView(QWidget):
                     commit.hexsha,
                     parent2_commit_hash,
                 )
-
         except Exception:
-            logging.exception("Error displaying file diff")
+            logging.exception("显示文件差异时出错")
