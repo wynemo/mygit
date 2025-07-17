@@ -21,6 +21,7 @@ from components.file_quick_search_popup import FileQuickSearchPopup  # 新增导
 from components.file_search_widget import FileSearchWidget
 from editors.modified_text_edit import ModifiedTextEdit
 from file_changes_view import FileChangesView
+from settings import Settings
 from syntax_highlighter import CodeHighlighter
 from threads import FileIndexThread
 from utils import get_main_window_by_parent
@@ -45,6 +46,12 @@ class WorkspaceExplorer(QWidget):
         # 初始化文件索引管理器
         self.file_index_manager = FileIndexManager()
         self._index_initialized = False
+
+        # 初始化设置管理器
+        self.settings = Settings()
+
+        # 面板名称映射
+        self.panel_names = ["file_tree", "commit_widget", "file_changes_view", "file_search_widget", "tab_widget"]
 
         self.setup_ui()
 
@@ -155,6 +162,9 @@ class WorkspaceExplorer(QWidget):
 
         # 添加分割器到布局
         layout.addWidget(self.splitter)
+
+        # 恢复分割器状态
+        self.restore_splitter_state()
 
     def tab_drag_enter_event(self, event: QDragEnterEvent):
         """处理拖拽进入事件"""
@@ -547,7 +557,11 @@ class WorkspaceExplorer(QWidget):
         self.file_search_widget.hide()
         self.commit_widget.hide()
         self.file_changes_view.hide()
-        self.splitter.setSizes([2, 0, 0, 0, 3])  # 增加file_tree初始宽度比例
+
+        # 使用记住的面板宽度
+        file_tree_width = self.get_panel_width("file_tree")
+        tab_widget_width = self.get_panel_width("tab_widget")
+        self.splitter.setSizes([file_tree_width, 0, 0, 0, tab_widget_width])
 
     def show_commit_dialog(self):
         """显示提交对话框并隐藏文件树"""
@@ -555,14 +569,22 @@ class WorkspaceExplorer(QWidget):
         self.file_tree.hide()
         self.file_search_widget.hide()
         self.file_changes_view.hide()
-        self.splitter.setSizes([0, 1, 0, 0, 2])  # 使用比例而非固定像素值
+
+        # 使用记住的面板宽度
+        commit_widget_width = self.get_panel_width("commit_widget")
+        tab_widget_width = self.get_panel_width("tab_widget")
+        self.splitter.setSizes([0, commit_widget_width, 0, 0, tab_widget_width])
 
     def show_file_changes_view(self):
         self.file_changes_view.show()
         self.file_tree.hide()
         self.file_search_widget.hide()
         self.commit_widget.hide()
-        self.splitter.setSizes([0, 0, 2, 0, 3])  # 增加file_changes_view的宽度比例
+
+        # 使用记住的面板宽度
+        file_changes_view_width = self.get_panel_width("file_changes_view")
+        tab_widget_width = self.get_panel_width("tab_widget")
+        self.splitter.setSizes([0, 0, file_changes_view_width, 0, tab_widget_width])
 
     def update_filename_display(self, file_path: str, is_dirty: bool):
         print("update_filename_display", file_path, is_dirty)
@@ -583,7 +605,11 @@ class WorkspaceExplorer(QWidget):
         self.file_tree.hide()
         self.commit_widget.hide()
         self.file_changes_view.hide()
-        self.splitter.setSizes([0, 0, 0, 1, 2])  # 使用比例而非固定像素值
+
+        # 使用记住的面板宽度
+        file_search_widget_width = self.get_panel_width("file_search_widget")
+        tab_widget_width = self.get_panel_width("tab_widget")
+        self.splitter.setSizes([0, 0, 0, file_search_widget_width, tab_widget_width])
 
     def view_folder_history(self, folder_path: str):
         """显示文件夹历史视图"""
@@ -659,3 +685,27 @@ class WorkspaceExplorer(QWidget):
     def _on_index_error(self, error_message):
         """索引建立出错的回调"""
         logging.exception("建立文件索引时出错")
+
+    def save_splitter_state(self):
+        """保存分割器状态和各面板宽度"""
+        current_sizes = self.splitter.sizes()
+        self.settings.save_splitter_state(current_sizes)
+
+        # 保存各面板的宽度（只保存可见面板的宽度）
+        panel_widths = {}
+        for i, panel_name in enumerate(self.panel_names):
+            if current_sizes[i] > 0:  # 只保存可见面板的宽度
+                panel_widths[panel_name] = current_sizes[i]
+
+        if panel_widths:
+            self.settings.save_panel_widths(panel_widths)
+
+    def restore_splitter_state(self):
+        """恢复分割器状态"""
+        saved_sizes = self.settings.get_splitter_state()
+        if saved_sizes:
+            self.splitter.setSizes(saved_sizes)
+
+    def get_panel_width(self, panel_name):
+        """获取指定面板的宽度"""
+        return self.settings.get_panel_width(panel_name)

@@ -38,6 +38,7 @@ class CommitHistoryView(QWidget):
         self.search_edit = QLineEdit()
         self.search_edit.setPlaceholderText("当搜索以后，可尝试往下滚动加载更多数据进行搜索...")
         self.search_edit.textChanged.connect(self.filter_history)
+        self.search_edit.setMaximumWidth(350)  # 设置搜索框最大宽度，使其变窄
         search_layout.addWidget(self.search_edit)
 
         # 添加清除按钮
@@ -45,6 +46,9 @@ class CommitHistoryView(QWidget):
         self.clear_button.clicked.connect(self.clear_search)
         self.clear_button.setMaximumWidth(60)
         search_layout.addWidget(self.clear_button)
+
+        # 添加伸缩空间使搜索框左对齐
+        search_layout.addStretch()
         layout.addLayout(search_layout)
 
         # 普通提交历史列表
@@ -73,7 +77,7 @@ class CommitHistoryView(QWidget):
 
         self.history_graph_list.hide()  # 默认隐藏
 
-        # cursor 生成: 初始检查数据状态
+        # cursor 生成：初始检查数据状态
         self._check_and_display_no_data_message()
 
     def update_history(self, git_manager, branch):
@@ -232,5 +236,5 @@ class CommitHistoryView(QWidget):
 
             item.setHidden(not show_item)
 
-        # cursor 生成: 过滤完成后检查数据状态
+        # cursor 生成：过滤完成后检查数据状态
         self._check_and_display_no_data_message()
