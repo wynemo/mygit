@@ -31,7 +31,7 @@ class Settings:
                 "commit_widget": 300,
                 "file_changes_view": 350,
                 "file_search_widget": 300,
-                "tab_widget": 400
+                "tab_widget": 400,
             },
         }
 
@@ -111,31 +111,34 @@ class Settings:
         """设置代码风格"""
         self.settings["code_style"] = code_style
         self.save_settings()
-    
+
     def save_splitter_state(self, sizes):
         """保存分割器状态"""
         self.settings["splitter_state"] = sizes
         self.save_settings()
-    
+
     def get_splitter_state(self):
         """获取分割器状态"""
         return self.settings.get("splitter_state")
-    
+
     def save_panel_widths(self, panel_widths):
         """保存各面板的宽度设置"""
         self.settings["panel_widths"].update(panel_widths)
         self.save_settings()
-    
+
     def get_panel_widths(self):
         """获取各面板的宽度设置"""
-        return self.settings.get("panel_widths", {
-            "file_tree": 250,
-            "commit_widget": 300,
-            "file_changes_view": 350,
-            "file_search_widget": 300,
-            "tab_widget": 400
-        })
-    
+        return self.settings.get(
+            "panel_widths",
+            {
+                "file_tree": 250,
+                "commit_widget": 300,
+                "file_changes_view": 350,
+                "file_search_widget": 300,
+                "tab_widget": 400,
+            },
+        )
+
     def get_panel_width(self, panel_name):
         """获取指定面板的宽度"""
         panel_widths = self.get_panel_widths()
@@ -151,3 +154,6 @@ BLAME_COLOR_PALETTE = [
 
 # icons folder
 ICONS_FOLDER = os.path.join(os.path.dirname(__file__), "icons")
+
+# 创建全局settings实例
+settings = Settings()

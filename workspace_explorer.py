@@ -21,7 +21,7 @@ from components.file_quick_search_popup import FileQuickSearchPopup  # 新增导
 from components.file_search_widget import FileSearchWidget
 from editors.modified_text_edit import ModifiedTextEdit
 from file_changes_view import FileChangesView
-from settings import Settings
+from settings import settings
 from syntax_highlighter import CodeHighlighter
 from threads import FileIndexThread
 from utils import get_main_window_by_parent
@@ -48,7 +48,7 @@ class WorkspaceExplorer(QWidget):
         self._index_initialized = False
 
         # 初始化设置管理器
-        self.settings = Settings()
+        self.settings = settings
 
         # 面板名称映射
         self.panel_names = ["file_tree", "commit_widget", "file_changes_view", "file_search_widget", "tab_widget"]

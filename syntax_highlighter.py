@@ -11,7 +11,7 @@ from PyQt6.QtGui import (  # 导入 QFont (Import QFont)
     QTextCharFormat,
 )
 
-from settings import Settings
+from settings import settings
 
 
 class PygmentsHighlighterEngine:
@@ -38,7 +38,6 @@ class PygmentsHighlighterEngine:
         try:
             # 您可以选择一个 Pygments 样式 (You can choose a Pygments style)
             # 例如 'default', 'monokai', 'emacs', 'friendly' 等 (e.g., 'default', 'monokai', 'emacs', 'friendly', etc.)
-            settings = Settings()
             style_name = settings.get_code_style()  # 从设置中获取代码风格 (Get code style from settings)
             if not style_name:
                 style_name = "friendly"  # 如果未设置，则使用默认样式 (Use default style if not set)

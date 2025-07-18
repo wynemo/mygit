@@ -27,7 +27,7 @@ from PyQt6.QtWidgets import (
 
 from components.find_dialog import FindDialog
 from diff_highlighter import DiffHighlighter
-from settings import BLAME_COLOR_PALETTE, Settings
+from settings import BLAME_COLOR_PALETTE, settings
 
 if TYPE_CHECKING:
     from git_manager import GitManager
@@ -197,7 +197,6 @@ class SyncedTextEdit(QPlainTextEdit):
         self.line_final_color_indices = []
         # self.commit_hash_colors removed
 
-        settings = Settings()
         self.setFont(QFont(settings.get_font_family(), settings.get_font_size()))
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self.setReadOnly(True)  # 默认设置为只读
