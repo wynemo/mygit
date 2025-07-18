@@ -36,6 +36,11 @@ class UnifiedHighlighter(MultiHighlighter):
                 self.setFormat(0, len(text), self.insert_format)
             elif line_type == "delete":
                 self.setFormat(0, len(text), self.delete_format)
+            elif line_type == "omitted":
+                # 为省略行设置特殊格式
+                omitted_format = QTextCharFormat()
+                omitted_format.setForeground(QColor(128, 128, 128))  # 灰色文字
+                self.setFormat(0, len(text), omitted_format)
 
 
 class UnifiedDiffViewer(QWidget):
@@ -109,17 +114,52 @@ class UnifiedDiffViewer(QWidget):
         unified_lines = []
         self.unified_line_mapping.clear()
         unified_line_num = 0
+        context_lines = 3  # 在变更前后显示的上下文行数
 
-        for chunk in self.diff_chunks:
+        for chunk_idx, chunk in enumerate(self.diff_chunks):
             if chunk.type == "equal":
-                for i in range(chunk.left_start, chunk.left_end):
-                    left_line_num = i + 1
-                    right_line_num = chunk.right_start + (i - chunk.left_start) + 1
-                    line_content = left_lines[i]
-                    formatted_line = f"{left_line_num:>4} {right_line_num:>4}  {line_content}"
-                    unified_lines.append(formatted_line)
-                    self.unified_line_mapping[unified_line_num] = ("equal", chunk, i)
-                    unified_line_num += 1
+                chunk_size = chunk.left_end - chunk.left_start
+
+                # 如果是第一个或最后一个chunk，或者chunk很小，就完全显示
+                if chunk_idx == 0 or chunk_idx == len(self.diff_chunks) - 1 or chunk_size <= 2 * context_lines:
+                    for i in range(chunk.left_start, chunk.left_end):
+                        left_line_num = i + 1
+                        right_line_num = chunk.right_start + (i - chunk.left_start) + 1
+                        line_content = left_lines[i]
+                        formatted_line = f"{left_line_num:>4} {right_line_num:>4}  {line_content}"
+                        unified_lines.append(formatted_line)
+                        self.unified_line_mapping[unified_line_num] = ("equal", chunk, i)
+                        unified_line_num += 1
+                else:
+                    # 显示开头的几行
+                    for i in range(chunk.left_start, min(chunk.left_start + context_lines, chunk.left_end)):
+                        left_line_num = i + 1
+                        right_line_num = chunk.right_start + (i - chunk.left_start) + 1
+                        line_content = left_lines[i]
+                        formatted_line = f"{left_line_num:>4} {right_line_num:>4}  {line_content}"
+                        unified_lines.append(formatted_line)
+                        self.unified_line_mapping[unified_line_num] = ("equal", chunk, i)
+                        unified_line_num += 1
+
+                    # 添加省略号
+                    omitted_count = chunk_size - 2 * context_lines
+                    if omitted_count > 0:
+                        formatted_line = f"{'':>4} {'':>4}  ... ({omitted_count} lines omitted) ..."
+                        unified_lines.append(formatted_line)
+                        self.unified_line_mapping[unified_line_num] = ("omitted", chunk, -1)
+                        unified_line_num += 1
+
+                    # 显示结尾的几行
+                    for i in range(
+                        max(chunk.left_end - context_lines, chunk.left_start + context_lines), chunk.left_end
+                    ):
+                        left_line_num = i + 1
+                        right_line_num = chunk.right_start + (i - chunk.left_start) + 1
+                        line_content = left_lines[i]
+                        formatted_line = f"{left_line_num:>4} {right_line_num:>4}  {line_content}"
+                        unified_lines.append(formatted_line)
+                        self.unified_line_mapping[unified_line_num] = ("equal", chunk, i)
+                        unified_line_num += 1
             elif chunk.type == "delete":
                 for i in range(chunk.left_start, chunk.left_end):
                     left_line_num = i + 1
