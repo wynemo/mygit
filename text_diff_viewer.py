@@ -140,8 +140,28 @@ class DiffViewer(QWidget):
         button = QPushButton()
         button.setIcon(QIcon(icon_path))
         button.setIconSize(button.sizeHint())  # 设置图标大小
-        button.setFixedSize(24, 24)  # 设置固定大小
+        button.setFixedSize(30, 30)  # 设置固定大小
         button.setToolTip(tooltip)
+        # 设置按钮样式，移除边框和背景，只显示箭头
+        button.setStyleSheet("""
+            QPushButton {
+                border: none;
+                background: transparent;
+                padding: 0px;
+            }
+            QPushButton:hover {
+                background: rgba(0, 0, 0, 0.1);
+                border-radius: 12px;
+            }
+            QPushButton:pressed {
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: 12px;
+            }
+            QPushButton:disabled {
+                background: transparent;
+                opacity: 0.3;
+            }
+        """)
         return button
 
     def setup_ui(self):
