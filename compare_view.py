@@ -91,6 +91,7 @@ class CompareView(QWidget):
                         self.right_text = f.read()
                 else:
                     self.right_text = ""
+                self.diff_viewer.right_edit.set_editable()
                 self.diff_viewer.set_texts(
                     self.left_text,
                     self.right_text,
@@ -99,7 +100,6 @@ class CompareView(QWidget):
                     left_commit_hash=commit.hexsha,
                     right_commit_hash=None,
                 )
-                self.diff_viewer.right_edit.set_editable()
                 self.stacked_widget.setCurrentWidget(self.diff_viewer)
                 self.view_mode_button.setVisible(True)
                 return
