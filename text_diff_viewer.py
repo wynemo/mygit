@@ -1,5 +1,4 @@
 import logging
-import os
 from typing import Optional
 
 from PyQt6.QtCore import QPoint, Qt, QTimer
@@ -167,6 +166,7 @@ class DiffViewer(QWidget):
     def setup_ui(self):
         # Button layout
         button_layout = QHBoxLayout()
+        button_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)  # 左对齐
 
         # cursor 生成：使用SVG图标替换文本按钮
         up_icon_path = "icons/up.svg"
@@ -692,6 +692,7 @@ class MergeDiffViewer(DiffViewer):
 
         # Button layout for navigation
         button_layout = QHBoxLayout()
+        button_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)  # 左对齐
         # Ensure these buttons are created for MergeDiffViewer specifically
         up_icon_path = "icons/up.svg"
         down_icon_path = "icons/down.svg"
