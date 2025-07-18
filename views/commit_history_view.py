@@ -1,7 +1,8 @@
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtWidgets import QHBoxLayout, QLineEdit, QPushButton, QTreeWidgetItem, QVBoxLayout, QWidget
+from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtWidgets import QHBoxLayout, QLineEdit, QTreeWidgetItem, QVBoxLayout, QWidget
 
 from custom_tree_widget import CustomTreeWidget
 from git_graph_view import GitGraphView
@@ -39,13 +40,17 @@ class CommitHistoryView(QWidget):
         self.search_edit.setPlaceholderText("当搜索以后，可尝试往下滚动加载更多数据进行搜索...")
         self.search_edit.textChanged.connect(self.filter_history)
         self.search_edit.setMaximumWidth(350)  # 设置搜索框最大宽度，使其变窄
-        search_layout.addWidget(self.search_edit)
 
-        # 添加清除按钮
-        self.clear_button = QPushButton("清除")
-        self.clear_button.clicked.connect(self.clear_search)
-        self.clear_button.setMaximumWidth(60)
-        search_layout.addWidget(self.clear_button)
+        # 添加清除动作到搜索框内
+        self.clear_action = QAction(self.search_edit)
+        self.clear_action.setIcon(
+            QIcon.fromTheme("edit-clear")
+            or self.style().standardIcon(self.style().StandardPixmap.SP_LineEditClearButton)
+        )
+        self.clear_action.triggered.connect(self.clear_search)
+        self.search_edit.addAction(self.clear_action, QLineEdit.ActionPosition.TrailingPosition)
+
+        search_layout.addWidget(self.search_edit)
 
         # 添加伸缩空间使搜索框左对齐
         search_layout.addStretch()
@@ -67,8 +72,8 @@ class CommitHistoryView(QWidget):
         # 滚动到底部自动加载更多，cursor 生成
         self.history_list.verticalScrollBar().valueChanged.connect(self._on_scroll)
 
-        # 默认隐藏清除按钮
-        self.clear_button.setVisible(False)
+        # 默认隐藏清除动作
+        self.clear_action.setVisible(False)
 
         # 图形化提交历史
         self.history_graph_list = GitGraphView()
@@ -181,14 +186,14 @@ class CommitHistoryView(QWidget):
     def filter_history(self, text):
         """根据输入文本过滤提交历史"""
         self.filter_text = text.strip().lower()
-        self.clear_button.setVisible(bool(self.filter_text))
+        self.clear_action.setVisible(bool(self.filter_text))
         self.search_timer.start()  # 启动或重启计时器
 
     def clear_search(self):
         """清除搜索框并恢复所有项目"""
         self.search_edit.clear()
         self.filter_text = ""
-        self.clear_button.setVisible(False)
+        self.clear_action.setVisible(False)
         self._apply_filter()
 
     def _check_and_display_no_data_message(self):
