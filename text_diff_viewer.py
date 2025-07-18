@@ -137,10 +137,12 @@ class DiffViewer(QWidget):
     def setup_ui(self):
         # Button layout
         button_layout = QHBoxLayout()
-        self.prev_diff_button = QPushButton("Previous Change")
-        self.next_diff_button = QPushButton("Next Change")
+        self.prev_diff_button = QPushButton("↑")
+        self.next_diff_button = QPushButton("↓")
         self.prev_diff_button.setEnabled(False)
         self.next_diff_button.setEnabled(False)
+        self.prev_diff_button.setToolTip("Previous Change")
+        self.next_diff_button.setToolTip("Next Change")
         self.prev_diff_button.clicked.connect(self.navigate_to_previous_diff)
         self.next_diff_button.clicked.connect(self.navigate_to_next_diff)
         button_layout.addWidget(self.prev_diff_button)
@@ -657,10 +659,12 @@ class MergeDiffViewer(DiffViewer):
         # Button layout for navigation
         button_layout = QHBoxLayout()
         # Ensure these buttons are created for MergeDiffViewer specifically
-        self.prev_diff_button = QPushButton("Previous Change")
-        self.next_diff_button = QPushButton("Next Change")
+        self.prev_diff_button = QPushButton("↑")
+        self.next_diff_button = QPushButton("↓")
         self.prev_diff_button.setEnabled(False)
         self.next_diff_button.setEnabled(False)
+        self.prev_diff_button.setToolTip("Previous Change")
+        self.next_diff_button.setToolTip("Next Change")
 
         # Connect signals AFTER buttons are created
         # self.prev_diff_button.clicked.disconnect() # Not needed for new buttons
