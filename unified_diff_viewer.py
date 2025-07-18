@@ -157,7 +157,7 @@ class UnifiedDiffViewer(QWidget):
                 for i in range(chunk.left_start, chunk.left_end):
                     left_line_num = i + 1
                     line_content = left_lines[i]
-                    formatted_line = f"{left_line_num:>4}      - {line_content}"
+                    formatted_line = f"{left_line_num:>4}       {line_content}"
                     unified_lines.append(formatted_line)
                     self.unified_line_mapping[unified_line_num] = ("delete", chunk, i)
                     unified_line_num += 1
@@ -165,7 +165,7 @@ class UnifiedDiffViewer(QWidget):
                 for i in range(chunk.right_start, chunk.right_end):
                     right_line_num = i + 1
                     line_content = right_lines[i]
-                    formatted_line = f"     {right_line_num:>4} + {line_content}"
+                    formatted_line = f"     {right_line_num:>4}  {line_content}"
                     unified_lines.append(formatted_line)
                     self.unified_line_mapping[unified_line_num] = ("insert", chunk, i)
                     unified_line_num += 1
@@ -173,14 +173,14 @@ class UnifiedDiffViewer(QWidget):
                 for i in range(chunk.left_start, chunk.left_end):
                     left_line_num = i + 1
                     line_content = left_lines[i]
-                    formatted_line = f"{left_line_num:>4}      - {line_content}"
+                    formatted_line = f"{left_line_num:>4}       {line_content}"
                     unified_lines.append(formatted_line)
                     self.unified_line_mapping[unified_line_num] = ("delete", chunk, i)
                     unified_line_num += 1
                 for i in range(chunk.right_start, chunk.right_end):
                     right_line_num = i + 1
                     line_content = right_lines[i]
-                    formatted_line = f"     {right_line_num:>4} + {line_content}"
+                    formatted_line = f"     {right_line_num:>4}  {line_content}"
                     unified_lines.append(formatted_line)
                     self.unified_line_mapping[unified_line_num] = ("insert", chunk, i)
                     unified_line_num += 1
