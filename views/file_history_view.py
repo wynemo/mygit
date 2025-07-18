@@ -143,6 +143,9 @@ class FileHistoryView(QWidget):
             if hasattr(main_window, "compare_view"):
                 current_commit: git.Commit = main_window.git_manager.repo.commit(commit_hash)
                 main_window.compare_view.show_diff(main_window.git_manager, current_commit, file_path)
+                # 切换到统一视图
+                if main_window.compare_view.stacked_widget.currentIndex() == 0:
+                    main_window.compare_view.toggle_view_mode()
 
     def show_context_menu(self, position):
         # 将位置转换为视口坐标
