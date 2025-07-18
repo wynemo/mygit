@@ -1,8 +1,6 @@
-import logging
 from typing import Dict, Tuple
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QFont, QTextCharFormat
+from PyQt6.QtGui import QColor, QTextCharFormat
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
 from diff_calculator import DiffCalculator, DifflibCalculator
@@ -72,11 +70,6 @@ class UnifiedDiffViewer(QWidget):
         self.unified_edit = SyncedTextEdit()
         self.unified_edit.setObjectName("unified_edit")
         self.unified_edit.setReadOnly(True)
-
-        # 设置等宽字体
-        font = QFont("Consolas", 10)
-        font.setStyleHint(QFont.StyleHint.Monospace)
-        self.unified_edit.setFont(font)
 
         # 主布局
         main_layout = QVBoxLayout()
