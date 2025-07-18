@@ -68,8 +68,8 @@ class TestBlameAnnotationClick(unittest.TestCase):
         mock_git_manager.initialize = MagicMock(return_value=True)
 
         # 2. Instantiate GitManagerWindow
-        with patch("git_manager_window.Settings", MagicMock()) as mock_settings_constructor:
-            mock_settings_instance = mock_settings_constructor.return_value
+        with patch("settings.settings", MagicMock()) as mock_settings_instance:
+            # mock_settings_instance is already the mocked settings object
             mock_settings_instance.get_last_folder.return_value = None
             mock_settings_instance.settings = {}
 
@@ -173,8 +173,8 @@ class TestBlameAnnotationClick(unittest.TestCase):
         mock_git_manager.initialize = MagicMock(return_value=True)
 
         # 2. Instantiate GitManagerWindow
-        with patch("git_manager_window.Settings", MagicMock()) as mock_settings_constructor:
-            mock_settings_instance = mock_settings_constructor.return_value
+        with patch("settings.settings", MagicMock()) as mock_settings_instance:
+            # mock_settings_instance is already the mocked settings object
             mock_settings_instance.get_last_folder.return_value = None
             mock_settings_instance.settings = {}
 

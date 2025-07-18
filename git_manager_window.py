@@ -26,7 +26,7 @@ from components.spin_icons import RotatingLabel
 from dialogs.settings_dialog import SettingsDialog
 from file_changes_view import FileChangesView
 from git_manager import GitManager
-from settings import Settings
+from settings import settings
 from threads import FetchThread, PullThread, PushThread  # Import PullThread and PushThread
 from views.commit_history_view import CommitHistoryView
 from views.folder_history_view import FolderHistoryView
@@ -94,7 +94,7 @@ class GitManagerWindow(QMainWindow):
 
         self.git_manager = None
         self.current_commit = None
-        self.settings = Settings()
+        self.settings = settings
         self.notification_widget = NotificationWidget(self)
         self.bottom_widget_visible = True  # 添加状态标记
 
@@ -981,7 +981,7 @@ class GitManagerWindow(QMainWindow):
         """Ensure the watchdog observer is stopped on close."""
         self.save_splitter_state()
         # 保存 WorkspaceExplorer 的分割器状态
-        if hasattr(self, 'workspace_explorer') and self.workspace_explorer:
+        if hasattr(self, "workspace_explorer") and self.workspace_explorer:
             self.workspace_explorer.save_splitter_state()
         self.stop_watching_folder()
         super().closeEvent(event)
