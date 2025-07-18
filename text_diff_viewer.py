@@ -1,8 +1,9 @@
 import logging
+import os
 from typing import Optional
 
-from PyQt6.QtCore import QPoint, Qt, QTimer  # Added Qt
-from PyQt6.QtGui import QColor, QKeyEvent, QTextCharFormat, QTextCursor  # Added QKeyEvent
+from PyQt6.QtCore import QPoint, Qt, QTimer
+from PyQt6.QtGui import QColor, QIcon, QKeyEvent, QTextCharFormat, QTextCursor
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QTextEdit, QVBoxLayout, QWidget
 
 from diff_calculator import DiffCalculator, DiffChunk, DifflibCalculator
@@ -134,15 +135,28 @@ class DiffViewer(QWidget):
         ):  # This case should not happen due to logic above, but good to log
             logging.info("Initial state with diffs: Next button forced to enabled to reach first diff.")
 
+    def _create_icon_button(self, icon_path: str, tooltip: str) -> QPushButton:
+        """cursor 生成：创建带SVG图标的按钮"""
+        button = QPushButton()
+        button.setIcon(QIcon(icon_path))
+        button.setIconSize(button.sizeHint())  # 设置图标大小
+        button.setFixedSize(24, 24)  # 设置固定大小
+        button.setToolTip(tooltip)
+        return button
+
     def setup_ui(self):
         # Button layout
         button_layout = QHBoxLayout()
-        self.prev_diff_button = QPushButton("↑")
-        self.next_diff_button = QPushButton("↓")
+
+        # cursor 生成：使用SVG图标替换文本按钮
+        up_icon_path = "icons/up.svg"
+        down_icon_path = "icons/down.svg"
+
+        self.prev_diff_button = self._create_icon_button(up_icon_path, "Previous Change")
+        self.next_diff_button = self._create_icon_button(down_icon_path, "Next Change")
+
         self.prev_diff_button.setEnabled(False)
         self.next_diff_button.setEnabled(False)
-        self.prev_diff_button.setToolTip("Previous Change")
-        self.next_diff_button.setToolTip("Next Change")
         self.prev_diff_button.clicked.connect(self.navigate_to_previous_diff)
         self.next_diff_button.clicked.connect(self.navigate_to_next_diff)
         button_layout.addWidget(self.prev_diff_button)
@@ -659,12 +673,13 @@ class MergeDiffViewer(DiffViewer):
         # Button layout for navigation
         button_layout = QHBoxLayout()
         # Ensure these buttons are created for MergeDiffViewer specifically
-        self.prev_diff_button = QPushButton("↑")
-        self.next_diff_button = QPushButton("↓")
+        up_icon_path = "icons/up.svg"
+        down_icon_path = "icons/down.svg"
+
+        self.prev_diff_button = self._create_icon_button(up_icon_path, "Previous Change")
+        self.next_diff_button = self._create_icon_button(down_icon_path, "Next Change")
         self.prev_diff_button.setEnabled(False)
         self.next_diff_button.setEnabled(False)
-        self.prev_diff_button.setToolTip("Previous Change")
-        self.next_diff_button.setToolTip("Next Change")
 
         # Connect signals AFTER buttons are created
         # self.prev_diff_button.clicked.disconnect() # Not needed for new buttons
