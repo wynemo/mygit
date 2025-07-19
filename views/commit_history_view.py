@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction, QIcon
-from PyQt6.QtWidgets import QHBoxLayout, QLineEdit, QTreeWidgetItem, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLineEdit, QTreeWidgetItem, QVBoxLayout, QWidget
 
 from custom_tree_widget import CustomTreeWidget
 from git_graph_view import GitGraphView
@@ -51,6 +51,22 @@ class CommitHistoryView(QWidget):
         self.search_edit.addAction(self.clear_action, QLineEdit.ActionPosition.TrailingPosition)
 
         search_layout.addWidget(self.search_edit)
+
+        # 添加下拉框
+        self.branch_combo = QComboBox()
+        self.branch_combo.addItem("Branch")
+        self.branch_combo.setMinimumWidth(80)
+        search_layout.addWidget(self.branch_combo)
+
+        self.user_combo = QComboBox()
+        self.user_combo.addItem("User")
+        self.user_combo.setMinimumWidth(80)
+        search_layout.addWidget(self.user_combo)
+
+        self.date_combo = QComboBox()
+        self.date_combo.addItem("Date")
+        self.date_combo.setMinimumWidth(80)
+        search_layout.addWidget(self.date_combo)
 
         # 添加伸缩空间使搜索框左对齐
         search_layout.addStretch()
