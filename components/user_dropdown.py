@@ -30,14 +30,14 @@ class UserDropdown(QWidget):
     def setup_ui(self):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(8, 6, 8, 6)
-        layout.setSpacing(8)
+        layout.setSpacing(2)
 
         # 左侧文字标签
         self.text_label = QLabel(self.text)
         self.text_label.setStyleSheet("""
             QLabel {
                 color: #495057;
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 500;
                 background: transparent;
                 border: none;
@@ -45,34 +45,31 @@ class UserDropdown(QWidget):
         """)
         layout.addWidget(self.text_label)
 
-        # 添加弹性空间，将箭头推到右边
-        layout.addStretch()
-
         # 右侧箭头图标
         self.arrow_label = QLabel()
         self.load_arrow_icon()
         layout.addWidget(self.arrow_label)
 
     def load_arrow_icon(self):
-        """加载SVG箭头图标"""
+        """加载 SVG 箭头图标"""
         svg_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icons", "chevron-down.svg")
 
         if os.path.exists(svg_path):
-            # 使用QSvgRenderer渲染SVG
+            # 使用 QSvgRenderer 渲染 SVG
             renderer = QSvgRenderer(svg_path)
 
-            # 创建一个16x16的像素图
+            # 创建一个 16x16 的像素图
             pixmap = QPixmap(16, 16)
             pixmap.fill(Qt.GlobalColor.transparent)
 
-            # 渲染SVG到像素图
+            # 渲染 SVG 到像素图
             painter = QPainter(pixmap)
             renderer.render(painter)
             painter.end()
 
             self.arrow_label.setPixmap(pixmap)
         else:
-            # 如果SVG文件不存在，使用文本箭头作为后备
+            # 如果 SVG 文件不存在，使用文本箭头作为后备
             self.arrow_label.setText("▼")
             self.arrow_label.setStyleSheet("""
                 QLabel {
