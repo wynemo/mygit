@@ -8,10 +8,12 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 class UserDropdown(QWidget):
     clicked = pyqtSignal()
+    clear_selection = pyqtSignal()
 
     def __init__(self, text="User", parent=None):
         super().__init__(parent)
         self.text = text
+        self.selected_item = None
         self.setup_ui()
         self.setFixedHeight(32)
         self.setStyleSheet("""
@@ -44,6 +46,43 @@ class UserDropdown(QWidget):
             }
         """)
         layout.addWidget(self.text_label)
+
+        # 选中项标签（初始隐藏）
+        self.selected_label = QLabel()
+        self.selected_label.setStyleSheet("""
+            QLabel {
+                color: #007bff;
+                font-size: 13px;
+                font-weight: 500;
+                background: transparent;
+                border: none;
+                margin-left: 8px;
+            }
+        """)
+        self.selected_label.hide()
+        layout.addWidget(self.selected_label)
+
+        # X 按钮（初始隐藏）
+        self.clear_button = QLabel()
+        self.clear_button.setText("×")
+        self.clear_button.setStyleSheet("""
+            QLabel {
+                color: #6c757d;
+                font-size: 16px;
+                font-weight: bold;
+                background: transparent;
+                border: none;
+                padding: 0 4px;
+                margin-left: 4px;
+            }
+            QLabel:hover {
+                color: #dc3545;
+                cursor: pointer;
+            }
+        """)
+        self.clear_button.hide()
+        self.clear_button.mousePressEvent = self._on_clear_clicked
+        layout.addWidget(self.clear_button)
 
         # 右侧箭头图标
         self.arrow_label = QLabel()
@@ -90,3 +129,28 @@ class UserDropdown(QWidget):
         """设置显示文字"""
         self.text = text
         self.text_label.setText(text)
+
+    def set_selected_item(self, item_text):
+        """设置选中项"""
+        self.selected_item = item_text
+        if item_text:
+            self.selected_label.setText(item_text)
+            self.selected_label.show()
+            self.clear_button.show()
+        else:
+            self.selected_label.hide()
+            self.clear_button.hide()
+
+    def clear_selected_item(self):
+        """清除选中项"""
+        self.selected_item = None
+        self.selected_label.hide()
+        self.clear_button.hide()
+
+    def _on_clear_clicked(self, event):
+        """处理清除按钮点击事件"""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clear_selected_item()
+            self.clear_selection.emit()
+        # 阻止事件传播，避免触发组件的 clicked 信号
+        event.accept()
