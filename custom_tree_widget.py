@@ -225,9 +225,9 @@ class CustomTreeWidget(HoverRevealTreeWidget):
         if parent and hasattr(parent, "git_manager") and parent.git_manager:
             git_manager: "GitManager" = parent.git_manager
             changed_files = git_manager.compare_commit_with_workspace(commit_hash)
+            workspace_explorer = get_main_window_by_parent(self).workspace_explorer
             if changed_files:
                 # 获取 WorkspaceExplorer 实例
-                workspace_explorer = get_main_window_by_parent(self).workspace_explorer
                 if workspace_explorer:
                     # 清空现有文件树
                     workspace_explorer.file_changes_view.changes_tree.clear()
@@ -245,7 +245,6 @@ class CustomTreeWidget(HoverRevealTreeWidget):
                     print("未找到 WorkspaceExplorer 实例")
             else:
                 # 显示无差异信息到文件变化视图
-                workspace_explorer = self.get_workspace_explorer()
                 if workspace_explorer:
                     workspace_explorer.file_changes_view.show_no_differences_message(commit_hash)
                     print(f"已将无差异信息显示到文件变化视图（提交 {commit_hash}）")
