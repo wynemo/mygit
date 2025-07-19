@@ -5,6 +5,18 @@ from PyQt6.QtGui import QPainter, QPixmap
 from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
+"""
+  使用方法：
+  # 设置选中项
+  dropdown.set_selected_item("张三")
+
+  # 清除选中项
+  dropdown.clear_selected_item()
+
+  # 监听清除信号
+  dropdown.clear_selection.connect(your_handler)
+"""
+
 
 class UserDropdown(QWidget):
     clicked = pyqtSignal()
