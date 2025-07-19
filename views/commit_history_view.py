@@ -4,8 +4,6 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLineEdit, QTreeWidgetItem, QVBoxLayout, QWidget
 
-from components.dropdown_select import DropdownSelect
-from components.multi_select_dropdown import MultiSelectDropdown
 from custom_tree_widget import CustomTreeWidget
 from git_graph_view import GitGraphView
 
@@ -60,8 +58,8 @@ class CommitHistoryView(QWidget):
         self.branch_combo.setMinimumWidth(80)
         search_layout.addWidget(self.branch_combo)
 
-        self.user_combo = DropdownSelect()
-        self.user_combo.set_options(["User"])
+        self.user_combo = QComboBox()
+        self.user_combo.addItem("User")
         self.user_combo.setMinimumWidth(80)
         search_layout.addWidget(self.user_combo)
 
