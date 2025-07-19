@@ -244,7 +244,15 @@ class CustomTreeWidget(HoverRevealTreeWidget):
                 else:
                     print("未找到 WorkspaceExplorer 实例")
             else:
-                print(f"提交 {commit_hash} 与工作区无差异")
+                # 显示无差异信息到文件变化视图
+                workspace_explorer = self.get_workspace_explorer()
+                if workspace_explorer:
+                    workspace_explorer.file_changes_view.show_no_differences_message(commit_hash)
+                    print(f"已将无差异信息显示到文件变化视图（提交 {commit_hash}）")
+                    # 模拟点击侧边栏的'变更'按钮
+                    get_main_window_by_parent(self).side_bar.changes_btn.click()
+                else:
+                    print("未找到 WorkspaceExplorer 实例")
         else:
             print("无法获取 GitManager 实例")
 
