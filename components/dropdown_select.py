@@ -9,16 +9,16 @@ from PyQt6.QtWidgets import QComboBox, QWidget
 
 class DropdownSelect(QComboBox):
     """简单的下拉选择框组件"""
-    
+
     selectionChanged = pyqtSignal(str)
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setup_ui()
         self.connect_signals()
-    
+
     def setup_ui(self):
-        """设置UI样式"""
+        """设置 UI 样式"""
         self.setStyleSheet("""
             QComboBox {
                 background-color: white;
@@ -42,10 +42,9 @@ class DropdownSelect(QComboBox):
                 width: 20px;
             }
             QComboBox::down-arrow {
-                image: none;
-                border-left: 4px solid transparent;
-                border-right: 4px solid transparent;
-                border-top: 4px solid #666;
+                image: url(icons/arrow_down.svg);
+                width: 12px;
+                height: 12px;
                 margin-right: 8px;
             }
             QComboBox::down-arrow:hover {
@@ -73,25 +72,25 @@ class DropdownSelect(QComboBox):
                 background-color: #e3f2fd;
             }
         """)
-        
+
         # 设置默认文本
         self.addItem("Select...")
         self.setCurrentIndex(0)
-    
+
     def connect_signals(self):
         """连接信号"""
         self.currentTextChanged.connect(self.on_selection_changed)
-    
+
     def on_selection_changed(self, text):
         """处理选择变化"""
         if text != "Select...":
             self.selectionChanged.emit(text)
-    
+
     def add_option(self, text):
         """添加选项"""
         if text not in [self.itemText(i) for i in range(self.count())]:
             self.addItem(text)
-    
+
     def set_options(self, options):
         """设置选项列表"""
         self.clear()
@@ -99,12 +98,12 @@ class DropdownSelect(QComboBox):
         for option in options:
             self.addItem(option)
         self.setCurrentIndex(0)
-    
+
     def get_selected_value(self):
         """获取选中的值"""
         current_text = self.currentText()
         return current_text if current_text != "Select..." else None
-    
+
     def set_selected_value(self, value):
         """设置选中值"""
         index = self.findText(value)
