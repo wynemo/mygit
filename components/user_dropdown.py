@@ -1,9 +1,9 @@
 import os
 
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QPainter, QPixmap
+from PyQt6.QtGui import QPainter, QPixmap, QCursor
 from PyQt6.QtSvg import QSvgRenderer
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget, QVBoxLayout, QFrame
 
 """
   使用方法：
@@ -18,6 +18,90 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 """
 
 
+class DropdownPopup(QFrame):
+    """下拉框弹出窗口"""
+    item_selected = pyqtSignal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        # 创建主容器
+        container = QFrame()
+        container.setStyleSheet("""
+            QFrame {
+                background-color: white;
+                border: 1px solid #e9ecef;
+                border-radius: 6px;
+            }
+        """)
+
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(0)
+
+        # 添加 "Select..." 选项
+        select_item = QLabel("Select...")
+        select_item.setStyleSheet("""
+            QLabel {
+                color: #6c757d;
+                font-size: 13px;
+                padding: 8px 12px;
+                background: transparent;
+                border: none;
+            }
+            QLabel:hover {
+                background-color: #f8f9fa;
+            }
+        """)
+        select_item.setMinimumHeight(32)
+        select_item.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        select_item.mousePressEvent = lambda _: self._on_item_clicked("Select...")
+        container_layout.addWidget(select_item)
+
+        # 添加示例用户项（可以根据需要动态添加）
+        sample_users = ["me", "John Doe", "Jane Smith"]
+        for user in sample_users:
+            user_item = QLabel(user)
+            user_item.setStyleSheet("""
+                QLabel {
+                    color: #495057;
+                    font-size: 13px;
+                    padding: 8px 12px;
+                    background: transparent;
+                    border: none;
+                }
+                QLabel:hover {
+                    background-color: #f8f9fa;
+                }
+            """)
+            user_item.setMinimumHeight(32)
+            user_item.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+            user_item.mousePressEvent = lambda _, u=user: self._on_item_clicked(u)
+            container_layout.addWidget(user_item)
+
+        layout.addWidget(container)
+
+    def _on_item_clicked(self, item_text):
+        """处理选项点击"""
+        self.item_selected.emit(item_text)
+        self.hide()
+
+    def show_at_position(self, position):
+        """在指定位置显示弹出框"""
+        # 设置最小宽度，确保与下拉框宽度一致
+        self.setMinimumWidth(150)
+        self.move(position)
+        self.show()
+
+
 class UserDropdown(QWidget):
     clicked = pyqtSignal()
     clear_selection = pyqtSignal()
@@ -26,6 +110,7 @@ class UserDropdown(QWidget):
         super().__init__(parent)
         self.text = text
         self.selected_item = None
+        self.dropdown_popup = None
         self.setup_ui()
         self.setFixedHeight(32)
         self.setStyleSheet("""
@@ -89,10 +174,10 @@ class UserDropdown(QWidget):
             }
             QLabel:hover {
                 color: #dc3545;
-                cursor: pointer;
             }
         """)
         self.clear_button.hide()
+        self.clear_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.clear_button.mousePressEvent = self._on_clear_clicked
         layout.addWidget(self.clear_button)
 
@@ -134,8 +219,24 @@ class UserDropdown(QWidget):
     def mousePressEvent(self, event):
         """处理鼠标点击事件"""
         if event.button() == Qt.MouseButton.LeftButton:
+            self._show_dropdown()
             self.clicked.emit()
         super().mousePressEvent(event)
+
+    def _show_dropdown(self):
+        """显示下拉框"""
+        if not self.dropdown_popup:
+            self.dropdown_popup = DropdownPopup(self)
+            self.dropdown_popup.item_selected.connect(self._on_item_selected)
+
+        # 计算弹出框位置
+        global_pos = self.mapToGlobal(self.rect().bottomLeft())
+        self.dropdown_popup.show_at_position(global_pos)
+
+    def _on_item_selected(self, item_text):
+        """处理选项选择"""
+        if item_text != "Select...":
+            self.set_selected_item(item_text)
 
     def set_text(self, text):
         """设置显示文字"""
