@@ -1,9 +1,9 @@
 import os
 
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QPainter, QPixmap, QCursor
+from PyQt6.QtGui import QCursor, QPainter, QPixmap
 from PyQt6.QtSvg import QSvgRenderer
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget, QVBoxLayout, QFrame
+from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 """
   使用方法：
@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget, QVBoxLayout, QFrame
 
 class DropdownPopup(QFrame):
     """下拉框弹出窗口"""
+
     item_selected = pyqtSignal(str)
 
     def __init__(self, parent=None):
