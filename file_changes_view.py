@@ -125,15 +125,15 @@ class FileChangesView(QWidget):
         """显示无差异消息"""
         self.changes_tree.clear()
         self.commit_hash = commit_hash
-        
+
         # 创建一个显示无差异的项目
         no_diff_item = QTreeWidgetItem(self.changes_tree)
         no_diff_item.setText(0, f"提交 {commit_hash[:8]} 与工作区无差异")
         no_diff_item.setText(1, "")
-        
+
         # 设置样式使其更突出
         no_diff_item.setForeground(0, no_diff_item.foreground(0))
-        
+
         self.changes_tree.expandAll()
         self.changes_tree.resizeColumnToContents(0)
         self.changes_tree.resizeColumnToContents(1)
