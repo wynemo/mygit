@@ -240,7 +240,7 @@ class DropdownPopup(QFrame):
         container_layout.addWidget(select_item)
 
         # 添加示例用户项（可以根据需要动态添加）
-        sample_users = ["me", "John Doe", "Jane Smith"]
+        sample_users = ["me"]
         for user in sample_users:
             user_item = QLabel(user)
             user_item.setStyleSheet("""
@@ -293,12 +293,12 @@ class DropdownPopup(QFrame):
         self.show()
 
 
-class UserDropdown(QWidget):
+class CustomDropdown(QWidget):
     clicked = pyqtSignal()
     clear_selection = pyqtSignal()
     values_changed = pyqtSignal(list)  # 新增：多值变化信号
 
-    def __init__(self, text="User", parent=None):
+    def __init__(self, text=None, parent=None):
         super().__init__(parent)
         self.text = text
         self.selected_item = None
@@ -307,13 +307,13 @@ class UserDropdown(QWidget):
         self.setup_ui()
         self.setFixedHeight(32)
         self.setStyleSheet("""
-            UserDropdown {
+            CustomDropdown {
                 background-color: #f8f9fa;
                 border: 1px solid #e9ecef;
                 border-radius: 6px;
                 padding: 6px 12px;
             }
-            UserDropdown:hover {
+            CustomDropdown:hover {
                 background-color: #e9ecef;
                 border-color: #dee2e6;
             }
@@ -325,7 +325,7 @@ class UserDropdown(QWidget):
         layout.setSpacing(2)
 
         # 左侧文字标签
-        self.text_label = QLabel(self.text)
+        self.text_label = QLabel(self.text or "")
         self.text_label.setStyleSheet("""
             QLabel {
                 color: #495057;
