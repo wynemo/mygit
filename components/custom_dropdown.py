@@ -300,7 +300,7 @@ class CustomDropdown(QWidget):
     def __init__(self, text=None, items=None, parent=None):
         super().__init__(parent)
         self.text = text
-        self.items = items or ["me"]  # 默认值为 ["me"]，可通过参数传入
+        self.items = items or []
         self.selected_item = None
         self.selected_values = []  # 新增：存储多个选中的值
         self.dropdown_popup = None
