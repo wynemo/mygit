@@ -24,6 +24,8 @@ class CommitHistoryView(QWidget):
         self._loading = False  # cursor 生成
         self._all_loaded = False  # cursor 生成
         self.filter_text = ""
+        self.selected_user = ""  # 用于存储选中的用户过滤条件
+        self.current_user = ""  # 用于存储当前Git用户名
         self.search_timer = QTimer(self)
         self.search_timer.setInterval(500)  # 设置延时为 500 毫秒
         self.search_timer.setSingleShot(True)  # 设置为单次触发
@@ -58,6 +60,7 @@ class CommitHistoryView(QWidget):
         search_layout.addWidget(self.branch_combo)
 
         self.user_combo = CustomDropdown(text="User", items=["me"])
+        self.user_combo.values_changed.connect(self.on_user_filter_changed)
         search_layout.addWidget(self.user_combo)
 
         self.date_combo = CustomDropdown(text="Date")
@@ -102,6 +105,11 @@ class CommitHistoryView(QWidget):
         self.branch = branch  # cursor 生成
         self.loaded_count = 0  # cursor 生成
         self._all_loaded = False  # cursor 生成
+
+        # 获取当前Git用户名
+        if git_manager:
+            self.current_user = git_manager.get_current_user() or ""
+
         self.history_list.clear()
         self.load_more_commits()  # cursor 生成
 
@@ -187,7 +195,7 @@ class CommitHistoryView(QWidget):
             # Optional: Handle cases where commit_hash couldn't be determined
             print(f"Warning: Could not determine commit hash from item: {item_or_sha}")
 
-    def on_current_item_changed(self, current: QTreeWidgetItem, previous: QTreeWidgetItem):
+    def on_current_item_changed(self, current: QTreeWidgetItem, _previous: QTreeWidgetItem):
         if current:
             print(current.text(0))
             self.history_list.show_full_text_for_item(current, 0)
@@ -205,6 +213,14 @@ class CommitHistoryView(QWidget):
         self.search_edit.clear()
         self.filter_text = ""
         self.clear_action.setVisible(False)
+        self._apply_filter()
+
+    def on_user_filter_changed(self, selected_items):
+        """当用户下拉框选择变化时触发"""
+        if selected_items:
+            self.selected_user = selected_items[0]
+        else:
+            self.selected_user = ""
         self._apply_filter()
 
     def _check_and_display_no_data_message(self):
@@ -231,25 +247,36 @@ class CommitHistoryView(QWidget):
         # 遍历所有项目
         for i in range(self.history_list.topLevelItemCount()):
             item = self.history_list.topLevelItem(i)
-            # 如果没有过滤文本，显示所有项目
-            if not self.filter_text:
-                item.setHidden(False)
-                continue
 
-            # 检查各列的匹配情况 (0: id, 1: message, 3: author, 4: date)
-            show_item = False
-            # 检查完整哈希
-            full_hash = item.data(0, Qt.ItemDataRole.UserRole)
-            if full_hash and self.filter_text in full_hash.lower():
-                show_item = True
+            # 检查用户过滤条件
+            author_match = True
+            if self.selected_user:
+                author = item.text(2)  # 作者列
+                if self.selected_user == "me":
+                    # 如果选择的是"me"，则只显示当前用户的提交
+                    author_match = author == self.current_user
+                else:
+                    # 其他情况下检查是否匹配选中的用户
+                    author_match = author == self.selected_user
 
-            if not show_item:  # 如果完整哈希没有匹配，则检查其他列
-                for col in range(self.history_list.columnCount()):
-                    item_text = item.text(col).lower()
-                    if self.filter_text in item_text:
-                        show_item = True
-                        break
+            # 检查文本过滤条件
+            text_match = True
+            if self.filter_text:
+                text_match = False
+                # 检查完整哈希
+                full_hash = item.data(0, Qt.ItemDataRole.UserRole)
+                if full_hash and self.filter_text in full_hash.lower():
+                    text_match = True
 
+                if not text_match:  # 如果完整哈希没有匹配，则检查其他列
+                    for col in range(self.history_list.columnCount()):
+                        item_text = item.text(col).lower()
+                        if self.filter_text in item_text:
+                            text_match = True
+                            break
+
+            # 只有当用户过滤和文本过滤都匹配时才显示项目
+            show_item = author_match and text_match
             item.setHidden(not show_item)
 
         # cursor 生成：过滤完成后检查数据状态

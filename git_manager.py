@@ -563,6 +563,15 @@ class GitManager:
             logging.exception("比较提交 %s 与工作区时发生未知错误", commit_hash)
             return []
 
+    def get_current_user(self) -> Optional[str]:
+        """获取当前Git用户名"""
+        if not self.repo:
+            return None
+        try:
+            return self.repo.config_reader().get_value("user", "name")
+        except Exception:
+            return None
+
     def reset_branch(self, commit_hash: str, mode: str) -> Optional[str]:
         """重置当前分支到指定的提交。
 

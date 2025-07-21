@@ -450,6 +450,7 @@ class CustomDropdown(QWidget):
         else:
             self.selected_values = []
         self._update_display()
+        self.values_changed.emit(self.selected_values)
 
     def set_selected_values(self, values):
         """设置多个选中的值"""
