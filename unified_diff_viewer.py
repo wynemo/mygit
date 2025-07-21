@@ -1,6 +1,8 @@
+import os
 from typing import Dict, Tuple
 
-from PyQt6.QtGui import QColor, QTextCharFormat
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QIcon, QTextCharFormat
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
 from diff_calculator import DiffCalculator, DifflibCalculator
@@ -54,11 +56,47 @@ class UnifiedDiffViewer(QWidget):
         self.setup_ui()
         self.diff_calculator = diff_calculator or DifflibCalculator()
 
+    def _create_icon_button(self, icon_path: str, tooltip: str) -> QPushButton:
+        """创建带SVG图标的按钮"""
+        button = QPushButton()
+        button.setIcon(QIcon(icon_path))
+        button.setIconSize(button.sizeHint())  # 设置图标大小
+        button.setFixedSize(30, 30)  # 设置固定大小
+        button.setToolTip(tooltip)
+        # 设置按钮样式，移除边框和背景，只显示箭头
+        button.setStyleSheet("""
+            QPushButton {
+                border: none;
+                background: transparent;
+                padding: 0px;
+            }
+            QPushButton:hover {
+                background: rgba(0, 0, 0, 0.1);
+                border-radius: 12px;
+            }
+            QPushButton:pressed {
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: 12px;
+            }
+            QPushButton:disabled {
+                background: transparent;
+                opacity: 0.3;
+            }
+        """)
+        return button
+
     def setup_ui(self):
         # 按钮布局
         button_layout = QHBoxLayout()
-        self.prev_diff_button = QPushButton("上一个变更")
-        self.next_diff_button = QPushButton("下一个变更")
+        button_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)  # 左对齐
+
+        # 使用SVG图标替换文本按钮
+        up_icon_path = os.path.join(os.path.dirname(__file__), "icons", "up.svg")
+        down_icon_path = os.path.join(os.path.dirname(__file__), "icons", "down.svg")
+
+        self.prev_diff_button = self._create_icon_button(up_icon_path, "Previous Change")
+        self.next_diff_button = self._create_icon_button(down_icon_path, "Next Change")
+
         self.prev_diff_button.setEnabled(False)
         self.next_diff_button.setEnabled(False)
         self.prev_diff_button.clicked.connect(self.navigate_to_previous_diff)
