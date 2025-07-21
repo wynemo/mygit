@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Optional
 
 from PyQt6.QtCore import QPoint, Qt, QTimer
@@ -169,8 +170,8 @@ class DiffViewer(QWidget):
         button_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)  # 左对齐
 
         # cursor 生成：使用SVG图标替换文本按钮
-        up_icon_path = "icons/up.svg"
-        down_icon_path = "icons/down.svg"
+        up_icon_path = os.path.join(os.path.dirname(__file__), "icons", "up.svg")
+        down_icon_path = os.path.join(os.path.dirname(__file__), "icons", "down.svg")
 
         self.prev_diff_button = self._create_icon_button(up_icon_path, "Previous Change")
         self.next_diff_button = self._create_icon_button(down_icon_path, "Next Change")
@@ -694,8 +695,8 @@ class MergeDiffViewer(DiffViewer):
         button_layout = QHBoxLayout()
         button_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)  # 左对齐
         # Ensure these buttons are created for MergeDiffViewer specifically
-        up_icon_path = "icons/up.svg"
-        down_icon_path = "icons/down.svg"
+        up_icon_path = os.path.join(os.path.dirname(__file__), "icons", "up.svg")
+        down_icon_path = os.path.join(os.path.dirname(__file__), "icons", "down.svg")
 
         self.prev_diff_button = self._create_icon_button(up_icon_path, "Previous Change")
         self.next_diff_button = self._create_icon_button(down_icon_path, "Next Change")
