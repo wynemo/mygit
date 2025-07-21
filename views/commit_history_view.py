@@ -57,7 +57,7 @@ class CommitHistoryView(QWidget):
         self.branch_combo = CustomDropdown(text="Branch")
         search_layout.addWidget(self.branch_combo)
 
-        self.user_combo = CustomDropdown(text="User")
+        self.user_combo = CustomDropdown(text="User", items=["me"])
         search_layout.addWidget(self.user_combo)
 
         self.date_combo = CustomDropdown(text="Date")

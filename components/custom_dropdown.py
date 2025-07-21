@@ -240,8 +240,7 @@ class DropdownPopup(QFrame):
         container_layout.addWidget(select_item)
 
         # 添加示例用户项（可以根据需要动态添加）
-        sample_users = ["me"]
-        for user in sample_users:
+        for user in self.parent().items:
             user_item = QLabel(user)
             user_item.setStyleSheet("""
                 QLabel {
@@ -298,9 +297,10 @@ class CustomDropdown(QWidget):
     clear_selection = pyqtSignal()
     values_changed = pyqtSignal(list)  # 新增：多值变化信号
 
-    def __init__(self, text=None, parent=None):
+    def __init__(self, text=None, items=None, parent=None):
         super().__init__(parent)
         self.text = text
+        self.items = items or ["me"]  # 默认值为 ["me"]，可通过参数传入
         self.selected_item = None
         self.selected_values = []  # 新增：存储多个选中的值
         self.dropdown_popup = None
