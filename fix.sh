@@ -1,0 +1,1 @@
+ruff check --fix --select I --exclude git-cola/ --exclude tests/
