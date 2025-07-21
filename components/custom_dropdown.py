@@ -240,9 +240,9 @@ class DropdownPopup(QFrame):
         container_layout.addWidget(select_item)
 
         # 添加示例用户项（可以根据需要动态添加）
-        for user in self.parent().items:
-            user_item = QLabel(user)
-            user_item.setStyleSheet("""
+        for item in self.parent().items:
+            _item = QLabel(item)
+            _item.setStyleSheet("""
                 QLabel {
                     color: #495057;
                     font-size: 13px;
@@ -254,10 +254,10 @@ class DropdownPopup(QFrame):
                     background-color: #f8f9fa;
                 }
             """)
-            user_item.setMinimumHeight(32)
-            user_item.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-            user_item.mousePressEvent = lambda _, u=user: self._on_item_clicked(u)
-            container_layout.addWidget(user_item)
+            _item.setMinimumHeight(32)
+            _item.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+            _item.mousePressEvent = lambda _, u=item: self._on_item_clicked(u)
+            container_layout.addWidget(_item)
 
         layout.addWidget(container)
 
