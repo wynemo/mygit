@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QStyledItemDelegate
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QPoint
 from PyQt6.QtGui import QPainter, QPen, QColor, QBrush, QPolygon, QPainterPath
 
 class DAGItemDelegate(QStyledItemDelegate):
@@ -80,7 +80,7 @@ class DAGItemDelegate(QStyledItemDelegate):
             ]
             poly = QPolygon()
             for p in points:
-                poly.append(p)
+                poly.append(QPoint(int(p[0]), int(p[1])))
             painter.drawPolygon(poly)
         else:
             # Circle for regular commits
