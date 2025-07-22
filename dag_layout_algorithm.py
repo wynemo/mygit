@@ -27,7 +27,8 @@ class DAGLayoutAlgorithm:
                 'color_index': 0,
                 'is_merge': len(commit['parents']) > 1,
                 'is_branch_start': False, # to be implemented
-                'connections': [] # to be implemented
+                'connections': [], # to be implemented
+                'has_children': len(children_map[commit['hash']]) > 0
             }
 
         self.assign_columns(commits, layouts)
@@ -77,14 +78,18 @@ class DAGLayoutAlgorithm:
             for parent_hash in commit['parents']:
                 if parent_hash in commit_to_lane:
                     parent_lane = commit_to_lane[parent_hash]
-                    # Check if any other commit needs this lane
-                    is_lane_needed = False
-                    for other_commit in commits[i:]:
-                        if parent_hash in other_commit['parents']:
-                            is_lane_needed = True
-                            break
-                    if not is_lane_needed:
-                        lanes[parent_lane] = None
+                    parent_commit = next((c for c in commits if c['hash'] == parent_hash), None)
+                    if parent_commit:
+                        # Check if all children of the parent have been processed
+                        all_children_processed = True
+                        for child_hash in parent_commit['children']:
+                            # Check if the child is in the processed part of the list
+                            child_processed = any(c['hash'] == child_hash for c in commits[:i+1])
+                            if not child_processed:
+                                all_children_processed = False
+                                break
+                        if all_children_processed:
+                            lanes[parent_lane] = None
 
 
     def calculate_connections(self, commits, layouts):

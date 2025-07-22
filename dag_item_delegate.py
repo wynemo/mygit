@@ -31,27 +31,32 @@ class DAGItemDelegate(QStyledItemDelegate):
 
     def draw_connections(self, painter, rect, dag_info):
         center_y = rect.center().y()
+        current_col = dag_info['column']
+        current_x = current_col * self.column_width + self.column_width / 2
 
+        # Draw line from center to bottom, if it has children
+        if dag_info.get('has_children'):
+            pen = QPen(QColor(self.colors[dag_info['color_index'] % len(self.colors)]), 2)
+            painter.setPen(pen)
+            painter.drawLine(int(current_x), int(center_y), int(current_x), rect.bottom())
+
+        # Draw lines from parents
         for conn in dag_info.get('connections', []):
-            from_col = conn['from_col']
-            to_col = conn['to_col']
+            parent_col = conn['from_col']
             color_index = conn['color_index']
 
             pen = QPen(QColor(self.colors[color_index % len(self.colors)]), 2)
             painter.setPen(pen)
 
-            start_x = from_col * self.column_width + self.column_width / 2
-            end_x = to_col * self.column_width + self.column_width / 2
+            parent_x = parent_col * self.column_width + self.column_width / 2
 
-            if from_col == to_col:
-                # Straight line
-                painter.drawLine(int(start_x), rect.top(), int(end_x), rect.bottom())
+            # Draw a line from the parent's column at the top to the current node's center
+            if parent_col == current_col:
+                painter.drawLine(int(current_x), rect.top(), int(current_x), int(center_y))
             else:
-                # Curved line for branching/merging
-                path = QPainterPath()
-                path.moveTo(start_x, rect.top())
-                path.cubicTo(start_x, center_y, end_x, center_y, end_x, rect.bottom())
-                painter.drawPath(path)
+                # branch/merge line
+                painter.drawLine(int(parent_x), rect.top(), int(parent_x), int(center_y))
+                painter.drawLine(int(parent_x), int(center_y), int(current_x), int(center_y))
 
 
     def draw_commit_node(self, painter, rect, dag_info):
