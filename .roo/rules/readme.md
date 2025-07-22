@@ -3,5 +3,4 @@
 + 这是用 pyqt6 的工程
 + 专注于当前的功能，不要修改无关的代码
 + logging 不要出现 flake8-logging-format 的情况;logging.exception 不需要记录异常，多余的
-+ edit the file in small chunks
 
