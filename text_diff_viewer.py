@@ -139,8 +139,8 @@ class DiffViewer(QWidget):
         """cursor 生成：创建带SVG图标的按钮"""
         button = QPushButton()
         button.setIcon(QIcon(icon_path))
-        button.setIconSize(button.sizeHint())  # 设置图标大小
-        button.setFixedSize(30, 30)  # 设置固定大小
+        button.setIconSize(button.sizeHint().scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio))  # 设置更小的图标大小
+        button.setFixedSize(24, 24)  # 设置更小的固定大小
         button.setToolTip(tooltip)
         # 设置按钮样式，移除边框和背景，只显示箭头
         button.setStyleSheet("""
@@ -151,11 +151,11 @@ class DiffViewer(QWidget):
             }
             QPushButton:hover {
                 background: rgba(0, 0, 0, 0.1);
-                border-radius: 12px;
+                border-radius: 6px;
             }
             QPushButton:pressed {
                 background: rgba(0, 0, 0, 0.2);
-                border-radius: 12px;
+                border-radius: 6px;
             }
             QPushButton:disabled {
                 background: transparent;
