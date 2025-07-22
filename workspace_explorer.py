@@ -431,7 +431,8 @@ class WorkspaceExplorer(QWidget):
                 tree_item.setIcon(0, get_folder_icon())
 
                 # 检查是否被.gitignore 忽略
-                if self.git_manager and self.git_manager.is_ignored(item_path):
+                is_ignored = self.git_manager and self.git_manager.is_ignored(item_path)
+                if is_ignored:
                     tree_item.setForeground(0, QColor(128, 128, 128))  # 灰色
 
                 is_this_entry_modified = False
@@ -439,7 +440,9 @@ class WorkspaceExplorer(QWidget):
                 # 递归处理子目录
                 if level < 2:
                     if self._add_directory_items(item_path, tree_item, level + 1):
-                        tree_item.setForeground(0, QColor(165, 42, 42))  # 目录被修改
+                        # 只有在未被忽略的情况下才设置修改颜色
+                        if not is_ignored:
+                            tree_item.setForeground(0, QColor(165, 42, 42))  # 目录被修改
                         is_this_entry_modified = True
                 else:
                     # 添加虚拟子项使目录可展开

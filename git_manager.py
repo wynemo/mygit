@@ -458,7 +458,17 @@ class GitManager:
             rel_path = os.path.relpath(path, self.repo_path)
             # 统一使用正斜杠
             rel_path = rel_path.replace(os.sep, "/")
-            return self.ignore_spec.match_file(rel_path)
+
+            # 检查是否为目录
+            if os.path.isdir(path):
+                # 对于目录，先检查带斜杠的形式
+                if self.ignore_spec.match_file(rel_path + "/"):
+                    return True
+                # 也检查不带斜杠的形式
+                return self.ignore_spec.match_file(rel_path)
+            else:
+                # 对于文件，直接匹配
+                return self.ignore_spec.match_file(rel_path)
         except ValueError:
             return False
 
