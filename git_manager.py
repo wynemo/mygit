@@ -98,6 +98,7 @@ class GitManager:
                         "author": commit.author.name,
                         "date": commit.committed_datetime.strftime("%Y-%m-%d %H:%M:%S"),
                         "decorations": decorations,
+                        "parents": [p.hexsha for p in commit.parents],
                     }
                 )
             return commits

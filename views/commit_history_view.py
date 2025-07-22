@@ -7,6 +7,8 @@ from PyQt6.QtWidgets import QHBoxLayout, QLineEdit, QTreeWidgetItem, QVBoxLayout
 from components.custom_dropdown import CustomDropdown
 from custom_tree_widget import CustomTreeWidget
 from git_graph_view import GitGraphView
+from dag_layout_algorithm import DAGLayoutAlgorithm
+from dag_item_delegate import DAGItemDelegate
 
 if TYPE_CHECKING:
     from git_manager import GitManager  # Assuming GitManager is defined in git_manager.py
@@ -30,6 +32,7 @@ class CommitHistoryView(QWidget):
         self.search_timer.setInterval(500)  # 设置延时为 500 毫秒
         self.search_timer.setSingleShot(True)  # 设置为单次触发
         self.search_timer.timeout.connect(self._apply_filter)
+        self.dag_algorithm = DAGLayoutAlgorithm()
         self.setup_ui()
 
     def setup_ui(self):
@@ -73,14 +76,19 @@ class CommitHistoryView(QWidget):
         # 普通提交历史列表
         self.history_list = CustomTreeWidget(self)
         self.history_list.empty_scrolled_signal.connect(self.load_more_commits)
-        self.history_list.set_hover_reveal_columns({0})  # Enable hover for commit message column
-        self.history_list.setHeaderLabels(["提交信息", "Branches", "作者", "日期"])
+        self.history_list.set_hover_reveal_columns({1})  # Enable hover for commit message column
+        self.history_list.setHeaderLabels(["DAG", "提交信息", "Branches", "作者", "日期"])
         self.history_list.itemClicked.connect(self.on_commit_clicked)
         self.history_list.currentItemChanged.connect(self.on_current_item_changed)
-        self.history_list.setColumnWidth(0, 200)  # Message
-        self.history_list.setColumnWidth(1, 150)  # Branches
-        self.history_list.setColumnWidth(2, 100)  # Author
-        self.history_list.setColumnWidth(3, 150)  # Date
+        self.history_list.setColumnWidth(0, 100)  # DAG
+        self.history_list.setColumnWidth(1, 200)  # Message
+        self.history_list.setColumnWidth(2, 150)  # Branches
+        self.history_list.setColumnWidth(3, 100)  # Author
+        self.history_list.setColumnWidth(4, 150)  # Date
+
+        self.dag_delegate = DAGItemDelegate(self.history_list)
+        self.history_list.setItemDelegateForColumn(0, self.dag_delegate)
+
         layout.addWidget(self.history_list)
 
         # 滚动到底部自动加载更多，cursor 生成
@@ -139,10 +147,29 @@ class CommitHistoryView(QWidget):
         commits = self.git_manager.get_commit_history(
             self.branch, self.load_batch_size, self.loaded_count, include_remotes=True
         )  # cursor 生成
+
+        if not commits:
+            self._loading = False
+            self._all_loaded = True
+            return
+
+        all_commits = []
+        for i in range(self.history_list.topLevelItemCount()):
+            item = self.history_list.topLevelItem(i)
+            all_commits.append(item.data(1, Qt.ItemDataRole.UserRole))
+
+        all_commits.extend(commits)
+
+        dag_layouts = self.dag_algorithm.calculate_layout(all_commits)
+
         for commit in commits:
             item = QTreeWidgetItem(self.history_list)
-            item.setData(0, Qt.ItemDataRole.UserRole, commit["hash"])  # 存储完整哈希
-            item.setText(0, commit["message"])  # Commit Message
+
+            # Store full commit data for later use, e.g. layout recalculation
+            item.setData(1, Qt.ItemDataRole.UserRole, commit)
+
+            # Set data for each column
+            item.setText(1, commit["message"])  # Commit Message
 
             decorations = commit.get("decorations", [])
             processed_decorations = []
@@ -158,11 +185,16 @@ class CommitHistoryView(QWidget):
                 else:
                     processed_decorations.append(ref_name)
             decoration_text = ", ".join(processed_decorations)
-            item.setText(1, decoration_text)  # Branches
+            item.setText(2, decoration_text)  # Branches
 
-            item.setText(2, commit["author"])  # Author
-            item.setText(3, commit["date"])  # Date
-        self.loaded_count += len(commits)  # cursor 生成
+            item.setText(3, commit["author"])  # Author
+            item.setText(4, commit["date"])  # Date
+
+            # Set DAG info
+            if commit['hash'] in dag_layouts:
+                item.setData(0, Qt.ItemDataRole.UserRole + 1, dag_layouts[commit['hash']])
+
+        self.loaded_count += len(commits)
         if len(commits) < self.load_batch_size:  # 没有更多了
             self._all_loaded = True  # cursor 生成
         self._loading = False
@@ -183,7 +215,9 @@ class CommitHistoryView(QWidget):
         if isinstance(item_or_sha, QTreeWidgetItem):
             # Clicked from the QTreeWidget (history_list)
             # Get the full hash from UserRole data
-            commit_hash = item_or_sha.data(0, Qt.ItemDataRole.UserRole)
+            commit_data = item_or_sha.data(1, Qt.ItemDataRole.UserRole)
+            if commit_data:
+                commit_hash = commit_data["hash"]
         elif isinstance(item_or_sha, str):
             # Clicked from the GitGraphView (history_graph_list)
             # The argument is already the commit SHA (full or short)
@@ -197,8 +231,8 @@ class CommitHistoryView(QWidget):
 
     def on_current_item_changed(self, current: QTreeWidgetItem, _previous: QTreeWidgetItem):
         if current:
-            print(current.text(0))
-            self.history_list.show_full_text_for_item(current, 0)
+            print(current.text(1))
+            self.history_list.show_full_text_for_item(current, 1)
         else:
             self.history_list.hide_overlay()
 
@@ -251,7 +285,7 @@ class CommitHistoryView(QWidget):
             # 检查用户过滤条件
             author_match = True
             if self.selected_user:
-                author = item.text(2)  # 作者列
+                author = item.text(3)  # 作者列
                 if self.selected_user == "me":
                     # 如果选择的是"me"，则只显示当前用户的提交
                     author_match = author == self.current_user
@@ -264,12 +298,12 @@ class CommitHistoryView(QWidget):
             if self.filter_text:
                 text_match = False
                 # 检查完整哈希
-                full_hash = item.data(0, Qt.ItemDataRole.UserRole)
-                if full_hash and self.filter_text in full_hash.lower():
+                commit_data = item.data(1, Qt.ItemDataRole.UserRole)
+                if commit_data and self.filter_text in commit_data['hash'].lower():
                     text_match = True
 
                 if not text_match:  # 如果完整哈希没有匹配，则检查其他列
-                    for col in range(self.history_list.columnCount()):
+                    for col in range(1, self.history_list.columnCount()):
                         item_text = item.text(col).lower()
                         if self.filter_text in item_text:
                             text_match = True
