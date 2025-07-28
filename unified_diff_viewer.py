@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 from diff_calculator import DiffCalculator, DifflibCalculator
 from diff_highlighter import MultiHighlighter
 from editors.text_edit import SyncedTextEdit
+from utils.language_map import LANGUAGE_MAP
 
 
 class UnifiedHighlighter(MultiHighlighter):
@@ -132,7 +133,7 @@ class UnifiedDiffViewer(QWidget):
         self.unified_edit.setPlainText(unified_text)
 
         self.unified_edit.highlighter = UnifiedHighlighter(self.unified_edit.document(), self.unified_line_mapping)
-        # self.unified_edit.highlighter.set_language(LANGUAGE_MAP.get(file_path.split(".")[-1], "text"))
+        self.unified_edit.highlighter.set_language(LANGUAGE_MAP.get(file_path.split(".")[-1], "text"))
 
         self._update_button_states()
 
