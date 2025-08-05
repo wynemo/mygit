@@ -89,13 +89,21 @@ class CustomTreeWidget(HoverRevealTreeWidget):
         if parent and hasattr(parent, "git_manager") and parent.git_manager:
             git_manager = parent.git_manager
             repo = git_manager.repo
-            current_branch = repo.active_branch
-
-            # 添加 "Reset current branch to here" 菜单项
-            reset_action = menu.addAction("reset current branch to here")
-            reset_action.triggered.connect(
-                partial(self._reset_branch_to_commit, item, git_manager, current_branch.name)
-            )
+            
+            # 检查是否处于 detached HEAD 状态
+            current_branch = None
+            try:
+                current_branch = repo.active_branch
+                branch_name = current_branch.name
+                
+                # 添加 "Reset current branch to here" 菜单项
+                reset_action = menu.addAction("reset current branch to here")
+                reset_action.triggered.connect(
+                    partial(self._reset_branch_to_commit, item, git_manager, branch_name)
+                )
+            except TypeError:
+                # 处于 detached HEAD 状态，不显示 reset 菜单项
+                pass
 
             # 从 item 获取分支信息 (假设分支信息在第 1 列)
             item_branches = item.text(1).split(", ")
@@ -118,8 +126,8 @@ class CustomTreeWidget(HoverRevealTreeWidget):
 
                 if checkout_target_name == "HEAD":
                     continue
-                # 仅当不是当前分支时才显示
-                if checkout_target_name != current_branch.name:
+                # 仅当不是当前分支时才显示（如果处于 detached HEAD 状态则显示所有分支）
+                if current_branch is None or checkout_target_name != current_branch.name:
                     action = checkout_menu.addAction(branch_name_str)
                     action.triggered.connect(partial(self._checkout_branch, git_manager, checkout_target_name))
                     checkout_action_added = True
@@ -137,7 +145,8 @@ class CustomTreeWidget(HoverRevealTreeWidget):
                 if not _branch_name:
                     continue
                 try:
-                    if current_branch.commit.hexsha != repo.refs[_branch_name].commit.hexsha:
+                    # 只有在非 detached HEAD 状态下才显示合并选项
+                    if current_branch and current_branch.commit.hexsha != repo.refs[_branch_name].commit.hexsha:
                         merge_action = menu.addAction(f"Merge {_branch_name}")
                         merge_action.triggered.connect(partial(self._merge_branch, git_manager, _branch_name))
                 except Exception:

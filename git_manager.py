@@ -33,7 +33,13 @@ class GitManager:
         """获取默认分支"""
         if not self.repo:
             return None
-        return self.repo.active_branch.name
+        try:
+            # 检查是否处于 detached HEAD 状态
+            return self.repo.active_branch.name
+        except TypeError:
+            # 当处于 detached HEAD 状态时，active_branch 会抛出 TypeError
+            # 返回当前 HEAD 指向的提交哈希的前7位
+            return f"HEAD ({self.repo.head.commit.hexsha[:7]})"
 
     def get_remote_branches(self) -> List[str]:
         """获取所有远程分支的完整名称（例如 'origin/main'）"""
@@ -73,7 +79,11 @@ class GitManager:
 
             # 如果没有指定分支且不包含远程分支，则使用当前活动分支
             if not revs:
-                revs = [self.repo.active_branch.name]
+                try:
+                    revs = [self.repo.active_branch.name]
+                except TypeError:
+                    # 处于 detached HEAD 状态，使用 HEAD
+                    revs = ["HEAD"]
 
             commits = []
             decorations_map = {}
@@ -178,14 +188,20 @@ class GitManager:
         if not self.repo:
             raise Exception("Repository not initialized.")
         try:
-            # 检查当前分支是否有上游分支
-            if not self.repo.active_branch.tracking_branch():
-                # 如果没有上游分支，则设置上游分支
-                branch_name = self.repo.active_branch.name
-                self.repo.git.push("--set-upstream", "origin", branch_name)
-            else:
-                # 如果有上游分支，正常推送
-                self.repo.remotes.origin.push()
+            # 检查当前是否处于 detached HEAD 状态
+            try:
+                current_branch = self.repo.active_branch
+                # 检查当前分支是否有上游分支
+                if not current_branch.tracking_branch():
+                    # 如果没有上游分支，则设置上游分支
+                    branch_name = current_branch.name
+                    self.repo.git.push("--set-upstream", "origin", branch_name)
+                else:
+                    # 如果有上游分支，正常推送
+                    self.repo.remotes.origin.push()
+            except TypeError:
+                # 处于 detached HEAD 状态，无法推送
+                raise Exception("无法从 detached HEAD 状态推送。请先切换到一个分支。")
         except GitCommandError as e:
             error_message = f"Push failed: {e!s}"
             if hasattr(e, "stderr") and e.stderr:
@@ -342,9 +358,14 @@ class GitManager:
         if not self.repo:
             return "仓库未初始化。"  # Repository not initialized.
         try:
-            # 检查当前分支是否已经是目标分支
-            if self.repo.active_branch.name == branch_name:
-                return None  # 已经是目标分支，无需切换
+            # 检查当前分支是否已经是目标分支（仅在非 detached HEAD 状态下检查）
+            try:
+                current_branch_name = self.repo.active_branch.name
+                if current_branch_name == branch_name:
+                    return None  # 已经是目标分支，无需切换
+            except TypeError:
+                # 处于 detached HEAD 状态，继续执行切换操作
+                pass
 
             # 检查工作区是否有未提交的更改
             # if self.repo.is_dirty(untracked_files=True):
