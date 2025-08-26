@@ -123,42 +123,42 @@ class HoverRevealTreeWidget(QTreeWidget):
         super().mouseMoveEvent(event)
         pos = event.pos()
         item = self.itemAt(pos)
-        # Ensure columnAt is a valid method or implement it if it's from a newer Qt version or custom.
-        # For standard QTreeWidget, we might need to calculate column based on x position.
-        # Let's assume self.columnAt(pos.x()) is available or implemented elsewhere.
-        # If not, a simplified approach for specific column (e.g., 0) might be needed.
-        # For this example, let's simulate columnAt or assume it works.
-        # A more robust way for QTreeWidget:
-        column = -1
-        if item:
-            # Iterate through columns to find which one the mouse is over
-            # This is a simplification; real column detection can be complex
-            # if headers are movable or sections have different widths.
-            x_pos = pos.x()
-            header = self.header()
-            logical_index = -1
-            current_x = 0
-            for i in range(header.count()):
-                current_x += header.sectionSize(i)
-                if x_pos < current_x:
-                    logical_index = header.logicalIndex(i)
-                    break
-            column = logical_index
 
-        if item and column != -1:
-            # Check if hover reveal is active for this column
-            if self.hover_reveal_columns is None or column in self.hover_reveal_columns:
-                if self._hovered_item_column != (item, column):
-                    self._hovered_item_column = (item, column)
-                    self.show_full_text_for_item(item, column)
-            # Hover reveal not active for this column, hide if previously shown
-            elif self._hovered_item_column is not None:
+        if item:
+            # 任何时候鼠标在某个 item 上移动，都更新视图，以确保 DAG 线条正确重绘
+            self.viewport().update()
+
+            column = self.columnAt(pos.x())
+            if column != -1:
+                # 检查此列是否启用了悬停显示
+                if self.hover_reveal_columns and column in self.hover_reveal_columns:
+                    if self._hovered_item_column != (item, column):
+                        self._hovered_item_column = (item, column)
+                        self.show_full_text_for_item(item, column)
+                # 对于未启用悬停的列，如果之前有显示，则隐藏
+                elif self._hovered_item_column is not None:
+                    self.hide_overlay()
+                    self._hovered_item_column = None
+            else:
                 self.hide_overlay()
                 self._hovered_item_column = None
-        # No item or invalid column, hide overlay
-        elif self._hovered_item_column is not None:
-            self.hide_overlay()
-            self._hovered_item_column = None
+        # 如果鼠标不在任何项上，则隐藏
+        else:
+            if self._hovered_item_column is not None:
+                self.hide_overlay()
+                self._hovered_item_column = None
+
+    def columnAt(self, x_pos: int) -> int:
+        """根据 x 坐标返回逻辑列索引"""
+        header = self.header()
+        logical_index = -1
+        current_x = 0
+        for i in range(header.count()):
+            current_x += header.sectionSize(i)
+            if x_pos < current_x:
+                logical_index = header.logicalIndex(i)
+                break
+        return logical_index
 
     def leaveEvent(self, event):
         super().leaveEvent(event)
