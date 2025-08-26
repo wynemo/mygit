@@ -118,6 +118,8 @@ class HoverRevealTreeWidget(QTreeWidget):
     def focusOutEvent(self, event):
         super().focusOutEvent(event)
         self.hide_overlay()
+        # 焦点改变时也要确保 DAG 线条正确重绘
+        self.viewport().update()
 
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
@@ -160,10 +162,17 @@ class HoverRevealTreeWidget(QTreeWidget):
                 break
         return logical_index
 
+    def enterEvent(self, event):
+        super().enterEvent(event)
+        # 鼠标进入控件时确保 DAG 线条正确重绘
+        self.viewport().update()
+
     def leaveEvent(self, event):
         super().leaveEvent(event)
         self.hide_overlay()
         self._hovered_item_column = None
+        # 鼠标离开控件时也要确保 DAG 线条正确重绘
+        self.viewport().update()
 
 
 class MainWindow(QMainWindow):
