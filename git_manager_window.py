@@ -916,8 +916,8 @@ class GitManagerWindow(QMainWindow):
         for i in range(history_list.topLevelItemCount()):
             item = history_list.topLevelItem(i)
             if item:
-                # 从 UserRole 获取完整哈希值进行比较
-                full_hash_in_item = item.data(0, Qt.ItemDataRole.UserRole)
+                # 从 UserRole 获取完整哈希值进行比较（数据存储在第1列）
+                full_hash_in_item = item.data(1, Qt.ItemDataRole.UserRole)
                 if full_hash_in_item and full_hash_in_item.startswith(short_hash_to_find):
                     found_item = item
                     break
@@ -936,7 +936,7 @@ class GitManagerWindow(QMainWindow):
                 for i in range(history_list.topLevelItemCount()):
                     item = history_list.topLevelItem(i)
                     if item:
-                        full_hash_in_item = item.data(0, Qt.ItemDataRole.UserRole)
+                        full_hash_in_item = item.data(1, Qt.ItemDataRole.UserRole)
                         if full_hash_in_item and full_hash_in_item.startswith(short_hash_to_find):
                             found_item = item
                             break  # 找到后跳出内部循环

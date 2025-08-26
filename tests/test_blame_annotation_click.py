@@ -112,13 +112,13 @@ class TestBlameAnnotationClick(unittest.TestCase):
 
         found_before_click = False
         for i in range(window.commit_history_view.history_list.topLevelItemCount()):
-            item_short_hash = window.commit_history_view.history_list.topLevelItem(i).text(0)
-            if item_short_hash == short_target_hash:
+            item_hash = window.commit_history_view.history_list.topLevelItem(i).data(1, Qt.ItemDataRole.UserRole)
+            if item_hash and item_hash.startswith(short_target_hash):
                 found_before_click = True
                 break
         self.assertFalse(
             found_before_click,
-            f"Target commit {short_target_hash} should not be loaded yet. Loaded items: {[window.commit_history_view.history_list.topLevelItem(i).text(0) for i in range(window.commit_history_view.history_list.topLevelItemCount())]}",
+            f"Target commit {short_target_hash} should not be loaded yet. Loaded items: {[window.commit_history_view.history_list.topLevelItem(i).data(1, Qt.ItemDataRole.UserRole)[:7] if window.commit_history_view.history_list.topLevelItem(i).data(1, Qt.ItemDataRole.UserRole) else 'None' for i in range(window.commit_history_view.history_list.topLevelItemCount())]}",
         )
 
         # 5. Simulate Blame Click
@@ -127,9 +127,9 @@ class TestBlameAnnotationClick(unittest.TestCase):
         # 6. Verify Commit Selection
         current_item = window.commit_history_view.history_list.currentItem()
         self.assertIsNotNone(current_item, "No item selected after blame click")
-        # 检查 UserRole 中的哈希前缀，因为 text(0) 现在是提交消息
+        # 检查 UserRole 中的哈希前缀，数据存储在第1列
         self.assertTrue(
-            current_item.data(0, Qt.ItemDataRole.UserRole).startswith(short_target_hash), "Incorrect commit selected"
+            current_item.data(1, Qt.ItemDataRole.UserRole).startswith(short_target_hash), "Incorrect commit selected"
         )
 
         expected_loaded_count = initial_load_batch_size * 2
@@ -218,8 +218,8 @@ class TestBlameAnnotationClick(unittest.TestCase):
 
         found_before_click = False
         for i in range(window.commit_history_view.history_list.topLevelItemCount()):
-            item_short_hash = window.commit_history_view.history_list.topLevelItem(i).text(0)
-            if item_short_hash == short_target_hash:
+            item_hash = window.commit_history_view.history_list.topLevelItem(i).data(1, Qt.ItemDataRole.UserRole)
+            if item_hash and item_hash.startswith(short_target_hash):
                 found_before_click = True
                 break
         self.assertFalse(found_before_click, f"Target commit {short_target_hash} should not be loaded yet.")
@@ -230,9 +230,9 @@ class TestBlameAnnotationClick(unittest.TestCase):
         # 6. Verify Commit Selection
         current_item = window.commit_history_view.history_list.currentItem()
         self.assertIsNotNone(current_item, "No item selected after blame click")
-        # 检查 UserRole 中的哈希前缀，因为 text(0) 现在是提交消息
+        # 检查 UserRole 中的哈希前缀，数据存储在第1列
         self.assertTrue(
-            current_item.data(0, Qt.ItemDataRole.UserRole).startswith(short_target_hash), "Incorrect commit selected"
+            current_item.data(1, Qt.ItemDataRole.UserRole).startswith(short_target_hash), "Incorrect commit selected"
         )
 
         # All commits should now be loaded
