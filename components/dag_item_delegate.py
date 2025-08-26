@@ -73,10 +73,8 @@ class DAGItemDelegate(QStyledItemDelegate):
                                 refs.append(ref.name)
                         commit_node.references = refs
                         
-                        print(f"提交 {commit_hash[:7]}: {len(commit_node.parents)} 个父提交, {len(refs)} 个引用")
                         
-                    except Exception as e:
-                        print(f"获取提交信息失败 {commit_hash[:7]}: {e}")
+                    except Exception:
                         commit_node.parents = []
                     
                     commits.append(commit_node)
@@ -92,14 +90,10 @@ class DAGItemDelegate(QStyledItemDelegate):
                 if parent_sha in commits_map:
                     commits_map[parent_sha].children.append(commit.sha)
         
-        print(f"总共 {len(commits)} 个提交")
         
         # 计算布局
         if commits:
             calculate_commit_positions(commits)
-            print("布局计算完成")
-            for i, commit in enumerate(commits[:5]):  # 只打印前5个
-                print(f"  {commit.sha[:7]}: column={commit.column}, color_idx={commit.color_idx}, parents={len(commit.parents)}")
             
         self.commits_data = commits
         self._calculate_positions()
