@@ -160,8 +160,7 @@ def calculate_commit_positions(commits: list[CommitNode]):
                 valid_children_for_color = [
                     c
                     for c in children_nodes
-                    if c.branch_color_idx is not None
-                    and (c.branch_color_idx != mainline_color_idx or not commit_node.is_on_mainline)
+                    if c.branch_color_idx is not None and c.branch_color_idx != mainline_color_idx
                 ]
                 if len(valid_children_for_color) == 1:  # Only inherit if one child dictates a clear branch path
                     # Check if this commit is a merge point from mainline to this child's branch
@@ -260,10 +259,17 @@ def calculate_commit_positions(commits: list[CommitNode]):
 
         # Fallback for color_idx if somehow still not set (e.g. non-mainline, no branch_color_idx)
         if commit_node.color_idx is None:
-            if parent_nodes and parent_nodes[0].color_idx is not None:
-                commit_node.color_idx = parent_nodes[0].color_idx  # Inherit from first parent as last resort
+            # If a commit is on a branch (non-mainline) and didn't get a color from
+            # the branch_color_idx pass (e.g., merged branch with no ref),
+            # use its layout column to determine its color. This ensures
+            # commits in the same visual column share the same color.
+            if not commit_node.is_on_mainline:
+                commit_node.color_idx = commit_node.column
+            elif parent_nodes and parent_nodes[0].color_idx is not None:
+                commit_node.color_idx = parent_nodes[0].color_idx  # Inherit from first parent as last resort for mainline
             else:
-                commit_node.color_idx = (mainline_color_idx + 1) % len(COLOR_PALETTE) if COLOR_PALETTE else 0
+                # Default for any other case (e.g. root commit)
+                commit_node.color_idx = mainline_color_idx
 
         lane_occupied_until_y[commit_node.column] = commit_node.y
         if commit_node.branch_color_idx is not None:

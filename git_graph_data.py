@@ -18,7 +18,7 @@ class CommitNode:
         self.x: float = 0.0
         self.y: float = 0.0
         self.column: int = 0
-        self.color_idx: int = 0  # For assigning branch colors
+        self.color_idx: int | None = None  # For assigning branch colors
 
     def __repr__(self) -> str:
         return (
