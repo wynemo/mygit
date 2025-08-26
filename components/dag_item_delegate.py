@@ -102,7 +102,7 @@ class DAGItemDelegate(QStyledItemDelegate):
         """计算每个提交的绘制位置"""
         self.commit_positions.clear()
         
-        for i, commit in enumerate(self.commits_data):
+        for commit in self.commits_data:
             # X 位置：根据分支列计算
             x = self.left_margin + commit.column * self.column_width
             
