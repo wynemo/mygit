@@ -89,18 +89,16 @@ class CustomTreeWidget(HoverRevealTreeWidget):
         if parent and hasattr(parent, "git_manager") and parent.git_manager:
             git_manager = parent.git_manager
             repo = git_manager.repo
-            
+
             # 检查是否处于 detached HEAD 状态
             current_branch = None
             try:
                 current_branch = repo.active_branch
                 branch_name = current_branch.name
-                
+
                 # 添加 "Reset current branch to here" 菜单项
                 reset_action = menu.addAction("reset current branch to here")
-                reset_action.triggered.connect(
-                    partial(self._reset_branch_to_commit, item, git_manager, branch_name)
-                )
+                reset_action.triggered.connect(partial(self._reset_branch_to_commit, item, git_manager, branch_name))
             except TypeError:
                 # 处于 detached HEAD 状态，不显示 reset 菜单项
                 pass

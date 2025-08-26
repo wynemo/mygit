@@ -225,7 +225,6 @@ class CommitHistoryView(QWidget):
             # Optional: Handle cases where commit_hash couldn't be determined
             print(f"Warning: Could not determine commit hash from item: {item_or_sha}")
 
-
     def filter_history(self, text):
         """根据输入文本过滤提交历史"""
         self.filter_text = text.strip().lower()
