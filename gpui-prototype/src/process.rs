@@ -2,7 +2,7 @@
 use anyhow::{Context, Result, bail};
 use std::{
     cell::RefCell,
-    io::Read,
+    io::{BufRead, BufReader, Read},
     process::{Command, Output, Stdio},
     sync::{
         Arc, Mutex,
@@ -175,9 +175,209 @@ pub fn output(command: &mut Command, timeout: Duration) -> Result<Output> {
         })
     })
 }
+/// Line-by-line output with consumer backpressure. A false return stops and
+/// reaps the process group, while retaining the already consumed records.
+pub struct LineOutput {
+    pub status: std::process::ExitStatus,
+    pub stderr: Vec<u8>,
+    pub stopped: bool,
+    pub record_exceeded: bool,
+}
+pub fn lines(
+    command: &mut Command,
+    timeout: Duration,
+    max_record: usize,
+    mut consume: impl FnMut(&[u8]) -> Result<bool> + Send,
+) -> Result<LineOutput> {
+    check()?;
+    command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .stdin(Stdio::null());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
+    let mut child = command.spawn().context("无法启动子进程")?;
+    let stdout = child.stdout.take().unwrap();
+    let stderr = child.stderr.take().unwrap();
+    let stop = AtomicBool::new(false);
+    let started = Instant::now();
+    std::thread::scope(|scope| {
+        let stop_ref = &stop;
+        let out = scope.spawn(move || -> Result<(bool, bool)> {
+            let result = (|| {
+                let mut reader = BufReader::new(stdout);
+                let mut record = vec![];
+                loop {
+                    let buffer = reader.fill_buf()?;
+                    if buffer.is_empty() {
+                        if !record.is_empty() && !consume(&record)? {
+                            return Ok((true, false));
+                        }
+                        return Ok((false, false));
+                    }
+                    let length = buffer
+                        .iter()
+                        .position(|byte| *byte == b'\n')
+                        .map_or(buffer.len(), |i| i + 1);
+                    if record.len().saturating_add(length) > max_record {
+                        return Ok((true, true));
+                    }
+                    record.extend_from_slice(&buffer[..length]);
+                    let complete = record.last() == Some(&b'\n');
+                    reader.consume(length);
+                    if complete {
+                        if !consume(&record)? {
+                            return Ok((true, false));
+                        }
+                        record.clear();
+                    }
+                }
+            })();
+            if !matches!(&result, Ok((false, false))) {
+                stop_ref.store(true, Ordering::Release);
+            }
+            result
+        });
+        let err = scope.spawn(move || drain(stderr, None));
+        let mut reason = None;
+        let status = loop {
+            match child.try_wait() {
+                Ok(Some(status)) => break Ok(status),
+                Ok(None) => {}
+                Err(error) => break Err(error),
+            }
+            if check().is_err() || started.elapsed() >= timeout || stop.load(Ordering::Acquire) {
+                if check().is_err() {
+                    reason = Some("任务已取消");
+                } else if started.elapsed() >= timeout {
+                    reason = Some("子进程操作超时，请重试");
+                }
+                #[cfg(unix)]
+                unsafe {
+                    libc::kill(-(child.id() as i32), libc::SIGKILL);
+                }
+                let _ = child.kill();
+                break child.wait();
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        };
+        #[cfg(unix)]
+        unsafe {
+            libc::kill(-(child.id() as i32), libc::SIGKILL);
+        }
+        if status.is_err() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+        let read = out
+            .join()
+            .map_err(|_| anyhow::anyhow!("读取标准输出失败"))?;
+        let (stderr, exceeded) = err
+            .join()
+            .map_err(|_| anyhow::anyhow!("读取错误输出失败"))??;
+        if let Some(reason) = reason {
+            bail!("{reason}");
+        }
+        check()?;
+        let (stopped, record_exceeded) = read?;
+        if exceeded {
+            bail!("错误输出超过 64 MB 上限");
+        }
+        Ok(LineOutput {
+            status: status?,
+            stderr,
+            stopped,
+            record_exceeded,
+        })
+    })
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[cfg(unix)]
+    fn streaming_consumer_limits_records_and_reaps_early_or_failed_consumers() {
+        let started = Instant::now();
+        let mut records = vec![];
+        let output = lines(
+            Command::new("sh").args(["-c", "printf 'one\ntwo\n'; sleep 20"]),
+            Duration::from_secs(2),
+            1024,
+            |line| {
+                records.push(line.to_vec());
+                Ok(false)
+            },
+        )
+        .unwrap();
+        assert!(output.stopped);
+        assert_eq!(records, vec![b"one\n".to_vec()]);
+        assert!(started.elapsed() < Duration::from_secs(1));
+        let output = lines(
+            Command::new("sh").args(["-c", "printf abcdef"]),
+            Duration::from_secs(2),
+            3,
+            |_| panic!("oversized record must not be delivered"),
+        )
+        .unwrap();
+        assert!(output.record_exceeded);
+        let error = lines(
+            Command::new("sh").args(["-c", "printf 'bad\n'; sleep 20"]),
+            Duration::from_secs(2),
+            1024,
+            |_| bail!("invalid record"),
+        )
+        .err()
+        .unwrap();
+        assert!(error.to_string().contains("invalid record"));
+        let mut bytes = vec![];
+        let output = lines(
+            Command::new("sh").args(["-c", "printf final"]),
+            Duration::from_secs(2),
+            1024,
+            |line| {
+                bytes.extend_from_slice(line);
+                Ok(true)
+            },
+        )
+        .unwrap();
+        assert!(!output.stopped);
+        assert!(output.status.success());
+        assert_eq!(bytes, b"final");
+    }
+    #[test]
+    #[cfg(unix)]
+    fn streaming_timeout_and_cancellation_finish_without_open_pipes() {
+        let error = lines(
+            Command::new("sh").args(["-c", "sleep 20"]),
+            Duration::from_millis(30),
+            1024,
+            |_| Ok(true),
+        )
+        .err()
+        .unwrap();
+        assert!(error.to_string().contains("超时"));
+        let token = Cancellation::default();
+        let trigger = token.clone();
+        let cancel = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(30));
+            trigger.cancel();
+        });
+        let error = scope(token, || {
+            lines(
+                Command::new("sh").args(["-c", "sleep 20"]),
+                Duration::from_secs(2),
+                1024,
+                |_| Ok(true),
+            )
+        })
+        .err()
+        .unwrap();
+        cancel.join().unwrap();
+        assert!(error.to_string().contains("取消"));
+    }
     #[test]
     fn diagnostic_display_bounds_large_unicode_output() {
         let source = format!("first\n{}\nlast", "🙂你".repeat(3000));

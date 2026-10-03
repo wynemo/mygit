@@ -1920,3 +1920,133 @@ fn quick_file_index_handles_ignored_untracked_renames_deletions_and_live_rebuild
         assert_eq!(replaced.search("src", 50).unwrap().paths, vec!["src"]);
     }
 }
+
+#[test]
+fn project_search_supports_unicode_spaces_case_regex_word_and_glob_filters() {
+    use crate::search::{Options, run};
+    let f = Fixture::new();
+    std::fs::create_dir(f.0.join("src")).unwrap();
+    std::fs::create_dir(f.0.join("ignored")).unwrap();
+    std::fs::write(f.0.join(".gitignore"), "ignored/\n").unwrap();
+    std::fs::write(
+        f.0.join("中文 空格.txt"),
+        "first\n针🙂\tneedle NEEDLE needle\r\n",
+    )
+    .unwrap();
+    std::fs::write(f.0.join("src/code.rs"), "needle\nneedles\n--no-ignore\n").unwrap();
+    std::fs::write(f.0.join("ignored/file"), "needle\n").unwrap();
+    std::fs::write(f.0.join(".hidden.txt"), "needle\n").unwrap();
+    let mut options = Options {
+        query: "needle".into(),
+        ..Default::default()
+    };
+    let result = run(&f.0, &options).unwrap();
+    assert_eq!(result.files, 2);
+    assert_eq!(result.hits.len(), 3);
+    assert_eq!(result.occurrences, 5);
+    let hit = result
+        .hits
+        .iter()
+        .find(|h| h.path == "中文 空格.txt")
+        .unwrap();
+    assert_eq!(hit.line, 2);
+    assert_eq!(hit.occurrences, 3);
+    let document =
+        crate::text::Document::new(&std::fs::read_to_string(f.0.join(&hit.path)).unwrap());
+    assert_eq!(&document.text[hit.locate(&document).unwrap()], "needle");
+    options.whole_word = true;
+    assert_eq!(run(&f.0, &options).unwrap().hits.len(), 2);
+    options.case_sensitive = true;
+    options.query = "NEEDLE".into();
+    assert_eq!(run(&f.0, &options).unwrap().occurrences, 1);
+    options.query = "^needle$".into();
+    options.regex = true;
+    options.include = "*.rs".into();
+    assert_eq!(run(&f.0, &options).unwrap().hits.len(), 1);
+    options.regex = false;
+    options.whole_word = false;
+    assert!(run(&f.0, &options).unwrap().hits.is_empty());
+    options.query = "--no-ignore".into();
+    assert_eq!(run(&f.0, &options).unwrap().hits[0].line, 3);
+    options.query = "needle".into();
+    options.include = "*.txt".into();
+    options.case_sensitive = false;
+    // An explicit positive glob can include hidden files, as ripgrep specifies.
+    assert_eq!(run(&f.0, &options).unwrap().files, 2);
+    options.exclude = "中文 空格.txt".into();
+    assert_eq!(run(&f.0, &options).unwrap().hits[0].path, ".hidden.txt");
+    options.exclude = "*.txt".into();
+    assert!(run(&f.0, &options).unwrap().hits.is_empty());
+    options.exclude.clear();
+    options.include.clear();
+    options.hidden = true;
+    assert_eq!(run(&f.0, &options).unwrap().files, 3);
+    std::fs::write(f.0.join(".git/private-search-fixture"), "metadata-secret\n").unwrap();
+    options.query = "metadata-secret".into();
+    options.include = "**".into();
+    assert!(run(&f.0, &options).unwrap().hits.is_empty());
+}
+
+#[test]
+fn project_search_limits_cancel_invalid_patterns_and_tracks_changed_lines() {
+    use crate::search::{Options, run, run_with_limit};
+    let f = Fixture::new();
+    std::fs::write(f.0.join("many"), "hit\nhit\nhit\nhit\n").unwrap();
+    let mut options = Options {
+        query: "hit".into(),
+        ..Default::default()
+    };
+    let result = run_with_limit(&f.0, &options, 2).unwrap();
+    assert_eq!(result.hits.len(), 2);
+    assert!(result.truncated);
+    let exact = run_with_limit(&f.0, &options, 4).unwrap();
+    assert_eq!(exact.hits.len(), 4);
+    assert!(!exact.truncated);
+    std::fs::write(f.0.join("many"), "different\nhit\nhit\nhit\n").unwrap();
+    let document = crate::text::Document::new(&std::fs::read_to_string(f.0.join("many")).unwrap());
+    assert!(result.hits[0].locate(&document).is_err());
+    assert!(result.hits[1].locate(&document).is_ok());
+    let token = crate::process::Cancellation::default();
+    token.cancel();
+    assert!(crate::process::scope(token, || run(&f.0, &options)).is_err());
+    options.regex = true;
+    options.query = "[".into();
+    assert!(
+        run(&f.0, &options)
+            .unwrap_err()
+            .to_string()
+            .contains("ripgrep 搜索失败")
+    );
+    options.query.clear();
+    assert!(run(&f.0, &options).unwrap().hits.is_empty());
+    options.query = "not found".into();
+    assert!(run(&f.0, &options).unwrap().hits.is_empty());
+    options.query = "hit".into();
+    options.regex = false;
+    let other = Fixture::new();
+    assert!(run(&other.0, &options).unwrap().hits.is_empty());
+}
+
+#[test]
+#[cfg(unix)]
+fn project_search_reports_non_utf8_paths_and_never_follows_directory_links() {
+    use std::os::unix::ffi::OsStringExt;
+    let f = Fixture::new();
+    let name = std::ffi::OsString::from_vec(vec![0xff, b'.', b't', b'x', b't']);
+    let non_utf8_written = match std::fs::write(f.0.join(name), "needle\n") {
+        Ok(()) => true,
+        Err(error) if error.raw_os_error() == Some(libc::EILSEQ) => false,
+        Err(error) => panic!("cannot create filename fixture: {error}"),
+    };
+    std::fs::create_dir(f.0.join(".git/linked-contents")).unwrap();
+    std::fs::write(f.0.join(".git/linked-contents/file"), "needle\n").unwrap();
+    std::os::unix::fs::symlink(".git/linked-contents", f.0.join("link")).unwrap();
+    let options = crate::search::Options {
+        query: "needle".into(),
+        hidden: true,
+        ..Default::default()
+    };
+    let result = crate::search::run(&f.0, &options).unwrap();
+    assert!(result.hits.is_empty());
+    assert_eq!(result.skipped_encoding, usize::from(non_utf8_written));
+}

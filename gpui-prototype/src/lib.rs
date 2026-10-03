@@ -11,6 +11,7 @@ pub mod operations;
 pub mod process;
 pub mod quick_open;
 pub mod recovery;
+pub mod search;
 pub mod settings;
 pub mod state;
 pub mod syntax;
