@@ -15,12 +15,7 @@ fn mode_button(
         .on_click(cx.listener(move |this, _, _, cx| this.select_mode(mode.clone(), cx)))
 }
 pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
-    let count = this
-        .state
-        .repo
-        .as_ref()
-        .map(|r| r.commits.len())
-        .unwrap_or(0);
+    let count = this.history_commits().len();
     div()
         .key_context("HistoryList")
         .track_focus(&this.history_focus)
@@ -58,24 +53,22 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     BrowseMode::Unstaged,
                 )),
         )
-        .child(
-            div()
-                .p_3()
-                .text_color(rgb(0x92a2b9))
-                .child(format!("提交历史 · 已加载 {count} 条")),
-        )
+        .child(div().p_3().text_color(rgb(0x92a2b9)).child(format!(
+            "{} · 已加载 {count} 条",
+            if this.history_query.is_some() {
+                "查询结果"
+            } else {
+                "提交历史"
+            }
+        )))
         .child(
             uniform_list(
                 "history",
                 count,
                 cx.processor(|this, range: std::ops::Range<usize>, _, cx| {
-                    if range.end
-                        >= this
-                            .state
-                            .repo
-                            .as_ref()
-                            .map(|r| r.commits.len())
-                            .unwrap_or(0)
+                    if !this.history_failed
+                        && this.history_more()
+                        && range.end >= this.history_commits().len()
                     {
                         let entity = cx.entity().downgrade();
                         cx.defer(move |cx| {
@@ -84,7 +77,7 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     }
                     range
                         .map(|i| {
-                            let c = &this.state.repo.as_ref().unwrap().commits[i];
+                            let c = &this.history_commits()[i];
                             div()
                                 .id(i)
                                 .h(px(64.))
@@ -109,9 +102,7 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                 .on_mouse_down(
                                     MouseButton::Right,
                                     cx.listener(move |this, _, window, cx| {
-                                        if let Some(commit) =
-                                            this.state.repo.as_ref().and_then(|r| r.commits.get(i))
-                                        {
+                                        if let Some(commit) = this.history_commits().get(i) {
                                             this.show_commit_branches(commit.sha.clone(), cx);
                                             window.focus(&this.branch_focus);
                                         }
@@ -137,7 +128,7 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 } else {
                     "加载更多"
                 },
-                !this.history_loading && this.state.repo.as_ref().is_some_and(|r| r.history_more),
+                !this.history_loading && this.history_more(),
             )
             .on_click(cx.listener(|this, _, _, cx| this.load_more_history(cx))),
         )
@@ -221,6 +212,14 @@ pub fn files(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             this.state.mode.label(),
             this.state.files.len()
         )))
+        .child(
+            button(
+                "current-file-history",
+                "当前文件历史",
+                this.state.current_file.is_some(),
+            )
+            .on_click(cx.listener(|this, _, _, cx| this.current_file_history(cx))),
+        )
         .when(
             matches!(
                 this.state.mode,

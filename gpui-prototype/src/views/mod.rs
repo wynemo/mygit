@@ -3,6 +3,7 @@ pub mod commit;
 pub mod compare;
 pub mod diff;
 pub mod editor;
+pub mod history;
 pub mod sidebar;
 pub mod tabs;
 pub mod text_line;
@@ -70,6 +71,18 @@ pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 !this.write_busy && this.state.repo.is_some(),
             )
             .on_click(cx.listener(|this, _, _, cx| this.undo_restore(cx))),
+        )
+        .child(
+            button("history-search", "历史搜索", this.state.repo.is_some()).on_click(cx.listener(
+                |this, _, window, cx| {
+                    this.toggle_history_search(cx);
+                    if this.show_history_search
+                        && let Some(editor) = this.history_inputs.first()
+                    {
+                        window.focus(&editor.read(cx).focus);
+                    }
+                },
+            )),
         )
         .child(
             button("show-branches", "分支", this.state.repo.is_some()).on_click(cx.listener(

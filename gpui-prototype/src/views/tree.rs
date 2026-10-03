@@ -20,6 +20,14 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .gap_2()
                 .child("工作区文件树")
                 .child(
+                    button(
+                        "selected-tree-history",
+                        "历史",
+                        this.tree.selected.is_some(),
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.selected_tree_history(cx))),
+                )
+                .child(
                     button("refresh-tree", "刷新", !this.tree_loading)
                         .on_click(cx.listener(|this, _, _, cx| this.refresh_tree(cx))),
                 ),
@@ -40,6 +48,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         .filter_map(|i| {
                             rows.get(i).cloned().map(|(entry, depth)| {
                                 let expanded = this.tree.expanded.contains(&entry.path);
+                                let history_entry = entry.clone();
                                 div()
                                     .id(("tree-entry", i))
                                     .h(px(30.))
@@ -70,6 +79,17 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                         entry.name,
                                         entry.status
                                     ))
+                                    .on_mouse_down(
+                                        MouseButton::Right,
+                                        cx.listener(move |this, _, _, cx| {
+                                            this.show_path_history(
+                                                history_entry.path.clone(),
+                                                history_entry.directory,
+                                                cx,
+                                            );
+                                            cx.stop_propagation();
+                                        }),
+                                    )
                                     .on_click(cx.listener(move |this, _, window, cx| {
                                         this.choose_tree(entry.clone(), window, cx)
                                     }))

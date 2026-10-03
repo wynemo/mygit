@@ -2,6 +2,7 @@ pub mod branches;
 pub mod diff;
 pub mod editor;
 pub mod git;
+pub mod history;
 pub mod model;
 pub mod operations;
 pub mod process;

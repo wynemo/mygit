@@ -133,7 +133,8 @@ impl MyGit {
                             if previous.history_tip == repo.history_tip {
                                 repo.commits = previous.commits.clone();
                                 repo.history_more = previous.history_more;
-                            } else {
+                            } else if this.history_query.is_none() && !this.history_search_pending {
+                                this.history_query_generation += 1;
                                 this.history_pending.cancel();
                                 this.history_pending = Default::default();
                                 this.history_loading = false;

@@ -1041,3 +1041,336 @@ fn remote_honors_configured_ssh_and_reports_authentication_failure() {
         Some(before.as_str())
     );
 }
+
+#[test]
+fn history_search_finds_unloaded_body_author_sha_and_paginates_without_duplicates() {
+    use crate::history::{self, Filter};
+    let f = Fixture::new();
+    std::fs::write(f.0.join("a"), "base").unwrap();
+    git(&f.0, &["add", "a"]).unwrap();
+    let tree = string(git(&f.0, &["write-tree"]).unwrap())
+        .unwrap()
+        .trim()
+        .to_owned();
+    let mut parent = String::new();
+    let mut oldest = String::new();
+    for i in 0..530 {
+        let message = if i == 0 {
+            "old subject\n\nUNLOADED 正文 keyword".to_owned()
+        } else {
+            format!("commit {i}")
+        };
+        let mut args = vec!["commit-tree", &tree, "-m", &message];
+        if !parent.is_empty() {
+            args.extend(["-p", &parent]);
+        }
+        parent = string(git(&f.0, &args).unwrap()).unwrap().trim().to_owned();
+        if i == 0 {
+            oldest = parent.clone();
+        }
+    }
+    git(&f.0, &["update-ref", "refs/heads/main", &parent]).unwrap();
+    let repo = snapshot(&f.0).unwrap();
+    assert!(!repo.commits.iter().any(|c| c.sha == oldest));
+    for text in ["unloaded 正文", "tEsT", &oldest[..10]] {
+        let query = history::prepare(
+            &f.0,
+            Filter {
+                text: text.into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let page = history::page(&f.0, &query, 0).unwrap();
+        if text != "tEsT" {
+            assert_eq!(page.commits.len(), 1);
+            assert_eq!(page.commits[0].sha, oldest);
+        } else {
+            assert_eq!(page.commits.len(), 100);
+            assert!(page.more);
+        }
+    }
+    let query = history::prepare(
+        &f.0,
+        Filter {
+            author: "test@example.invalid".into(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let first = history::page(&f.0, &query, 0).unwrap();
+    assert_eq!(first.commits.len(), 100);
+    assert!(first.more);
+    let new =
+        string(git(&f.0, &["commit-tree", &tree, "-p", &parent, "-m", "newer"]).unwrap()).unwrap();
+    git(&f.0, &["update-ref", "refs/heads/main", new.trim()]).unwrap();
+    let second = history::page(&f.0, &query, first.next).unwrap();
+    assert_eq!(second.commits.len(), 100);
+    assert!(second.more);
+    assert!(
+        second
+            .commits
+            .iter()
+            .all(|c| !first.commits.iter().any(|a| a.sha == c.sha))
+    );
+    let mut all = first.commits;
+    let mut next = second.next;
+    let mut more = second.more;
+    all.extend(second.commits);
+    while more {
+        let page = history::page(&f.0, &query, next).unwrap();
+        next = page.next;
+        more = page.more;
+        all.extend(page.commits);
+    }
+    assert_eq!(all.len(), 530);
+    assert_eq!(
+        all.iter()
+            .map(|commit| &commit.sha)
+            .collect::<std::collections::HashSet<_>>()
+            .len(),
+        530
+    );
+    assert_eq!(all.last().unwrap().sha, oldest);
+    let query = history::prepare(
+        &f.0,
+        Filter {
+            text: "[not a regex]".into(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert!(history::page(&f.0, &query, 0).unwrap().commits.is_empty());
+}
+
+#[test]
+fn history_scope_dates_and_renamed_file_directory_paths_are_distinct() {
+    use crate::history::{self, Filter};
+    let f = Fixture::new();
+    std::fs::create_dir(f.0.join("one")).unwrap();
+    std::fs::create_dir(f.0.join("two")).unwrap();
+    std::fs::write(f.0.join("one/same"), "one\n").unwrap();
+    let original = f.commit();
+    std::fs::write(f.0.join("two/same"), "two\n").unwrap();
+    let two = f.commit();
+    std::fs::rename(f.0.join("one/same"), f.0.join("one/moved")).unwrap();
+    let moved = f.commit();
+    std::fs::write(f.0.join("one/moved"), "changed\n").unwrap();
+    let changed = f.commit();
+    let query = history::prepare(
+        &f.0,
+        Filter {
+            path: Some("one/moved".into()),
+            follow: true,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let page = history::page(&f.0, &query, 0).unwrap();
+    assert_eq!(
+        page.commits
+            .iter()
+            .map(|c| c.sha.as_str())
+            .collect::<Vec<_>>(),
+        vec![changed.as_str(), moved.as_str(), original.as_str()]
+    );
+    assert!(!page.commits.iter().any(|c| c.sha == two));
+    let query = history::prepare(
+        &f.0,
+        Filter {
+            path: Some("two".into()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(history::page(&f.0, &query, 0).unwrap().commits[0].sha, two);
+    crate::branches::create(&f.0, "other", &original).unwrap();
+    std::fs::write(f.0.join("other"), "branch-only").unwrap();
+    let other = f.commit();
+    crate::branches::switch(&f.0, "refs/heads/main", None).unwrap();
+    let query = history::prepare(
+        &f.0,
+        Filter {
+            scope: "ALL".into(),
+            text: "fixture".into(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert!(
+        history::page(&f.0, &query, 0)
+            .unwrap()
+            .commits
+            .iter()
+            .any(|c| c.sha == other)
+    );
+    let query = history::prepare(
+        &f.0,
+        Filter {
+            scope: "other".into(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(history::page(&f.0, &query, 0).unwrap().commits.len(), 2);
+    let query = history::prepare(
+        &f.0,
+        Filter {
+            since: "2099-01-01".into(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert!(history::page(&f.0, &query, 0).unwrap().commits.is_empty());
+    for since in ["2026-02-30", "2026-13-01", "not-date", "2026-+2-01"] {
+        assert!(
+            history::prepare(
+                &f.0,
+                Filter {
+                    since: since.into(),
+                    ..Default::default()
+                }
+            )
+            .is_err()
+        );
+    }
+    assert!(
+        history::prepare(
+            &f.0,
+            Filter {
+                path: Some("../outside".into()),
+                ..Default::default()
+            }
+        )
+        .is_err()
+    );
+    assert!(
+        history::prepare(
+            &f.0,
+            Filter {
+                scope: "--option".into(),
+                ..Default::default()
+            }
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn file_history_pagination_follows_rename_past_first_page() {
+    use crate::history::{self, Filter};
+    let f = Fixture::new();
+    std::fs::write(f.0.join("old"), "original\n").unwrap();
+    let original = f.commit();
+    std::fs::rename(f.0.join("old"), f.0.join("new")).unwrap();
+    let renamed = f.commit();
+    let tree_one = string(git(&f.0, &["write-tree"]).unwrap())
+        .unwrap()
+        .trim()
+        .to_owned();
+    std::fs::write(f.0.join("new"), "changed\n").unwrap();
+    git(&f.0, &["add", "new"]).unwrap();
+    let tree_two = string(git(&f.0, &["write-tree"]).unwrap())
+        .unwrap()
+        .trim()
+        .to_owned();
+    let mut parent = renamed.clone();
+    for index in 0..105 {
+        let tree = if index % 2 == 0 { &tree_two } else { &tree_one };
+        parent = string(
+            git(
+                &f.0,
+                &[
+                    "commit-tree",
+                    tree,
+                    "-p",
+                    &parent,
+                    "-m",
+                    &format!("edit {index}"),
+                ],
+            )
+            .unwrap(),
+        )
+        .unwrap()
+        .trim()
+        .to_owned();
+    }
+    git(&f.0, &["update-ref", "refs/heads/main", &parent]).unwrap();
+    let query = history::prepare(
+        &f.0,
+        Filter {
+            path: Some("new".into()),
+            follow: true,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let first = history::page(&f.0, &query, 0).unwrap();
+    assert_eq!(first.commits.len(), 100);
+    assert!(first.more);
+    let second = history::page(&f.0, &query, first.next).unwrap();
+    assert_eq!(second.commits.len(), 7);
+    assert!(!second.more);
+    assert!(second.commits.iter().any(|commit| commit.sha == renamed));
+    assert_eq!(second.commits.last().unwrap().sha, original);
+    assert!(
+        second
+            .commits
+            .iter()
+            .all(|commit| !first.commits.iter().any(|old| old.sha == commit.sha))
+    );
+}
+
+#[test]
+fn history_date_filter_traverses_out_of_order_commit_dates() {
+    use crate::history::{self, Filter};
+    let f = Fixture::new();
+    std::fs::write(f.0.join("a"), "base").unwrap();
+    git(&f.0, &["add", "a"]).unwrap();
+    let tree = string(git(&f.0, &["write-tree"]).unwrap())
+        .unwrap()
+        .trim()
+        .to_owned();
+    let commit = |date: &str, parent: Option<&str>| {
+        let mut command = Command::new("git");
+        command
+            .arg("-C")
+            .arg(&f.0)
+            .args(["commit-tree", &tree, "-m", "dated"])
+            .env("GIT_AUTHOR_DATE", date)
+            .env("GIT_COMMITTER_DATE", date);
+        if let Some(parent) = parent {
+            command.args(["-p", parent]);
+        }
+        let output =
+            crate::process::output(&mut command, std::time::Duration::from_secs(2)).unwrap();
+        assert!(output.status.success());
+        string(output.stdout).unwrap().trim().to_owned()
+    };
+    let future = commit("2030-01-15T00:00:00Z", None);
+    let past = commit("2020-01-15T00:00:00Z", Some(&future));
+    git(&f.0, &["update-ref", "refs/heads/main", &past]).unwrap();
+    let query = history::prepare(
+        &f.0,
+        Filter {
+            since: "2025-01-01".into(),
+            until: "2031-01-01".into(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let page = history::page(&f.0, &query, 0).unwrap();
+    assert_eq!(page.commits.len(), 1);
+    assert_eq!(page.commits[0].sha, future);
+    assert!(
+        history::prepare(
+            &f.0,
+            Filter {
+                since: "2031-01-01".into(),
+                until: "2025-01-01".into(),
+                ..Default::default()
+            }
+        )
+        .is_err()
+    );
+}

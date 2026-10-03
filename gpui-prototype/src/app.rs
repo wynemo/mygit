@@ -1,4 +1,5 @@
 mod branches;
+mod history;
 mod refresh;
 use crate::views::editor::{Changed, Editor};
 use crate::views::text_line::LineHit;
@@ -22,6 +23,7 @@ actions!(
         RefreshRepo,
         ToggleSettings,
         ToggleBranches,
+        ToggleHistorySearch,
         Quit,
         FocusNext,
         FocusPrevious,
@@ -92,6 +94,17 @@ pub struct MyGit {
     pub write_progress_text: String,
     pub show_commit: bool,
     pub show_compare: bool,
+    pub show_history_search: bool,
+    pub history_inputs: Vec<Entity<Editor>>,
+    pub history_input_subscription: Option<Subscription>,
+    pub history_query: Option<mygit_gpui::history::Query>,
+    pub history_query_generation: u64,
+    pub history_search_pending: bool,
+    pub history_path: Option<(String, bool)>,
+    pub history_search_error: Option<String>,
+    filtered_commits: Vec<Commit>,
+    filtered_next: usize,
+    filtered_more: bool,
     pub show_branches: bool,
     pub branch_name: Option<Entity<Editor>>,
     pub branch_base: Option<Entity<Editor>>,
@@ -177,6 +190,17 @@ impl MyGit {
             write_progress_text: String::new(),
             show_commit: false,
             show_compare: false,
+            show_history_search: false,
+            history_inputs: vec![],
+            history_input_subscription: None,
+            history_query: None,
+            history_query_generation: 0,
+            history_search_pending: false,
+            history_path: None,
+            history_search_error: None,
+            filtered_commits: vec![],
+            filtered_next: 0,
+            filtered_more: false,
             show_branches: false,
             branch_name: None,
             branch_base: None,
@@ -260,6 +284,7 @@ impl MyGit {
     }
     fn load_unchecked(&mut self, path: PathBuf, cx: &mut Context<Self>) {
         self.reset_refresh();
+        self.reset_history_search();
         self.edit_mode = false;
         self.capture_tab();
         self.active_tab = None;
@@ -995,6 +1020,10 @@ impl MyGit {
     }
     pub fn toggle_compare(&mut self, cx: &mut Context<Self>) {
         self.show_compare = !self.show_compare;
+        if self.show_compare {
+            self.show_branches = false;
+            self.show_history_search = false;
+        }
         if self.compare_left.is_none() {
             let font = self.state.font_family.clone();
             let size = self.state.font_size;
@@ -1056,6 +1085,10 @@ impl MyGit {
     }
     pub fn toggle_commit(&mut self, cx: &mut Context<Self>) {
         self.show_commit = !self.show_commit;
+        if self.show_commit {
+            self.show_branches = false;
+            self.show_history_search = false;
+        }
         if self.commit_editor.is_none() {
             let font = self.state.font_family.clone();
             let size = self.state.font_size;
@@ -1281,6 +1314,10 @@ impl MyGit {
         cx.notify();
     }
     pub fn load_more_history(&mut self, cx: &mut Context<Self>) {
+        if self.history_query.is_some() {
+            self.load_more_filtered(cx);
+            return;
+        }
         let Some(repo) = &self.state.repo else {
             return;
         };
@@ -1293,6 +1330,7 @@ impl MyGit {
         let root = repo.root.clone();
         let skip = repo.commits.len();
         let epoch = self.repository_epoch;
+        let query_generation = self.history_query_generation;
         self.history_loading = true;
         self.history_failed = false;
         cx.notify();
@@ -1304,7 +1342,9 @@ impl MyGit {
         cx.spawn(async move |this, cx| {
             let result = task.await;
             let _ = this.update(cx, |this, cx| {
-                if this.repository_epoch != epoch {
+                if this.repository_epoch != epoch
+                    || this.history_query_generation != query_generation
+                {
                     return;
                 }
                 if !this.state.repo.as_ref().is_some_and(|repo| {
@@ -1354,13 +1394,14 @@ impl MyGit {
         self.repository_epoch += 1;
         self.history_loading = false;
         self.history_failed = true;
+        self.history_search_pending = false;
         self.state.generation += 1;
         self.state.loading = false;
         self.state.message = "已取消，可刷新或重新选择".into();
         cx.notify();
     }
     pub fn choose_history(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(commit) = self.state.repo.as_ref().and_then(|r| r.commits.get(index)) else {
+        let Some(commit) = self.history_commits().get(index) else {
             return;
         };
         let sha = commit.sha.clone();
@@ -1375,12 +1416,7 @@ impl MyGit {
         if self.show_branches && self.branch_focus.is_focused(window) {
             self.move_branch(forward, cx);
         } else if self.history_focus.is_focused(window) {
-            let count = self
-                .state
-                .repo
-                .as_ref()
-                .map(|r| r.commits.len())
-                .unwrap_or(0);
+            let count = self.history_commits().len();
             if count == 0 {
                 return;
             }
@@ -1792,6 +1828,14 @@ impl Render for MyGit {
                     this.load(path, cx);
                 }
             }))
+            .on_action(cx.listener(|this, _: &ToggleHistorySearch, window, cx| {
+                this.toggle_history_search(cx);
+                if this.show_history_search
+                    && let Some(editor) = this.history_inputs.first()
+                {
+                    window.focus(&editor.read(cx).focus);
+                }
+            }))
             .on_action(cx.listener(|this, _: &ToggleBranches, window, cx| {
                 this.toggle_branches(cx);
                 if this.show_branches {
@@ -1888,6 +1932,9 @@ impl Render for MyGit {
             .text_color(rgb(0xdce5f3))
             .text_size(px(13.))
             .child(views::toolbar(self, cx))
+            .when(self.show_history_search, |s| {
+                s.child(views::history::pane(self, cx))
+            })
             .when(self.show_branches, |s| {
                 s.child(views::branches::pane(self, cx))
             })

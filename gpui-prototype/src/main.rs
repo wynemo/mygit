@@ -31,6 +31,7 @@ fn main() {
                     MenuItem::action("打开仓库", OpenRepo),
                     MenuItem::action("刷新", RefreshRepo),
                     MenuItem::action("分支管理", ToggleBranches),
+                    MenuItem::action("历史搜索", ToggleHistorySearch),
                     MenuItem::action("取消加载", CancelTask),
                     MenuItem::separator(),
                     MenuItem::action("全部变更", ViewWorkspace),

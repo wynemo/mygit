@@ -8,6 +8,7 @@ impl MyGit {
         self.branch_filter_sha = None;
         self.prepare_branch_inputs(cx);
         if self.show_branches {
+            self.show_history_search = false;
             self.show_compare = false;
             self.show_commit = false;
             self.show_settings = false;
@@ -44,6 +45,7 @@ impl MyGit {
     }
     pub fn show_commit_branches(&mut self, sha: String, cx: &mut Context<Self>) {
         self.show_branches = true;
+        self.show_history_search = false;
         self.branch_filter_sha = Some(sha);
         self.prepare_branch_inputs(cx);
         self.show_compare = false;
