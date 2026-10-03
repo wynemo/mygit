@@ -16,6 +16,7 @@ pub struct Settings {
     pub recent: Vec<PathBuf>,
     pub last: Option<PathBuf>,
     pub warning: Option<String>,
+    pub draft: Option<(String, String)>,
 }
 impl Settings {
     pub fn default_path() -> PathBuf {
@@ -71,7 +72,20 @@ impl Settings {
                 .unwrap_or_default(),
             last: data["last_folder"].as_str().map(PathBuf::from),
             warning,
+            draft: None,
         }
+    }
+    pub fn draft_for(&self, root: &Path) -> String {
+        let Ok(bytes) = fs::read(&self.path) else {
+            return String::new();
+        };
+        let Ok(data) = serde_json::from_slice::<Value>(&bytes) else {
+            return String::new();
+        };
+        data["gpui"]["commit_drafts"][root.to_string_lossy().as_ref()]
+            .as_str()
+            .unwrap_or("")
+            .into()
     }
     pub fn opened(&mut self, path: &Path) {
         self.last = Some(path.to_owned());
@@ -108,6 +122,12 @@ impl Settings {
         }
         data["gpui"]["history_width"] = json!(self.history_width);
         data["gpui"]["files_width"] = json!(self.files_width);
+        if let Some((root, text)) = &self.draft {
+            if !data["gpui"]["commit_drafts"].is_object() {
+                data["gpui"]["commit_drafts"] = json!({});
+            }
+            data["gpui"]["commit_drafts"][root] = json!(text);
+        }
         let temp = parent.join(format!(
             ".settings-{}-{}.tmp",
             std::process::id(),
@@ -168,6 +188,15 @@ mod tests {
         assert_eq!(value["gpui"]["future"], 2);
         assert_eq!(value["other"], "new");
         assert_eq!(Settings::load(path.clone()).font_size, 18.);
+        settings.draft = Some(("/tmp/repo-a".into(), "draft a\n正文".into()));
+        settings.save().unwrap();
+        settings.draft = Some(("/tmp/repo-b".into(), "draft b".into()));
+        settings.save().unwrap();
+        assert_eq!(
+            settings.draft_for(Path::new("/tmp/repo-a")),
+            "draft a\n正文"
+        );
+        assert_eq!(settings.draft_for(Path::new("/tmp/repo-b")), "draft b");
         fs::write(&path, b"{broken").unwrap();
         settings = Settings::load(path.clone());
         assert!(settings.warning.is_some());

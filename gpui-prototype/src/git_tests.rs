@@ -366,3 +366,102 @@ fn lazy_tree_status_rename_ignored_and_symlinks() {
         );
     }
 }
+
+#[test]
+fn stage_unstage_and_commit_only_index_including_unborn_and_rename() {
+    let f = Fixture::new();
+    git(&f.0, &["config", "commit.gpgsign", "false"]).unwrap();
+    std::fs::write(f.0.join("space 中文.txt"), "first\n").unwrap();
+    let path = vec!["space 中文.txt".into()];
+    stage(&f.0, &path, false).unwrap();
+    unstage(&f.0, &path, false).unwrap();
+    assert!(
+        selection(&f.0, &BrowseMode::Staged)
+            .unwrap()
+            .files
+            .is_empty()
+    );
+    assert!(f.0.join(&path[0]).exists());
+    stage(&f.0, &path, false).unwrap();
+    assert!(commit_index(&f.0, "").is_err());
+    std::fs::write(f.0.join(&path[0]), "not staged\n").unwrap();
+    commit_index(&f.0, "title\n\n中文正文").unwrap();
+    assert_eq!(
+        string(git(&f.0, &["show", "HEAD:space 中文.txt"]).unwrap()).unwrap(),
+        "first\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.0.join(&path[0])).unwrap(),
+        "not staged\n"
+    );
+    assert!(commit_index(&f.0, "empty index").is_err());
+    stage(&f.0, &[], true).unwrap();
+    unstage(&f.0, &[], true).unwrap();
+    assert!(
+        selection(&f.0, &BrowseMode::Staged)
+            .unwrap()
+            .files
+            .is_empty()
+    );
+    git(&f.0, &["mv", "space 中文.txt", "renamed.txt"]).unwrap();
+    let renamed = vec!["space 中文.txt".into(), "renamed.txt".into()];
+    unstage(&f.0, &renamed, false).unwrap();
+    assert!(
+        selection(&f.0, &BrowseMode::Staged)
+            .unwrap()
+            .files
+            .is_empty()
+    );
+    stage(&f.0, &renamed, false).unwrap();
+    assert!(
+        selection(&f.0, &BrowseMode::Staged)
+            .unwrap()
+            .files
+            .iter()
+            .any(|f| f.path == "renamed.txt")
+    );
+    assert!(stage(&f.0, &["../outside".into()], false).is_err());
+}
+#[test]
+#[cfg(unix)]
+fn commit_hook_failure_preserves_head_index_and_worktree() {
+    use std::os::unix::fs::PermissionsExt;
+    let f = Fixture::new();
+    git(&f.0, &["config", "commit.gpgsign", "false"]).unwrap();
+    std::fs::write(f.0.join("file"), "before\n").unwrap();
+    let before = f.commit();
+    std::fs::write(f.0.join("file"), "staged\n").unwrap();
+    stage(&f.0, &[], true).unwrap();
+    let hooks = f.0.join("hooks");
+    std::fs::create_dir(&hooks).unwrap();
+    let hook = hooks.join("pre-commit");
+    std::fs::write(
+        &hook,
+        "#!/bin/sh\necho 'fixture hook rejected' >&2\nexit 1\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).unwrap();
+    git(&f.0, &["config", "core.hooksPath", hooks.to_str().unwrap()]).unwrap();
+    assert!(
+        commit_index(&f.0, "blocked")
+            .unwrap_err()
+            .to_string()
+            .contains("fixture hook rejected")
+    );
+    assert_eq!(
+        string(git(&f.0, &["rev-parse", "HEAD"]).unwrap())
+            .unwrap()
+            .trim(),
+        before
+    );
+    assert!(
+        !selection(&f.0, &BrowseMode::Staged)
+            .unwrap()
+            .files
+            .is_empty()
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.0.join("file")).unwrap(),
+        "staged\n"
+    );
+}

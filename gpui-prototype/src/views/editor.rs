@@ -751,7 +751,9 @@ impl Render for Editor {
                         )
                         .child(div().text_color(rgb(0x92a2b9)).child(format!(
                             "{} · {}",
-                            if self.buffer.dirty() {
+                            if self.buffer.path.is_none() {
+                                "提交信息"
+                            } else if self.buffer.dirty() {
                                 "未保存"
                             } else {
                                 "已保存"

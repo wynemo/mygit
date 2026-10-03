@@ -7,6 +7,9 @@ use std::{
 };
 
 fn git(root: &Path, args: &[&str]) -> Result<Vec<u8>> {
+    git_timeout(root, args, std::time::Duration::from_secs(30))
+}
+fn git_timeout(root: &Path, args: &[&str], timeout: std::time::Duration) -> Result<Vec<u8>> {
     let mut command = Command::new("git");
     command
         .arg("-C")
@@ -14,7 +17,7 @@ fn git(root: &Path, args: &[&str]) -> Result<Vec<u8>> {
         .arg("--literal-pathspecs")
         .args(args)
         .env("GIT_OPTIONAL_LOCKS", "0");
-    let output = crate::process::output(&mut command, std::time::Duration::from_secs(30))?;
+    let output = crate::process::output(&mut command, timeout)?;
     if !output.status.success() {
         bail!("{}", String::from_utf8_lossy(&output.stderr).trim());
     }
@@ -282,6 +285,84 @@ pub fn selection(root: &Path, mode: &BrowseMode) -> Result<Selection> {
     files.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(Selection { comparison, files })
 }
+fn validate_paths(paths: &[String]) -> Result<()> {
+    for path in paths {
+        if path.is_empty()
+            || Path::new(path).is_absolute()
+            || Path::new(path).components().any(|c| {
+                matches!(
+                    c,
+                    std::path::Component::ParentDir | std::path::Component::Prefix(_)
+                )
+            })
+        {
+            bail!("文件路径必须位于当前仓库");
+        }
+    }
+    Ok(())
+}
+pub fn stage(root: &Path, paths: &[String], all: bool) -> Result<()> {
+    validate_paths(paths)?;
+    if !all && paths.is_empty() {
+        bail!("请选择要暂存的文件");
+    }
+    let mut filtered = vec![];
+    if !all {
+        for path in paths {
+            if root.join(path).symlink_metadata().is_ok()
+                || !git(root, &["ls-files", "-z", "--", path])?.is_empty()
+            {
+                filtered.push(path.as_str());
+            }
+        }
+        if filtered.is_empty() {
+            bail!("所选路径已不存在，请刷新状态");
+        }
+    }
+    let mut args = vec!["add", "--all", "--"];
+    if all {
+        args.push(".");
+    } else {
+        args.extend(filtered);
+    }
+    git_timeout(root, &args, std::time::Duration::from_secs(120))?;
+    Ok(())
+}
+pub fn unstage(root: &Path, paths: &[String], all: bool) -> Result<()> {
+    validate_paths(paths)?;
+    if !all && paths.is_empty() {
+        bail!("请选择要取消暂存的文件");
+    }
+    let mut args = match head(root)? {
+        Revision::Empty => vec!["rm", "--cached", "-r", "--ignore-unmatch", "--"],
+        _ => vec!["reset", "--quiet", "HEAD", "--"],
+    };
+    if all {
+        args.push(".");
+    } else {
+        args.extend(paths.iter().map(String::as_str));
+    }
+    git_timeout(root, &args, std::time::Duration::from_secs(120))?;
+    Ok(())
+}
+pub fn commit_index(root: &Path, message: &str) -> Result<String> {
+    if message.trim().is_empty() {
+        bail!("提交信息不能为空");
+    }
+    if !git(root, &["ls-files", "--unmerged", "-z"])?.is_empty() {
+        bail!("仍有未解决的冲突，不能提交");
+    }
+    if git(root, &["diff", "--cached", "--name-only", "-z", "--"])?.is_empty() {
+        bail!("暂存区为空，请先暂存文件");
+    }
+    let output = string(git_timeout(
+        root,
+        &["commit", "-m", message, "--"],
+        std::time::Duration::from_secs(120),
+    )?)?;
+    Ok(output.trim().into())
+}
+
 pub fn workspace_status(root: &Path) -> Result<BTreeMap<String, String>> {
     let bytes = git(
         root,

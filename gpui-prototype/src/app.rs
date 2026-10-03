@@ -4,7 +4,10 @@ use crate::{tasks, views};
 use gpui::{prelude::*, *};
 use mygit_gpui::text::{Motion, Side};
 use mygit_gpui::{git, model::*, state::AppState};
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
 actions!(
     mygit,
@@ -60,6 +63,12 @@ pub struct MyGit {
     pub editor_subscriptions: HashMap<String, Subscription>,
     pub edit_mode: bool,
     pub confirmation: Option<Confirmation>,
+    pub file_selection: HashSet<String>,
+    pub write_busy: bool,
+    pub write_message: String,
+    pub show_commit: bool,
+    pub commit_editor: Option<Entity<Editor>>,
+    write_pending: mygit_gpui::process::Cancellation,
     pub active_tab: Option<usize>,
     pub tab_scroll: HashMap<String, UniformListScrollHandle>,
     pub settings: mygit_gpui::settings::Settings,
@@ -103,6 +112,7 @@ impl MyGit {
             this.pending.cancel();
             this.history_pending.cancel();
             this.tree_pending.cancel();
+            this.write_pending.cancel();
             async {
                 Timer::after(std::time::Duration::from_millis(100)).await;
             }
@@ -115,6 +125,12 @@ impl MyGit {
             editor_subscriptions: HashMap::new(),
             edit_mode: false,
             confirmation: None,
+            file_selection: HashSet::new(),
+            write_busy: false,
+            write_message: String::new(),
+            show_commit: false,
+            commit_editor: None,
+            write_pending: Default::default(),
             active_tab: None,
             tab_scroll: HashMap::new(),
             settings,
@@ -170,6 +186,11 @@ impl MyGit {
         .detach();
     }
     pub fn load(&mut self, path: PathBuf, cx: &mut Context<Self>) {
+        if self.write_busy {
+            self.state.message = "Git 写操作正在执行，请等待完成后再切换或刷新仓库".into();
+            cx.notify();
+            return;
+        }
         let switching = !self.state.repo.as_ref().is_some_and(|r| r.root == path);
         if switching && self.editors.values().any(|e| e.read(cx).buffer.dirty()) {
             self.confirmation = Some(Confirmation::Load(path));
@@ -183,6 +204,8 @@ impl MyGit {
         self.capture_tab();
         self.active_tab = None;
         if !self.state.repo.as_ref().is_some_and(|r| r.root == path) {
+            self.commit_editor = None;
+            self.show_commit = false;
             self.editors.clear();
             self.editor_subscriptions.clear();
             self.tabs.clear();
@@ -240,6 +263,7 @@ impl MyGit {
         let root = repo.root.clone();
         self.capture_tab();
         self.active_tab = None;
+        self.file_selection.clear();
         self.state.detail = None;
         self.state.current_file = None;
         self.show_tree = false;
@@ -564,6 +588,11 @@ impl MyGit {
         );
     }
     pub fn request_close(&mut self, cx: &mut Context<Self>) -> bool {
+        if self.write_busy {
+            self.state.message = "Git 写操作执行中，请等待完成后退出".into();
+            cx.notify();
+            return false;
+        }
         if self.editors.values().any(|e| e.read(cx).buffer.dirty()) {
             self.confirmation = Some(Confirmation::Quit);
             cx.notify();
@@ -624,6 +653,184 @@ impl MyGit {
             Confirmation::Load(path) => self.load_unchecked(path, cx),
             Confirmation::Quit => cx.quit(),
         }
+        cx.notify();
+    }
+    pub fn toggle_file_selection(&mut self, index: usize, cx: &mut Context<Self>) {
+        if let Some(file) = self.state.files.get(index)
+            && !self.file_selection.remove(&file.path)
+        {
+            self.file_selection.insert(file.path.clone());
+        }
+        cx.notify();
+    }
+    pub fn change_index(&mut self, stage: bool, all: bool, cx: &mut Context<Self>) {
+        if self.write_busy || matches!(self.state.mode, BrowseMode::History(_)) {
+            return;
+        }
+        let Some(repo) = &self.state.repo else {
+            return;
+        };
+        let root = repo.root.clone();
+        let selected: Vec<_> = self
+            .state
+            .files
+            .iter()
+            .filter(|file| {
+                if self.file_selection.is_empty() {
+                    self.state
+                        .active_file()
+                        .is_some_and(|active| active.path == file.path)
+                } else {
+                    self.file_selection.contains(&file.path)
+                }
+            })
+            .collect();
+        let mut paths: Vec<String> = selected
+            .iter()
+            .flat_map(|f| [f.path.clone(), f.old_path.clone()])
+            .collect();
+        paths.sort();
+        paths.dedup();
+        if stage
+            && self
+                .editors
+                .iter()
+                .any(|(path, e)| (all || paths.contains(path)) && e.read(cx).buffer.dirty())
+        {
+            self.write_message = "所选文件有未保存修改，请先保存后再暂存".into();
+            cx.notify();
+            return;
+        }
+        self.run_write(
+            if stage {
+                "正在暂存…"
+            } else {
+                "正在取消暂存…"
+            },
+            if stage {
+                BrowseMode::Staged
+            } else {
+                BrowseMode::Unstaged
+            },
+            false,
+            move || {
+                if stage {
+                    git::stage(&root, &paths, all)?;
+                } else {
+                    git::unstage(&root, &paths, all)?;
+                }
+                Ok("index 已更新".into())
+            },
+            cx,
+        );
+    }
+    pub fn toggle_commit(&mut self, cx: &mut Context<Self>) {
+        self.show_commit = !self.show_commit;
+        if self.commit_editor.is_none() {
+            let font = self.state.font_family.clone();
+            let size = self.state.font_size;
+            let text = self
+                .state
+                .repo
+                .as_ref()
+                .map(|r| self.settings.draft_for(&r.root))
+                .unwrap_or_default();
+            let editor =
+                cx.new(|cx| Editor::new(mygit_gpui::editor::Buffer::new(&text), font, size, cx));
+            cx.subscribe(&editor, |this, editor, _: &Changed, cx| {
+                if let Some(repo) = &this.state.repo {
+                    this.settings.draft = Some((
+                        repo.root.to_string_lossy().into(),
+                        editor.read(cx).buffer.text().into(),
+                    ));
+                    this.save_settings();
+                }
+            })
+            .detach();
+            self.commit_editor = Some(editor);
+        }
+        cx.notify();
+    }
+    pub fn commit(&mut self, cx: &mut Context<Self>) {
+        if self.write_busy {
+            return;
+        }
+        let (Some(repo), Some(editor)) = (&self.state.repo, &self.commit_editor) else {
+            return;
+        };
+        let root = repo.root.clone();
+        let message = editor.read(cx).buffer.text().to_owned();
+        self.run_write(
+            "正在提交暂存内容…",
+            BrowseMode::Workspace,
+            true,
+            move || git::commit_index(&root, &message),
+            cx,
+        );
+    }
+    fn run_write(
+        &mut self,
+        label: &str,
+        mode: BrowseMode,
+        clear_message: bool,
+        job: impl FnOnce() -> anyhow::Result<String> + Send + 'static,
+        cx: &mut Context<Self>,
+    ) {
+        if self.write_busy {
+            return;
+        }
+        let Some(repo) = &self.state.repo else {
+            return;
+        };
+        let root = repo.root.clone();
+        let submitted_message = self
+            .commit_editor
+            .as_ref()
+            .map(|e| e.read(cx).buffer.text().to_owned());
+        let epoch = self.repository_epoch;
+        self.write_busy = true;
+        self.write_message = label.into();
+        self.write_pending = Default::default();
+        let token = self.write_pending.clone();
+        let task = cx.background_executor().spawn(async move {
+            mygit_gpui::process::scope(token, || {
+                let result = job();
+                let snapshot = git::snapshot(&root);
+                (result, snapshot)
+            })
+        });
+        cx.spawn(async move |this, cx| {
+            let (result, snapshot) = task.await;
+            let _ = this.update(cx, |this, cx| {
+                this.write_busy = false;
+                if this.repository_epoch != epoch {
+                    cx.notify();
+                    return;
+                }
+                let succeeded = result.is_ok();
+                this.write_message = match result {
+                    Ok(message) => message,
+                    Err(error) => format!("Git 操作失败：{error:#}"),
+                };
+                if succeeded
+                    && clear_message
+                    && let Some(editor) = &this.commit_editor
+                    && submitted_message.as_deref() == Some(editor.read(cx).buffer.text())
+                {
+                    editor.update(cx, |e, cx| {
+                        e.buffer = mygit_gpui::editor::Buffer::new("");
+                        e.refresh(cx);
+                    });
+                }
+                if let Ok(repo) = snapshot {
+                    this.state.repo = Some(repo);
+                }
+                this.refresh_tree(cx);
+                this.select_mode(mode, cx);
+                cx.notify();
+            });
+        })
+        .detach();
         cx.notify();
     }
     pub fn refresh_tree(&mut self, cx: &mut Context<Self>) {
@@ -763,6 +970,11 @@ impl MyGit {
         .detach();
     }
     pub fn cancel_task(&mut self, cx: &mut Context<Self>) {
+        if self.write_busy {
+            self.state.message = "Git 写操作执行中，请等待结果".into();
+            cx.notify();
+            return;
+        }
         if self.confirmation.take().is_some() {
             cx.notify();
             return;
@@ -1264,6 +1476,15 @@ impl Render for MyGit {
                         self.state.message
                     )),
             )
+            .when(self.show_commit, |s| s.child(views::commit::pane(self, cx)))
+            .when(!self.write_message.is_empty(), |s| {
+                s.child(
+                    div()
+                        .p_2()
+                        .text_color(rgb(0xffd479))
+                        .child(self.write_message.clone()),
+                )
+            })
             .when(self.confirmation.is_some(), |s| {
                 s.child(views::confirmation(self, cx))
             })
@@ -1275,5 +1496,6 @@ impl Drop for MyGit {
         self.pending.cancel();
         self.history_pending.cancel();
         self.tree_pending.cancel();
+        self.write_pending.cancel();
     }
 }
