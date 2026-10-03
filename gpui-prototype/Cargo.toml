@@ -1,0 +1,18 @@
+[package]
+name = "mygit-gpui"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = ["ui"]
+ui = ["dep:gpui"]
+
+[[bin]]
+name = "mygit-gpui"
+path = "src/main.rs"
+required-features = ["ui"]
+
+[dependencies]
+gpui = { version = "=0.2.2", optional = true }
+anyhow = "1"
+similar = "2"

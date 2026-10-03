@@ -177,3 +177,11 @@ python main.py
 
 MIT License - 详见 [LICENSE](LICENSE) 文件
 
+
+## Rust + GPUI 原型
+
+提交历史和双栏只读 Diff 的独立原型位于 [gpui-prototype](gpui-prototype/README.md)。
+
+```bash
+cargo run --manifest-path gpui-prototype/Cargo.toml -- .
+```
