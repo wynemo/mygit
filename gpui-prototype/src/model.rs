@@ -159,8 +159,15 @@ pub struct UnifiedRow {
     pub row: usize,
     pub side: crate::text::Side,
 }
+#[derive(Clone, Debug)]
+pub struct ThirdColumn {
+    pub document: crate::text::Document,
+    pub syntax: crate::syntax::Highlighted,
+    pub rows: Arc<Vec<crate::merge::Row>>,
+}
 #[derive(Clone, Debug, Default)]
 pub struct Diff {
+    pub third: Option<Arc<ThirdColumn>>,
     pub rows: Arc<Vec<DiffRow>>,
     pub unified: Arc<Vec<UnifiedRow>>,
     pub blocks: Vec<Range<usize>>,
@@ -198,6 +205,7 @@ impl Diff {
                         if match side {
                             crate::text::Side::Left => item.left_no.is_some(),
                             crate::text::Side::Right => item.right_no.is_some(),
+                            crate::text::Side::Third => false,
                         } {
                             unified.push(UnifiedRow { row, side });
                         }
@@ -229,20 +237,39 @@ impl Diff {
         match side {
             crate::text::Side::Left => &self.left_document,
             crate::text::Side::Right => &self.right_document,
+            crate::text::Side::Third => self
+                .third
+                .as_ref()
+                .map(|third| &third.document)
+                .unwrap_or(&self.right_document),
         }
     }
     pub fn syntax(&self, side: crate::text::Side) -> &crate::syntax::Highlighted {
         match side {
             crate::text::Side::Left => &self.left_syntax,
             crate::text::Side::Right => &self.right_syntax,
+            crate::text::Side::Third => self
+                .third
+                .as_ref()
+                .map(|third| &third.syntax)
+                .unwrap_or(&self.right_syntax),
         }
     }
     pub fn source_line(&self, side: crate::text::Side, row: usize) -> Option<usize> {
+        if side == crate::text::Side::Third {
+            return self
+                .third
+                .as_ref()
+                .and_then(|third| third.rows.get(row))
+                .and_then(|r| r.lines[2])
+                .map(|n| n - 1);
+        }
         self.rows
             .get(row)
             .and_then(|r| match side {
                 crate::text::Side::Left => r.left_no,
                 crate::text::Side::Right => r.right_no,
+                crate::text::Side::Third => None,
             })
             .map(|n| n - 1)
     }

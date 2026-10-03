@@ -8,6 +8,7 @@ pub(super) struct Key {
     left: Arc<str>,
     right: Arc<str>,
     editing: bool,
+    merge: Option<Arc<mygit_gpui::merge::View>>,
 }
 impl Key {
     fn matches(&self, other: &Self) -> bool {
@@ -15,6 +16,19 @@ impl Key {
             && self.file.old_path == other.file.old_path
             && self.comparison == other.comparison
             && self.editing == other.editing
+            && match (&self.merge, &other.merge) {
+                (None, None) => true,
+                (Some(a), Some(b)) => {
+                    Arc::ptr_eq(a, b)
+                        || (a.revisions == b.revisions
+                            && a.paths == b.paths
+                            && a.documents
+                                .iter()
+                                .zip(&b.documents)
+                                .all(|(a, b)| Arc::ptr_eq(&a.text, &b.text) || a.text == b.text))
+                }
+                _ => false,
+            }
             && (Arc::ptr_eq(&self.left, &other.left) || self.left == other.left)
             && (Arc::ptr_eq(&self.right, &other.right) || self.right == other.right)
     }
@@ -25,15 +39,6 @@ impl MyGit {
             return;
         }
         self.show_blame = !self.show_blame;
-        if self.state.merge.is_some() {
-            if self.blame_loading {
-                self.blame_pending.cancel();
-                self.blame_epoch += 1;
-                self.blame_loading = false;
-                self.blame_key = None;
-            }
-            return;
-        }
         if !self.show_blame {
             self.blame_pending.cancel();
             self.blame_epoch += 1;
@@ -72,6 +77,7 @@ impl MyGit {
             left: self.state.diff.left_document.text.clone(),
             right,
             editing: self.edit_mode,
+            merge: self.state.merge.clone(),
         };
         if self
             .blame_key
@@ -91,9 +97,11 @@ impl MyGit {
         let token = self.blame_pending.clone();
         self.blame_left = Default::default();
         self.blame_right = Default::default();
+        self.blame_third = Default::default();
         self.blame_loading = true;
         self.blame_error.clear();
         self.sync_editor_blame(cx);
+        let is_merge = key.merge.is_some();
         let task = cx.background_executor().spawn(async move {
             if key.editing {
                 Timer::after(std::time::Duration::from_millis(250)).await;
@@ -117,11 +125,22 @@ impl MyGit {
                         &key.right,
                     )
                 };
-                (left, right)
+                let third = if let Some(merge) = &key.merge {
+                    mygit_gpui::blame::annotate(
+                        &root,
+                        &Revision::Commit(merge.revisions[2].clone()),
+                        &merge.paths[2],
+                        &merge.paths[2],
+                        &merge.documents[2].text,
+                    )
+                } else {
+                    Ok(vec![])
+                };
+                (left, right, third)
             })
         });
         cx.spawn(async move |this, cx| {
-            let (left, right) = task.await;
+            let (left, right, third) = task.await;
             let _ = this.update(cx, |this, cx| {
                 if this.repository_epoch != repository || this.blame_epoch != epoch {
                     return;
@@ -131,14 +150,27 @@ impl MyGit {
                 this.blame_left = match left {
                     Ok(lines) => Arc::new(lines),
                     Err(error) => {
-                        errors.push(format!("左侧 Blame：{error:#}"));
+                        errors.push(format!(
+                            "{} Blame：{error:#}",
+                            if is_merge { "父提交 1" } else { "左侧" }
+                        ));
                         Default::default()
                     }
                 };
                 this.blame_right = match right {
                     Ok(lines) => Arc::new(lines),
                     Err(error) => {
-                        errors.push(format!("右侧 Blame：{error:#}"));
+                        errors.push(format!(
+                            "{} Blame：{error:#}",
+                            if is_merge { "合并结果" } else { "右侧" }
+                        ));
+                        Default::default()
+                    }
+                };
+                this.blame_third = match third {
+                    Ok(lines) => Arc::new(lines),
+                    Err(error) => {
+                        errors.push(format!("父提交 2 Blame：{error:#}"));
                         Default::default()
                     }
                 };
@@ -175,6 +207,7 @@ impl MyGit {
         match side {
             Side::Left => &self.blame_left,
             Side::Right => &self.blame_right,
+            Side::Third => &self.blame_third,
         }
         .get(line)
         .cloned()
@@ -250,6 +283,7 @@ impl MyGit {
         self.blame_key = None;
         self.blame_left = Default::default();
         self.blame_right = Default::default();
+        self.blame_third = Default::default();
         self.blame_loading = false;
         self.blame_error.clear();
         self.blame_detail_pending.cancel();

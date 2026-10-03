@@ -5,6 +5,7 @@ use unicode_segmentation::UnicodeSegmentation;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Side {
     Left,
+    Third,
     #[default]
     Right,
 }

@@ -35,6 +35,7 @@ fn cell(
     let ending = match side {
         Side::Left => this.state.diff.rows[row].left_ending,
         Side::Right => this.state.diff.rows[row].right_ending,
+        Side::Third => None,
     };
     div()
         .id((

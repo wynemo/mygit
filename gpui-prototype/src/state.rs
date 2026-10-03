@@ -116,6 +116,9 @@ impl AppState {
         let unchanged = self.diff.left_document.text == diff.left_document.text
             && self.diff.right_document.text == diff.right_document.text;
         let mut selection = self.text_selection.clone();
+        if selection.side == crate::text::Side::Third && diff.third.is_none() {
+            selection.side = crate::text::Side::Right;
+        }
         let horizontal = self.horizontal_offset;
         let block = self.current_block;
         self.set_diff(diff);
@@ -149,7 +152,7 @@ impl AppState {
             .is_some_and(|b| b.contains(&index))
     }
     pub fn view_row(&self, row: usize, side: crate::text::Side) -> usize {
-        if !self.unified {
+        if !self.unified || self.merge.is_some() {
             return row;
         }
         self.diff
@@ -160,7 +163,7 @@ impl AppState {
             .unwrap_or(0)
     }
     pub fn view_count(&self) -> usize {
-        if self.unified {
+        if self.unified && self.merge.is_none() {
             self.diff.unified.len()
         } else {
             self.diff.rows.len()
@@ -169,6 +172,11 @@ impl AppState {
     pub fn restore_positions(&mut self, previous: &FileTab) -> bool {
         if self.diff.left_document.text != previous.diff.left_document.text
             || self.diff.right_document.text != previous.diff.right_document.text
+            || match (&self.diff.third, &previous.diff.third) {
+                (None, None) => false,
+                (Some(a), Some(b)) => a.document.text != b.document.text || a.rows != b.rows,
+                _ => true,
+            }
         {
             return false;
         }
@@ -268,6 +276,67 @@ mod tests {
         assert_eq!(state.navigate(false), None);
     }
     #[test]
+    fn third_side_selection_copies_raw_text_skips_padding_and_preserves_graphemes() {
+        use crate::text::{Motion, Side};
+        let result = "a\t😀\r\ninserted\nb";
+        let third = "a\t😀\r\nb";
+        let view = crate::merge::align(
+            &crate::diff::calculate(result.as_bytes(), result.as_bytes()).unwrap(),
+            &crate::diff::calculate(third.as_bytes(), result.as_bytes()).unwrap(),
+        )
+        .unwrap();
+        let mut state = AppState::default();
+        state.set_merge(view);
+        state.unified = true;
+        assert_eq!(state.view_count(), state.diff.rows.len());
+        let padding = (0..state.diff.rows.len())
+            .find(|row| state.diff.source_line(Side::Third, *row).is_none())
+            .unwrap();
+        let offset = state.diff.padding_offset(Side::Third, padding);
+        assert_eq!(&state.diff.document(Side::Third).text[offset..], "b");
+        assert_eq!(state.view_row(padding, Side::Third), padding);
+        state
+            .text_selection
+            .point(Side::Third, 0, false, state.diff.document(Side::Third));
+        state
+            .text_selection
+            .select_all(state.diff.document(Side::Third));
+        assert_eq!(
+            state
+                .text_selection
+                .copy(state.diff.document(Side::Third))
+                .unwrap(),
+            third
+        );
+        state
+            .text_selection
+            .point(Side::Third, 2, false, state.diff.document(Side::Third));
+        state
+            .text_selection
+            .move_cursor(state.diff.document(Side::Third), Motion::Right, true);
+        assert_eq!(
+            state
+                .text_selection
+                .copy(state.diff.document(Side::Third))
+                .unwrap(),
+            "😀"
+        );
+        state
+            .text_selection
+            .point(Side::Left, 0, true, state.diff.document(Side::Left));
+        assert_eq!(state.text_selection.anchor, 0);
+        assert_eq!(state.text_selection.head, 0);
+        state.text_selection.point(
+            Side::Third,
+            third.len(),
+            false,
+            state.diff.document(Side::Third),
+        );
+        state.refresh_diff(crate::diff::calculate(b"a", b"b").unwrap());
+        assert_eq!(state.text_selection.side, Side::Right);
+        assert_eq!(state.text_selection.head, 1);
+    }
+    #[test]
     fn merge_tabs_preserve_third_parent_navigation_width_and_read_only_state() {
         let left = crate::diff::calculate(b"a\nb\nc\nd\n", b"a\nb\nc\nd\n").unwrap();
         let right = crate::diff::calculate(b"x\nb\nc\ny\n", b"a\nb\nc\nd\n").unwrap();
@@ -290,8 +359,21 @@ mod tests {
         assert_eq!(state.navigate(true), Some(3));
         assert_eq!(state.navigate(true), None);
         state.horizontal_offset = 55.;
+        state.text_selection.point(
+            crate::text::Side::Third,
+            0,
+            false,
+            state.diff.document(crate::text::Side::Third),
+        );
+        state
+            .text_selection
+            .select_all(state.diff.document(crate::text::Side::Third));
         let tab = state.tab_snapshot().unwrap();
         let width = state.panel_width;
+        let mut same_two_columns = tab.diff.clone();
+        same_two_columns.third = None;
+        state.set_diff(same_two_columns);
+        assert!(!state.restore_positions(&tab));
         state.set_diff(crate::diff::calculate(b"normal", b"normal").unwrap());
         assert!(state.merge.is_none());
         state.restore_tab(tab);
@@ -299,6 +381,14 @@ mod tests {
         assert_eq!(state.current_block, Some(1));
         assert_eq!(state.horizontal_offset, 55.);
         assert_eq!(state.panel_width, width);
+        assert_eq!(state.text_selection.side, crate::text::Side::Third);
+        assert_eq!(
+            state
+                .text_selection
+                .copy(state.diff.document(crate::text::Side::Third))
+                .unwrap(),
+            "x\nb\nc\ny\n"
+        );
         assert_eq!(state.navigate(false), Some(0));
         state.clear_diff();
         assert!(state.merge.is_none());

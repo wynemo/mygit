@@ -101,6 +101,7 @@ pub struct MyGit {
     blame_epoch: u64,
     pub blame_left: std::sync::Arc<Vec<mygit_gpui::blame::Line>>,
     pub blame_right: std::sync::Arc<Vec<mygit_gpui::blame::Line>>,
+    pub blame_third: std::sync::Arc<Vec<mygit_gpui::blame::Line>>,
     pub blame_loading: bool,
     pub blame_error: String,
     pub blame_details: HashMap<String, CommitDetail>,
@@ -213,6 +214,7 @@ impl MyGit {
             blame_epoch: 0,
             blame_left: Default::default(),
             blame_right: Default::default(),
+            blame_third: Default::default(),
             blame_loading: false,
             blame_error: String::new(),
             blame_details: HashMap::new(),
@@ -1855,7 +1857,7 @@ impl MyGit {
                     - self.visible_files_width
             });
         let visible = if self.state.merge.is_some() {
-            width / 3. - 140.
+            width / 3. - 140. - if self.show_blame { 100. } else { 0. }
         } else if self.state.unified {
             width - 122.
         } else {

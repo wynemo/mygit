@@ -1680,6 +1680,35 @@ fn merge_three_columns_union_both_parents_and_pin_renamed_deleted_and_added_path
         )
         .unwrap()
     };
+    for file in &selection.files {
+        let view = load(&file.path);
+        let diff = view.pair_diff();
+        for (column, side) in [
+            crate::text::Side::Left,
+            crate::text::Side::Right,
+            crate::text::Side::Third,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let lines = crate::blame::annotate(
+                &f.0,
+                &Revision::Commit(view.revisions[column].clone()),
+                &view.paths[column],
+                &view.paths[column],
+                &view.documents[column].text,
+            )
+            .unwrap();
+            assert_eq!(lines.len(), view.documents[column].lines.len());
+            assert_eq!(diff.document(side).text, view.documents[column].text);
+            for (row, mapped) in view.rows.iter().enumerate() {
+                assert_eq!(
+                    diff.source_line(side, row),
+                    mapped.lines[column].map(|n| n - 1)
+                );
+            }
+        }
+    }
     let renamed = load("new name");
     assert_eq!(renamed.paths, ["new name", "new name", "old name"]);
     assert_eq!(renamed.revisions, [main, sha, side]);

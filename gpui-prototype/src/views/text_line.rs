@@ -38,6 +38,7 @@ pub fn line(this: &MyGit, side: Side, row: usize, cx: &mut Context<MyGit>) -> im
     let inline = match side {
         Side::Left => this.state.diff.rows[row].left_inline.clone(),
         Side::Right => this.state.diff.rows[row].right_inline.clone(),
+        Side::Third => vec![],
     };
     let selection = this.state.text_selection.clone();
     let horizontal = this.state.horizontal_offset;

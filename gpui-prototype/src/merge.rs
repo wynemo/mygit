@@ -102,6 +102,11 @@ impl View {
         diff.right_document = self.documents[1].clone();
         diff.left_syntax = self.syntax[0].clone();
         diff.right_syntax = self.syntax[1].clone();
+        diff.third = Some(Arc::new(crate::model::ThirdColumn {
+            document: self.documents[2].clone(),
+            syntax: self.syntax[2].clone(),
+            rows: self.rows.clone(),
+        }));
         diff.message = self.message.clone();
         diff
     }

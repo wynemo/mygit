@@ -2,18 +2,11 @@ use crate::{app::MyGit, views::button};
 use gpui::{prelude::*, *};
 use mygit_gpui::{
     model::{BrowseMode, short_sha},
-    text::DisplayLine,
+    text::Side,
 };
 fn cell(this: &MyGit, side: usize, row: usize, cx: &mut Context<MyGit>) -> impl IntoElement {
     let view = this.state.merge.as_ref().unwrap();
     let source = view.rows[row].lines[side];
-    let display = source
-        .map(|line| {
-            DisplayLine::new(
-                &view.documents[side].text[view.documents[side].display_range(line - 1)],
-            )
-        })
-        .unwrap_or_else(|| DisplayLine::new(""));
     let ending = source.filter(|_| view.rows[row].changed[side]).map(|line| {
         let raw = &view.documents[side].text[view.documents[side].lines[line - 1].clone()];
         if raw.ends_with("\r\n") {
@@ -24,11 +17,7 @@ fn cell(this: &MyGit, side: usize, row: usize, cx: &mut Context<MyGit>) -> impl 
             "无末尾换行"
         }
     });
-    let tokens = source
-        .and_then(|line| view.syntax[side].lines.get(line - 1))
-        .cloned()
-        .unwrap_or_default();
-    let horizontal = this.state.horizontal_offset;
+    let source_side = [Side::Left, Side::Right, Side::Third][side];
     let raw = source.map(|line| {
         view.documents[side].text[view.documents[side].lines[line - 1].clone()].to_owned()
     });
@@ -58,6 +47,13 @@ fn cell(this: &MyGit, side: usize, row: usize, cx: &mut Context<MyGit>) -> impl 
         .h_full()
         .overflow_hidden()
         .bg(rgb(color))
+        .cursor(CursorStyle::IBeam)
+        .on_mouse_down(
+            MouseButton::Left,
+            cx.listener(move |this, event, window, cx| {
+                this.mouse_down(source_side, row, event, window, cx)
+            }),
+        )
         .on_mouse_down(
             MouseButton::Right,
             cx.listener(move |_, _, _, cx| {
@@ -74,56 +70,14 @@ fn cell(this: &MyGit, side: usize, row: usize, cx: &mut Context<MyGit>) -> impl 
                 .text_color(rgb(0x8995a8))
                 .child(source.map(|n| n.to_string()).unwrap_or_default()),
         )
-        .child(
-            canvas(
-                move |_, window, _| {
-                    let font = window.text_style().font();
-                    let mut runs: Vec<TextRun> = tokens
-                        .iter()
-                        .filter_map(|token| {
-                            let len = display.display_offset(token.range.end)
-                                - display.display_offset(token.range.start);
-                            (len > 0).then(|| TextRun {
-                                len,
-                                font: font.clone(),
-                                color: rgb(token.color).into(),
-                                background_color: None,
-                                underline: None,
-                                strikethrough: None,
-                            })
-                        })
-                        .collect();
-                    if runs.is_empty() {
-                        runs.push(TextRun {
-                            len: display.text.len(),
-                            font,
-                            color: rgb(0xdce5f3).into(),
-                            background_color: None,
-                            underline: None,
-                            strikethrough: None,
-                        });
-                    }
-                    window.text_system().shape_line(
-                        display.text.clone().into(),
-                        window.text_style().font_size.to_pixels(window.rem_size()),
-                        &runs,
-                        None,
-                    )
-                },
-                move |bounds, line, window, cx| {
-                    window.with_content_mask(Some(ContentMask { bounds }), |window| {
-                        let _ = line.paint(
-                            point(bounds.left() - px(horizontal), bounds.top()),
-                            bounds.size.height,
-                            window,
-                            cx,
-                        );
-                    });
-                },
-            )
-            .w_full()
-            .h_full(),
-        )
+        .when(this.show_blame, |s| {
+            s.child(crate::views::blame::gutter(
+                cx.entity().downgrade(),
+                source.and_then(|line| this.blame_line(source_side, line - 1)),
+                row * 3 + side,
+            ))
+        })
+        .child(crate::views::text_line::line(this, source_side, row, cx))
         .when_some(ending, |s, ending| {
             s.child(
                 div()
@@ -160,6 +114,29 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             cx.listener(|this, _, window, _| window.focus(&this.focus)),
         )
         .child(crate::views::tabs::bar(this, cx))
+        .child(
+            button(
+                "merge-blame-toggle",
+                if this.show_blame {
+                    "隐藏 Blame"
+                } else {
+                    "Blame"
+                },
+                !this.state.loading,
+            )
+            .on_click(cx.listener(|this, _, _, cx| this.toggle_blame(cx))),
+        )
+        .when(this.show_blame && this.blame_loading, |s| {
+            s.child(div().px_2().child("正在读取三侧 Blame…"))
+        })
+        .when(this.show_blame && !this.blame_error.is_empty(), |s| {
+            s.child(
+                div()
+                    .px_2()
+                    .text_color(rgb(0xffd479))
+                    .child(this.blame_error.clone()),
+            )
+        })
         .child(
             div()
                 .p_2()
