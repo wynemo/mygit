@@ -9,6 +9,7 @@ impl MyGit {
         self.prepare_branch_inputs(cx);
         if self.show_branches {
             self.hide_quick_open();
+            self.hide_project_search();
             self.show_history_search = false;
             self.show_compare = false;
             self.show_commit = false;

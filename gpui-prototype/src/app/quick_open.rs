@@ -49,6 +49,7 @@ impl MyGit {
             self.close_quick_open(window, cx);
             return;
         }
+        self.hide_project_search();
         self.quick.shown = true;
         self.show_branches = false;
         self.show_history_search = false;

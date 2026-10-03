@@ -185,6 +185,7 @@ impl MyGit {
                     Err(error) => this.write_message = format!("刷新失败：{error:#}"),
                 }
                 this.refresh_quick_index(cx);
+                this.search_project(cx);
                 cx.notify();
             });
         })

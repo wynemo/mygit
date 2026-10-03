@@ -74,6 +74,11 @@ pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             .on_click(cx.listener(|this, _, _, cx| this.undo_restore(cx))),
         )
         .child(
+            button("project-search", "项目搜索", this.state.repo.is_some()).on_click(
+                cx.listener(|this, _, window, cx| this.toggle_project_search(window, cx)),
+            ),
+        )
+        .child(
             button("quick-open", "文件定位", this.state.repo.is_some())
                 .on_click(cx.listener(|this, _, window, cx| this.toggle_quick_open(window, cx))),
         )
@@ -121,6 +126,7 @@ pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 this.show_settings = !this.show_settings;
                 if this.show_settings {
                     this.hide_quick_open();
+                    this.hide_project_search();
                 }
                 cx.notify();
             })),
@@ -130,7 +136,8 @@ pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 || this.history_loading
                 || this.blame_loading
                 || this.quick.indexing
-                || this.quick.searching,
+                || this.quick.searching
+                || this.search.loading,
             |s| {
                 s.child(
                     button("cancel-task", "取消加载", true)
@@ -338,3 +345,4 @@ pub mod graph;
 pub mod merge;
 
 pub mod quick_open;
+pub mod search;

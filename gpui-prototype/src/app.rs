@@ -3,6 +3,7 @@ mod branches;
 mod history;
 mod quick_open;
 mod refresh;
+mod search;
 use crate::views::editor::{Changed, Editor};
 use crate::views::text_line::LineHit;
 use crate::{tasks, views};
@@ -26,6 +27,11 @@ actions!(
         ToggleSettings,
         ToggleBranches,
         ToggleHistorySearch,
+        ToggleProjectSearch,
+        ProjectSearchUp,
+        ProjectSearchDown,
+        ProjectSearchAccept,
+        ProjectSearchDismiss,
         ToggleQuickOpen,
         QuickUp,
         QuickDown,
@@ -82,6 +88,7 @@ pub enum Confirmation {
 }
 pub struct MyGit {
     pub quick: quick_open::State,
+    pub search: search::State,
     watcher: Option<mygit_gpui::watch::RepositoryWatch>,
     refresh_debounce: mygit_gpui::watch::Debounce,
     refresh_pending: mygit_gpui::process::Cancellation,
@@ -183,6 +190,7 @@ impl MyGit {
         Self::start_refresh_loop(cx);
         cx.on_app_quit(|this, _| {
             this.quick.cancel();
+            this.search.cancel();
             this.blame_pending.cancel();
             this.blame_detail_pending.cancel();
             this.refresh_pending.cancel();
@@ -218,6 +226,7 @@ impl MyGit {
             show_compare: false,
             show_blame: false,
             quick: Default::default(),
+            search: Default::default(),
             blame_key: None,
             blame_pending: Default::default(),
             blame_epoch: 0,
@@ -329,6 +338,7 @@ impl MyGit {
         self.reset_blame();
         self.reset_history_search();
         self.quick.reset();
+        self.search.reset();
         self.edit_mode = false;
         self.capture_tab();
         self.active_tab = None;
@@ -396,6 +406,7 @@ impl MyGit {
     }
     pub fn select_mode(&mut self, mode: BrowseMode, cx: &mut Context<Self>) {
         self.hide_quick_open();
+        self.hide_project_search();
         let Some(repo) = &self.state.repo else {
             return;
         };
@@ -1128,6 +1139,7 @@ impl MyGit {
         self.show_compare = !self.show_compare;
         if self.show_compare {
             self.hide_quick_open();
+            self.hide_project_search();
             self.show_branches = false;
             self.show_history_search = false;
         }
@@ -1194,6 +1206,7 @@ impl MyGit {
         self.show_commit = !self.show_commit;
         if self.show_commit {
             self.hide_quick_open();
+            self.hide_project_search();
             self.show_branches = false;
             self.show_history_search = false;
         }
@@ -1380,7 +1393,19 @@ impl MyGit {
         cx.notify();
     }
     pub fn open_workspace_file(&mut self, path: String, cx: &mut Context<Self>) {
+        self.open_workspace_target(path, None, cx);
+    }
+    pub fn open_workspace_hit(&mut self, hit: mygit_gpui::search::Hit, cx: &mut Context<Self>) {
+        self.open_workspace_target(hit.path.clone(), Some(hit), cx);
+    }
+    fn open_workspace_target(
+        &mut self,
+        path: String,
+        hit: Option<mygit_gpui::search::Hit>,
+        cx: &mut Context<Self>,
+    ) {
         self.hide_quick_open();
+        self.hide_project_search();
         let Some(repo) = &self.state.repo else {
             return;
         };
@@ -1415,9 +1440,21 @@ impl MyGit {
             move || {
                 let (comparison, file) = git::workspace_file(&root, &path)?;
                 let diff = git::compare(&root, &comparison, &file)?;
-                Ok((comparison, file, diff))
+                let location = hit.map(|hit| {
+                    let line = hit.line;
+                    (
+                        line,
+                        match &diff.message {
+                            Some(message) => Err(format!("{message}；请使用文件预览入口")),
+                            None => hit
+                                .locate(&diff.right_document)
+                                .map_err(|error| format!("{error:#}")),
+                        },
+                    )
+                });
+                Ok((comparison, file, diff, location))
             },
-            move |this, (comparison, file, diff), _| {
+            move |this, (comparison, file, diff, location), _| {
                 this.state.comparison = Some(comparison);
                 this.state.current_file = Some(file);
                 this.state.set_diff(diff);
@@ -1429,6 +1466,32 @@ impl MyGit {
                         .get(&previous.file.path)
                         .cloned()
                         .unwrap_or_default();
+                }
+                if let Some((line, location)) = location {
+                    match location {
+                        Ok(range) => {
+                            this.state.text_selection = mygit_gpui::text::TextSelection {
+                                side: Side::Right,
+                                anchor: range.start,
+                                head: range.end,
+                            };
+                            if let Some(row) = this
+                                .state
+                                .diff
+                                .rows
+                                .iter()
+                                .position(|row| row.right_no == Some(line))
+                            {
+                                this.diff_scroll.scroll_to_item(
+                                    this.state.view_row(row, Side::Right),
+                                    ScrollStrategy::Center,
+                                );
+                            }
+                        }
+                        Err(error) => {
+                            this.state.message = format!("文件已打开，但无法定位：{error}")
+                        }
+                    }
                 }
                 this.remember_tab();
             },
@@ -1502,10 +1565,14 @@ impl MyGit {
             cx.notify();
             return;
         }
+        if self.search.loading {
+            self.search.error = Some("已取消搜索，可修改查询或点击重新搜索重试".into());
+        }
         if self.quick.indexing || self.quick.searching {
             self.quick.error = Some("已取消文件定位任务，可刷新索引重试".into());
         }
         self.quick.cancel();
+        self.search.cancel();
         self.blame_pending.cancel();
         self.blame_epoch += 1;
         if self.blame_loading {
@@ -1991,6 +2058,23 @@ impl Render for MyGit {
                     this.load(path, cx);
                 }
             }))
+            .on_action(cx.listener(|this, _: &ToggleProjectSearch, window, cx| {
+                this.toggle_project_search(window, cx)
+            }))
+            .on_action(
+                cx.listener(|this, _: &ProjectSearchUp, _, cx| this.project_search_move(false, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &ProjectSearchDown, _, cx| {
+                    this.project_search_move(true, cx)
+                }),
+            )
+            .on_action(cx.listener(|this, _: &ProjectSearchAccept, window, cx| {
+                this.accept_project_search(window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &ProjectSearchDismiss, window, cx| {
+                this.close_project_search(window, cx)
+            }))
             .on_action(cx.listener(|this, _: &ToggleQuickOpen, window, cx| {
                 this.toggle_quick_open(window, cx)
             }))
@@ -2020,6 +2104,7 @@ impl Render for MyGit {
                 this.show_settings = !this.show_settings;
                 if this.show_settings {
                     this.hide_quick_open();
+                    this.hide_project_search();
                 }
                 cx.notify();
             }))
@@ -2109,6 +2194,9 @@ impl Render for MyGit {
             .text_color(rgb(0xdce5f3))
             .text_size(px(13.))
             .child(views::toolbar(self, cx))
+            .when(self.search.shown, |s| {
+                s.child(views::search::pane(self, cx))
+            })
             .when(self.quick.shown, |s| {
                 s.child(views::quick_open::pane(self, cx))
             })
@@ -2190,6 +2278,7 @@ impl Render for MyGit {
 impl Drop for MyGit {
     fn drop(&mut self) {
         self.quick.cancel();
+        self.search.cancel();
         self.blame_pending.cancel();
         self.blame_detail_pending.cancel();
         self.refresh_pending.cancel();

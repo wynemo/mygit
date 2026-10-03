@@ -32,6 +32,7 @@ fn main() {
                     MenuItem::action("刷新", RefreshRepo),
                     MenuItem::action("分支管理", ToggleBranches),
                     MenuItem::action("历史搜索", ToggleHistorySearch),
+                    MenuItem::action("项目内容搜索", ToggleProjectSearch),
                     MenuItem::action("文件快速定位", ToggleQuickOpen),
                     MenuItem::action("取消加载", CancelTask),
                     MenuItem::separator(),
@@ -57,6 +58,24 @@ fn main() {
             },
         ]);
         cx.bind_keys([
+            KeyBinding::new("cmd-shift-f", ToggleProjectSearch, Some("MyGit")),
+            KeyBinding::new("ctrl-shift-f", ToggleProjectSearch, Some("MyGit")),
+            KeyBinding::new("up", ProjectSearchUp, Some("ProjectSearch && FileEditor")),
+            KeyBinding::new(
+                "down",
+                ProjectSearchDown,
+                Some("ProjectSearch && FileEditor"),
+            ),
+            KeyBinding::new(
+                "enter",
+                ProjectSearchAccept,
+                Some("ProjectSearch && FileEditor"),
+            ),
+            KeyBinding::new(
+                "escape",
+                ProjectSearchDismiss,
+                Some("ProjectSearch && FileEditor"),
+            ),
             KeyBinding::new("cmd-p", ToggleQuickOpen, Some("MyGit")),
             KeyBinding::new("ctrl-p", ToggleQuickOpen, Some("MyGit")),
             KeyBinding::new("up", QuickUp, Some("QuickOpen && FileEditor")),
