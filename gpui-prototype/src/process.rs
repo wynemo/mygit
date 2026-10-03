@@ -5,7 +5,7 @@ use std::{
     io::Read,
     process::{Command, Output, Stdio},
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicBool, Ordering},
     },
     time::{Duration, Instant},
@@ -20,6 +20,52 @@ impl Cancellation {
     pub fn cancelled(&self) -> bool {
         self.0.load(Ordering::Relaxed)
     }
+}
+pub fn display_diagnostic(text: String) -> String {
+    if text.len() <= 8192 {
+        return text;
+    }
+    let mut first = 4096;
+    let mut last = text.len() - 4096;
+    while !text.is_char_boundary(first) {
+        first -= 1;
+    }
+    while !text.is_char_boundary(last) {
+        last += 1;
+    }
+    format!(
+        "{}\n…输出较长，显示首尾…\n{}",
+        &text[..first],
+        &text[last..]
+    )
+}
+#[derive(Clone, Default)]
+pub struct Progress(Arc<Mutex<Vec<u8>>>);
+impl Progress {
+    pub fn append(&self, bytes: &[u8]) {
+        let mut output = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        output.extend_from_slice(bytes);
+        let excess = output.len().saturating_sub(8192);
+        if excess > 0 {
+            output.drain(..excess);
+        }
+    }
+    pub fn text(&self) -> String {
+        String::from_utf8_lossy(&self.0.lock().unwrap_or_else(|e| e.into_inner()))
+            .replace('\r', "\n")
+    }
+}
+thread_local! { static PROGRESS: RefCell<Option<Progress>> = const { RefCell::new(None) }; }
+pub fn with_progress<T>(progress: Progress, job: impl FnOnce() -> T) -> T {
+    struct Restore(Option<Progress>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            PROGRESS.with(|slot| *slot.borrow_mut() = self.0.take());
+        }
+    }
+    let previous = PROGRESS.with(|slot| slot.replace(Some(progress)));
+    let _restore = Restore(previous);
+    job()
 }
 thread_local! { static CURRENT: RefCell<Cancellation> = RefCell::new(Cancellation::default()); }
 pub fn scope<T>(token: Cancellation, job: impl FnOnce() -> T) -> T {
@@ -39,7 +85,7 @@ pub fn check() -> Result<()> {
     }
     Ok(())
 }
-fn drain(mut reader: impl Read) -> std::io::Result<(Vec<u8>, bool)> {
+fn drain(mut reader: impl Read, progress: Option<Progress>) -> std::io::Result<(Vec<u8>, bool)> {
     let mut bytes = vec![];
     let mut buf = [0u8; 8192];
     let mut exceeded = false;
@@ -47,6 +93,9 @@ fn drain(mut reader: impl Read) -> std::io::Result<(Vec<u8>, bool)> {
         let n = reader.read(&mut buf)?;
         if n == 0 {
             break;
+        }
+        if let Some(progress) = &progress {
+            progress.append(&buf[..n]);
         }
         if bytes.len() + n <= 64 * 1024 * 1024 {
             bytes.extend_from_slice(&buf[..n]);
@@ -73,8 +122,9 @@ pub fn output(command: &mut Command, timeout: Duration) -> Result<Output> {
     let started = Instant::now();
     // Scoped readers always finish after the child/process group is reaped.
     std::thread::scope(|scope| {
-        let out = scope.spawn(|| drain(stdout));
-        let err = scope.spawn(|| drain(stderr));
+        let progress = PROGRESS.with(|slot| slot.borrow().clone());
+        let out = scope.spawn(move || drain(stdout, None));
+        let err = scope.spawn(move || drain(stderr, progress));
         let mut reason = None;
         let status = loop {
             match child.try_wait() {
@@ -128,6 +178,38 @@ pub fn output(command: &mut Command, timeout: Duration) -> Result<Output> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn diagnostic_display_bounds_large_unicode_output() {
+        let source = format!("first\n{}\nlast", "🙂你".repeat(3000));
+        let shown = display_diagnostic(source);
+        assert!(shown.starts_with("first"));
+        assert!(shown.ends_with("last"));
+        assert!(shown.len() < 8300);
+        assert_eq!(display_diagnostic("short".into()), "short");
+    }
+    #[test]
+    #[cfg(unix)]
+    fn progress_is_bounded_stderr_only_and_scope_does_not_leak() {
+        let progress = Progress::default();
+        progress.append(&vec![b'a'; 10000]);
+        assert_eq!(progress.text().len(), 8192);
+        let progress = Progress::default();
+        let output = with_progress(progress.clone(), || {
+            output(
+                Command::new("sh").args(["-c", "printf private; printf progress >&2"]),
+                Duration::from_secs(2),
+            )
+        })
+        .unwrap();
+        assert_eq!(output.stdout, b"private");
+        assert_eq!(progress.text(), "progress");
+        super::output(
+            Command::new("sh").args(["-c", "printf later >&2"]),
+            Duration::from_secs(2),
+        )
+        .unwrap();
+        assert_eq!(progress.text(), "progress");
+    }
     #[test]
     fn already_cancelled_scope_does_not_launch_and_restores_previous() {
         let token = Cancellation::default();

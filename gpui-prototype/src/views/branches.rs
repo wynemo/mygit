@@ -9,6 +9,9 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .as_ref()
         .and_then(|reference| rows.iter().find(|b| &b.reference == reference));
     div()
+        .id("branches-pane")
+        .max_h(px(300.))
+        .overflow_y_scroll()
         .flex()
         .flex_col()
         .p_2()
@@ -128,13 +131,85 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .flex()
                 .gap_2()
                 .items_center()
-                .child("新分支起点")
+                .child("新分支起点 / Reset 目标")
                 .when_some(this.branch_base.clone(), |s, e| {
                     s.child(div().flex_1().min_w_0().h(px(32.)).child(e))
                 })
                 .child(
                     button("create-branch", "创建并切换", !this.write_busy)
                         .on_click(cx.listener(|this, _, _, cx| this.create_branch(cx))),
+                ),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_wrap()
+                .gap_2()
+                .items_center()
+                .child("远程")
+                .when_some(this.remote_name.clone(), |s, e| {
+                    s.child(div().w(px(180.)).h(px(32.)).child(e))
+                })
+                .child(
+                    button("fetch-remote", "Fetch", !this.write_busy).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.remote_operation(
+                                mygit_gpui::operations::RemoteOperation::Fetch,
+                                cx,
+                            )
+                        },
+                    )),
+                )
+                .child(
+                    button("pull-remote", "Pull", !this.write_busy).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.remote_operation(mygit_gpui::operations::RemoteOperation::Pull, cx)
+                        },
+                    )),
+                )
+                .child(
+                    button("push-remote", "Push", !this.write_busy).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.remote_operation(mygit_gpui::operations::RemoteOperation::Push, cx)
+                        },
+                    )),
+                )
+                .child(
+                    button(
+                        "merge-branch",
+                        "合并选中到当前",
+                        !this.write_busy && selected.is_some(),
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.merge_branch(cx))),
+                ),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_wrap()
+                .gap_2()
+                .items_center()
+                .child("Reset 至上方目标：")
+                .child(
+                    button("reset-soft", "soft…", !this.write_busy).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.request_reset(mygit_gpui::operations::ResetMode::Soft, cx)
+                        },
+                    )),
+                )
+                .child(
+                    button("reset-mixed", "mixed…", !this.write_busy).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.request_reset(mygit_gpui::operations::ResetMode::Mixed, cx)
+                        },
+                    )),
+                )
+                .child(
+                    button("reset-hard", "hard…", !this.write_busy).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.request_reset(mygit_gpui::operations::ResetMode::Hard, cx)
+                        },
+                    )),
                 ),
         )
         .child(div().text_color(rgb(0x92a2b9)).child(

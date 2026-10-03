@@ -12,6 +12,13 @@ impl MyGit {
                 Timer::after(Duration::from_millis(150)).await;
                 if this
                     .update(cx, |this, cx| {
+                        if this.write_busy {
+                            let text = this.write_progress.text();
+                            if text != this.write_progress_text {
+                                this.write_progress_text = text;
+                                cx.notify();
+                            }
+                        }
                         let now = Instant::now();
                         if let Some(watcher) = &this.watcher {
                             this.refresh_debounce.observe(watcher.revision(), now);

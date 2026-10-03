@@ -205,6 +205,18 @@ pub fn confirmation(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 String::new()
             }
         )),
+        Some(crate::app::Confirmation::Reset {
+            target,
+            mode,
+            expected_head,
+            expected_branch,
+        }) => Some(format!(
+            "{}\n目标提交：{}\n当前 HEAD：{}\n当前分支：{}\n这是本地操作，不会推送远程。已提交内容可从 reflog 查找。",
+            mode.description(),
+            target,
+            expected_head.as_deref().unwrap_or("空仓库"),
+            expected_branch.as_deref().unwrap_or("detached HEAD")
+        )),
         _ => None,
     };
     let paths = this
@@ -230,7 +242,14 @@ pub fn confirmation(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .flex_col()
                 .gap_3()
                 .child(if restore.is_some() {
-                    "确认还原"
+                    if matches!(
+                        this.confirmation,
+                        Some(crate::app::Confirmation::Reset { .. })
+                    ) {
+                        "确认 Reset"
+                    } else {
+                        "确认还原"
+                    }
                 } else {
                     "存在未保存内容"
                 })
@@ -252,7 +271,14 @@ pub fn confirmation(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                             button(
                                 "save-and-continue",
                                 if restore.is_some() {
-                                    "确认还原"
+                                    if matches!(
+                                        this.confirmation,
+                                        Some(crate::app::Confirmation::Reset { .. })
+                                    ) {
+                                        "确认 Reset"
+                                    } else {
+                                        "确认还原"
+                                    }
                                 } else {
                                     "保存并继续"
                                 },

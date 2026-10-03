@@ -24,7 +24,11 @@ pub(crate) fn git_timeout(
         .env("GIT_OPTIONAL_LOCKS", "0");
     let output = crate::process::output(&mut command, timeout)?;
     if !output.status.success() {
-        bail!("{}", String::from_utf8_lossy(&output.stderr).trim());
+        bail!(
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stderr).trim(),
+            String::from_utf8_lossy(&output.stdout).trim()
+        );
     }
     Ok(output.stdout)
 }

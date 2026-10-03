@@ -773,3 +773,271 @@ fn branch_creation_supports_unborn_and_pinned_base_and_refuses_non_commit() {
     assert_eq!(snapshot(&f.0).unwrap().branch, "from-tag");
     assert!(!snapshot(&f.0).unwrap().detached);
 }
+
+#[test]
+fn reset_modes_match_head_index_and_worktree_and_reject_stale_confirmation() {
+    use crate::operations::{self, ResetMode};
+    for mode in [ResetMode::Soft, ResetMode::Mixed, ResetMode::Hard] {
+        let f = Fixture::new();
+        std::fs::write(f.0.join("a"), "original\n").unwrap();
+        let original = f.commit();
+        std::fs::write(f.0.join("a"), "latest\n").unwrap();
+        let latest = f.commit();
+        std::fs::write(f.0.join("a"), "staged\n").unwrap();
+        git(&f.0, &["add", "a"]).unwrap();
+        std::fs::write(f.0.join("a"), "working\n").unwrap();
+        std::fs::write(f.0.join("untracked"), "keep").unwrap();
+        assert!(operations::reset(&f.0, &original, mode, Some(&original), Some("main")).is_err());
+        assert!(operations::reset(&f.0, &original, mode, Some(&latest), Some("other")).is_err());
+        assert_eq!(std::fs::read_to_string(f.0.join("a")).unwrap(), "working\n");
+        operations::reset(&f.0, &original, mode, Some(&latest), Some("main")).unwrap();
+        assert_eq!(
+            snapshot(&f.0).unwrap().history_tip.as_deref(),
+            Some(original.as_str())
+        );
+        let expected_index = if mode == ResetMode::Soft {
+            b"staged\n".as_slice()
+        } else {
+            b"original\n".as_slice()
+        };
+        assert_eq!(git(&f.0, &["show", ":a"]).unwrap(), expected_index);
+        assert_eq!(
+            std::fs::read_to_string(f.0.join("a")).unwrap(),
+            if mode == ResetMode::Hard {
+                "original\n"
+            } else {
+                "working\n"
+            }
+        );
+        assert_eq!(
+            std::fs::read_to_string(f.0.join("untracked")).unwrap(),
+            "keep"
+        );
+        assert_eq!(
+            string(git(&f.0, &["rev-parse", "ORIG_HEAD"]).unwrap())
+                .unwrap()
+                .trim(),
+            latest
+        );
+    }
+}
+
+#[test]
+fn merge_fast_forward_merge_commit_and_conflict_preserve_git_state() {
+    use crate::operations;
+    let f = Fixture::new();
+    std::fs::write(f.0.join("a"), "original\n").unwrap();
+    f.commit();
+    crate::branches::create(&f.0, "feature", "HEAD").unwrap();
+    std::fs::write(f.0.join("a"), "feature\n").unwrap();
+    let feature = f.commit();
+    crate::branches::switch(&f.0, "refs/heads/main", None).unwrap();
+    operations::merge(&f.0, "refs/heads/feature").unwrap();
+    assert_eq!(
+        snapshot(&f.0).unwrap().history_tip.as_deref(),
+        Some(feature.as_str())
+    );
+    git(
+        &f.0,
+        &["update-ref", "refs/remotes/origin/feature", &feature],
+    )
+    .unwrap();
+    crate::branches::create(&f.0, "remote-merge", "main~1").unwrap();
+    operations::merge(&f.0, "refs/remotes/origin/feature").unwrap();
+    assert_eq!(
+        snapshot(&f.0).unwrap().history_tip.as_deref(),
+        Some(feature.as_str())
+    );
+    crate::branches::switch(&f.0, "refs/heads/main", None).unwrap();
+    std::fs::write(f.0.join("main-only"), "main\n").unwrap();
+    f.commit();
+    crate::branches::switch(&f.0, "refs/heads/feature", None).unwrap();
+    std::fs::write(f.0.join("feature-only"), "feature\n").unwrap();
+    f.commit();
+    crate::branches::switch(&f.0, "refs/heads/main", None).unwrap();
+    operations::merge(&f.0, "refs/heads/feature").unwrap();
+    assert_eq!(
+        string(git(&f.0, &["rev-list", "--parents", "-n", "1", "HEAD"]).unwrap())
+            .unwrap()
+            .split_whitespace()
+            .count(),
+        3
+    );
+    std::fs::write(f.0.join("a"), "main conflict\n").unwrap();
+    let before_conflict = f.commit();
+    crate::branches::switch(&f.0, "refs/heads/feature", None).unwrap();
+    std::fs::write(f.0.join("a"), "feature conflict\n").unwrap();
+    f.commit();
+    crate::branches::switch(&f.0, "refs/heads/main", None).unwrap();
+    let error = operations::merge(&f.0, "refs/heads/feature")
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("CONFLICT"), "{error}");
+    assert_eq!(
+        snapshot(&f.0).unwrap().history_tip.as_deref(),
+        Some(before_conflict.as_str())
+    );
+    assert!(!git(&f.0, &["ls-files", "-u"]).unwrap().is_empty());
+    assert!(
+        selection(&f.0, &BrowseMode::Workspace)
+            .unwrap()
+            .files
+            .iter()
+            .any(|file| file.path == "a")
+    );
+}
+
+#[test]
+fn local_remote_fetch_pull_push_and_rejections() {
+    use crate::operations::{self, RemoteOperation};
+    let f = Fixture::new();
+    std::fs::write(f.0.join("a"), "original\n").unwrap();
+    f.commit();
+    let remote = f.0.join(".git/upstream.git");
+    git(&f.0, &["init", "--bare", remote.to_str().unwrap()]).unwrap();
+    git(&f.0, &["remote", "add", "origin", remote.to_str().unwrap()]).unwrap();
+    operations::remote(&f.0, RemoteOperation::Push, "origin").unwrap();
+    assert_eq!(
+        crate::branches::list(&f.0)
+            .unwrap()
+            .iter()
+            .find(|b| b.current)
+            .unwrap()
+            .upstream,
+        "refs/remotes/origin/main"
+    );
+    let other = f.0.join(".git/other");
+    git(
+        &f.0,
+        &[
+            "clone",
+            "-b",
+            "main",
+            remote.to_str().unwrap(),
+            other.to_str().unwrap(),
+        ],
+    )
+    .unwrap();
+    git(&other, &["config", "user.name", "Test"]).unwrap();
+    git(&other, &["config", "user.email", "test@example.invalid"]).unwrap();
+    std::fs::write(other.join("a"), "remote change\n").unwrap();
+    git(&other, &["add", "a"]).unwrap();
+    git(&other, &["commit", "-m", "remote change"]).unwrap();
+    git(&other, &["push"]).unwrap();
+    operations::remote(&f.0, RemoteOperation::Fetch, "origin").unwrap();
+    assert!(
+        crate::branches::list(&f.0)
+            .unwrap()
+            .iter()
+            .find(|b| b.current)
+            .unwrap()
+            .tracking
+            .contains("behind 1")
+    );
+    operations::remote(&f.0, RemoteOperation::Pull, "origin").unwrap();
+    assert_eq!(
+        std::fs::read_to_string(f.0.join("a")).unwrap(),
+        "remote change\n"
+    );
+    std::fs::write(f.0.join("local"), "local commit\n").unwrap();
+    f.commit();
+    std::fs::write(other.join("remote"), "other commit\n").unwrap();
+    git(&other, &["add", "remote"]).unwrap();
+    git(&other, &["commit", "-m", "other"]).unwrap();
+    git(&other, &["push"]).unwrap();
+    let before = snapshot(&f.0).unwrap().history_tip;
+    assert!(operations::remote(&f.0, RemoteOperation::Push, "origin").is_err());
+    assert_eq!(snapshot(&f.0).unwrap().history_tip, before);
+    assert!(operations::remote(&f.0, RemoteOperation::Fetch, "missing").is_err());
+    git(
+        &f.0,
+        &["remote", "set-url", "origin", "./nonexistent-remote"],
+    )
+    .unwrap();
+    assert!(operations::remote(&f.0, RemoteOperation::Fetch, "origin").is_err());
+    assert_eq!(snapshot(&f.0).unwrap().history_tip, before);
+}
+
+#[test]
+fn pull_conflict_reports_conflict_and_leaves_index_inspectable() {
+    use crate::operations::{self, RemoteOperation};
+    let f = Fixture::new();
+    std::fs::write(f.0.join("a"), "original\n").unwrap();
+    f.commit();
+    let remote = f.0.join(".git/upstream.git");
+    git(&f.0, &["init", "--bare", remote.to_str().unwrap()]).unwrap();
+    git(&f.0, &["remote", "add", "origin", remote.to_str().unwrap()]).unwrap();
+    operations::remote(&f.0, RemoteOperation::Push, "origin").unwrap();
+    let other = f.0.join(".git/other");
+    git(
+        &f.0,
+        &[
+            "clone",
+            "-b",
+            "main",
+            remote.to_str().unwrap(),
+            other.to_str().unwrap(),
+        ],
+    )
+    .unwrap();
+    git(&other, &["config", "user.name", "Test"]).unwrap();
+    git(&other, &["config", "user.email", "test@example.invalid"]).unwrap();
+    std::fs::write(other.join("a"), "remote\n").unwrap();
+    git(&other, &["add", "a"]).unwrap();
+    git(&other, &["commit", "-m", "remote"]).unwrap();
+    git(&other, &["push"]).unwrap();
+    std::fs::write(f.0.join("a"), "local\n").unwrap();
+    let local = f.commit();
+    git(&f.0, &["config", "pull.rebase", "false"]).unwrap();
+    let error = operations::remote(&f.0, RemoteOperation::Pull, "origin")
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("CONFLICT"), "{error}");
+    assert_eq!(
+        snapshot(&f.0).unwrap().history_tip.as_deref(),
+        Some(local.as_str())
+    );
+    assert!(!git(&f.0, &["ls-files", "-u"]).unwrap().is_empty());
+    assert!(
+        std::fs::read_to_string(f.0.join("a"))
+            .unwrap()
+            .contains("<<<<<<<")
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn remote_honors_configured_ssh_and_reports_authentication_failure() {
+    use std::os::unix::fs::PermissionsExt;
+    let f = Fixture::new();
+    std::fs::write(f.0.join("a"), "original\n").unwrap();
+    let before = f.commit();
+    let ssh = f.0.join(".git/test-ssh");
+    std::fs::write(
+        &ssh,
+        "#!/bin/sh\necho 'mygit-test-auth-denied: Permission denied (publickey).' >&2\nexit 255\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&ssh, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let command = format!("'{}'", ssh.to_str().unwrap().replace('\'', "'\\''"));
+    git(&f.0, &["config", "core.sshCommand", &command]).unwrap();
+    git(
+        &f.0,
+        &[
+            "remote",
+            "add",
+            "origin",
+            "ssh://git@example.invalid/repository",
+        ],
+    )
+    .unwrap();
+    let error =
+        crate::operations::remote(&f.0, crate::operations::RemoteOperation::Fetch, "origin")
+            .unwrap_err()
+            .to_string();
+    assert!(error.contains("mygit-test-auth-denied"), "{error}");
+    assert_eq!(
+        snapshot(&f.0).unwrap().history_tip.as_deref(),
+        Some(before.as_str())
+    );
+}

@@ -58,6 +58,12 @@ pub enum Confirmation {
     CloseOthers(Option<String>),
     Load(PathBuf),
     Quit,
+    Reset {
+        target: String,
+        mode: mygit_gpui::operations::ResetMode,
+        expected_head: Option<String>,
+        expected_branch: Option<String>,
+    },
     Restore {
         file: FileChange,
         comparison: Comparison,
@@ -82,11 +88,14 @@ pub struct MyGit {
     pub file_selection: HashSet<String>,
     pub write_busy: bool,
     pub write_message: String,
+    pub write_progress: mygit_gpui::process::Progress,
+    pub write_progress_text: String,
     pub show_commit: bool,
     pub show_compare: bool,
     pub show_branches: bool,
     pub branch_name: Option<Entity<Editor>>,
     pub branch_base: Option<Entity<Editor>>,
+    pub remote_name: Option<Entity<Editor>>,
     pub branch_selected: Option<String>,
     pub branch_filter_sha: Option<String>,
     pub branch_focus: FocusHandle,
@@ -164,11 +173,14 @@ impl MyGit {
             file_selection: HashSet::new(),
             write_busy: false,
             write_message: String::new(),
+            write_progress: Default::default(),
+            write_progress_text: String::new(),
             show_commit: false,
             show_compare: false,
             show_branches: false,
             branch_name: None,
             branch_base: None,
+            remote_name: None,
             branch_selected: None,
             branch_filter_sha: None,
             branch_focus: cx.focus_handle(),
@@ -255,6 +267,7 @@ impl MyGit {
             self.show_branches = false;
             self.branch_name = None;
             self.branch_base = None;
+            self.remote_name = None;
             self.branch_selected = None;
             self.branch_filter_sha = None;
             self.commit_editor = None;
@@ -829,6 +842,19 @@ impl MyGit {
         let Some(action) = self.confirmation.clone() else {
             return;
         };
+        if let Confirmation::Reset {
+            target,
+            mode,
+            expected_head,
+            expected_branch,
+        } = action.clone()
+        {
+            self.confirmation = None;
+            if save {
+                self.execute_reset(target, mode, expected_head, expected_branch, cx);
+            }
+            return;
+        }
         if let Confirmation::Restore {
             file,
             comparison,
@@ -887,7 +913,9 @@ impl MyGit {
             }
             Confirmation::Load(path) => self.load_unchecked(path, cx),
             Confirmation::Quit => cx.quit(),
-            Confirmation::Restore { .. } => unreachable!("handled before editor closure"),
+            Confirmation::Restore { .. } | Confirmation::Reset { .. } => {
+                unreachable!("handled before editor closure")
+            }
         }
         cx.notify();
     }
@@ -1098,24 +1126,28 @@ impl MyGit {
         self.state.loading = false;
         self.write_busy = true;
         self.write_message = label.into();
+        self.write_progress = Default::default();
+        self.write_progress_text.clear();
+        let progress = self.write_progress.clone();
         self.write_pending = Default::default();
         let token = self.write_pending.clone();
-        let task = cx
-            .background_executor()
-            .spawn(async move { mygit_gpui::process::scope(token, job) });
+        let task = cx.background_executor().spawn(async move {
+            mygit_gpui::process::with_progress(progress, || mygit_gpui::process::scope(token, job))
+        });
         cx.spawn(async move |this, cx| {
             let result = task.await;
             let _ = this.update(cx, |this, cx| {
                 this.write_busy = false;
+                this.write_progress_text.clear();
                 if this.repository_epoch != epoch {
                     cx.notify();
                     return;
                 }
                 let succeeded = result.is_ok();
-                this.write_message = match result {
+                this.write_message = mygit_gpui::process::display_diagnostic(match result {
                     Ok(message) => message,
                     Err(error) => format!("Git 操作失败：{error:#}"),
-                };
+                });
                 if succeeded
                     && clear_message
                     && let Some(editor) = &this.commit_editor
@@ -1890,9 +1922,29 @@ impl Render for MyGit {
                     )),
             )
             .when(self.show_commit, |s| s.child(views::commit::pane(self, cx)))
+            .when(
+                self.write_busy && !self.write_progress_text.is_empty(),
+                |s| {
+                    let text = self
+                        .write_progress_text
+                        .lines()
+                        .rev()
+                        .take(3)
+                        .collect::<Vec<_>>()
+                        .into_iter()
+                        .rev()
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    s.child(div().px_3().py_1().text_color(rgb(0x92a2b9)).child(text))
+                },
+            )
             .when(!self.write_message.is_empty(), |s| {
                 s.child(
                     div()
+                        .id("operation-result")
+                        .max_h(px(90.))
+                        .overflow_y_scroll()
+                        .flex_shrink_0()
                         .p_2()
                         .text_color(rgb(0xffd479))
                         .child(self.write_message.clone()),
@@ -1906,6 +1958,7 @@ impl Render for MyGit {
 
 impl Drop for MyGit {
     fn drop(&mut self) {
+        self.refresh_pending.cancel();
         self.pending.cancel();
         self.history_pending.cancel();
         self.tree_pending.cancel();

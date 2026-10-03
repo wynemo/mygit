@@ -3,6 +3,7 @@ pub mod diff;
 pub mod editor;
 pub mod git;
 pub mod model;
+pub mod operations;
 pub mod process;
 pub mod recovery;
 pub mod settings;
