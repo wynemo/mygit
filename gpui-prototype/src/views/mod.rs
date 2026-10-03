@@ -1,5 +1,6 @@
 pub mod diff;
 pub mod sidebar;
+pub mod text_line;
 use crate::app::MyGit;
 use gpui::{prelude::*, *};
 

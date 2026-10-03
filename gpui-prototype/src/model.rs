@@ -106,12 +106,21 @@ pub struct DiffRow {
     pub left: String,
     pub right: String,
     pub changed: bool,
+    /// UTF-8 byte ranges in the visible source line, on grapheme boundaries.
+    pub left_inline: Vec<Range<usize>>,
+    pub right_inline: Vec<Range<usize>>,
+    pub left_ending: Option<&'static str>,
+    pub right_ending: Option<&'static str>,
 }
 #[derive(Clone, Debug, Default)]
 pub struct Diff {
     pub rows: Vec<DiffRow>,
     pub blocks: Vec<Range<usize>>,
     pub message: Option<String>,
+    pub left_document: crate::text::Document,
+    pub right_document: crate::text::Document,
+    pub left_syntax: crate::syntax::Highlighted,
+    pub right_syntax: crate::syntax::Highlighted,
 }
 impl Diff {
     pub fn from_rows(rows: Vec<DiffRow>) -> Self {
@@ -131,6 +140,7 @@ impl Diff {
             rows,
             blocks,
             message: None,
+            ..Self::default()
         }
     }
     pub fn notice(message: &str) -> Self {
@@ -138,6 +148,42 @@ impl Diff {
             message: Some(message.into()),
             ..Self::default()
         }
+    }
+    pub fn document(&self, side: crate::text::Side) -> &crate::text::Document {
+        match side {
+            crate::text::Side::Left => &self.left_document,
+            crate::text::Side::Right => &self.right_document,
+        }
+    }
+    pub fn syntax(&self, side: crate::text::Side) -> &crate::syntax::Highlighted {
+        match side {
+            crate::text::Side::Left => &self.left_syntax,
+            crate::text::Side::Right => &self.right_syntax,
+        }
+    }
+    pub fn source_line(&self, side: crate::text::Side, row: usize) -> Option<usize> {
+        self.rows
+            .get(row)
+            .and_then(|r| match side {
+                crate::text::Side::Left => r.left_no,
+                crate::text::Side::Right => r.right_no,
+            })
+            .map(|n| n - 1)
+    }
+    pub fn padding_offset(&self, side: crate::text::Side, row: usize) -> usize {
+        (row..self.rows.len())
+            .find_map(|i| self.source_line(side, i))
+            .map(|i| self.document(side).display_range(i).start)
+            .unwrap_or(self.document(side).text.len())
+    }
+    pub fn row_for_offset(&self, side: crate::text::Side, offset: usize) -> usize {
+        let line = self.document(side).line_index(offset);
+        self.rows
+            .iter()
+            .enumerate()
+            .find(|(i, _)| self.source_line(side, *i) == Some(line))
+            .map(|(i, _)| i)
+            .unwrap_or(0)
     }
     pub fn panel_width(&self) -> f32 {
         fn width(text: &str) -> usize {

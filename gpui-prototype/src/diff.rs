@@ -10,7 +10,11 @@ pub fn calculate(left: &[u8], right: &[u8]) -> Result<Diff> {
     }
     let left = std::str::from_utf8(left).context("旧版本不是 UTF-8 文本")?;
     let right = std::str::from_utf8(right).context("新版本不是 UTF-8 文本")?;
-    Ok(Diff::from_rows(align(left, right)))
+    let mut diff = Diff::from_rows(align(left, right));
+    diff.left_document = crate::text::Document::new(left);
+    diff.right_document = crate::text::Document::new(right);
+    annotate(&mut diff);
+    Ok(diff)
 }
 
 fn align(left: &str, right: &str) -> Vec<DiffRow> {
@@ -31,16 +35,21 @@ fn align(left: &str, right: &str) -> Vec<DiffRow> {
                 left: deleted.get(i).map(|v| v.1.clone()).unwrap_or_default(),
                 right: inserted.get(i).map(|v| v.1.clone()).unwrap_or_default(),
                 changed: true,
+                left_inline: vec![],
+                right_inline: vec![],
+                left_ending: None,
+                right_ending: None,
             });
         }
         deleted.clear();
         inserted.clear();
     }
     for change in TextDiff::from_lines(left, right).iter_all_changes() {
-        let text = change
-            .value()
-            .trim_end_matches('\n')
-            .trim_end_matches('\r')
+        let raw = change.value();
+        let text = raw
+            .strip_suffix("\r\n")
+            .or_else(|| raw.strip_suffix('\n'))
+            .unwrap_or(raw)
             .to_string();
         match change.tag() {
             ChangeTag::Delete => {
@@ -59,6 +68,10 @@ fn align(left: &str, right: &str) -> Vec<DiffRow> {
                     left: text.clone(),
                     right: text,
                     changed: false,
+                    left_inline: vec![],
+                    right_inline: vec![],
+                    left_ending: None,
+                    right_ending: None,
                 });
                 l += 1;
                 r += 1;
@@ -68,6 +81,99 @@ fn align(left: &str, right: &str) -> Vec<DiffRow> {
     flush(&mut rows, &mut deleted, &mut inserted);
     rows
 }
+fn ending(document: &crate::text::Document, no: usize) -> &'static str {
+    let text = &document.text[document.lines[no - 1].clone()];
+    if text.ends_with("\r\n") {
+        "CRLF"
+    } else if text.ends_with('\n') {
+        "LF"
+    } else {
+        "无末尾换行"
+    }
+}
+
+fn annotate(diff: &mut Diff) {
+    for row in &mut diff.rows {
+        if !row.changed {
+            continue;
+        }
+        match (row.left_no, row.right_no) {
+            (Some(l), Some(r)) => {
+                (row.left_inline, row.right_inline) = inline(&row.left, &row.right);
+                let le = ending(&diff.left_document, l);
+                let re = ending(&diff.right_document, r);
+                if le != re {
+                    row.left_ending = Some(le);
+                    row.right_ending = Some(re);
+                }
+            }
+            (Some(l), None) => {
+                row.left_inline = if row.left.is_empty() {
+                    vec![]
+                } else {
+                    std::iter::once(0..row.left.len()).collect()
+                };
+                if ending(&diff.left_document, l) == "无末尾换行" {
+                    row.left_ending = Some("无末尾换行");
+                }
+            }
+            (None, Some(r)) => {
+                row.right_inline = if row.right.is_empty() {
+                    vec![]
+                } else {
+                    std::iter::once(0..row.right.len()).collect()
+                };
+                if ending(&diff.right_document, r) == "无末尾换行" {
+                    row.right_ending = Some("无末尾换行");
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn inline(left: &str, right: &str) -> (Vec<std::ops::Range<usize>>, Vec<std::ops::Range<usize>>) {
+    use similar::{Algorithm, DiffTag, capture_diff_slices_deadline};
+    use unicode_segmentation::UnicodeSegmentation;
+    let l: Vec<&str> = left.graphemes(true).collect();
+    let r: Vec<&str> = right.graphemes(true).collect();
+    let offsets = |parts: &[&str]| {
+        let mut result = vec![0];
+        for part in parts {
+            result.push(result.last().unwrap() + part.len());
+        }
+        result
+    };
+    let lo = offsets(&l);
+    let ro = offsets(&r);
+    let mut lr = vec![];
+    let mut rr = vec![];
+    // Large/pathological lines remain bounded; the fallback still marks changed spans.
+    for op in capture_diff_slices_deadline(
+        Algorithm::Myers,
+        &l,
+        &r,
+        Some(std::time::Instant::now() + std::time::Duration::from_millis(5)),
+    ) {
+        let (tag, a, b) = op.as_tag_tuple();
+        if tag == DiffTag::Equal {
+            continue;
+        }
+        if !a.is_empty() {
+            lr.push(lo[a.start]..lo[a.end]);
+        }
+        if !b.is_empty() {
+            rr.push(ro[b.start]..ro[b.end]);
+        }
+    }
+    (lr, rr)
+}
+
+pub fn highlight(diff: &mut Diff, left_path: &str, right_path: &str) {
+    diff.left_syntax = crate::syntax::highlight(&diff.left_document, left_path);
+    diff.right_syntax = crate::syntax::highlight(&diff.right_document, right_path);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -97,5 +203,81 @@ mod tests {
         assert_eq!(deleted.blocks, vec![0..3]);
         assert!(deleted.rows.iter().all(|r| r.right_no.is_none()));
         assert!(calculate(b"same\n", b"same\n").unwrap().blocks.is_empty());
+    }
+    #[test]
+    fn inline_preserves_graphemes_and_spaces() {
+        let d = calculate("前 é 👩‍💻 后\n".as_bytes(), "前 è 👨‍💻  后\n".as_bytes()).unwrap();
+        let row = &d.rows[0];
+        let left: Vec<_> = row
+            .left_inline
+            .iter()
+            .map(|r| &row.left[r.clone()])
+            .collect();
+        let right: Vec<_> = row
+            .right_inline
+            .iter()
+            .map(|r| &row.right[r.clone()])
+            .collect();
+        assert_eq!(left, ["é", "👩‍💻"]);
+        assert_eq!(right, ["è 👨‍💻"]);
+        assert!(row.left_ending.is_none());
+    }
+    #[test]
+    fn line_endings_and_eof_are_visible_without_changing_text() {
+        let d = calculate(b"same\r\nlast\n", b"same\nlast").unwrap();
+        assert_eq!(d.blocks, std::iter::once(0..2).collect::<Vec<_>>());
+        assert_eq!(
+            (d.rows[0].left_ending, d.rows[0].right_ending),
+            (Some("CRLF"), Some("LF"))
+        );
+        assert_eq!(
+            (d.rows[1].left_ending, d.rows[1].right_ending),
+            (Some("LF"), Some("无末尾换行"))
+        );
+        assert!(
+            d.rows
+                .iter()
+                .all(|r| r.left_inline.is_empty() && r.right_inline.is_empty())
+        );
+        assert_eq!(&*d.left_document.text, "same\r\nlast\n");
+        let cr = calculate(b"a\r", b"b\r").unwrap();
+        assert_eq!(cr.rows[0].left, "a\r");
+        assert_eq!(cr.left_document.display_range(0), 0..2);
+    }
+    #[test]
+    fn repeated_lines_empty_lines_and_unpaired_rows_keep_mapping() {
+        let d = calculate(b"repeat\n\nrepeat\nx\n", b"repeat\n\nrepeat\ny\nz\n").unwrap();
+        assert!(!d.rows[1].changed);
+        assert_eq!((d.rows[3].left_no, d.rows[3].right_no), (Some(4), Some(4)));
+        assert_eq!(
+            d.rows[3].left_inline,
+            std::iter::once(0..1).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            d.rows[4].right_inline,
+            std::iter::once(0..1).collect::<Vec<_>>()
+        );
+        assert!(d.rows[4].left_inline.is_empty());
+        let empty = calculate(b"\n", b" \n").unwrap();
+        assert!(empty.rows[0].left_inline.is_empty());
+        assert_eq!(
+            empty.rows[0].right_inline,
+            std::iter::once(0..1).collect::<Vec<_>>()
+        );
+    }
+    #[test]
+    fn separated_edits_do_not_mark_unchanged_middle() {
+        let (l, r) = inline("abc foo xyz", "aBc foo xYz");
+        assert_eq!(l, [1..2, 9..10]);
+        assert_eq!(r, [1..2, 9..10]);
+        let tabs = calculate(b"a\tb\n", b"a  b\n").unwrap();
+        assert_eq!(
+            tabs.rows[0].left_inline,
+            std::iter::once(1..2).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            tabs.rows[0].right_inline,
+            std::iter::once(1..3).collect::<Vec<_>>()
+        );
     }
 }

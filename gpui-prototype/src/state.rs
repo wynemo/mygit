@@ -14,6 +14,9 @@ pub struct AppState {
     pub panel_width: f32,
     pub horizontal_offset: f32,
     pub current_block: Option<usize>,
+    pub text_selection: crate::text::TextSelection,
+    pub font_size: f32,
+    pub font_family: String,
 }
 impl Default for AppState {
     fn default() -> Self {
@@ -30,6 +33,9 @@ impl Default for AppState {
             panel_width: 420.,
             horizontal_offset: 0.,
             current_block: None,
+            text_selection: crate::text::TextSelection::default(),
+            font_size: 12.,
+            font_family: "Menlo".into(),
         }
     }
 }
@@ -42,11 +48,13 @@ impl AppState {
     }
     pub fn clear_diff(&mut self) {
         self.diff = Diff::default();
+        self.text_selection = crate::text::TextSelection::default();
         self.current_block = None;
         self.horizontal_offset = 0.;
         self.panel_width = 420.;
     }
     pub fn set_diff(&mut self, diff: Diff) {
+        self.text_selection = crate::text::TextSelection::default();
         self.panel_width = diff.panel_width();
         self.message = diff.message.clone().unwrap_or_else(|| {
             if diff.blocks.is_empty() {

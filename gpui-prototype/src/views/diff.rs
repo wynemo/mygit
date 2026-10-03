@@ -1,14 +1,43 @@
+use crate::views::text_line;
 use crate::{app::MyGit, views::button};
 use gpui::{prelude::*, *};
+use mygit_gpui::text::Side;
 
-fn cell(no: Option<usize>, text: &str, color: u32, offset: f32, active: bool) -> Div {
+fn cell(
+    this: &MyGit,
+    side: Side,
+    row: usize,
+    color: u32,
+    active: bool,
+    cx: &mut Context<MyGit>,
+) -> impl IntoElement {
+    let no = this.state.diff.source_line(side, row).map(|i| i + 1);
+    let ending = match side {
+        Side::Left => this.state.diff.rows[row].left_ending,
+        Side::Right => this.state.diff.rows[row].right_ending,
+    };
     div()
+        .id((
+            if side == Side::Left {
+                "left-text"
+            } else {
+                "right-text"
+            },
+            row,
+        ))
         .flex()
         .flex_1()
         .min_w_0()
-        .h(px(24.))
+        .h(px(this.state.font_size + 12.))
         .overflow_hidden()
         .bg(rgb(color))
+        .cursor(CursorStyle::IBeam)
+        .on_mouse_down(
+            MouseButton::Left,
+            cx.listener(move |this, event, window, cx| {
+                this.mouse_down(side, row, event, window, cx)
+            }),
+        )
         .child(
             div()
                 .w(px(52.))
@@ -21,16 +50,19 @@ fn cell(no: Option<usize>, text: &str, color: u32, offset: f32, active: bool) ->
                 .flex_1()
                 .min_w_0()
                 .h_full()
-                .relative()
                 .overflow_hidden()
-                .child(
-                    div()
-                        .absolute()
-                        .left(px(-offset))
-                        .whitespace_nowrap()
-                        .child(text.replace('\t', "    ")),
-                ),
+                .child(text_line::line(this, side, row, cx)),
         )
+        .when_some(ending, |s, label| {
+            s.child(
+                div()
+                    .px_1()
+                    .flex_shrink_0()
+                    .text_color(rgb(0xffd479))
+                    .bg(rgb(0x283346))
+                    .child(label),
+            )
+        })
 }
 pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
     let title = this
@@ -58,6 +90,8 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
     );
     div()
         .id("diff-pane")
+        .key_context("DiffText")
+        .track_focus(&this.focus)
         .flex()
         .flex_col()
         .flex_1()
@@ -93,6 +127,54 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .child(button("scroll-right", "→", true).on_click(
                     cx.listener(|this, _, window, cx| this.move_horizontal(true, window, cx)),
                 )),
+        )
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .gap_2()
+                .px_2()
+                .py_1()
+                .child(
+                    button("select-all-text", "全选", !this.state.diff.rows.is_empty()).on_click(
+                        cx.listener(|this, _, window, cx| this.select_all_text(window, cx)),
+                    ),
+                )
+                .child(
+                    button(
+                        "copy-text",
+                        "复制",
+                        !this.state.text_selection.range().is_empty(),
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.copy_text(cx))),
+                )
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .text_color(rgb(0x92a2b9))
+                        .child(format!(
+                            "{} · {} · 选区 {} 字节",
+                            this.state.diff.right_syntax.language,
+                            if this.state.text_selection.side == Side::Left {
+                                "左侧"
+                            } else {
+                                "右侧"
+                            },
+                            this.state.text_selection.range().len()
+                        )),
+                )
+                .child(
+                    button("font-smaller", "字号 −", this.state.font_size > 10.)
+                        .on_click(cx.listener(|this, _, _, cx| this.change_font_size(false, cx))),
+                )
+                .child(div().child(format!("{}", this.state.font_size)))
+                .child(
+                    button("font-larger", "字号 +", this.state.font_size < 22.)
+                        .on_click(cx.listener(|this, _, _, cx| this.change_font_size(true, cx))),
+                ),
         )
         .child(
             div()
@@ -141,7 +223,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 uniform_list(
                     ("diff", this.state.generation as usize),
                     this.state.diff.rows.len(),
-                    cx.processor(|this, range: std::ops::Range<usize>, _, _| {
+                    cx.processor(|this, range: std::ops::Range<usize>, _, cx| {
                         range
                             .map(|i| {
                                 let r = &this.state.diff.rows[i];
@@ -150,12 +232,13 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                     .id(i)
                                     .flex()
                                     .w_full()
-                                    .h(px(24.))
-                                    .font_family("Menlo")
-                                    .text_size(px(12.))
+                                    .h(px(this.state.font_size + 12.))
+                                    .font_family(this.state.font_family.clone())
+                                    .text_size(px(this.state.font_size))
                                     .child(cell(
-                                        r.left_no,
-                                        &r.left,
+                                        this,
+                                        Side::Left,
+                                        i,
                                         if active {
                                             0x624233
                                         } else if r.changed && r.left_no.is_some() {
@@ -163,13 +246,14 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                         } else {
                                             0x151d29
                                         },
-                                        this.state.horizontal_offset,
                                         active,
+                                        cx,
                                     ))
                                     .child(div().w(px(1.)).h_full().bg(rgb(0x354259)))
                                     .child(cell(
-                                        r.right_no,
-                                        &r.right,
+                                        this,
+                                        Side::Right,
+                                        i,
                                         if active {
                                             0x365245
                                         } else if r.changed && r.right_no.is_some() {
@@ -177,8 +261,8 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                         } else {
                                             0x151d29
                                         },
-                                        this.state.horizontal_offset,
                                         active,
+                                        cx,
                                     ))
                             })
                             .collect::<Vec<_>>()

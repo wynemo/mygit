@@ -226,7 +226,11 @@ pub fn compare(root: &Path, comparison: &Comparison, file: &FileChange) -> Resul
         return Ok(Diff::notice("冲突文件：暂不支持预览未合并的 index 内容"));
     }
     let (left, right) = comparison.targets(file);
-    diff::calculate(&content(root, &left)?, &content(root, &right)?)
+    let mut diff = diff::calculate(&content(root, &left)?, &content(root, &right)?)?;
+    if diff.message.is_none() {
+        diff::highlight(&mut diff, &file.old_path, &file.path);
+    }
+    Ok(diff)
 }
 
 #[cfg(test)]
