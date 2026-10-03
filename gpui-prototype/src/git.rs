@@ -35,7 +35,7 @@ pub(crate) fn git_timeout(
 fn string(bytes: Vec<u8>) -> Result<String> {
     String::from_utf8(bytes).context("Git 返回非 UTF-8 文本，暂不支持该路径或编码")
 }
-fn head(root: &Path) -> Result<Revision> {
+pub(crate) fn head(root: &Path) -> Result<Revision> {
     match git(root, &["rev-parse", "--verify", "HEAD"]) {
         Ok(bytes) => Ok(Revision::Head(string(bytes)?.trim().into())),
         Err(error) => {
@@ -739,6 +739,25 @@ pub fn version_content(
         symlink: mode == "120000",
         executable: mode == "100755",
     }))
+}
+/// Read the exact bounded ordinary-file version for consumers such as Blame.
+pub fn text_version(root: &Path, revision: &Revision, path: &str, limit: usize) -> Result<Vec<u8>> {
+    validate_paths(&[path.to_owned()])?;
+    if *revision == Revision::Empty {
+        return Ok(vec![]);
+    }
+    let target = FileTarget {
+        revision: revision.clone(),
+        path: path.into(),
+    };
+    let metadata = info(root, &target)?;
+    if metadata.kind != "文本/二进制文件" {
+        bail!("逐行归属仅支持普通文本文件");
+    }
+    if metadata.size > limit as u64 {
+        bail!("文件超过逐行归属读取上限");
+    }
+    content(root, &target, &metadata, limit)
 }
 pub fn compare(root: &Path, comparison: &Comparison, file: &FileChange) -> Result<Diff> {
     compare_with_limit(root, comparison, file, 2_000_000)

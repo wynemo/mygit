@@ -48,6 +48,9 @@ pub struct Editor {
     pub saving: bool,
     external_changed: bool,
     pub reference: mygit_gpui::text::Document,
+    pub show_blame: bool,
+    pub blame_lines: std::sync::Arc<Vec<mygit_gpui::blame::Line>>,
+    pub blame_owner: Option<WeakEntity<MyGit>>,
     pub compact: bool,
     query: Option<Entity<Editor>>,
     query_subscription: Option<Subscription>,
@@ -119,6 +122,9 @@ impl Editor {
             external_changed: false,
             reference: Default::default(),
             compact: false,
+            show_blame: false,
+            blame_lines: Default::default(),
+            blame_owner: None,
             query: None,
             query_subscription: None,
             matches: vec![],
@@ -905,6 +911,17 @@ impl Render for Editor {
                                                 i + 1
                                             )),
                                     )
+                                    .when(this.show_blame && !this.compact, |s| {
+                                        if let Some(owner) = &this.blame_owner {
+                                            s.child(crate::views::blame::gutter(
+                                                owner.clone(),
+                                                this.blame_lines.get(i).cloned(),
+                                                i,
+                                            ))
+                                        } else {
+                                            s
+                                        }
+                                    })
                                     .child(
                                         div()
                                             .min_w_0()

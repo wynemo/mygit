@@ -1,3 +1,4 @@
+pub mod blame;
 pub mod branches;
 pub mod commit;
 pub mod compare;
@@ -117,12 +118,15 @@ pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 cx.notify();
             })),
         )
-        .when(this.state.loading || this.history_loading, |s| {
-            s.child(
-                button("cancel-task", "取消加载", true)
-                    .on_click(cx.listener(|this, _, _, cx| this.cancel_task(cx))),
-            )
-        })
+        .when(
+            this.state.loading || this.history_loading || this.blame_loading,
+            |s| {
+                s.child(
+                    button("cancel-task", "取消加载", true)
+                        .on_click(cx.listener(|this, _, _, cx| this.cancel_task(cx))),
+                )
+            },
+        )
         .child(
             div()
                 .flex_1()

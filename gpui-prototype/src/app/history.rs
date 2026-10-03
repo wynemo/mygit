@@ -116,7 +116,7 @@ impl MyGit {
             self.show_path_history(entry.path, entry.directory, cx);
         }
     }
-    fn start_history_filter(&mut self, filter: Filter, cx: &mut Context<Self>) {
+    pub(super) fn start_history_filter(&mut self, filter: Filter, cx: &mut Context<Self>) {
         let Some(repo) = &self.state.repo else {
             return;
         };

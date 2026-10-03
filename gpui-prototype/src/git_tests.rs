@@ -1374,3 +1374,168 @@ fn history_date_filter_traverses_out_of_order_commit_dates() {
         .is_err()
     );
 }
+
+#[test]
+fn blame_distinguishes_commit_index_and_worktree_and_preserves_raw_lines() {
+    use crate::blame;
+    let f = Fixture::new();
+    std::fs::write(f.0.join("file"), "a\r\nb\r\nc").unwrap();
+    let original = f.commit();
+    std::fs::write(f.0.join("file"), "a\r\nnew b\r\nc").unwrap();
+    let latest = f.commit();
+    let committed = blame::annotate(
+        &f.0,
+        &Revision::Commit(original.clone()),
+        "file",
+        "file",
+        "a\r\nb\r\nc",
+    )
+    .unwrap();
+    assert_eq!(committed.len(), 3);
+    assert!(committed.iter().all(|line| line.commit.sha == original));
+    std::fs::write(f.0.join("file"), "a\r\nstaged\r\nnew b\r\nc").unwrap();
+    git(&f.0, &["add", "file"]).unwrap();
+    std::fs::write(f.0.join("file"), "a\r\nworking\r\nnew b\r\nc\r\nadded\r\n").unwrap();
+    let index = blame::annotate(
+        &f.0,
+        &Revision::Index,
+        "file",
+        "file",
+        "a\r\nstaged\r\nnew b\r\nc",
+    )
+    .unwrap();
+    assert_eq!(index[0].commit.sha, original);
+    assert!(index[1].commit.uncommitted());
+    assert_eq!(index[2].commit.sha, latest);
+    let working = blame::annotate(
+        &f.0,
+        &Revision::Worktree,
+        "file",
+        "file",
+        "a\r\nworking\r\nnew b\r\nc\r\nadded\r\n",
+    )
+    .unwrap();
+    assert_eq!(working.len(), 5);
+    assert!(working[1].commit.uncommitted());
+    assert!(working[4].commit.uncommitted());
+    assert_eq!(working[2].commit.sha, latest);
+    assert!(blame::annotate(&f.0, &Revision::Index, "file", "file", "stale").is_err());
+    assert!(blame::annotate(&f.0, &Revision::Worktree, "file", "file", "stale").is_err());
+}
+
+#[test]
+fn blame_follows_staged_and_committed_rename_and_handles_quoted_paths() {
+    use crate::blame;
+    let f = Fixture::new();
+    let old = "old\tname\nfile";
+    let new = "new 中文\tname";
+    std::fs::write(f.0.join(old), "original\nsecond\n").unwrap();
+    let original = f.commit();
+    std::fs::rename(f.0.join(old), f.0.join(new)).unwrap();
+    git(&f.0, &["add", "-A"]).unwrap();
+    let index = blame::annotate(&f.0, &Revision::Index, new, old, "original\nsecond\n").unwrap();
+    assert!(index.iter().all(|line| line.commit.sha == original));
+    assert_eq!(index[0].path.as_ref(), old);
+    let working =
+        blame::annotate(&f.0, &Revision::Worktree, new, new, "original\nsecond\n").unwrap();
+    assert!(working.iter().all(|line| line.commit.sha == original));
+    let renamed = f.commit();
+    let committed = blame::annotate(
+        &f.0,
+        &Revision::Commit(renamed),
+        new,
+        new,
+        "original\nsecond\n",
+    )
+    .unwrap();
+    assert!(committed.iter().all(|line| line.commit.sha == original));
+    assert_eq!(committed[0].path.as_ref(), old);
+    assert!(std::sync::Arc::ptr_eq(
+        &committed[0].commit,
+        &committed[1].commit
+    ));
+}
+
+#[test]
+fn blame_handles_unborn_untracked_and_rejects_special_files() {
+    use crate::blame;
+    let f = Fixture::new();
+    std::fs::write(f.0.join("new"), "🙂new\n\n").unwrap();
+    let worktree = blame::annotate(&f.0, &Revision::Worktree, "new", "new", "🙂new\n\n").unwrap();
+    assert_eq!(worktree.len(), 2);
+    assert!(worktree.iter().all(|line| line.commit.uncommitted()));
+    git(&f.0, &["add", "new"]).unwrap();
+    assert!(
+        blame::annotate(&f.0, &Revision::Index, "new", "new", "🙂new\n\n")
+            .unwrap()
+            .iter()
+            .all(|line| line.commit.uncommitted())
+    );
+    f.commit();
+    std::fs::write(f.0.join("another"), "untracked").unwrap();
+    assert!(
+        blame::annotate(&f.0, &Revision::Worktree, "another", "another", "untracked").unwrap()[0]
+            .commit
+            .uncommitted()
+    );
+    assert!(blame::annotate(&f.0, &Revision::Worktree, "../outside", "new", "text").is_err());
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink("new", f.0.join("link")).unwrap();
+        assert!(blame::annotate(&f.0, &Revision::Worktree, "link", "link", "new").is_err());
+    }
+}
+
+#[test]
+fn blame_editor_buffer_marks_unsaved_lines_without_writing_files_or_index() {
+    let f = Fixture::new();
+    std::fs::write(f.0.join("file"), "original\nsecond\n").unwrap();
+    let original = f.commit();
+    let index = git(&f.0, &["write-tree"]).unwrap();
+    let lines = crate::blame::annotate_buffer(&f.0, "file", "original\nunsaved\nsecond\n").unwrap();
+    assert_eq!(lines.len(), 3);
+    assert_eq!(lines[0].commit.sha, original);
+    assert!(lines[1].commit.uncommitted());
+    assert_eq!(lines[2].commit.sha, original);
+    assert_eq!(
+        std::fs::read_to_string(f.0.join("file")).unwrap(),
+        "original\nsecond\n"
+    );
+    assert_eq!(git(&f.0, &["write-tree"]).unwrap(), index);
+}
+
+#[test]
+fn blame_accepts_sha256_object_ids() {
+    let f = Fixture::new();
+    let root = f.0.join(".git/sha256");
+    git(
+        &f.0,
+        &[
+            "init",
+            "--object-format=sha256",
+            "-b",
+            "main",
+            root.to_str().unwrap(),
+        ],
+    )
+    .unwrap();
+    git(&root, &["config", "user.name", "Test"]).unwrap();
+    git(&root, &["config", "user.email", "test@example.invalid"]).unwrap();
+    std::fs::write(root.join("file"), "sha256\n").unwrap();
+    git(&root, &["add", "file"]).unwrap();
+    git(&root, &["commit", "-m", "sha256"]).unwrap();
+    let sha = string(git(&root, &["rev-parse", "HEAD"]).unwrap())
+        .unwrap()
+        .trim()
+        .to_owned();
+    assert_eq!(sha.len(), 64);
+    let lines = crate::blame::annotate(
+        &root,
+        &Revision::Commit(sha.clone()),
+        "file",
+        "file",
+        "sha256\n",
+    )
+    .unwrap();
+    assert_eq!(lines[0].commit.sha, sha);
+}

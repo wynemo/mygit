@@ -1,3 +1,4 @@
+pub mod blame;
 pub mod branches;
 pub mod diff;
 pub mod editor;

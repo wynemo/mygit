@@ -1,3 +1,4 @@
+mod blame;
 mod branches;
 mod history;
 mod refresh;
@@ -94,6 +95,18 @@ pub struct MyGit {
     pub write_progress_text: String,
     pub show_commit: bool,
     pub show_compare: bool,
+    pub show_blame: bool,
+    blame_key: Option<blame::Key>,
+    blame_pending: mygit_gpui::process::Cancellation,
+    blame_epoch: u64,
+    pub blame_left: std::sync::Arc<Vec<mygit_gpui::blame::Line>>,
+    pub blame_right: std::sync::Arc<Vec<mygit_gpui::blame::Line>>,
+    pub blame_loading: bool,
+    pub blame_error: String,
+    pub blame_details: HashMap<String, CommitDetail>,
+    blame_detail_loading: Option<String>,
+    blame_detail_pending: mygit_gpui::process::Cancellation,
+    blame_detail_serial: u64,
     pub show_history_search: bool,
     pub history_inputs: Vec<Entity<Editor>>,
     pub history_input_subscription: Option<Subscription>,
@@ -159,6 +172,8 @@ impl MyGit {
         };
         Self::start_refresh_loop(cx);
         cx.on_app_quit(|this, _| {
+            this.blame_pending.cancel();
+            this.blame_detail_pending.cancel();
             this.refresh_pending.cancel();
             this.pending.cancel();
             this.history_pending.cancel();
@@ -190,6 +205,18 @@ impl MyGit {
             write_progress_text: String::new(),
             show_commit: false,
             show_compare: false,
+            show_blame: false,
+            blame_key: None,
+            blame_pending: Default::default(),
+            blame_epoch: 0,
+            blame_left: Default::default(),
+            blame_right: Default::default(),
+            blame_loading: false,
+            blame_error: String::new(),
+            blame_details: HashMap::new(),
+            blame_detail_loading: None,
+            blame_detail_pending: Default::default(),
+            blame_detail_serial: 0,
             show_history_search: false,
             history_inputs: vec![],
             history_input_subscription: None,
@@ -284,6 +311,7 @@ impl MyGit {
     }
     fn load_unchecked(&mut self, path: PathBuf, cx: &mut Context<Self>) {
         self.reset_refresh();
+        self.reset_blame();
         self.reset_history_search();
         self.edit_mode = false;
         self.capture_tab();
@@ -1380,6 +1408,15 @@ impl MyGit {
             cx.notify();
             return;
         }
+        self.blame_pending.cancel();
+        self.blame_epoch += 1;
+        if self.blame_loading {
+            self.blame_error = "已取消 Blame，可隐藏后重新显示重试".into();
+        }
+        self.blame_loading = false;
+        self.blame_detail_pending.cancel();
+        self.blame_detail_serial += 1;
+        self.blame_detail_loading = None;
         self.pending.cancel();
         self.history_pending.cancel();
         self.history_pending = Default::default();
@@ -1763,6 +1800,7 @@ impl MyGit {
 }
 impl Render for MyGit {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.ensure_blame(cx);
         self.line_layouts.clear();
         let entity = cx.entity().downgrade();
         window.on_mouse_event(move |event: &ScrollWheelEvent, phase, window, cx| {
@@ -2005,6 +2043,8 @@ impl Render for MyGit {
 
 impl Drop for MyGit {
     fn drop(&mut self) {
+        self.blame_pending.cancel();
+        self.blame_detail_pending.cancel();
         self.refresh_pending.cancel();
         self.pending.cancel();
         self.history_pending.cancel();

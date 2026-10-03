@@ -65,6 +65,13 @@ fn cell(
                 .text_color(rgb(if active { 0xffd479 } else { 0x7f8b9c }))
                 .child(no.map(|n| n.to_string()).unwrap_or_default()),
         )
+        .when(this.show_blame, |s| {
+            s.child(crate::views::blame::gutter(
+                cx.entity().downgrade(),
+                no.and_then(|n| this.blame_line(side, n - 1)),
+                row,
+            ))
+        })
         .child(
             div()
                 .flex_1()
@@ -150,6 +157,16 @@ fn unified_cell(this: &MyGit, index: usize, cx: &mut Context<MyGit>) -> Stateful
                 .text_color(rgb(0x7f8b9c))
                 .child(right.map(|n| n.to_string()).unwrap_or_default()),
         )
+        .when(this.show_blame, |s| {
+            s.child(crate::views::blame::gutter(
+                cx.entity().downgrade(),
+                this.state
+                    .diff
+                    .source_line(side, row)
+                    .and_then(|line| this.blame_line(side, line)),
+                index,
+            ))
+        })
         .child(div().w(px(18.)).flex_shrink_0().child(if !changed {
             " "
         } else if side == Side::Left {
@@ -214,6 +231,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .border_b_1()
                 .border_color(rgb(0x2b3545))
                 .flex()
+                .flex_wrap()
                 .items_center()
                 .gap_2()
                 .child(
@@ -287,6 +305,18 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         true,
                     )
                     .on_click(cx.listener(|this, _, _, cx| this.toggle_unified(cx))),
+                )
+                .child(
+                    button(
+                        "toggle-blame",
+                        if this.show_blame {
+                            "隐藏 Blame"
+                        } else {
+                            "Blame"
+                        },
+                        this.state.current_file.is_some(),
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.toggle_blame(cx))),
                 )
                 .child(
                     button("previous-diff", "上一处", previous)
@@ -400,6 +430,17 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 )
             },
         )
+        .when(this.show_blame && this.blame_loading, |s| {
+            s.child(div().px_2().child("正在读取两侧 Blame…"))
+        })
+        .when(this.show_blame && !this.blame_error.is_empty(), |s| {
+            s.child(
+                div()
+                    .px_2()
+                    .text_color(rgb(0xffd479))
+                    .child(this.blame_error.clone()),
+            )
+        })
         .when_some(this.current_editor(), |s, editor| s.child(editor))
         .when(
             this.current_editor().is_none() && this.state.diff.rows.is_empty(),
