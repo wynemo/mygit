@@ -8,4 +8,5 @@ pub mod settings;
 pub mod state;
 pub mod syntax;
 pub mod text;
+pub mod watch;
 pub mod workspace;

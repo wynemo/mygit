@@ -53,6 +53,24 @@ impl Buffer {
         buffer.canonical = Some(path.canonicalize()?);
         Ok(buffer)
     }
+    /// Apply a background disk read only while this buffer has no local edits.
+    pub fn accept_external(&mut self, mut replacement: Self) -> bool {
+        if self.dirty()
+            || self.marked.is_some()
+            || self.path != replacement.path
+            || self.canonical != replacement.canonical
+        {
+            return false;
+        }
+        if self.document.text == replacement.document.text {
+            return true;
+        }
+        replacement.selection = self.selection.clone();
+        replacement.selection.anchor = replacement.document.snap(replacement.selection.anchor);
+        replacement.selection.head = replacement.document.snap(replacement.selection.head);
+        *self = replacement;
+        true
+    }
     pub fn dirty(&self) -> bool {
         self.document.text.as_ref() != self.baseline.as_ref()
     }
@@ -277,6 +295,13 @@ pub struct ExternalSnapshot {
     baseline: std::sync::Arc<str>,
 }
 impl ExternalSnapshot {
+    pub fn load_changed(&self) -> Result<Option<Buffer>> {
+        if self.changed()? {
+            Ok(Some(Buffer::load(&self.path)?))
+        } else {
+            Ok(None)
+        }
+    }
     pub fn changed(&self) -> Result<bool> {
         if self.path.canonicalize()? != self.canonical {
             return Ok(true);
@@ -374,6 +399,21 @@ pub fn find(text: &str, query: &str) -> Vec<Range<usize>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn external_refresh_preserves_clean_selection_and_protects_local_edits() {
+        let mut buffer = Buffer::new("🙂original");
+        buffer.selection.anchor = 4;
+        buffer.selection.head = 8;
+        assert!(buffer.accept_external(Buffer::new("你")));
+        assert_eq!((buffer.selection.anchor, buffer.selection.head), (3, 3));
+        buffer.paste("unsaved").unwrap();
+        let edited = buffer.text().to_owned();
+        assert!(!buffer.accept_external(Buffer::new("external")));
+        assert_eq!(buffer.text(), edited);
+        let mut composing = Buffer::new("");
+        composing.compose(None, "ni", None).unwrap();
+        assert!(!composing.accept_external(Buffer::new("disk")));
+    }
     #[test]
     fn ime_updates_are_one_undo_transaction_and_utf16_is_correct() {
         let mut b = Buffer::new("前🙂后");

@@ -73,17 +73,29 @@ impl Editor {
             cx.spawn(async move |this, cx| {
                 loop {
                     Timer::after(std::time::Duration::from_secs(2)).await;
-                    let snapshot = match this.update(cx, |this, _| this.buffer.external_snapshot())
-                    {
-                        Ok(Some(s)) => s,
+                    let (snapshot, generation) = match this.update(cx, |this, _| {
+                        (this.buffer.external_snapshot(), this.generation)
+                    }) {
+                        Ok((Some(snapshot), generation)) => (snapshot, generation),
                         _ => break,
                     };
                     let task = cx
                         .background_executor()
-                        .spawn(async move { snapshot.changed() });
-                    let changed = task.await.unwrap_or(true);
+                        .spawn(async move { snapshot.load_changed() });
+                    let result = task.await;
                     if this
                         .update(cx, |this, cx| {
+                            if this.generation != generation {
+                                return;
+                            }
+                            let changed = !matches!(&result, Ok(None));
+                            if let Ok(Some(replacement)) = result
+                                && this.buffer.accept_external(replacement)
+                            {
+                                this.external_changed = false;
+                                this.refresh(cx);
+                                return;
+                            }
                             if this.external_changed != changed {
                                 this.external_changed = changed;
                                 cx.notify();
@@ -230,8 +242,13 @@ impl Editor {
         if let Some(path) = self.buffer.path.clone() {
             match Buffer::load(&path) {
                 Ok(buffer) => {
-                    self.buffer = buffer;
-                    self.refresh(cx);
+                    if self.buffer.accept_external(buffer) {
+                        self.external_changed = false;
+                        self.refresh(cx);
+                    } else {
+                        self.message = "文件目标已变化或正在输入，请关闭后重新打开".into();
+                        cx.notify();
+                    }
                 }
                 Err(e) => {
                     self.message = format!("{e:#}");

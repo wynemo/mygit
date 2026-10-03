@@ -579,3 +579,69 @@ fn bounded_preview_binary_encoding_large_file_and_submodule_metadata() {
     let d = crate::diff::calculate(b"", &vec![b'\n'; 200_001]).unwrap();
     assert!(d.message.unwrap().contains("200000 行"));
 }
+
+#[test]
+fn refresh_tracks_external_edits_commits_and_branch_switches() {
+    let f = Fixture::new();
+    std::fs::write(f.0.join("a"), "original\n").unwrap();
+    let original = f.commit();
+    std::fs::write(f.0.join("a"), "external\n").unwrap();
+    let selected = selection(&f.0, &BrowseMode::Workspace).unwrap();
+    let active = (selected.files[0].clone(), selected.comparison.clone());
+    let refreshed =
+        refresh_snapshot(&f.0, &BrowseMode::Workspace, Some(active.clone()), true).unwrap();
+    assert_eq!(
+        refreshed.active.unwrap().2.right_document.text.as_ref(),
+        "external\n"
+    );
+    let latest = f.commit();
+    let refreshed =
+        refresh_snapshot(&f.0, &BrowseMode::Workspace, Some(active.clone()), true).unwrap();
+    assert!(refreshed.selection.files.is_empty());
+    let (_, comparison, diff) = refreshed.active.unwrap();
+    assert_eq!(comparison.left, Revision::Head(latest));
+    assert!(diff.blocks.is_empty());
+    git(&f.0, &["checkout", "-b", "previous", &original]).unwrap();
+    let refreshed = refresh_snapshot(&f.0, &BrowseMode::Workspace, Some(active), true).unwrap();
+    assert_eq!(refreshed.repo.branch, "previous");
+    assert_eq!(
+        refreshed.active.unwrap().2.right_document.text.as_ref(),
+        "original\n"
+    );
+}
+
+#[test]
+fn linked_worktree_watches_private_and_shared_metadata() {
+    let f = Fixture::new();
+    std::fs::write(f.0.join("a"), "original\n").unwrap();
+    f.commit();
+    let linked = f.0.join("linked");
+    git(
+        &f.0,
+        &["worktree", "add", "-b", "linked", linked.to_str().unwrap()],
+    )
+    .unwrap();
+    let directories = metadata_directories(&linked).unwrap();
+    assert_eq!(directories.len(), 2);
+    assert!(directories.contains(&f.0.join(".git").canonicalize().unwrap()));
+    assert!(directories.iter().all(|p| p.is_absolute() && p.is_dir()));
+    assert!(directories.iter().any(|p| p.ends_with("worktrees/linked")));
+}
+
+#[test]
+fn refresh_after_committed_rename_uses_new_head_path() {
+    let f = Fixture::new();
+    std::fs::write(f.0.join("old"), "same\n").unwrap();
+    f.commit();
+    std::fs::rename(f.0.join("old"), f.0.join("new")).unwrap();
+    git(&f.0, &["add", "-A"]).unwrap();
+    let selected = selection(&f.0, &BrowseMode::Workspace).unwrap();
+    let active = (selected.files[0].clone(), selected.comparison.clone());
+    assert_eq!(active.0.old_path, "old");
+    f.commit();
+    let refreshed = refresh_snapshot(&f.0, &BrowseMode::Workspace, Some(active), true).unwrap();
+    let (file, _, diff) = refreshed.active.unwrap();
+    assert_eq!(file.old_path, "new");
+    assert!(diff.blocks.is_empty());
+    assert_eq!(diff.left_document.text.as_ref(), "same\n");
+}

@@ -78,6 +78,22 @@ impl AppState {
         self.diff = diff;
         self.current_block = None;
     }
+    /// Refresh retains source offsets and viewport; changed text clamps to grapheme boundaries.
+    pub fn refresh_diff(&mut self, diff: Diff) -> bool {
+        let unchanged = self.diff.left_document.text == diff.left_document.text
+            && self.diff.right_document.text == diff.right_document.text;
+        let mut selection = self.text_selection.clone();
+        let horizontal = self.horizontal_offset;
+        let block = self.current_block;
+        self.set_diff(diff);
+        let document = self.diff.document(selection.side);
+        selection.anchor = document.snap(selection.anchor);
+        selection.head = document.snap(selection.head);
+        self.text_selection = selection;
+        self.horizontal_offset = horizontal;
+        self.current_block = block.filter(|i| *i < self.diff.blocks.len());
+        unchanged
+    }
     pub fn navigation_target(&self, forward: bool) -> Option<usize> {
         if self.loading || self.diff.blocks.is_empty() {
             return None;
@@ -174,6 +190,27 @@ impl AppState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn refresh_preserves_selection_and_clamps_changed_unicode() {
+        let mut state = AppState::default();
+        state.set_diff(crate::diff::calculate(b"old", "🙂new".as_bytes()).unwrap());
+        state.text_selection.anchor = 4;
+        state.text_selection.head = 7;
+        state.horizontal_offset = 50.;
+        state.current_block = Some(0);
+        assert!(state.refresh_diff(crate::diff::calculate(b"old", "🙂new".as_bytes()).unwrap()));
+        assert_eq!(
+            (state.text_selection.anchor, state.text_selection.head),
+            (4, 7)
+        );
+        assert_eq!(state.horizontal_offset, 50.);
+        assert_eq!(state.current_block, Some(0));
+        assert!(!state.refresh_diff(crate::diff::calculate(b"old", "你".as_bytes()).unwrap()));
+        assert_eq!(
+            (state.text_selection.anchor, state.text_selection.head),
+            (3, 3)
+        );
+    }
     #[test]
     fn navigation_tracks_blocks_and_stops_at_boundaries() {
         let mut state = AppState::default();

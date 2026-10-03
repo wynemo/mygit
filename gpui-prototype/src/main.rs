@@ -150,6 +150,7 @@ fn main() {
             |window, cx| {
                 let entity = cx.new(|cx| {
                     let mut app = MyGit::new(cx);
+                    app.observe_activation(window, cx);
                     app.load(path, cx);
                     window.focus(&app.history_focus);
                     app

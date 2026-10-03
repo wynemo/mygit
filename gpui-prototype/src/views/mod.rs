@@ -43,7 +43,9 @@ pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .child(
             button("refresh", "刷新", this.last_path.is_some()).on_click(cx.listener(
                 |this, _, _, cx| {
-                    if let Some(path) = this.last_path.clone() {
+                    if this.state.repo.is_some() {
+                        this.request_refresh(cx);
+                    } else if let Some(path) = this.last_path.clone() {
                         this.load(path, cx);
                     }
                 },

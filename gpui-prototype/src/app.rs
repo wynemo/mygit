@@ -1,3 +1,4 @@
+mod refresh;
 use crate::views::editor::{Changed, Editor};
 use crate::views::text_line::LineHit;
 use crate::{tasks, views};
@@ -63,6 +64,13 @@ pub enum Confirmation {
     },
 }
 pub struct MyGit {
+    watcher: Option<mygit_gpui::watch::RepositoryWatch>,
+    refresh_debounce: mygit_gpui::watch::Debounce,
+    refresh_pending: mygit_gpui::process::Cancellation,
+    refresh_requested: bool,
+    refresh_running: bool,
+    refresh_serial: u64,
+    last_reconcile: std::time::Instant,
     pub state: AppState,
     pub tabs: Vec<FileTab>,
     pub editors: HashMap<String, Entity<Editor>>,
@@ -118,7 +126,9 @@ impl MyGit {
             font_family: settings.font_family.clone(),
             ..Default::default()
         };
+        Self::start_refresh_loop(cx);
         cx.on_app_quit(|this, _| {
+            this.refresh_pending.cancel();
             this.pending.cancel();
             this.history_pending.cancel();
             this.tree_pending.cancel();
@@ -129,6 +139,13 @@ impl MyGit {
         })
         .detach();
         Self {
+            watcher: None,
+            refresh_debounce: Default::default(),
+            refresh_pending: Default::default(),
+            refresh_requested: false,
+            refresh_running: false,
+            refresh_serial: 0,
+            last_reconcile: std::time::Instant::now(),
             state,
             tabs: vec![],
             editors: HashMap::new(),
@@ -214,6 +231,7 @@ impl MyGit {
         self.load_unchecked(path, cx);
     }
     fn load_unchecked(&mut self, path: PathBuf, cx: &mut Context<Self>) {
+        self.reset_refresh();
         self.edit_mode = false;
         self.capture_tab();
         self.active_tab = None;
@@ -267,6 +285,7 @@ impl MyGit {
                 this.settings.opened(&repo.root);
                 this.state.repo = Some(repo);
                 this.save_settings();
+                this.start_watcher(cx);
                 this.refresh_tree(cx);
                 this.select_mode(BrowseMode::Workspace, cx);
             },
@@ -1041,28 +1060,30 @@ impl MyGit {
         if self.write_busy {
             return;
         }
-        let Some(repo) = &self.state.repo else {
+        if self.state.repo.is_none() {
             return;
-        };
-        let root = repo.root.clone();
+        }
         let submitted_message = self
             .commit_editor
             .as_ref()
             .map(|e| e.read(cx).buffer.text().to_owned());
         let epoch = self.repository_epoch;
+        self.refresh_pending.cancel();
+        self.refresh_pending = Default::default();
+        self.refresh_serial += 1;
+        self.refresh_running = false;
+        self.pending.cancel();
+        self.state.generation += 1;
+        self.state.loading = false;
         self.write_busy = true;
         self.write_message = label.into();
         self.write_pending = Default::default();
         let token = self.write_pending.clone();
-        let task = cx.background_executor().spawn(async move {
-            mygit_gpui::process::scope(token, || {
-                let result = job();
-                let snapshot = git::snapshot(&root);
-                (result, snapshot)
-            })
-        });
+        let task = cx
+            .background_executor()
+            .spawn(async move { mygit_gpui::process::scope(token, job) });
         cx.spawn(async move |this, cx| {
-            let (result, snapshot) = task.await;
+            let result = task.await;
             let _ = this.update(cx, |this, cx| {
                 this.write_busy = false;
                 if this.repository_epoch != epoch {
@@ -1084,16 +1105,15 @@ impl MyGit {
                         e.refresh(cx);
                     });
                 }
-                if let Ok(repo) = snapshot {
-                    this.state.repo = Some(repo);
-                }
                 for editor in this.editors.values() {
                     if !editor.read(cx).buffer.dirty() {
                         editor.update(cx, |e, cx| e.reload(cx));
                     }
                 }
-                this.refresh_tree(cx);
-                this.select_mode(mode, cx);
+                if this.state.mode != mode {
+                    this.select_mode(mode, cx);
+                }
+                this.request_refresh(cx);
                 cx.notify();
             });
         })
@@ -1223,6 +1243,7 @@ impl MyGit {
         self.history_loading = true;
         self.history_failed = false;
         cx.notify();
+        let expected_tip = tip.clone();
         let token = self.history_pending.clone();
         let task = cx.background_executor().spawn(async move {
             mygit_gpui::process::scope(token, || git::history_page(&root, &tip, skip))
@@ -1231,6 +1252,11 @@ impl MyGit {
             let result = task.await;
             let _ = this.update(cx, |this, cx| {
                 if this.repository_epoch != epoch {
+                    return;
+                }
+                if !this.state.repo.as_ref().is_some_and(|repo| {
+                    repo.history_tip.as_ref() == Some(&expected_tip) && repo.commits.len() == skip
+                }) {
                     return;
                 }
                 this.history_loading = false;
@@ -1267,6 +1293,11 @@ impl MyGit {
         self.tree_pending.cancel();
         self.tree_epoch += 1;
         self.tree_loading = false;
+        self.refresh_pending.cancel();
+        self.refresh_pending = Default::default();
+        self.refresh_serial += 1;
+        self.refresh_running = false;
+        self.refresh_requested = false;
         self.repository_epoch += 1;
         self.history_loading = false;
         self.history_failed = true;
@@ -1701,7 +1732,9 @@ impl Render for MyGit {
             }))
             .on_action(cx.listener(|this, _: &OpenRepo, _, cx| this.open(cx)))
             .on_action(cx.listener(|this, _: &RefreshRepo, _, cx| {
-                if let Some(path) = this.last_path.clone() {
+                if this.state.repo.is_some() {
+                    this.request_refresh(cx);
+                } else if let Some(path) = this.last_path.clone() {
                     this.load(path, cx);
                 }
             }))

@@ -37,6 +37,74 @@ fn head(root: &Path) -> Result<Revision> {
         }
     }
 }
+pub struct RefreshSnapshot {
+    pub repo: Snapshot,
+    pub selection: Selection,
+    pub active: Option<(FileChange, Comparison, Diff)>,
+}
+/// Re-read mutable versions while retaining pinned historical/custom comparisons.
+pub fn refresh_snapshot(
+    root: &Path,
+    mode: &BrowseMode,
+    active: Option<(FileChange, Comparison)>,
+    follows_list: bool,
+) -> Result<RefreshSnapshot> {
+    let repo = snapshot(root)?;
+    let selection = selection(root, mode)?;
+    if let Revision::Head(sha) = &selection.comparison.left
+        && repo.history_tip.as_ref() != Some(sha)
+    {
+        bail!("HEAD 在刷新期间改变，稍后重试");
+    }
+    let active = if let Some((mut file, mut comparison)) = active {
+        if follows_list {
+            comparison = selection.comparison.clone();
+            if let Some(updated) = selection.files.iter().find(|f| f.path == file.path) {
+                file = updated.clone();
+            } else if matches!(
+                mode,
+                BrowseMode::Workspace | BrowseMode::Staged | BrowseMode::Unstaged
+            ) {
+                // A committed/unstaged rename must no longer read the obsolete old path.
+                file.old_path = file.path.clone();
+                file.status = "M".into();
+            }
+        } else if matches!(comparison.left, Revision::Head(_))
+            && comparison.right == Revision::Worktree
+        {
+            comparison.left = repo
+                .history_tip
+                .clone()
+                .map(Revision::Head)
+                .unwrap_or(Revision::Empty);
+        }
+        let diff = compare(root, &comparison, &file)?;
+        Some((file, comparison, diff))
+    } else {
+        None
+    };
+    Ok(RefreshSnapshot {
+        repo,
+        selection,
+        active,
+    })
+}
+
+/// Watch both per-worktree and shared metadata (which may be outside the worktree).
+pub fn metadata_directories(root: &Path) -> Result<Vec<PathBuf>> {
+    let mut paths = vec![];
+    for option in ["--git-dir", "--git-common-dir"] {
+        let path = PathBuf::from(
+            string(git(root, &["rev-parse", "--path-format=absolute", option])?)?
+                .trim_end_matches('\n'),
+        );
+        let path = path.canonicalize()?;
+        if !paths.contains(&path) {
+            paths.push(path);
+        }
+    }
+    Ok(paths)
+}
 pub fn snapshot(path: &Path) -> Result<Snapshot> {
     let root = PathBuf::from(
         string(git(path, &["rev-parse", "--show-toplevel"])?)?.trim_end_matches('\n'),
