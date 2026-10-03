@@ -57,6 +57,8 @@ pub struct Row {
 }
 #[derive(Clone, Debug)]
 pub struct View {
+    pub exists: [bool; 3],
+    pub descriptions: [String; 2],
     pub revisions: [String; 3],
     pub paths: [String; 3],
     pub documents: [Document; 3],
@@ -64,6 +66,45 @@ pub struct View {
     pub rows: Arc<Vec<Row>>,
     pub blocks: Vec<Range<usize>>,
     pub message: Option<String>,
+}
+impl View {
+    /// A two-side projection shares existing selection, block navigation and tab
+    /// state; changes in parent 2 also contribute to its navigation blocks.
+    pub fn pair_diff(&self) -> Diff {
+        let mut diff = Diff::from_rows(
+            self.rows
+                .iter()
+                .map(|row| {
+                    let text = |side: usize| {
+                        row.lines[side]
+                            .map(|line| {
+                                self.documents[side].text
+                                    [self.documents[side].display_range(line - 1)]
+                                .to_owned()
+                            })
+                            .unwrap_or_default()
+                    };
+                    crate::model::DiffRow {
+                        left_no: row.lines[0],
+                        right_no: row.lines[1],
+                        left: text(0),
+                        right: text(1),
+                        changed: row.changed.iter().any(|c| *c),
+                        left_inline: vec![],
+                        right_inline: vec![],
+                        left_ending: None,
+                        right_ending: None,
+                    }
+                })
+                .collect(),
+        );
+        diff.left_document = self.documents[0].clone();
+        diff.right_document = self.documents[1].clone();
+        diff.left_syntax = self.syntax[0].clone();
+        diff.right_syntax = self.syntax[1].clone();
+        diff.message = self.message.clone();
+        diff
+    }
 }
 fn revision(root: &Path, sha: &str, path: &str) -> Result<Revision> {
     git::validate_paths(&[path.into()])?;
@@ -87,13 +128,18 @@ pub fn load(root: &Path, selection: &Selection, file: &File, limit: usize) -> Re
         file.path.clone(),
         file.parent_paths[1].clone(),
     ];
-    let result = revision(root, &revisions[1], &paths[1])?;
+    let targets: [Revision; 3] = [
+        revision(root, &revisions[0], &paths[0])?,
+        revision(root, &revisions[1], &paths[1])?,
+        revision(root, &revisions[2], &paths[2])?,
+    ];
+    let result = targets[1].clone();
     let limit = limit.min(20_000_000);
     let pair = |side: usize| {
         git::compare_with_limit(
             root,
             &Comparison {
-                left: revision(root, &revisions[side], &paths[side])?,
+                left: targets[side].clone(),
                 right: result.clone(),
             },
             &FileChange {
@@ -107,6 +153,7 @@ pub fn load(root: &Path, selection: &Selection, file: &File, limit: usize) -> Re
     let left = pair(0)?;
     let right = pair(2)?;
     let mut view = align(&left, &right)?;
+    view.exists = targets.map(|target| target != Revision::Empty);
     view.revisions = revisions;
     view.paths = paths;
     if view.documents.iter().map(|d| d.text.len()).sum::<usize>() > limit {
@@ -167,6 +214,11 @@ pub fn align(left: &Diff, right: &Diff) -> Result<View> {
         _ => None,
     };
     let mut view = View {
+        exists: [true; 3],
+        descriptions: [
+            left.description.clone().unwrap_or_default(),
+            right.description.clone().unwrap_or_default(),
+        ],
         revisions: Default::default(),
         paths: Default::default(),
         documents: Default::default(),

@@ -107,8 +107,16 @@ fn main() {
             KeyBinding::new("ctrl-c", CopyText, Some("DiffText || FileEditor")),
             KeyBinding::new("cmd-a", SelectAllText, Some("DiffText || FileEditor")),
             KeyBinding::new("ctrl-a", SelectAllText, Some("DiffText || FileEditor")),
-            KeyBinding::new("alt-down", NextDiff, Some("DiffText || FileEditor")),
-            KeyBinding::new("alt-up", PreviousDiff, Some("DiffText || FileEditor")),
+            KeyBinding::new(
+                "alt-down",
+                NextDiff,
+                Some("DiffText || FileEditor || MergeHistory"),
+            ),
+            KeyBinding::new(
+                "alt-up",
+                PreviousDiff,
+                Some("DiffText || FileEditor || MergeHistory"),
+            ),
             KeyBinding::new("left", Left, Some("DiffText || FileEditor")),
             KeyBinding::new("shift-left", SelectLeft, Some("DiffText || FileEditor")),
             KeyBinding::new("right", Right, Some("DiffText || FileEditor")),

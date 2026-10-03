@@ -330,6 +330,24 @@ fn untracked(root: &Path) -> Result<Vec<FileChange>> {
 pub fn selection(root: &Path, mode: &BrowseMode) -> Result<Selection> {
     let (comparison, mut files) = match mode {
         BrowseMode::Compare(comparison) => return comparison_selection(root, comparison),
+        BrowseMode::Merge(sha) => {
+            let selected = crate::merge::selection(root, sha)?;
+            return Ok(Selection {
+                comparison: Comparison {
+                    left: Revision::Commit(selected.detail.parents[0].clone()),
+                    right: Revision::Commit(selected.detail.sha),
+                },
+                files: selected
+                    .files
+                    .into_iter()
+                    .map(|f| FileChange {
+                        old_path: f.parent_paths[0].clone(),
+                        path: f.path,
+                        status: "M".into(),
+                    })
+                    .collect(),
+            });
+        }
         BrowseMode::History(sha) => {
             let sha = string(git(
                 root,

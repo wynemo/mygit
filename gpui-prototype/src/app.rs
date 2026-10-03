@@ -414,7 +414,9 @@ impl MyGit {
             self.pending.clone(),
             move || {
                 let detail = match &mode {
-                    BrowseMode::History(sha) => Some(git::commit_detail(&root, sha)?),
+                    BrowseMode::History(sha) | BrowseMode::Merge(sha) => {
+                        Some(git::commit_detail(&root, sha)?)
+                    }
                     _ => None,
                 };
                 Ok((git::selection(&root, &mode)?, detail))
@@ -447,6 +449,10 @@ impl MyGit {
         let root = repo.root.clone();
         let comparison = comparison.clone();
         let file = file.clone();
+        let merge_sha = match &self.state.mode {
+            BrowseMode::Merge(sha) => Some(sha.clone()),
+            _ => None,
+        };
         self.capture_tab();
         self.active_tab = None;
         self.state.editable = matches!(
@@ -475,9 +481,26 @@ impl MyGit {
             cx,
             generation,
             self.pending.clone(),
-            move || git::compare(&root, &comparison, &file),
-            move |this, diff, _| {
-                this.state.set_diff(diff);
+            move || {
+                if let Some(sha) = merge_sha {
+                    let selection = mygit_gpui::merge::selection(&root, &sha)?;
+                    let target = selection
+                        .files
+                        .iter()
+                        .find(|f| f.path == file.path)
+                        .ok_or_else(|| anyhow::anyhow!("合并文件不再存在"))?;
+                    let view = mygit_gpui::merge::load(&root, &selection, target, 2_000_000)?;
+                    Ok((None, Some(view)))
+                } else {
+                    Ok((Some(git::compare(&root, &comparison, &file)?), None))
+                }
+            },
+            move |this, (diff, merge), _| {
+                if let Some(merge) = merge {
+                    this.state.set_merge(merge);
+                } else if let Some(diff) = diff {
+                    this.state.set_diff(diff);
+                }
                 if let Some(previous) = &previous
                     && this.state.restore_positions(previous)
                 {
@@ -724,6 +747,11 @@ impl MyGit {
             return;
         };
         let root = repo.root.clone();
+        let merge_sha = self
+            .state
+            .merge
+            .as_ref()
+            .map(|view| view.revisions[1].clone());
         let generation = self.state.begin("正在按需读取大文件（最高 20 MB）…".into());
         self.pending.cancel();
         self.pending = Default::default();
@@ -731,15 +759,48 @@ impl MyGit {
             cx,
             generation,
             self.pending.clone(),
-            move || git::compare_with_limit(&root, &comparison, &file, 20_000_000),
-            |this, diff, _| {
-                this.state.set_diff(diff);
+            move || {
+                if let Some(sha) = merge_sha {
+                    let selection = mygit_gpui::merge::selection(&root, &sha)?;
+                    let target = selection
+                        .files
+                        .iter()
+                        .find(|f| f.path == file.path)
+                        .ok_or_else(|| anyhow::anyhow!("合并文件不再存在"))?;
+                    Ok((
+                        None,
+                        Some(mygit_gpui::merge::load(
+                            &root, &selection, target, 20_000_000,
+                        )?),
+                    ))
+                } else {
+                    Ok((
+                        Some(git::compare_with_limit(
+                            &root,
+                            &comparison,
+                            &file,
+                            20_000_000,
+                        )?),
+                        None,
+                    ))
+                }
+            },
+            |this, (diff, merge), _| {
+                if let Some(merge) = merge {
+                    this.state.set_merge(merge);
+                } else if let Some(diff) = diff {
+                    this.state.set_diff(diff);
+                }
                 this.remember_tab();
             },
         );
         cx.notify();
     }
     pub fn refresh_visible_diff(&mut self, cx: &mut Context<Self>) {
+        if self.state.merge.is_some() {
+            self.request_refresh(cx);
+            return;
+        }
         let (Some(repo), Some(file), Some(comparison)) = (
             &self.state.repo,
             self.state.current_file.clone(),
@@ -1547,7 +1608,11 @@ impl MyGit {
     pub fn navigate(&mut self, forward: bool, cx: &mut Context<Self>) {
         if let Some(row) = self.state.navigate(forward) {
             self.diff_scroll.scroll_to_item_strict(
-                self.state.view_row(row, Side::Left),
+                if self.state.merge.is_some() {
+                    row
+                } else {
+                    self.state.view_row(row, Side::Left)
+                },
                 ScrollStrategy::Center,
             );
             cx.notify();
@@ -1789,7 +1854,9 @@ impl MyGit {
                     - self.visible_history_width
                     - self.visible_files_width
             });
-        let visible = if self.state.unified {
+        let visible = if self.state.merge.is_some() {
+            width / 3. - 140.
+        } else if self.state.unified {
             width - 122.
         } else {
             width / 2. - 52.
@@ -2016,7 +2083,11 @@ impl Render for MyGit {
                     } else {
                         views::sidebar::files(self, cx).into_any_element()
                     })
-                    .child(views::diff::pane(self, cx)),
+                    .child(if self.state.merge.is_some() {
+                        views::merge::pane(self, cx).into_any_element()
+                    } else {
+                        views::diff::pane(self, cx).into_any_element()
+                    }),
             )
             .child(
                 div()

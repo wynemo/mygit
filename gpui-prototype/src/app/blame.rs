@@ -25,6 +25,15 @@ impl MyGit {
             return;
         }
         self.show_blame = !self.show_blame;
+        if self.state.merge.is_some() {
+            if self.blame_loading {
+                self.blame_pending.cancel();
+                self.blame_epoch += 1;
+                self.blame_loading = false;
+                self.blame_key = None;
+            }
+            return;
+        }
         if !self.show_blame {
             self.blame_pending.cancel();
             self.blame_epoch += 1;

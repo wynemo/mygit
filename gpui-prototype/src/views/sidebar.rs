@@ -101,7 +101,9 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                 .overflow_hidden()
                                 .cursor_pointer()
                                 .bg(rgb(
-                                    if this.state.mode == BrowseMode::History(c.sha.clone()) {
+                                    if this.state.mode == BrowseMode::History(c.sha.clone())
+                                        || this.state.mode == BrowseMode::Merge(c.sha.clone())
+                                    {
                                         0x263b56
                                     } else {
                                         0x151d29
@@ -177,6 +179,26 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     .on_click(cx.listener(|this, _, _, cx| this.compare_selected_worktree(cx))),
             )
         })
+        .when(
+            this.state
+                .detail
+                .as_ref()
+                .is_some_and(|d| d.parents.len() == 2),
+            |s| {
+                s.child(
+                    button(
+                        "merge-three-columns",
+                        "合并提交三栏查看",
+                        !this.state.loading,
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        if let Some(detail) = &this.state.detail {
+                            this.select_mode(BrowseMode::Merge(detail.sha.clone()), cx);
+                        }
+                    })),
+                )
+            },
+        )
         .when_some(this.state.detail.clone(), |s, detail| {
             let sha = detail.sha.clone();
             let message = detail.message.clone();
@@ -357,7 +379,15 @@ pub fn files(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                         )
                                     },
                                 )
-                                .child(format!("{}  {}", file.status, file.path))
+                                .child(format!(
+                                    "{}  {}",
+                                    if matches!(this.state.mode, BrowseMode::Merge(_)) {
+                                        "Δ"
+                                    } else {
+                                        &file.status
+                                    },
+                                    file.path
+                                ))
                                 .on_click(cx.listener(move |this, _, window, cx| {
                                     window.focus(&this.files_focus);
                                     cx.activate(true);

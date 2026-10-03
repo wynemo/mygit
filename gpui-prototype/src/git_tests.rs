@@ -1646,6 +1646,19 @@ fn merge_three_columns_union_both_parents_and_pin_renamed_deleted_and_added_path
         .to_owned();
     let selection = crate::merge::selection(&f.0, &sha).unwrap();
     assert_eq!(selection.detail.parents, vec![main.clone(), side.clone()]);
+    let browse = super::selection(&f.0, &BrowseMode::Merge(sha.clone())).unwrap();
+    assert_eq!(
+        browse
+            .files
+            .iter()
+            .map(|f| f.path.as_str())
+            .collect::<Vec<_>>(),
+        selection
+            .files
+            .iter()
+            .map(|f| f.path.as_str())
+            .collect::<Vec<_>>()
+    );
     assert_eq!(
         selection
             .files
@@ -1677,6 +1690,7 @@ fn merge_three_columns_union_both_parents_and_pin_renamed_deleted_and_added_path
             .all(|d| &*d.text == "one\ntwo\nthree\nfour\n")
     );
     let deleted = load("deleted");
+    assert_eq!(deleted.exists, [false, false, true]);
     assert!(deleted.documents[0].text.is_empty());
     assert!(deleted.documents[1].text.is_empty());
     assert_eq!(&*deleted.documents[2].text, "gone\n");

@@ -87,6 +87,7 @@ pub enum BrowseMode {
     Staged,
     Unstaged,
     History(String),
+    Merge(String),
     Compare(Comparison),
 }
 impl BrowseMode {
@@ -96,6 +97,7 @@ impl BrowseMode {
             Self::Staged => "已暂存",
             Self::Unstaged => "未暂存",
             Self::History(_) => "提交变更",
+            Self::Merge(_) => "合并提交三栏",
             Self::Compare(_) => "自定义比较",
         }
     }
@@ -286,6 +288,8 @@ impl Diff {
 
 #[derive(Clone, Debug)]
 pub struct FileTab {
+    pub panel_width: f32,
+    pub merge: Option<Arc<crate::merge::View>>,
     pub file: FileChange,
     pub comparison: Comparison,
     pub editable: bool,

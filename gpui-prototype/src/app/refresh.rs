@@ -98,7 +98,16 @@ impl MyGit {
             .current_file
             .clone()
             .zip(self.state.comparison.clone());
+        // Historical merge documents are immutable and already pinned; keep the
+        // three-column cache while refreshing refs and the file list.
         let follows_list = self.state.comparison == self.state.listed_comparison;
+        let active = if self.state.merge.is_some()
+            || (matches!(self.state.mode, BrowseMode::Merge(_)) && follows_list)
+        {
+            None
+        } else {
+            active
+        };
         self.refresh_serial += 1;
         let serial = self.refresh_serial;
         let generation = self.state.generation;

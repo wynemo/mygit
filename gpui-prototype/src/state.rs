@@ -2,6 +2,7 @@ use crate::model::*;
 
 /// UI-independent state, shared by task results and view rendering.
 pub struct AppState {
+    pub merge: Option<std::sync::Arc<crate::merge::View>>,
     pub repo: Option<Snapshot>,
     pub mode: BrowseMode,
     pub detail: Option<CommitDetail>,
@@ -27,6 +28,7 @@ pub struct AppState {
 impl Default for AppState {
     fn default() -> Self {
         Self {
+            merge: None,
             repo: None,
             mode: BrowseMode::Workspace,
             detail: None,
@@ -59,6 +61,7 @@ impl AppState {
         self.generation
     }
     pub fn clear_diff(&mut self) {
+        self.merge = None;
         self.diff = Diff::default();
         self.text_selection = crate::text::TextSelection::default();
         self.current_block = None;
@@ -66,6 +69,7 @@ impl AppState {
         self.panel_width = 420.;
     }
     pub fn set_diff(&mut self, diff: Diff) {
+        self.merge = None;
         self.text_selection = crate::text::TextSelection::default();
         self.panel_width = diff.panel_width();
         self.message = diff.message.clone().unwrap_or_else(|| {
@@ -77,6 +81,35 @@ impl AppState {
         });
         self.diff = diff;
         self.current_block = None;
+    }
+    pub fn set_merge(&mut self, view: crate::merge::View) {
+        self.set_diff(view.pair_diff());
+        self.panel_width = view
+            .documents
+            .iter()
+            .flat_map(|doc| {
+                doc.lines.iter().map(|range| {
+                    doc.text[range.clone()]
+                        .chars()
+                        .map(|c| {
+                            if c == '\t' {
+                                4
+                            } else if c.is_ascii() {
+                                1
+                            } else {
+                                2
+                            }
+                        })
+                        .sum::<usize>()
+                })
+            })
+            .max()
+            .unwrap_or(0)
+            .saturating_mul(8)
+            .saturating_add(68)
+            .max(420) as f32;
+        self.editable = false;
+        self.merge = Some(std::sync::Arc::new(view));
     }
     /// Refresh retains source offsets and viewport; changed text clamps to grapheme boundaries.
     pub fn refresh_diff(&mut self, diff: Diff) -> bool {
@@ -146,6 +179,8 @@ impl AppState {
     }
     pub fn tab_snapshot(&self) -> Option<FileTab> {
         Some(FileTab {
+            merge: self.merge.clone(),
+            panel_width: self.panel_width,
             file: self.current_file.clone()?,
             comparison: self.comparison.clone()?,
             editable: self.editable,
@@ -167,6 +202,8 @@ impl AppState {
         self.comparison = Some(tab.comparison);
         self.detail = tab.detail;
         self.set_diff(tab.diff);
+        self.merge = tab.merge;
+        self.panel_width = tab.panel_width;
         self.text_selection = tab.selection;
         self.horizontal_offset = tab.horizontal;
         self.current_block = tab.block;
@@ -229,6 +266,43 @@ mod tests {
         assert_eq!(state.navigate(false), Some(3));
         state.begin("loading".into());
         assert_eq!(state.navigate(false), None);
+    }
+    #[test]
+    fn merge_tabs_preserve_third_parent_navigation_width_and_read_only_state() {
+        let left = crate::diff::calculate(b"a\nb\nc\nd\n", b"a\nb\nc\nd\n").unwrap();
+        let right = crate::diff::calculate(b"x\nb\nc\ny\n", b"a\nb\nc\nd\n").unwrap();
+        let view = crate::merge::align(&left, &right).unwrap();
+        let mut state = AppState {
+            current_file: Some(FileChange {
+                path: "file".into(),
+                old_path: "file".into(),
+                status: "M".into(),
+            }),
+            comparison: Some(Comparison {
+                left: Revision::Commit("parent".into()),
+                right: Revision::Commit("merged".into()),
+            }),
+            ..Default::default()
+        };
+        state.set_merge(view);
+        assert!(!state.editable);
+        assert_eq!(state.navigate(true), Some(0));
+        assert_eq!(state.navigate(true), Some(3));
+        assert_eq!(state.navigate(true), None);
+        state.horizontal_offset = 55.;
+        let tab = state.tab_snapshot().unwrap();
+        let width = state.panel_width;
+        state.set_diff(crate::diff::calculate(b"normal", b"normal").unwrap());
+        assert!(state.merge.is_none());
+        state.restore_tab(tab);
+        assert!(state.merge.is_some());
+        assert_eq!(state.current_block, Some(1));
+        assert_eq!(state.horizontal_offset, 55.);
+        assert_eq!(state.panel_width, width);
+        assert_eq!(state.navigate(false), Some(0));
+        state.clear_diff();
+        assert!(state.merge.is_none());
+        assert!(state.diff.rows.is_empty());
     }
     #[test]
     fn tabs_restore_own_version_and_do_not_retarget_browsed_file_list() {
