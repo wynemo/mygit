@@ -17,6 +17,7 @@ pub struct Settings {
     pub last: Option<PathBuf>,
     pub warning: Option<String>,
     pub draft: Option<(String, String)>,
+    pub ai_update: Option<crate::ai::Config>,
 }
 impl Settings {
     pub fn default_path() -> PathBuf {
@@ -73,6 +74,7 @@ impl Settings {
             last: data["last_folder"].as_str().map(PathBuf::from),
             warning,
             draft: None,
+            ai_update: None,
         }
     }
     pub fn draft_for(&self, root: &Path) -> String {
@@ -113,6 +115,12 @@ impl Settings {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => json!({}),
             Err(e) => return Err(e.into()),
         };
+        if let Some(config) = &self.ai_update {
+            data["api_url"] = json!(config.api_url);
+            data["api_secret"] = json!(config.api_secret);
+            data["model_name"] = json!(config.model_name);
+            data["prompt"] = json!(config.prompt);
+        }
         data["font_family"] = json!(self.font_family);
         data["font_size"] = json!(self.font_size);
         data["recent_folders"] = json!(self.recent);
@@ -159,6 +167,44 @@ impl Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn ai_configuration_updates_are_explicit_private_and_preserve_legacy_fields() {
+        let dir = std::env::temp_dir().join(format!(
+            "mygit-ai-settings-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir(&dir).unwrap();
+        let path = dir.join("settings.json");
+        fs::write(&path, r#"{"api_url":"https://example.com/v1","api_secret":"fixture-old","model_name":"old","prompt":"old","future":42}"#).unwrap();
+        let mut settings = Settings::load(path.clone());
+        settings.save().unwrap();
+        let data: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        assert_eq!(data["api_secret"], "fixture-old");
+        settings.ai_update = Some(crate::ai::Config {
+            api_url: "https://example.com/new".into(),
+            api_secret: "fixture-new".into(),
+            model_name: "new".into(),
+            prompt: "中文提示".into(),
+        });
+        settings.save().unwrap();
+        let data: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        assert_eq!(data["api_secret"], "fixture-new");
+        assert_eq!(data["prompt"], "中文提示");
+        assert_eq!(data["future"], 42);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+                0o600
+            );
+        }
+        fs::remove_dir_all(dir).unwrap();
+    }
     #[test]
     fn preserves_unknown_fresh_fields_and_backs_up_corrupt_settings() {
         let dir = std::env::temp_dir().join(format!(

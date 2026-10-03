@@ -3291,6 +3291,7 @@ dependencies = [
  "similar",
  "syntect",
  "unicode-segmentation",
+ "url",
 ]
 
 [[package]]

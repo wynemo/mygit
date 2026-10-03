@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod blame;
 pub mod branches;
 pub mod diff;

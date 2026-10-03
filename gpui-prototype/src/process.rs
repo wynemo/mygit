@@ -2,7 +2,7 @@
 use anyhow::{Context, Result, bail};
 use std::{
     cell::RefCell,
-    io::{BufRead, BufReader, Read},
+    io::{BufRead, BufReader, Read, Write},
     process::{Command, Output, Stdio},
     sync::{
         Arc, Mutex,
@@ -187,24 +187,46 @@ pub fn lines(
     command: &mut Command,
     timeout: Duration,
     max_record: usize,
+    consume: impl FnMut(&[u8]) -> Result<bool> + Send,
+) -> Result<LineOutput> {
+    lines_with_input(command, timeout, max_record, None, consume)
+}
+/// Input is piped concurrently with reading, so secrets need not appear in
+/// process arguments or temporary files. Cancellation closes blocked writers.
+pub fn lines_with_input(
+    command: &mut Command,
+    timeout: Duration,
+    max_record: usize,
+    input: Option<&[u8]>,
     mut consume: impl FnMut(&[u8]) -> Result<bool> + Send,
 ) -> Result<LineOutput> {
     check()?;
     command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .stdin(Stdio::null());
+        .stdin(if input.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        });
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
         command.process_group(0);
     }
     let mut child = command.spawn().context("无法启动子进程")?;
+    let stdin = child.stdin.take();
     let stdout = child.stdout.take().unwrap();
     let stderr = child.stderr.take().unwrap();
     let stop = AtomicBool::new(false);
     let started = Instant::now();
     std::thread::scope(|scope| {
+        let writer = scope.spawn(move || -> std::io::Result<()> {
+            if let (Some(mut stdin), Some(input)) = (stdin, input) {
+                stdin.write_all(input)?;
+            }
+            Ok(())
+        });
         let stop_ref = &stop;
         let out = scope.spawn(move || -> Result<(bool, bool)> {
             let result = (|| {
@@ -278,11 +300,20 @@ pub fn lines(
         let (stderr, exceeded) = err
             .join()
             .map_err(|_| anyhow::anyhow!("读取错误输出失败"))??;
+        let written = writer
+            .join()
+            .map_err(|_| anyhow::anyhow!("写入标准输入失败"))?;
         if let Some(reason) = reason {
             bail!("{reason}");
         }
         check()?;
         let (stopped, record_exceeded) = read?;
+        // BrokenPipe is expected when a child rejects input or output hits a limit.
+        if let Err(error) = written
+            && error.kind() != std::io::ErrorKind::BrokenPipe
+        {
+            return Err(error.into());
+        }
         if exceeded {
             bail!("错误输出超过 64 MB 上限");
         }
@@ -297,6 +328,38 @@ pub fn lines(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[cfg(unix)]
+    fn piped_input_roundtrips_and_blocked_writer_is_cancelled() {
+        let input = "中文🙂\n".repeat(20_000);
+        let mut output = Vec::new();
+        let result = lines_with_input(
+            &mut Command::new("cat"),
+            Duration::from_secs(2),
+            1024,
+            Some(input.as_bytes()),
+            |record| {
+                output.extend_from_slice(record);
+                Ok(true)
+            },
+        )
+        .unwrap();
+        assert!(result.status.success());
+        assert_eq!(output, input.as_bytes());
+        let input = vec![b'x'; 256_000];
+        let started = Instant::now();
+        let error = lines_with_input(
+            Command::new("sh").args(["-c", "sleep 20"]),
+            Duration::from_millis(30),
+            1024,
+            Some(&input),
+            |_| Ok(true),
+        )
+        .err()
+        .unwrap();
+        assert!(error.to_string().contains("超时"));
+        assert!(started.elapsed() < Duration::from_secs(1));
+    }
     #[test]
     #[cfg(unix)]
     fn streaming_consumer_limits_records_and_reaps_early_or_failed_consumers() {
