@@ -18,6 +18,27 @@ pub struct Snapshot {
     pub root: PathBuf,
     pub branch: String,
     pub commits: Vec<Commit>,
+    pub history_tip: Option<String>,
+    pub history_more: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct CommitDetail {
+    pub sha: String,
+    pub message: String,
+    pub author: String,
+    pub author_email: String,
+    pub author_date: String,
+    pub committer: String,
+    pub committer_email: String,
+    pub commit_date: String,
+    pub references: String,
+    pub parents: Vec<String>,
+}
+#[derive(Clone, Debug)]
+pub struct HistoryPage {
+    pub commits: Vec<Commit>,
+    pub more: bool,
 }
 
 /// HEAD and historical commits are pinned to an object ID for the selected comparison.
@@ -208,4 +229,15 @@ impl Diff {
             .saturating_add(68)
             .max(420) as f32
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct FileTab {
+    pub file: FileChange,
+    pub comparison: Comparison,
+    pub detail: Option<CommitDetail>,
+    pub diff: Diff,
+    pub selection: crate::text::TextSelection,
+    pub horizontal: f32,
+    pub block: Option<usize>,
 }

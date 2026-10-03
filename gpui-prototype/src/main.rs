@@ -9,9 +9,71 @@ fn main() {
     let path = std::env::args_os()
         .nth(1)
         .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+        .or_else(|| {
+            mygit_gpui::settings::Settings::load(mygit_gpui::settings::Settings::default_path())
+                .last
+        })
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
     Application::new().run(move |cx: &mut App| {
+        cx.on_action(|_: &Quit, cx| cx.quit());
+        cx.set_menus(vec![
+            Menu {
+                name: "MyGit".into(),
+                items: vec![
+                    MenuItem::action("设置", ToggleSettings),
+                    MenuItem::separator(),
+                    MenuItem::action("退出", Quit),
+                ],
+            },
+            Menu {
+                name: "仓库".into(),
+                items: vec![
+                    MenuItem::action("打开仓库", OpenRepo),
+                    MenuItem::action("刷新", RefreshRepo),
+                    MenuItem::action("取消加载", CancelTask),
+                    MenuItem::separator(),
+                    MenuItem::action("全部变更", ViewWorkspace),
+                    MenuItem::action("已暂存", ViewStaged),
+                    MenuItem::action("未暂存", ViewUnstaged),
+                    MenuItem::action("复制提交 SHA", CopyCommitSha),
+                ],
+            },
+            Menu {
+                name: "编辑".into(),
+                items: vec![
+                    MenuItem::action("复制", CopyText),
+                    MenuItem::action("全选", SelectAllText),
+                ],
+            },
+            Menu {
+                name: "差异".into(),
+                items: vec![
+                    MenuItem::action("上一处", PreviousDiff),
+                    MenuItem::action("下一处", NextDiff),
+                ],
+            },
+        ]);
         cx.bind_keys([
+            KeyBinding::new("cmd-1", ViewWorkspace, Some("MyGit")),
+            KeyBinding::new("cmd-2", ViewStaged, Some("MyGit")),
+            KeyBinding::new("cmd-3", ViewUnstaged, Some("MyGit")),
+            KeyBinding::new("ctrl-1", ViewWorkspace, Some("MyGit")),
+            KeyBinding::new("ctrl-2", ViewStaged, Some("MyGit")),
+            KeyBinding::new("ctrl-3", ViewUnstaged, Some("MyGit")),
+            KeyBinding::new("cmd-shift-c", CopyCommitSha, Some("HistoryList")),
+            KeyBinding::new("ctrl-shift-c", CopyCommitSha, Some("HistoryList")),
+            KeyBinding::new("cmd-q", Quit, None),
+            KeyBinding::new("cmd-o", OpenRepo, Some("MyGit")),
+            KeyBinding::new("ctrl-o", OpenRepo, Some("MyGit")),
+            KeyBinding::new("cmd-r", RefreshRepo, Some("MyGit")),
+            KeyBinding::new("ctrl-r", RefreshRepo, Some("MyGit")),
+            KeyBinding::new("cmd-,", ToggleSettings, Some("MyGit")),
+            KeyBinding::new("escape", CancelTask, Some("MyGit")),
+            KeyBinding::new("tab", FocusNext, Some("MyGit")),
+            KeyBinding::new("shift-tab", FocusPrevious, Some("MyGit")),
+            KeyBinding::new("up", ListUp, Some("HistoryList || FilesList")),
+            KeyBinding::new("down", ListDown, Some("HistoryList || FilesList")),
+            KeyBinding::new("enter", ListEnter, Some("HistoryList || FilesList")),
             KeyBinding::new("cmd-c", CopyText, Some("DiffText")),
             KeyBinding::new("ctrl-c", CopyText, Some("DiffText")),
             KeyBinding::new("cmd-a", SelectAllText, Some("DiffText")),
@@ -47,16 +109,18 @@ fn main() {
                     size(px(1400.), px(860.)),
                     cx,
                 ))),
+                window_min_size: Some(size(px(760.), px(480.))),
                 titlebar: Some(TitlebarOptions {
                     title: Some("MyGit · GPUI Prototype".into()),
                     ..Default::default()
                 }),
                 ..Default::default()
             },
-            |_, cx| {
+            |window, cx| {
                 cx.new(|cx| {
                     let mut app = MyGit::new(cx);
                     app.load(path, cx);
+                    window.focus(&app.history_focus);
                     app
                 })
             },

@@ -8,6 +8,20 @@ use std::{collections::HashMap, path::PathBuf};
 actions!(
     mygit,
     [
+        ViewWorkspace,
+        ViewStaged,
+        ViewUnstaged,
+        CopyCommitSha,
+        OpenRepo,
+        RefreshRepo,
+        ToggleSettings,
+        Quit,
+        FocusNext,
+        FocusPrevious,
+        ListUp,
+        ListDown,
+        ListEnter,
+        CancelTask,
         CopyText,
         SelectAllText,
         Left,
@@ -33,6 +47,30 @@ actions!(
 
 pub struct MyGit {
     pub state: AppState,
+    pub tabs: Vec<FileTab>,
+    pub active_tab: Option<usize>,
+    pub tab_scroll: HashMap<String, UniformListScrollHandle>,
+    pub settings: mygit_gpui::settings::Settings,
+    pub show_settings: bool,
+    pub pending: mygit_gpui::process::Cancellation,
+    pub history_pending: mygit_gpui::process::Cancellation,
+    pub tree: mygit_gpui::workspace::Tree,
+    pub tree_pending: mygit_gpui::process::Cancellation,
+    pub tree_loading: bool,
+    pub tree_epoch: u64,
+    pub tree_error: Option<String>,
+    pub show_tree: bool,
+    pub history_loading: bool,
+    pub history_failed: bool,
+    pub history_focus: FocusHandle,
+    pub files_focus: FocusHandle,
+    pub history_scroll: UniformListScrollHandle,
+    pub files_scroll: UniformListScrollHandle,
+    pub history_cursor: Option<usize>,
+    pub visible_history_width: f32,
+    pub visible_files_width: f32,
+    pub repository_epoch: u64,
+    pub last_path: Option<PathBuf>,
     pub diff_scroll: UniformListScrollHandle,
     pub focus: FocusHandle,
     pub line_layouts: HashMap<(Side, usize), LineHit>,
@@ -42,8 +80,48 @@ pub struct MyGit {
 }
 impl MyGit {
     pub fn new(cx: &mut Context<Self>) -> Self {
+        let settings =
+            mygit_gpui::settings::Settings::load(mygit_gpui::settings::Settings::default_path());
+        let state = AppState {
+            font_size: settings.font_size,
+            font_family: settings.font_family.clone(),
+            ..Default::default()
+        };
+        cx.on_app_quit(|this, _| {
+            this.pending.cancel();
+            this.history_pending.cancel();
+            this.tree_pending.cancel();
+            async {
+                Timer::after(std::time::Duration::from_millis(100)).await;
+            }
+        })
+        .detach();
         Self {
-            state: AppState::default(),
+            state,
+            tabs: vec![],
+            active_tab: None,
+            tab_scroll: HashMap::new(),
+            settings,
+            show_settings: false,
+            pending: Default::default(),
+            history_pending: Default::default(),
+            tree: mygit_gpui::workspace::Tree::new(),
+            tree_pending: Default::default(),
+            tree_loading: false,
+            tree_epoch: 0,
+            tree_error: None,
+            show_tree: false,
+            history_loading: false,
+            history_failed: false,
+            history_focus: cx.focus_handle(),
+            files_focus: cx.focus_handle(),
+            history_scroll: UniformListScrollHandle::new(),
+            files_scroll: UniformListScrollHandle::new(),
+            history_cursor: None,
+            visible_history_width: 260.,
+            visible_files_width: 220.,
+            repository_epoch: 0,
+            last_path: None,
             diff_scroll: UniformListScrollHandle::new(),
             focus: cx.focus_handle(),
             line_layouts: HashMap::new(),
@@ -76,10 +154,34 @@ impl MyGit {
         .detach();
     }
     pub fn load(&mut self, path: PathBuf, cx: &mut Context<Self>) {
+        self.capture_tab();
+        self.active_tab = None;
+        if !self.state.repo.as_ref().is_some_and(|r| r.root == path) {
+            self.tabs.clear();
+            self.active_tab = None;
+            self.tab_scroll.clear();
+            self.tree = mygit_gpui::workspace::Tree::new();
+        }
+        self.tree_pending.cancel();
+        self.tree_loading = false;
+        self.tree_epoch += 1;
+        self.pending.cancel();
+        self.history_pending.cancel();
+        self.history_pending = Default::default();
+        self.repository_epoch += 1;
+        self.history_loading = false;
+        self.history_failed = false;
+        self.history_cursor = None;
+        self.history_scroll = UniformListScrollHandle::new();
+        self.files_scroll = UniformListScrollHandle::new();
+        self.last_path = Some(path.clone());
+        self.state.detail = None;
         self.state.repo = None;
         self.state.comparison = None;
+        self.state.listed_comparison = None;
         self.state.files.clear();
         self.state.selected = None;
+        self.state.current_file = None;
         self.state.mode = BrowseMode::Workspace;
         self.state.clear_diff();
         self.line_layouts.clear();
@@ -87,12 +189,18 @@ impl MyGit {
         self.diff_scroll = UniformListScrollHandle::new();
         let generation = self.state.begin("正在读取仓库…".into());
         cx.notify();
+        self.pending.cancel();
+        self.pending = Default::default();
         tasks::run(
             cx,
             generation,
+            self.pending.clone(),
             move || git::snapshot(&path),
             |this, repo, cx| {
+                this.settings.opened(&repo.root);
                 this.state.repo = Some(repo);
+                this.save_settings();
+                this.refresh_tree(cx);
                 this.select_mode(BrowseMode::Workspace, cx);
             },
         );
@@ -102,8 +210,14 @@ impl MyGit {
             return;
         };
         let root = repo.root.clone();
+        self.capture_tab();
+        self.active_tab = None;
+        self.state.detail = None;
+        self.state.current_file = None;
+        self.show_tree = false;
         self.state.mode = mode.clone();
         self.state.comparison = None;
+        self.state.listed_comparison = None;
         self.state.files.clear();
         self.state.selected = None;
         self.state.clear_diff();
@@ -111,11 +225,22 @@ impl MyGit {
         self.dragging = false;
         let generation = self.state.begin(format!("正在读取{}…", mode.label()));
         cx.notify();
+        self.pending.cancel();
+        self.pending = Default::default();
         tasks::run(
             cx,
             generation,
-            move || git::selection(&root, &mode),
-            |this, selection, cx| {
+            self.pending.clone(),
+            move || {
+                let detail = match &mode {
+                    BrowseMode::History(sha) => Some(git::commit_detail(&root, sha)?),
+                    _ => None,
+                };
+                Ok((git::selection(&root, &mode)?, detail))
+            },
+            |this, (selection, detail), cx| {
+                this.state.detail = detail;
+                this.state.listed_comparison = Some(selection.comparison.clone());
                 this.state.comparison = Some(selection.comparison);
                 this.state.files = selection.files;
                 this.state.message = format!(
@@ -132,7 +257,7 @@ impl MyGit {
     pub fn select_file(&mut self, index: usize, cx: &mut Context<Self>) {
         let (Some(repo), Some(comparison), Some(file)) = (
             &self.state.repo,
-            &self.state.comparison,
+            &self.state.listed_comparison,
             self.state.files.get(index),
         ) else {
             return;
@@ -140,19 +265,385 @@ impl MyGit {
         let root = repo.root.clone();
         let comparison = comparison.clone();
         let file = file.clone();
+        self.capture_tab();
+        self.active_tab = None;
+        self.state.comparison = Some(comparison.clone());
         self.state.selected = Some(index);
+        self.state.current_file = Some(file.clone());
         self.state.clear_diff();
         self.line_layouts.clear();
         self.dragging = false;
         self.diff_scroll = UniformListScrollHandle::new();
         let generation = self.state.begin(format!("正在比较 {}…", file.path));
         cx.notify();
+        self.pending.cancel();
+        self.pending = Default::default();
         tasks::run(
             cx,
             generation,
+            self.pending.clone(),
             move || git::compare(&root, &comparison, &file),
-            |this, diff, _| this.state.set_diff(diff),
+            |this, diff, _| {
+                this.state.set_diff(diff);
+                this.remember_tab();
+            },
         );
+    }
+    pub fn capture_tab(&mut self) {
+        if self.state.loading {
+            return;
+        }
+        let Some(index) = self.active_tab else {
+            return;
+        };
+        let Some(tab) = self.tabs.get_mut(index) else {
+            return;
+        };
+        tab.selection = self.state.text_selection.clone();
+        tab.horizontal = self.state.horizontal_offset;
+        tab.block = self.state.current_block;
+        self.tab_scroll
+            .insert(tab.file.path.clone(), self.diff_scroll.clone());
+    }
+    pub fn remember_tab(&mut self) {
+        let Some(tab) = self.state.tab_snapshot() else {
+            return;
+        };
+        let file = tab.file.clone();
+        let index = match self.tabs.iter().position(|t| t.file.path == file.path) {
+            Some(index) => {
+                self.tabs[index] = tab;
+                index
+            }
+            None => {
+                self.tabs.push(tab);
+                self.tabs.len() - 1
+            }
+        };
+        self.active_tab = Some(index);
+        self.tab_scroll.insert(file.path, self.diff_scroll.clone());
+    }
+    pub fn activate_tab(&mut self, index: usize, cx: &mut Context<Self>) {
+        self.capture_tab();
+        let Some(tab) = self.tabs.get(index).cloned() else {
+            return;
+        };
+        self.pending.cancel();
+        self.state.generation += 1;
+        self.state.loading = false;
+        let path = tab.file.path.clone();
+        self.state.restore_tab(tab);
+        self.diff_scroll = self.tab_scroll.get(&path).cloned().unwrap_or_default();
+        self.active_tab = Some(index);
+        self.line_layouts.clear();
+        self.dragging = false;
+        cx.notify();
+    }
+    pub fn close_tab(&mut self, index: usize, cx: &mut Context<Self>) {
+        if index >= self.tabs.len() {
+            return;
+        }
+        self.capture_tab();
+        let removed = self.tabs.remove(index);
+        self.tab_scroll.remove(&removed.file.path);
+        match self.active_tab {
+            Some(active) if active == index => {
+                self.active_tab = None;
+                if !self.tabs.is_empty() {
+                    self.activate_tab(index.min(self.tabs.len() - 1), cx);
+                } else {
+                    self.state.current_file = None;
+                    self.state.selected = None;
+                    self.state.clear_diff();
+                }
+            }
+            Some(active) if active > index => self.active_tab = Some(active - 1),
+            _ => {}
+        }
+        cx.notify();
+    }
+    pub fn close_other_tabs(&mut self, all: bool, cx: &mut Context<Self>) {
+        if !all && self.active_tab.is_none() {
+            return;
+        }
+        self.capture_tab();
+        self.pending.cancel();
+        self.state.generation += 1;
+        self.state.loading = false;
+        if !all && let Some(tab) = self.active_tab.and_then(|i| self.tabs.get(i)).cloned() {
+            let scroll = self.tab_scroll.remove(&tab.file.path);
+            self.tabs = vec![tab.clone()];
+            self.active_tab = Some(0);
+            self.tab_scroll.clear();
+            if let Some(scroll) = scroll {
+                self.tab_scroll.insert(tab.file.path, scroll);
+            }
+        } else {
+            self.tabs.clear();
+            self.tab_scroll.clear();
+            self.active_tab = None;
+            self.state.current_file = None;
+            self.state.selected = None;
+            self.state.clear_diff();
+        }
+        cx.notify();
+    }
+    pub fn refresh_tree(&mut self, cx: &mut Context<Self>) {
+        let Some(repo) = &self.state.repo else {
+            return;
+        };
+        let root = repo.root.clone();
+        let expanded = self.tree.expanded.clone();
+        self.tree_pending.cancel();
+        self.tree_pending = Default::default();
+        let token = self.tree_pending.clone();
+        self.tree_epoch += 1;
+        let epoch = self.tree_epoch;
+        self.tree_loading = true;
+        self.tree_error = None;
+        let task = cx.background_executor().spawn(async move {
+            mygit_gpui::process::scope(token, || mygit_gpui::workspace::read(&root, &expanded))
+        });
+        cx.spawn(async move |this, cx| {
+            let result = task.await;
+            let _ = this.update(cx, |this, cx| {
+                if this.tree_epoch != epoch {
+                    return;
+                }
+                this.tree_loading = false;
+                match result {
+                    Ok(children) => this.tree.children = children,
+                    Err(e) => this.tree_error = Some(format!("{e:#}")),
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+        cx.notify();
+    }
+    pub fn choose_tree(
+        &mut self,
+        entry: mygit_gpui::workspace::Entry,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        window.focus(&self.files_focus);
+        cx.activate(true);
+        self.tree.selected = Some(entry.path.clone());
+        if entry.directory {
+            if !self.tree.expanded.remove(&entry.path) {
+                self.tree.expanded.insert(entry.path);
+            }
+            self.refresh_tree(cx);
+        } else {
+            self.open_workspace_file(entry.path, cx);
+        }
+        cx.notify();
+    }
+    pub fn open_workspace_file(&mut self, path: String, cx: &mut Context<Self>) {
+        let Some(repo) = &self.state.repo else {
+            return;
+        };
+        let root = repo.root.clone();
+        self.capture_tab();
+        self.active_tab = None;
+        self.state.selected = None;
+        self.state.detail = None;
+        self.state.current_file = Some(FileChange {
+            path: path.clone(),
+            old_path: path.clone(),
+            status: "M".into(),
+        });
+        self.state.clear_diff();
+        self.line_layouts.clear();
+        self.dragging = false;
+        self.diff_scroll = UniformListScrollHandle::new();
+        let generation = self.state.begin(format!("正在打开 {path}…"));
+        self.pending.cancel();
+        self.pending = Default::default();
+        tasks::run(
+            cx,
+            generation,
+            self.pending.clone(),
+            move || {
+                let (comparison, file) = git::workspace_file(&root, &path)?;
+                let diff = git::compare(&root, &comparison, &file)?;
+                Ok((comparison, file, diff))
+            },
+            |this, (comparison, file, diff), _| {
+                this.state.comparison = Some(comparison);
+                this.state.current_file = Some(file);
+                this.state.set_diff(diff);
+                this.remember_tab();
+            },
+        );
+        cx.notify();
+    }
+    pub fn load_more_history(&mut self, cx: &mut Context<Self>) {
+        let Some(repo) = &self.state.repo else {
+            return;
+        };
+        if self.history_loading || !repo.history_more {
+            return;
+        }
+        let Some(tip) = repo.history_tip.clone() else {
+            return;
+        };
+        let root = repo.root.clone();
+        let skip = repo.commits.len();
+        let epoch = self.repository_epoch;
+        self.history_loading = true;
+        self.history_failed = false;
+        cx.notify();
+        let token = self.history_pending.clone();
+        let task = cx.background_executor().spawn(async move {
+            mygit_gpui::process::scope(token, || git::history_page(&root, &tip, skip))
+        });
+        cx.spawn(async move |this, cx| {
+            let result = task.await;
+            let _ = this.update(cx, |this, cx| {
+                if this.repository_epoch != epoch {
+                    return;
+                }
+                this.history_loading = false;
+                match result {
+                    Ok(page) => {
+                        if let Some(repo) = &mut this.state.repo {
+                            repo.commits.extend(page.commits);
+                            repo.history_more = page.more;
+                        }
+                    }
+                    Err(e) => {
+                        this.history_failed = true;
+                        this.state.message = format!("加载历史失败：{e:#}");
+                    }
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+    pub fn cancel_task(&mut self, cx: &mut Context<Self>) {
+        self.pending.cancel();
+        self.history_pending.cancel();
+        self.history_pending = Default::default();
+        self.tree_pending.cancel();
+        self.tree_epoch += 1;
+        self.tree_loading = false;
+        self.repository_epoch += 1;
+        self.history_loading = false;
+        self.history_failed = true;
+        self.state.generation += 1;
+        self.state.loading = false;
+        self.state.message = "已取消，可刷新或重新选择".into();
+        cx.notify();
+    }
+    pub fn choose_history(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(commit) = self.state.repo.as_ref().and_then(|r| r.commits.get(index)) else {
+            return;
+        };
+        let sha = commit.sha.clone();
+        self.history_cursor = Some(index);
+        window.focus(&self.history_focus);
+        cx.activate(true);
+        self.history_scroll
+            .scroll_to_item(index, ScrollStrategy::Center);
+        self.select_mode(BrowseMode::History(sha), cx);
+    }
+    pub fn list_move(&mut self, forward: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.history_focus.is_focused(window) {
+            let count = self
+                .state
+                .repo
+                .as_ref()
+                .map(|r| r.commits.len())
+                .unwrap_or(0);
+            if count == 0 {
+                return;
+            }
+            let index = match self.history_cursor {
+                None => 0,
+                Some(i) => {
+                    if forward {
+                        (i + 1).min(count - 1)
+                    } else {
+                        i.saturating_sub(1)
+                    }
+                }
+            };
+            self.choose_history(index, window, cx);
+        } else if self.files_focus.is_focused(window) {
+            if self.show_tree {
+                let rows = self.tree.rows();
+                if rows.is_empty() {
+                    return;
+                }
+                let current = rows
+                    .iter()
+                    .position(|(e, _)| Some(&e.path) == self.tree.selected.as_ref())
+                    .unwrap_or(0);
+                let next = if forward {
+                    (current + 1).min(rows.len() - 1)
+                } else {
+                    current.saturating_sub(1)
+                };
+                self.tree.selected = Some(rows[next].0.path.clone());
+                self.files_scroll
+                    .scroll_to_item(next, ScrollStrategy::Center);
+                cx.notify();
+                return;
+            }
+            if self.state.files.is_empty() {
+                return;
+            }
+            let index = match self.state.selected {
+                None => 0,
+                Some(i) => {
+                    if forward {
+                        (i + 1).min(self.state.files.len() - 1)
+                    } else {
+                        i.saturating_sub(1)
+                    }
+                }
+            };
+            self.files_scroll
+                .scroll_to_item(index, ScrollStrategy::Center);
+            self.select_file(index, cx);
+        }
+    }
+    pub fn list_enter(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.history_focus.is_focused(window) {
+            window.focus(&self.files_focus);
+        } else if self.files_focus.is_focused(window) {
+            if self.show_tree
+                && let Some((entry, _)) = self
+                    .tree
+                    .rows()
+                    .into_iter()
+                    .find(|(e, _)| Some(&e.path) == self.tree.selected.as_ref())
+            {
+                self.choose_tree(entry, window, cx);
+                return;
+            }
+            window.focus(&self.focus);
+        }
+        cx.notify();
+    }
+    pub fn cycle_focus(&mut self, reverse: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let index = if self.history_focus.is_focused(window) {
+            0
+        } else if self.files_focus.is_focused(window) {
+            1
+        } else {
+            2
+        };
+        let next = (index + if reverse { 2 } else { 1 }) % 3;
+        window.focus(match next {
+            0 => &self.history_focus,
+            1 => &self.files_focus,
+            _ => &self.focus,
+        });
+        cx.notify();
     }
     pub fn navigate(&mut self, forward: bool, cx: &mut Context<Self>) {
         if let Some(row) = self.state.navigate(forward) {
@@ -316,10 +807,39 @@ impl MyGit {
         window.focus(&self.focus);
         cx.notify();
     }
+    pub fn save_settings(&mut self) {
+        self.settings.font_size = self.state.font_size;
+        self.settings.font_family = self.state.font_family.clone();
+        if let Err(e) = self.settings.save() {
+            self.state.message = format!("无法保存设置：{e:#}");
+        }
+    }
+    pub fn cycle_font(&mut self, cx: &mut Context<Self>) {
+        self.state.font_family = match self.state.font_family.as_str() {
+            "Menlo" => "Courier New",
+            "Courier New" => "monospace",
+            _ => "Menlo",
+        }
+        .into();
+        self.save_settings();
+        cx.notify();
+    }
+    pub fn resize_panel(&mut self, history: bool, increase: bool, cx: &mut Context<Self>) {
+        let width = if history {
+            &mut self.settings.history_width
+        } else {
+            &mut self.settings.files_width
+        };
+        *width = (*width + if increase { 20. } else { -20. })
+            .clamp(if history { 160. } else { 120. }, 600.);
+        self.save_settings();
+        cx.notify();
+    }
     pub fn change_font_size(&mut self, increase: bool, cx: &mut Context<Self>) {
         self.state.font_size =
             (self.state.font_size + if increase { 1. } else { -1. }).clamp(10., 22.);
         self.diff_scroll = UniformListScrollHandle::new();
+        self.save_settings();
         cx.notify();
     }
     pub fn move_horizontal(&mut self, forward: bool, window: &Window, cx: &mut Context<Self>) {
@@ -334,9 +854,55 @@ impl MyGit {
     }
 }
 impl Render for MyGit {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.line_layouts.clear();
+        let available = (f32::from(window.viewport_size().width) - 420.).max(280.);
+        let factor =
+            (available / (self.settings.history_width + self.settings.files_width)).min(1.);
+        self.visible_history_width = (self.settings.history_width * factor).max(160.);
+        self.visible_files_width = (self.settings.files_width * factor).max(120.);
         div()
+            .key_context("MyGit")
+            .on_action(cx.listener(|this, _: &ViewWorkspace, _, cx| {
+                this.select_mode(BrowseMode::Workspace, cx)
+            }))
+            .on_action(
+                cx.listener(|this, _: &ViewStaged, _, cx| this.select_mode(BrowseMode::Staged, cx)),
+            )
+            .on_action(cx.listener(|this, _: &ViewUnstaged, _, cx| {
+                this.select_mode(BrowseMode::Unstaged, cx)
+            }))
+            .on_action(cx.listener(|this, _: &CopyCommitSha, _, cx| {
+                if let Some(detail) = &this.state.detail {
+                    cx.write_to_clipboard(ClipboardItem::new_string(detail.sha.clone()));
+                }
+            }))
+            .on_action(cx.listener(|this, _: &OpenRepo, _, cx| this.open(cx)))
+            .on_action(cx.listener(|this, _: &RefreshRepo, _, cx| {
+                if let Some(path) = this.last_path.clone() {
+                    this.load(path, cx);
+                }
+            }))
+            .on_action(cx.listener(|this, _: &ToggleSettings, _, cx| {
+                this.show_settings = !this.show_settings;
+                cx.notify();
+            }))
+            .on_action(cx.listener(|this, _: &CancelTask, _, cx| this.cancel_task(cx)))
+            .on_action(
+                cx.listener(|this, _: &FocusNext, window, cx| this.cycle_focus(false, window, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &FocusPrevious, window, cx| {
+                    this.cycle_focus(true, window, cx)
+                }),
+            )
+            .on_action(
+                cx.listener(|this, _: &ListUp, window, cx| this.list_move(false, window, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &ListDown, window, cx| this.list_move(true, window, cx)),
+            )
+            .on_action(cx.listener(|this, _: &ListEnter, window, cx| this.list_enter(window, cx)))
             .on_mouse_move(cx.listener(Self::mouse_move))
             .on_mouse_up(
                 MouseButton::Left,
@@ -407,13 +973,18 @@ impl Render for MyGit {
             .text_color(rgb(0xdce5f3))
             .text_size(px(13.))
             .child(views::toolbar(self, cx))
+            .when(self.show_settings, |s| s.child(views::settings(self, cx)))
             .child(
                 div()
                     .flex()
                     .flex_1()
                     .min_h_0()
                     .child(views::sidebar::history(self, cx))
-                    .child(views::sidebar::files(self, cx))
+                    .child(if self.show_tree {
+                        views::tree::pane(self, cx).into_any_element()
+                    } else {
+                        views::sidebar::files(self, cx).into_any_element()
+                    })
                     .child(views::diff::pane(self, cx)),
             )
             .child(
@@ -429,5 +1000,13 @@ impl Render for MyGit {
                         self.state.message
                     )),
             )
+    }
+}
+
+impl Drop for MyGit {
+    fn drop(&mut self) {
+        self.pending.cancel();
+        self.history_pending.cancel();
+        self.tree_pending.cancel();
     }
 }

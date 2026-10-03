@@ -22,10 +22,13 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .map(|r| r.commits.len())
         .unwrap_or(0);
     div()
-        .w(px(300.))
+        .key_context("HistoryList")
+        .track_focus(&this.history_focus)
+        .w(px(this.visible_history_width))
         .flex_shrink_0()
         .flex()
         .flex_col()
+        .min_h_0()
         .border_r_1()
         .border_color(rgb(0x2b3545))
         .child(
@@ -59,17 +62,29 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             div()
                 .p_3()
                 .text_color(rgb(0x92a2b9))
-                .child("提交历史 · 最近 100 条"),
+                .child(format!("提交历史 · 已加载 {count} 条")),
         )
         .child(
             uniform_list(
                 "history",
                 count,
                 cx.processor(|this, range: std::ops::Range<usize>, _, cx| {
+                    if range.end
+                        >= this
+                            .state
+                            .repo
+                            .as_ref()
+                            .map(|r| r.commits.len())
+                            .unwrap_or(0)
+                    {
+                        let entity = cx.entity().downgrade();
+                        cx.defer(move |cx| {
+                            let _ = entity.update(cx, |this, cx| this.load_more_history(cx));
+                        });
+                    }
                     range
                         .map(|i| {
                             let c = &this.state.repo.as_ref().unwrap().commits[i];
-                            let sha = c.sha.clone();
                             div()
                                 .id(i)
                                 .h(px(64.))
@@ -91,22 +106,96 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                     c.author,
                                     c.date
                                 )))
-                                .on_click(cx.listener(move |this, _, _, cx| {
-                                    this.select_mode(BrowseMode::History(sha.clone()), cx)
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    this.choose_history(i, window, cx)
                                 }))
                         })
                         .collect::<Vec<_>>()
                 }),
             )
+            .track_scroll(this.history_scroll.clone())
+            .min_h_0()
             .flex_1(),
         )
+        .child(
+            button(
+                "more-history",
+                if this.history_loading {
+                    "正在加载历史…"
+                } else {
+                    "加载更多"
+                },
+                !this.history_loading && this.state.repo.as_ref().is_some_and(|r| r.history_more),
+            )
+            .on_click(cx.listener(|this, _, _, cx| this.load_more_history(cx))),
+        )
+        .when_some(this.state.detail.clone(), |s, detail| {
+            let sha = detail.sha.clone();
+            let message = detail.message.clone();
+            s.child(
+                div()
+                    .id("commit-detail")
+                    .h(px(240.))
+                    .overflow_y_scroll()
+                    .p_2()
+                    .border_t_1()
+                    .border_color(rgb(0x2b3545))
+                    .child(
+                        div()
+                            .flex()
+                            .gap_2()
+                            .child(button("copy-sha", "复制 SHA", true).on_click(cx.listener(
+                                move |_, _, _, cx| {
+                                    cx.write_to_clipboard(ClipboardItem::new_string(sha.clone()));
+                                },
+                            )))
+                            .child(
+                                button("copy-message", "复制信息", true).on_click(cx.listener(
+                                    move |_, _, _, cx| {
+                                        cx.write_to_clipboard(ClipboardItem::new_string(
+                                            message.clone(),
+                                        ));
+                                    },
+                                )),
+                            ),
+                    )
+                    .child(div().text_color(rgb(0x92a2b9)).child(format!(
+                        "{} <{}>\n{}",
+                        detail.author, detail.author_email, detail.author_date
+                    )))
+                    .child(div().text_color(rgb(0x92a2b9)).child(format!(
+                        "提交者：{} <{}>\n{}",
+                        detail.committer, detail.committer_email, detail.commit_date
+                    )))
+                    .child(div().child(detail.references))
+                    .child(div().child(format!(
+                            "父提交：{}",
+                            detail
+                                .parents
+                                .iter()
+                                .map(|p| short_sha(p))
+                                .collect::<Vec<_>>()
+                                .join(" ")
+                        )))
+                    .children(
+                        detail
+                            .message
+                            .split('\n')
+                            .map(|line| div().min_h(px(18.)).child(line.to_owned()))
+                            .collect::<Vec<_>>(),
+                    ),
+            )
+        })
 }
 pub fn files(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
     div()
-        .w(px(220.))
+        .key_context("FilesList")
+        .track_focus(&this.files_focus)
+        .w(px(this.visible_files_width))
         .flex_shrink_0()
         .flex()
         .flex_col()
+        .min_h_0()
         .border_r_1()
         .border_color(rgb(0x2b3545))
         .child(div().p_3().child(format!(
@@ -137,13 +226,17 @@ pub fn files(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                 }))
                                 .hover(|s| s.bg(rgb(0x253248)))
                                 .child(format!("{}  {}", file.status, file.path))
-                                .on_click(
-                                    cx.listener(move |this, _, _, cx| this.select_file(i, cx)),
-                                )
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    window.focus(&this.files_focus);
+                                    cx.activate(true);
+                                    this.select_file(i, cx);
+                                }))
                         })
                         .collect::<Vec<_>>()
                 }),
             )
+            .track_scroll(this.files_scroll.clone())
+            .min_h_0()
             .flex_1(),
         )
 }

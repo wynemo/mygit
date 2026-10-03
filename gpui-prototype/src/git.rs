@@ -1,20 +1,20 @@
 use crate::{diff, model::*};
 use anyhow::{Context, Result, bail};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     path::{Path, PathBuf},
     process::Command,
 };
 
 fn git(root: &Path, args: &[&str]) -> Result<Vec<u8>> {
-    let output = Command::new("git")
+    let mut command = Command::new("git");
+    command
         .arg("-C")
         .arg(root)
         .arg("--literal-pathspecs")
         .args(args)
-        .env("GIT_OPTIONAL_LOCKS", "0")
-        .output()
-        .context("无法启动 Git")?;
+        .env("GIT_OPTIONAL_LOCKS", "0");
+    let output = crate::process::output(&mut command, std::time::Duration::from_secs(30))?;
     if !output.status.success() {
         bail!("{}", String::from_utf8_lossy(&output.stderr).trim());
     }
@@ -43,31 +43,103 @@ pub fn snapshot(path: &Path) -> Result<Snapshot> {
     )?
     .trim()
     .to_string();
-    let commits = if let Revision::Head(sha) = head(&root)? {
-        string(git(
-            &root,
-            &["log", "-100", "--format=%H%x1f%s%x1f%an%x1f%as", &sha, "--"],
-        )?)?
-        .lines()
-        .filter_map(|line| {
-            let fields: Vec<_> = line.split('\x1f').collect();
-            (fields.len() == 4).then(|| Commit {
-                sha: fields[0].into(),
-                subject: fields[1].into(),
-                author: fields[2].into(),
-                date: fields[3].into(),
-            })
-        })
-        .collect()
-    } else {
-        vec![]
+    let history_tip = match head(&root)? {
+        Revision::Head(sha) => Some(sha),
+        _ => None,
+    };
+    let page = match &history_tip {
+        Some(sha) => history_page(&root, sha, 0)?,
+        None => HistoryPage {
+            commits: vec![],
+            more: false,
+        },
     };
     Ok(Snapshot {
         root,
         branch,
-        commits,
+        commits: page.commits,
+        history_tip,
+        history_more: page.more,
     })
 }
+/// All pages use the same pinned tip, even when HEAD changes between requests.
+pub fn history_page(root: &Path, tip: &str, skip: usize) -> Result<HistoryPage> {
+    let output = string(git(
+        root,
+        &[
+            "log",
+            "-101",
+            &format!("--skip={skip}"),
+            "-z",
+            "--format=%H%x00%s%x00%an%x00%aI",
+            tip,
+            "--",
+        ],
+    )?)?;
+    let fields: Vec<_> = output.trim_end_matches('\0').split('\0').collect();
+    if output.is_empty() {
+        return Ok(HistoryPage {
+            commits: vec![],
+            more: false,
+        });
+    }
+    if !fields.len().is_multiple_of(4) {
+        bail!("提交历史格式无效");
+    }
+    let mut commits: Vec<_> = fields
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|f| Commit {
+            sha: f[0].into(),
+            subject: f[1].into(),
+            author: f[2].into(),
+            date: f[3].into(),
+        })
+        .collect();
+    let more = commits.len() > 100;
+    commits.truncate(100);
+    Ok(HistoryPage { commits, more })
+}
+
+pub fn commit_detail(root: &Path, sha: &str) -> Result<CommitDetail> {
+    let sha = string(git(
+        root,
+        &[
+            "rev-parse",
+            "--verify",
+            "--end-of-options",
+            &format!("{sha}^{{commit}}"),
+        ],
+    )?)?;
+    let output = string(git(
+        root,
+        &[
+            "show",
+            "-s",
+            "--format=%H%x00%B%x00%an%x00%ae%x00%aI%x00%cn%x00%ce%x00%cI%x00%D%x00%P",
+            sha.trim(),
+            "--",
+        ],
+    )?)?;
+    let f: Vec<_> = output.trim_end_matches('\n').split('\0').collect();
+    if f.len() != 10 {
+        bail!("提交详情格式无效");
+    }
+    Ok(CommitDetail {
+        sha: f[0].into(),
+        message: f[1].into(),
+        author: f[2].into(),
+        author_email: f[3].into(),
+        author_date: f[4].into(),
+        committer: f[5].into(),
+        committer_email: f[6].into(),
+        commit_date: f[7].into(),
+        references: f[8].into(),
+        parents: f[9].split_whitespace().map(String::from).collect(),
+    })
+}
+
 fn parse_files(bytes: &[u8]) -> Result<Vec<FileChange>> {
     let text = std::str::from_utf8(bytes).context("文件路径不是 UTF-8，暂不支持预览")?;
     let mut records = text.split('\0').filter(|r| !r.is_empty());
@@ -210,11 +282,66 @@ pub fn selection(root: &Path, mode: &BrowseMode) -> Result<Selection> {
     files.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(Selection { comparison, files })
 }
+pub fn workspace_status(root: &Path) -> Result<BTreeMap<String, String>> {
+    let bytes = git(
+        root,
+        &[
+            "status",
+            "--porcelain=v1",
+            "-z",
+            "--ignored=matching",
+            "--untracked-files=all",
+        ],
+    )?;
+    let text = std::str::from_utf8(&bytes).context("状态路径不是 UTF-8")?;
+    let mut records = text.split('\0').filter(|r| !r.is_empty());
+    let mut result = BTreeMap::new();
+    while let Some(record) = records.next() {
+        if record.len() < 4 || !record.is_char_boundary(3) {
+            bail!("状态记录无效");
+        }
+        let status = &record[..2];
+        let path = record[3..].trim_end_matches('/');
+        result.insert(path.to_owned(), status.to_owned());
+        if status.contains('R') || status.contains('C') {
+            let old = records.next().context("重命名缺少原路径")?;
+            result.insert(old.into(), "D".into());
+        }
+    }
+    Ok(result)
+}
+pub fn workspace_file(root: &Path, path: &str) -> Result<(Comparison, FileChange)> {
+    let left = head(root)?;
+    let exists_in_head = match &left {
+        Revision::Head(sha) => git(root, &["cat-file", "-e", &format!("{sha}:{path}")]).is_ok(),
+        _ => false,
+    };
+    Ok((
+        Comparison {
+            left,
+            right: Revision::Worktree,
+        },
+        FileChange {
+            path: path.into(),
+            old_path: path.into(),
+            status: if exists_in_head { "M" } else { "A" }.into(),
+        },
+    ))
+}
+
 fn content(root: &Path, target: &FileTarget) -> Result<Vec<u8>> {
     match &target.revision {
         Revision::Empty => Ok(vec![]),
-        Revision::Worktree => std::fs::read(root.join(&target.path))
-            .with_context(|| format!("无法读取工作区文件 {}", target.path)),
+        Revision::Worktree => {
+            let path = root.join(&target.path);
+            if std::fs::symlink_metadata(&path)?.file_type().is_symlink() {
+                return Ok(std::fs::read_link(&path)?
+                    .to_string_lossy()
+                    .as_bytes()
+                    .to_vec());
+            }
+            std::fs::read(path).with_context(|| format!("无法读取工作区文件 {}", target.path))
+        }
         Revision::Index => git(root, &["show", &format!(":{}", target.path)]),
         Revision::Head(sha) | Revision::Commit(sha) => {
             git(root, &["show", &format!("{sha}:{}", target.path)])

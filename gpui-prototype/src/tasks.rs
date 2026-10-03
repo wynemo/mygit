@@ -6,10 +6,13 @@ use gpui::Context;
 pub fn run<T: Send + 'static>(
     cx: &mut Context<MyGit>,
     generation: u64,
+    token: mygit_gpui::process::Cancellation,
     job: impl FnOnce() -> Result<T> + Send + 'static,
     apply: impl FnOnce(&mut MyGit, T, &mut Context<MyGit>) + 'static,
 ) {
-    let task = cx.background_executor().spawn(async move { job() });
+    let task = cx
+        .background_executor()
+        .spawn(async move { mygit_gpui::process::scope(token, job) });
     cx.spawn(async move |this, cx| {
         let result = task.await;
         let _ = this.update(cx, |this, cx| {

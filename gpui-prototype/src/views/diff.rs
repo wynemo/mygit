@@ -67,8 +67,7 @@ fn cell(
 pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
     let title = this
         .state
-        .selected
-        .and_then(|i| this.state.files.get(i))
+        .active_file()
         .map(|f| {
             if f.old_path != f.path {
                 format!("{} → {}", f.old_path, f.path)
@@ -97,6 +96,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .flex_1()
         .min_w_0()
         .min_h_0()
+        .child(crate::views::tabs::bar(this, cx))
         .child(
             div()
                 .p_3()
@@ -209,7 +209,8 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     .text_color(rgb(0x92a2b9))
                     .child(if this.state.loading {
                         "正在加载…".into()
-                    } else if this.state.selected.is_some() || this.state.comparison.is_none() {
+                    } else if this.state.active_file().is_some() || this.state.comparison.is_none()
+                    {
                         this.state.message.clone()
                     } else if this.state.repo.is_some() {
                         format!("{}：没有变更文件", this.state.mode.label())

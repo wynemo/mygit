@@ -261,3 +261,108 @@ fn empty_and_detached_repository_browsing() {
     std::fs::create_dir(f.0.join("subdir")).unwrap();
     assert_eq!(snapshot(&f.0.join("subdir")).unwrap().root, repo.root);
 }
+
+#[test]
+fn history_pages_are_pinned_and_details_preserve_multiline_message() {
+    let f = Fixture::new();
+    std::fs::write(f.0.join("file"), "text\n").unwrap();
+    git(&f.0, &["add", "."]).unwrap();
+    let tree = string(git(&f.0, &["write-tree"]).unwrap())
+        .unwrap()
+        .trim()
+        .to_owned();
+    let mut parent = String::new();
+    for i in 0..105 {
+        let message = format!("subject {i}\n\n中文正文\nline two");
+        let mut args = vec!["commit-tree", &tree, "-m", &message];
+        if !parent.is_empty() {
+            args.extend(["-p", &parent]);
+        }
+        parent = string(git(&f.0, &args).unwrap()).unwrap().trim().into();
+    }
+    git(&f.0, &["update-ref", "refs/heads/main", &parent]).unwrap();
+    let s = snapshot(&f.0).unwrap();
+    assert_eq!(s.commits.len(), 100);
+    assert!(s.history_more);
+    assert_eq!(s.commits[0].subject, "subject 104");
+    let second = history_page(&f.0, s.history_tip.as_ref().unwrap(), 100).unwrap();
+    assert_eq!(second.commits.len(), 5);
+    assert!(!second.more);
+    assert_eq!(second.commits[0].subject, "subject 4");
+    let detail = commit_detail(&f.0, &parent).unwrap();
+    assert_eq!(detail.message, "subject 104\n\n中文正文\nline two\n");
+    assert_eq!(detail.author_email, "test@example.invalid");
+    assert_eq!(detail.parents.len(), 1);
+    let new =
+        string(git(&f.0, &["commit-tree", &tree, "-p", &parent, "-m", "new"]).unwrap()).unwrap();
+    git(&f.0, &["update-ref", "refs/heads/main", new.trim()]).unwrap();
+    assert_eq!(
+        history_page(&f.0, s.history_tip.as_ref().unwrap(), 100)
+            .unwrap()
+            .commits[0]
+            .sha,
+        second.commits[0].sha
+    );
+    std::fs::create_dir(f.0.join("nested")).unwrap();
+    assert_eq!(snapshot(&f.0.join("nested")).unwrap().root, s.root);
+    assert!(snapshot(&f.0.join("missing")).is_err());
+}
+
+#[test]
+fn lazy_tree_status_rename_ignored_and_symlinks() {
+    use crate::workspace::{Tree, read};
+    let f = Fixture::new();
+    std::fs::create_dir_all(f.0.join("a/deep")).unwrap();
+    std::fs::create_dir_all(f.0.join("b")).unwrap();
+    std::fs::write(f.0.join("a/same.txt"), "a\n").unwrap();
+    std::fs::write(f.0.join("b/same.txt"), "b\n").unwrap();
+    std::fs::write(f.0.join(".gitignore"), "ignored/\n").unwrap();
+    f.commit();
+    git(&f.0, &["mv", "a/same.txt", "a/renamed.txt"]).unwrap();
+    std::fs::write(f.0.join("b/same.txt"), "changed\n").unwrap();
+    std::fs::create_dir(f.0.join("ignored")).unwrap();
+    std::fs::write(f.0.join("ignored/file"), "ignored").unwrap();
+    let mut tree = Tree::new();
+    tree.children = read(&f.0, &tree.expanded).unwrap();
+    assert_eq!(tree.children.len(), 1);
+    assert!(!tree.rows().iter().any(|(e, _)| e.name == ".git"));
+    assert!(
+        tree.rows()
+            .iter()
+            .any(|(e, _)| e.path == "b" && e.status == "变更")
+    );
+    assert!(
+        tree.rows()
+            .iter()
+            .any(|(e, _)| e.path == "ignored" && e.status == "!!")
+    );
+    tree.expanded.insert("a".into());
+    tree.expanded.insert("ignored".into());
+    tree.children = read(&f.0, &tree.expanded).unwrap();
+    assert!(!tree.children.contains_key("a/deep"));
+    assert!(
+        tree.rows()
+            .iter()
+            .any(|(e, d)| e.path == "a/renamed.txt" && *d == 1 && e.status.contains('R'))
+    );
+    assert!(
+        tree.rows()
+            .iter()
+            .any(|(e, _)| e.path == "ignored/file" && e.status == "!!")
+    );
+    tree.selected = Some("a/renamed.txt".into());
+    tree.children = read(&f.0, &tree.expanded).unwrap();
+    assert_eq!(tree.selected.as_deref(), Some("a/renamed.txt"));
+    let (comparison, file) = workspace_file(&f.0, "b/same.txt").unwrap();
+    assert_eq!(file.status, "M");
+    assert_eq!(compare(&f.0, &comparison, &file).unwrap().rows[0].left, "b");
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink("b/same.txt", f.0.join("link")).unwrap();
+        let (comparison, file) = workspace_file(&f.0, "link").unwrap();
+        assert_eq!(
+            compare(&f.0, &comparison, &file).unwrap().rows[0].right,
+            "b/same.txt"
+        );
+    }
+}

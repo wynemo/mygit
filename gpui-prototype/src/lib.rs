@@ -1,6 +1,9 @@
 pub mod diff;
 pub mod git;
 pub mod model;
+pub mod process;
+pub mod settings;
 pub mod state;
 pub mod syntax;
 pub mod text;
+pub mod workspace;
