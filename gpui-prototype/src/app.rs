@@ -1,6 +1,7 @@
 mod blame;
 mod branches;
 mod history;
+mod quick_open;
 mod refresh;
 use crate::views::editor::{Changed, Editor};
 use crate::views::text_line::LineHit;
@@ -25,6 +26,11 @@ actions!(
         ToggleSettings,
         ToggleBranches,
         ToggleHistorySearch,
+        ToggleQuickOpen,
+        QuickUp,
+        QuickDown,
+        QuickAccept,
+        QuickDismiss,
         Quit,
         FocusNext,
         FocusPrevious,
@@ -75,6 +81,7 @@ pub enum Confirmation {
     },
 }
 pub struct MyGit {
+    pub quick: quick_open::State,
     watcher: Option<mygit_gpui::watch::RepositoryWatch>,
     refresh_debounce: mygit_gpui::watch::Debounce,
     refresh_pending: mygit_gpui::process::Cancellation,
@@ -175,6 +182,7 @@ impl MyGit {
         };
         Self::start_refresh_loop(cx);
         cx.on_app_quit(|this, _| {
+            this.quick.cancel();
             this.blame_pending.cancel();
             this.blame_detail_pending.cancel();
             this.refresh_pending.cancel();
@@ -209,6 +217,7 @@ impl MyGit {
             show_commit: false,
             show_compare: false,
             show_blame: false,
+            quick: Default::default(),
             blame_key: None,
             blame_pending: Default::default(),
             blame_epoch: 0,
@@ -319,6 +328,7 @@ impl MyGit {
         self.reset_refresh();
         self.reset_blame();
         self.reset_history_search();
+        self.quick.reset();
         self.edit_mode = false;
         self.capture_tab();
         self.active_tab = None;
@@ -385,6 +395,7 @@ impl MyGit {
         );
     }
     pub fn select_mode(&mut self, mode: BrowseMode, cx: &mut Context<Self>) {
+        self.hide_quick_open();
         let Some(repo) = &self.state.repo else {
             return;
         };
@@ -1116,6 +1127,7 @@ impl MyGit {
     pub fn toggle_compare(&mut self, cx: &mut Context<Self>) {
         self.show_compare = !self.show_compare;
         if self.show_compare {
+            self.hide_quick_open();
             self.show_branches = false;
             self.show_history_search = false;
         }
@@ -1181,6 +1193,7 @@ impl MyGit {
     pub fn toggle_commit(&mut self, cx: &mut Context<Self>) {
         self.show_commit = !self.show_commit;
         if self.show_commit {
+            self.hide_quick_open();
             self.show_branches = false;
             self.show_history_search = false;
         }
@@ -1325,7 +1338,20 @@ impl MyGit {
                 }
                 this.tree_loading = false;
                 match result {
-                    Ok(children) => this.tree.children = children,
+                    Ok(children) => {
+                        this.tree.children = children;
+                        if let Some(path) = this.quick.reveal.take()
+                            && this.tree.selected.as_ref() == Some(&path)
+                            && let Some(row) = this
+                                .tree
+                                .rows()
+                                .iter()
+                                .position(|(entry, _)| entry.path == path)
+                        {
+                            this.files_scroll
+                                .scroll_to_item(row, ScrollStrategy::Center);
+                        }
+                    }
                     Err(e) => this.tree_error = Some(format!("{e:#}")),
                 }
                 cx.notify();
@@ -1354,6 +1380,7 @@ impl MyGit {
         cx.notify();
     }
     pub fn open_workspace_file(&mut self, path: String, cx: &mut Context<Self>) {
+        self.hide_quick_open();
         let Some(repo) = &self.state.repo else {
             return;
         };
@@ -1475,6 +1502,10 @@ impl MyGit {
             cx.notify();
             return;
         }
+        if self.quick.indexing || self.quick.searching {
+            self.quick.error = Some("已取消文件定位任务，可刷新索引重试".into());
+        }
+        self.quick.cancel();
         self.blame_pending.cancel();
         self.blame_epoch += 1;
         if self.blame_loading {
@@ -1960,6 +1991,17 @@ impl Render for MyGit {
                     this.load(path, cx);
                 }
             }))
+            .on_action(cx.listener(|this, _: &ToggleQuickOpen, window, cx| {
+                this.toggle_quick_open(window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &QuickUp, _, cx| this.quick_move(false, cx)))
+            .on_action(cx.listener(|this, _: &QuickDown, _, cx| this.quick_move(true, cx)))
+            .on_action(
+                cx.listener(|this, _: &QuickAccept, window, cx| this.accept_quick_open(window, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &QuickDismiss, window, cx| this.close_quick_open(window, cx)),
+            )
             .on_action(cx.listener(|this, _: &ToggleHistorySearch, window, cx| {
                 this.toggle_history_search(cx);
                 if this.show_history_search
@@ -1976,6 +2018,9 @@ impl Render for MyGit {
             }))
             .on_action(cx.listener(|this, _: &ToggleSettings, _, cx| {
                 this.show_settings = !this.show_settings;
+                if this.show_settings {
+                    this.hide_quick_open();
+                }
                 cx.notify();
             }))
             .on_action(cx.listener(|this, _: &CancelTask, _, cx| this.cancel_task(cx)))
@@ -2064,6 +2109,9 @@ impl Render for MyGit {
             .text_color(rgb(0xdce5f3))
             .text_size(px(13.))
             .child(views::toolbar(self, cx))
+            .when(self.quick.shown, |s| {
+                s.child(views::quick_open::pane(self, cx))
+            })
             .when(self.show_history_search, |s| {
                 s.child(views::history::pane(self, cx))
             })
@@ -2141,6 +2189,7 @@ impl Render for MyGit {
 
 impl Drop for MyGit {
     fn drop(&mut self) {
+        self.quick.cancel();
         self.blame_pending.cancel();
         self.blame_detail_pending.cancel();
         self.refresh_pending.cancel();

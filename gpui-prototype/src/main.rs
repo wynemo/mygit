@@ -32,6 +32,7 @@ fn main() {
                     MenuItem::action("刷新", RefreshRepo),
                     MenuItem::action("分支管理", ToggleBranches),
                     MenuItem::action("历史搜索", ToggleHistorySearch),
+                    MenuItem::action("文件快速定位", ToggleQuickOpen),
                     MenuItem::action("取消加载", CancelTask),
                     MenuItem::separator(),
                     MenuItem::action("全部变更", ViewWorkspace),
@@ -56,6 +57,12 @@ fn main() {
             },
         ]);
         cx.bind_keys([
+            KeyBinding::new("cmd-p", ToggleQuickOpen, Some("MyGit")),
+            KeyBinding::new("ctrl-p", ToggleQuickOpen, Some("MyGit")),
+            KeyBinding::new("up", QuickUp, Some("QuickOpen && FileEditor")),
+            KeyBinding::new("down", QuickDown, Some("QuickOpen && FileEditor")),
+            KeyBinding::new("enter", QuickAccept, Some("QuickOpen && FileEditor")),
+            KeyBinding::new("escape", QuickDismiss, Some("QuickOpen && FileEditor")),
             KeyBinding::new("cmd-f", FindText, Some("FileEditor")),
             KeyBinding::new("ctrl-f", FindText, Some("FileEditor")),
             KeyBinding::new("f3", FindNext, Some("FileEditor")),

@@ -9,6 +9,7 @@ pub mod merge;
 pub mod model;
 pub mod operations;
 pub mod process;
+pub mod quick_open;
 pub mod recovery;
 pub mod settings;
 pub mod state;

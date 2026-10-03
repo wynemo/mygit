@@ -74,6 +74,10 @@ pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             .on_click(cx.listener(|this, _, _, cx| this.undo_restore(cx))),
         )
         .child(
+            button("quick-open", "文件定位", this.state.repo.is_some())
+                .on_click(cx.listener(|this, _, window, cx| this.toggle_quick_open(window, cx))),
+        )
+        .child(
             button("history-search", "历史搜索", this.state.repo.is_some()).on_click(cx.listener(
                 |this, _, window, cx| {
                     this.toggle_history_search(cx);
@@ -115,11 +119,18 @@ pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .child(
             button("settings", "设置 / 最近仓库", true).on_click(cx.listener(|this, _, _, cx| {
                 this.show_settings = !this.show_settings;
+                if this.show_settings {
+                    this.hide_quick_open();
+                }
                 cx.notify();
             })),
         )
         .when(
-            this.state.loading || this.history_loading || this.blame_loading,
+            this.state.loading
+                || this.history_loading
+                || this.blame_loading
+                || this.quick.indexing
+                || this.quick.searching,
             |s| {
                 s.child(
                     button("cancel-task", "取消加载", true)
@@ -325,3 +336,5 @@ pub fn confirmation(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
 pub mod graph;
 
 pub mod merge;
+
+pub mod quick_open;

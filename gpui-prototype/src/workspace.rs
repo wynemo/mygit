@@ -26,6 +26,21 @@ impl Tree {
             ..Default::default()
         }
     }
+    pub fn reveal(&mut self, path: &str) -> Result<()> {
+        git::validate_paths(&[path.into()])?;
+        self.expanded.insert(String::new());
+        let mut parent = String::new();
+        let parts: Vec<_> = path.split('/').collect();
+        for part in parts.iter().take(parts.len().saturating_sub(1)) {
+            if !parent.is_empty() {
+                parent.push('/');
+            }
+            parent.push_str(part);
+            self.expanded.insert(parent.clone());
+        }
+        self.selected = Some(path.into());
+        Ok(())
+    }
     pub fn rows(&self) -> Vec<(Entry, usize)> {
         fn visit(tree: &Tree, parent: &str, depth: usize, result: &mut Vec<(Entry, usize)>) {
             if let Some(children) = tree.children.get(parent) {

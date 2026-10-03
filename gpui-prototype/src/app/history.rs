@@ -26,6 +26,7 @@ impl MyGit {
         self.show_history_search = !self.show_history_search;
         self.prepare_history_inputs(cx);
         if self.show_history_search {
+            self.hide_quick_open();
             self.show_branches = false;
             self.show_compare = false;
             self.show_settings = false;
@@ -83,6 +84,7 @@ impl MyGit {
     pub fn show_path_history(&mut self, path: String, directory: bool, cx: &mut Context<Self>) {
         self.prepare_history_inputs(cx);
         self.history_path = Some((path.clone(), directory));
+        self.hide_quick_open();
         self.show_history_search = true;
         self.show_branches = false;
         self.show_compare = false;

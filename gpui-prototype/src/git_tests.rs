@@ -1847,3 +1847,76 @@ fn merge_three_columns_combined_budget_and_octopus_are_explicit() {
             .contains("3 个父提交")
     );
 }
+
+#[test]
+fn quick_file_index_handles_ignored_untracked_renames_deletions_and_live_rebuilds() {
+    let f = Fixture::new();
+    std::fs::create_dir(f.0.join("src")).unwrap();
+    std::fs::create_dir(f.0.join("tests")).unwrap();
+    std::fs::write(f.0.join(".gitignore"), "ignored/\n*.tmp\n").unwrap();
+    std::fs::write(f.0.join("src/main.rs"), "main\n").unwrap();
+    std::fs::write(f.0.join("tests/main.rs"), "test\n").unwrap();
+    std::fs::write(f.0.join("removed"), "removed\n").unwrap();
+    f.commit();
+    std::fs::create_dir(f.0.join("ignored")).unwrap();
+    std::fs::write(f.0.join("ignored/hidden"), "hidden\n").unwrap();
+    std::fs::write(f.0.join("hidden.tmp"), "ignored\n").unwrap();
+    std::fs::write(f.0.join("中文 空格.rs"), "new\n").unwrap();
+    std::fs::write(f.0.join("line\nbreak"), "newline filename\n").unwrap();
+    std::fs::remove_file(f.0.join("removed")).unwrap();
+    git(&f.0, &["mv", "src/main.rs", "src/renamed.rs"]).unwrap();
+    let first = crate::quick_open::read(&f.0).unwrap();
+    let mut tree = crate::workspace::Tree::new();
+    tree.reveal("tests/main.rs").unwrap();
+    tree.children = crate::workspace::read(&f.0, &tree.expanded).unwrap();
+    assert_eq!(tree.selected.as_deref(), Some("tests/main.rs"));
+    assert!(
+        tree.rows()
+            .iter()
+            .any(|(entry, _)| entry.path == "tests/main.rs")
+    );
+    assert!(tree.reveal("../outside").is_err());
+    assert_eq!(
+        first.search("", 50).unwrap().paths,
+        vec![
+            ".gitignore",
+            "line\nbreak",
+            "src/renamed.rs",
+            "tests/main.rs",
+            "中文 空格.rs"
+        ]
+    );
+    assert_eq!(
+        first.search("ren", 50).unwrap().paths,
+        vec!["src/renamed.rs"]
+    );
+    std::fs::remove_file(f.0.join("中文 空格.rs")).unwrap();
+    std::fs::write(f.0.join("new file"), "new\n").unwrap();
+    let second = crate::quick_open::read(&f.0).unwrap();
+    assert_eq!(second.search("中文", 50).unwrap().total, 0);
+    assert_eq!(
+        second.search("new file", 50).unwrap().paths,
+        vec!["new file"]
+    );
+    let other = Fixture::new();
+    assert!(crate::quick_open::read(&other.0).unwrap().is_empty());
+    assert_eq!(
+        second.search("new file", 50).unwrap().paths,
+        vec!["new file"]
+    );
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink("ignored", f.0.join("directory-link")).unwrap();
+        let third = crate::quick_open::read(&f.0).unwrap();
+        assert_eq!(
+            third.search("directory-link", 50).unwrap().paths,
+            vec!["directory-link"]
+        );
+        assert_eq!(third.search("hidden", 50).unwrap().total, 0);
+        std::fs::rename(f.0.join("src"), f.0.join(".git/saved-src")).unwrap();
+        std::os::unix::fs::symlink(".git/saved-src", f.0.join("src")).unwrap();
+        let replaced = crate::quick_open::read(&f.0).unwrap();
+        assert_eq!(replaced.search("src/", 50).unwrap().total, 0);
+        assert_eq!(replaced.search("src", 50).unwrap().paths, vec!["src"]);
+    }
+}
