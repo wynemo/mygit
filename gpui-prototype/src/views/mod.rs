@@ -1,3 +1,4 @@
+pub mod branches;
 pub mod commit;
 pub mod compare;
 pub mod diff;
@@ -27,10 +28,21 @@ pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .state
         .repo
         .as_ref()
-        .map(|r| format!("{}   /   {}", r.root.display(), r.branch))
+        .map(|r| {
+            format!(
+                "{}   /   {}",
+                r.root.display(),
+                if r.detached {
+                    format!("detached HEAD · {}", r.branch)
+                } else {
+                    r.branch.clone()
+                }
+            )
+        })
         .unwrap_or_else(|| "MyGit · GPUI".into());
     div()
         .flex()
+        .flex_wrap()
         .items_center()
         .gap_3()
         .p_3()
@@ -58,6 +70,16 @@ pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 !this.write_busy && this.state.repo.is_some(),
             )
             .on_click(cx.listener(|this, _, _, cx| this.undo_restore(cx))),
+        )
+        .child(
+            button("show-branches", "分支", this.state.repo.is_some()).on_click(cx.listener(
+                |this, _, window, cx| {
+                    this.toggle_branches(cx);
+                    if this.show_branches {
+                        window.focus(&this.branch_focus);
+                    }
+                },
+            )),
         )
         .child(
             button("show-compare", "比较版本", this.state.repo.is_some())

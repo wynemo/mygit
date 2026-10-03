@@ -645,3 +645,131 @@ fn refresh_after_committed_rename_uses_new_head_path() {
     assert!(diff.blocks.is_empty());
     assert_eq!(diff.left_document.text.as_ref(), "same\n");
 }
+
+#[test]
+fn branch_create_switch_and_failed_checkout_preserve_worktree() {
+    let f = Fixture::new();
+    std::fs::write(f.0.join("a"), "original\n").unwrap();
+    let original = f.commit();
+    crate::branches::create(&f.0, "feature", "HEAD").unwrap();
+    std::fs::write(f.0.join("a"), "target\n").unwrap();
+    f.commit();
+    crate::branches::switch(&f.0, "refs/heads/main", None).unwrap();
+    assert_eq!(
+        std::fs::read_to_string(f.0.join("a")).unwrap(),
+        "original\n"
+    );
+    std::fs::write(f.0.join("a"), "unsaved-on-disk\n").unwrap();
+    let index = git(&f.0, &["write-tree"]).unwrap();
+    assert!(crate::branches::switch(&f.0, "refs/heads/feature", None).is_err());
+    assert!(crate::branches::create(&f.0, "failed", "feature").is_err());
+    let repo = snapshot(&f.0).unwrap();
+    assert_eq!(repo.branch, "main");
+    assert_eq!(repo.history_tip.as_deref(), Some(original.as_str()));
+    assert_eq!(
+        std::fs::read_to_string(f.0.join("a")).unwrap(),
+        "unsaved-on-disk\n"
+    );
+    assert_eq!(git(&f.0, &["write-tree"]).unwrap(), index);
+    assert!(!repo.branches.iter().any(|b| b.name == "failed"));
+    for name in [
+        "", "-option", "bad name", "a..b", "HEAD", "@{-1}", "a\nb", "main",
+    ] {
+        assert!(
+            crate::branches::create(&f.0, name, "HEAD").is_err(),
+            "{name}"
+        );
+    }
+    // Safe, non-overlapping local changes remain available when Git allows checkout.
+    std::fs::write(f.0.join("a"), "original\n").unwrap();
+    std::fs::write(f.0.join("untracked"), "keep").unwrap();
+    crate::branches::switch(&f.0, "refs/heads/feature", None).unwrap();
+    assert_eq!(
+        std::fs::read_to_string(f.0.join("untracked")).unwrap(),
+        "keep"
+    );
+}
+
+#[test]
+fn branch_list_and_remote_tracking_include_upstream_and_skip_symbolic_head() {
+    let f = Fixture::new();
+    std::fs::write(f.0.join("a"), "original\n").unwrap();
+    f.commit();
+    let remote = f.0.join(".git/upstream.git");
+    git(&f.0, &["init", "--bare", remote.to_str().unwrap()]).unwrap();
+    git(&f.0, &["remote", "add", "origin", remote.to_str().unwrap()]).unwrap();
+    git(&f.0, &["push", "-u", "origin", "main"]).unwrap();
+    git(
+        &f.0,
+        &[
+            "symbolic-ref",
+            "refs/remotes/origin/HEAD",
+            "refs/remotes/origin/main",
+        ],
+    )
+    .unwrap();
+    let branches = crate::branches::list(&f.0).unwrap();
+    let main = branches
+        .iter()
+        .find(|b| b.reference == "refs/heads/main")
+        .unwrap();
+    assert!(main.current);
+    assert_eq!(main.upstream, "refs/remotes/origin/main");
+    assert_eq!(branches.iter().filter(|b| b.remote).count(), 1);
+    assert_eq!(
+        branches
+            .iter()
+            .find(|b| b.remote)
+            .unwrap()
+            .local_name
+            .as_deref(),
+        Some("main")
+    );
+    assert!(crate::branches::switch(&f.0, "refs/remotes/origin/main", None).is_err()); // Existing local branch.
+    crate::branches::switch(&f.0, "refs/remotes/origin/main", Some("tracking/main")).unwrap();
+    let branches = crate::branches::list(&f.0).unwrap();
+    let tracked = branches.iter().find(|b| b.current).unwrap();
+    assert_eq!(tracked.name, "tracking/main");
+    assert_eq!(tracked.upstream, "refs/remotes/origin/main");
+    std::fs::write(f.0.join("a"), "ahead\n").unwrap();
+    f.commit();
+    assert!(
+        crate::branches::list(&f.0)
+            .unwrap()
+            .iter()
+            .find(|b| b.current)
+            .unwrap()
+            .tracking
+            .contains("ahead 1")
+    );
+}
+
+#[test]
+fn branch_creation_supports_unborn_and_pinned_base_and_refuses_non_commit() {
+    let f = Fixture::new();
+    crate::branches::create(&f.0, "first", "HEAD").unwrap();
+    assert_eq!(snapshot(&f.0).unwrap().branch, "first");
+    std::fs::write(f.0.join("a"), "original\n").unwrap();
+    let original = f.commit();
+    std::fs::write(f.0.join("a"), "new\n").unwrap();
+    f.commit();
+    git(&f.0, &["tag", "tagged", &original]).unwrap();
+    crate::branches::create(&f.0, "from-tag", "tagged").unwrap();
+    assert_eq!(
+        snapshot(&f.0).unwrap().history_tip.as_deref(),
+        Some(original.as_str())
+    );
+    for base in ["INDEX", "WORKTREE", "EMPTY", "--option"] {
+        assert!(crate::branches::create(&f.0, "invalid-base", base).is_err());
+    }
+    git(&f.0, &["checkout", "--detach", &original]).unwrap();
+    assert!(
+        !crate::branches::list(&f.0)
+            .unwrap()
+            .iter()
+            .any(|b| b.current)
+    );
+    crate::branches::switch(&f.0, "refs/heads/from-tag", None).unwrap();
+    assert_eq!(snapshot(&f.0).unwrap().branch, "from-tag");
+    assert!(!snapshot(&f.0).unwrap().detached);
+}

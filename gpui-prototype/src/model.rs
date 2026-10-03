@@ -17,9 +17,23 @@ pub struct FileChange {
 pub struct Snapshot {
     pub root: PathBuf,
     pub branch: String,
+    pub detached: bool,
     pub commits: Vec<Commit>,
     pub history_tip: Option<String>,
     pub history_more: bool,
+    pub branches: Vec<BranchRef>,
+}
+
+#[derive(Clone, Debug)]
+pub struct BranchRef {
+    pub reference: String,
+    pub name: String,
+    pub sha: String,
+    pub current: bool,
+    pub remote: bool,
+    pub upstream: String,
+    pub tracking: String,
+    pub local_name: Option<String>,
 }
 
 #[derive(Clone, Debug)]

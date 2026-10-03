@@ -7,10 +7,14 @@ use std::{
     process::Command,
 };
 
-fn git(root: &Path, args: &[&str]) -> Result<Vec<u8>> {
+pub(crate) fn git(root: &Path, args: &[&str]) -> Result<Vec<u8>> {
     git_timeout(root, args, std::time::Duration::from_secs(30))
 }
-fn git_timeout(root: &Path, args: &[&str], timeout: std::time::Duration) -> Result<Vec<u8>> {
+pub(crate) fn git_timeout(
+    root: &Path,
+    args: &[&str],
+    timeout: std::time::Duration,
+) -> Result<Vec<u8>> {
     let mut command = Command::new("git");
     command
         .arg("-C")
@@ -109,12 +113,15 @@ pub fn snapshot(path: &Path) -> Result<Snapshot> {
     let root = PathBuf::from(
         string(git(path, &["rev-parse", "--show-toplevel"])?)?.trim_end_matches('\n'),
     );
-    let branch = string(
-        git(&root, &["symbolic-ref", "--short", "--quiet", "HEAD"])
-            .or_else(|_| git(&root, &["rev-parse", "--short", "HEAD"]))?,
-    )?
-    .trim()
-    .to_string();
+    let (branch, detached) = match git(&root, &["symbolic-ref", "--short", "--quiet", "HEAD"]) {
+        Ok(bytes) => (string(bytes)?.trim().to_string(), false),
+        Err(_) => (
+            string(git(&root, &["rev-parse", "--short", "HEAD"])?)?
+                .trim()
+                .to_string(),
+            true,
+        ),
+    };
     let history_tip = match head(&root)? {
         Revision::Head(sha) => Some(sha),
         _ => None,
@@ -126,9 +133,12 @@ pub fn snapshot(path: &Path) -> Result<Snapshot> {
             more: false,
         },
     };
+    let branches = crate::branches::list(&root)?;
     Ok(Snapshot {
+        branches,
         root,
         branch,
+        detached,
         commits: page.commits,
         history_tip,
         history_more: page.more,

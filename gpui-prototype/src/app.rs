@@ -1,3 +1,4 @@
+mod branches;
 mod refresh;
 use crate::views::editor::{Changed, Editor};
 use crate::views::text_line::LineHit;
@@ -20,6 +21,7 @@ actions!(
         OpenRepo,
         RefreshRepo,
         ToggleSettings,
+        ToggleBranches,
         Quit,
         FocusNext,
         FocusPrevious,
@@ -82,6 +84,13 @@ pub struct MyGit {
     pub write_message: String,
     pub show_commit: bool,
     pub show_compare: bool,
+    pub show_branches: bool,
+    pub branch_name: Option<Entity<Editor>>,
+    pub branch_base: Option<Entity<Editor>>,
+    pub branch_selected: Option<String>,
+    pub branch_filter_sha: Option<String>,
+    pub branch_focus: FocusHandle,
+    pub branch_scroll: UniformListScrollHandle,
     pub compare_left: Option<Entity<Editor>>,
     pub compare_right: Option<Entity<Editor>>,
     pub commit_editor: Option<Entity<Editor>>,
@@ -157,6 +166,13 @@ impl MyGit {
             write_message: String::new(),
             show_commit: false,
             show_compare: false,
+            show_branches: false,
+            branch_name: None,
+            branch_base: None,
+            branch_selected: None,
+            branch_filter_sha: None,
+            branch_focus: cx.focus_handle(),
+            branch_scroll: UniformListScrollHandle::new(),
             compare_left: None,
             compare_right: None,
             commit_editor: None,
@@ -236,6 +252,11 @@ impl MyGit {
         self.capture_tab();
         self.active_tab = None;
         if !self.state.repo.as_ref().is_some_and(|r| r.root == path) {
+            self.show_branches = false;
+            self.branch_name = None;
+            self.branch_base = None;
+            self.branch_selected = None;
+            self.branch_filter_sha = None;
             self.commit_editor = None;
             self.show_commit = false;
             self.editors.clear();
@@ -1319,7 +1340,9 @@ impl MyGit {
         self.select_mode(BrowseMode::History(sha), cx);
     }
     pub fn list_move(&mut self, forward: bool, window: &mut Window, cx: &mut Context<Self>) {
-        if self.history_focus.is_focused(window) {
+        if self.show_branches && self.branch_focus.is_focused(window) {
+            self.move_branch(forward, cx);
+        } else if self.history_focus.is_focused(window) {
             let count = self
                 .state
                 .repo
@@ -1380,7 +1403,9 @@ impl MyGit {
         }
     }
     pub fn list_enter(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.history_focus.is_focused(window) {
+        if self.show_branches && self.branch_focus.is_focused(window) {
+            self.switch_branch(cx);
+        } else if self.history_focus.is_focused(window) {
             window.focus(&self.files_focus);
         } else if self.files_focus.is_focused(window) {
             if self.show_tree
@@ -1398,19 +1423,16 @@ impl MyGit {
         cx.notify();
     }
     pub fn cycle_focus(&mut self, reverse: bool, window: &mut Window, cx: &mut Context<Self>) {
-        let index = if self.history_focus.is_focused(window) {
-            0
-        } else if self.files_focus.is_focused(window) {
-            1
-        } else {
-            2
-        };
-        let next = (index + if reverse { 2 } else { 1 }) % 3;
-        window.focus(match next {
-            0 => &self.history_focus,
-            1 => &self.files_focus,
-            _ => &self.focus,
-        });
+        let mut handles = vec![&self.history_focus, &self.files_focus, &self.focus];
+        if self.show_branches {
+            handles.push(&self.branch_focus);
+        }
+        let index = handles
+            .iter()
+            .position(|focus| focus.is_focused(window))
+            .unwrap_or(2);
+        let next = (index + if reverse { handles.len() - 1 } else { 1 }) % handles.len();
+        window.focus(handles[next]);
         cx.notify();
     }
     pub fn navigate(&mut self, forward: bool, cx: &mut Context<Self>) {
@@ -1738,6 +1760,12 @@ impl Render for MyGit {
                     this.load(path, cx);
                 }
             }))
+            .on_action(cx.listener(|this, _: &ToggleBranches, window, cx| {
+                this.toggle_branches(cx);
+                if this.show_branches {
+                    window.focus(&this.branch_focus);
+                }
+            }))
             .on_action(cx.listener(|this, _: &ToggleSettings, _, cx| {
                 this.show_settings = !this.show_settings;
                 cx.notify();
@@ -1828,6 +1856,9 @@ impl Render for MyGit {
             .text_color(rgb(0xdce5f3))
             .text_size(px(13.))
             .child(views::toolbar(self, cx))
+            .when(self.show_branches, |s| {
+                s.child(views::branches::pane(self, cx))
+            })
             .when(self.show_compare, |s| {
                 s.child(views::compare::pane(self, cx))
             })

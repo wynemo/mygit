@@ -1,3 +1,4 @@
+pub mod branches;
 pub mod diff;
 pub mod editor;
 pub mod git;

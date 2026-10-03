@@ -30,6 +30,7 @@ fn main() {
                 items: vec![
                     MenuItem::action("打开仓库", OpenRepo),
                     MenuItem::action("刷新", RefreshRepo),
+                    MenuItem::action("分支管理", ToggleBranches),
                     MenuItem::action("取消加载", CancelTask),
                     MenuItem::separator(),
                     MenuItem::action("全部变更", ViewWorkspace),
@@ -90,9 +91,17 @@ fn main() {
             KeyBinding::new("escape", CancelTask, Some("MyGit")),
             KeyBinding::new("tab", FocusNext, Some("MyGit")),
             KeyBinding::new("shift-tab", FocusPrevious, Some("MyGit")),
-            KeyBinding::new("up", ListUp, Some("HistoryList || FilesList")),
-            KeyBinding::new("down", ListDown, Some("HistoryList || FilesList")),
-            KeyBinding::new("enter", ListEnter, Some("HistoryList || FilesList")),
+            KeyBinding::new("up", ListUp, Some("HistoryList || FilesList || BranchList")),
+            KeyBinding::new(
+                "down",
+                ListDown,
+                Some("HistoryList || FilesList || BranchList"),
+            ),
+            KeyBinding::new(
+                "enter",
+                ListEnter,
+                Some("HistoryList || FilesList || BranchList"),
+            ),
             KeyBinding::new("cmd-c", CopyText, Some("DiffText || FileEditor")),
             KeyBinding::new("ctrl-c", CopyText, Some("DiffText || FileEditor")),
             KeyBinding::new("cmd-a", SelectAllText, Some("DiffText || FileEditor")),

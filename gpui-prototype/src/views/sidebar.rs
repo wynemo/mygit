@@ -106,6 +106,18 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                     c.author,
                                     c.date
                                 )))
+                                .on_mouse_down(
+                                    MouseButton::Right,
+                                    cx.listener(move |this, _, window, cx| {
+                                        if let Some(commit) =
+                                            this.state.repo.as_ref().and_then(|r| r.commits.get(i))
+                                        {
+                                            this.show_commit_branches(commit.sha.clone(), cx);
+                                            window.focus(&this.branch_focus);
+                                        }
+                                        cx.stop_propagation();
+                                    }),
+                                )
                                 .on_click(cx.listener(move |this, _, window, cx| {
                                     this.choose_history(i, window, cx)
                                 }))
