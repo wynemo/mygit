@@ -48,7 +48,7 @@ pub struct Editor {
     pub saving: bool,
     external_changed: bool,
     pub reference: mygit_gpui::text::Document,
-    compact: bool,
+    pub compact: bool,
     query: Option<Entity<Editor>>,
     query_subscription: Option<Subscription>,
     matches: Vec<Range<usize>>,
@@ -599,7 +599,53 @@ fn line(this: &Editor, index: usize, cx: &mut Context<Editor>) -> impl IntoEleme
     .h_full()
 }
 impl Render for Editor {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let weak = cx.entity().downgrade();
+        window.on_mouse_event(move |event: &ScrollWheelEvent, phase, _, cx| {
+            if phase != DispatchPhase::Capture {
+                return;
+            }
+            let _ = weak.update(cx, |this, cx| {
+                if !this
+                    .hits
+                    .values()
+                    .any(|h| h.bounds.contains(&event.position))
+                {
+                    return;
+                }
+                let delta = event.delta.pixel_delta(px(this.font_size + 12.));
+                let dx = if event.modifiers.shift && delta.x == px(0.) {
+                    delta.y
+                } else {
+                    delta.x
+                };
+                if dx != px(0.) {
+                    let visible = this
+                        .hits
+                        .values()
+                        .map(|h| f32::from(h.bounds.size.width))
+                        .fold(0., f32::max);
+                    let longest = this
+                        .buffer
+                        .text()
+                        .lines()
+                        .map(|s| {
+                            DisplayLine::new(s)
+                                .text
+                                .chars()
+                                .map(|c| if c.is_ascii() { 1 } else { 2 })
+                                .sum::<usize>()
+                        })
+                        .max()
+                        .unwrap_or(0) as f32
+                        * this.font_size;
+                    this.horizontal =
+                        (this.horizontal - f32::from(dx)).clamp(0., (longest - visible).max(0.));
+                    cx.stop_propagation();
+                    cx.notify();
+                }
+            });
+        });
         self.hits.clear();
         let entity = cx.entity();
         let focus = self.focus.clone();

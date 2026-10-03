@@ -1,4 +1,4 @@
-use std::{ops::Range, path::PathBuf};
+use std::{ops::Range, path::PathBuf, sync::Arc};
 
 #[derive(Clone, Debug)]
 pub struct Commit {
@@ -70,6 +70,7 @@ pub enum BrowseMode {
     Staged,
     Unstaged,
     History(String),
+    Compare(Comparison),
 }
 impl BrowseMode {
     pub fn label(&self) -> &'static str {
@@ -78,6 +79,7 @@ impl BrowseMode {
             Self::Staged => "已暂存",
             Self::Unstaged => "未暂存",
             Self::History(_) => "提交变更",
+            Self::Compare(_) => "自定义比较",
         }
     }
 }
@@ -133,11 +135,18 @@ pub struct DiffRow {
     pub left_ending: Option<&'static str>,
     pub right_ending: Option<&'static str>,
 }
+#[derive(Clone, Debug)]
+pub struct UnifiedRow {
+    pub row: usize,
+    pub side: crate::text::Side,
+}
 #[derive(Clone, Debug, Default)]
 pub struct Diff {
-    pub rows: Vec<DiffRow>,
+    pub rows: Arc<Vec<DiffRow>>,
+    pub unified: Arc<Vec<UnifiedRow>>,
     pub blocks: Vec<Range<usize>>,
     pub message: Option<String>,
+    pub description: Option<String>,
     pub left_document: crate::text::Document,
     pub right_document: crate::text::Document,
     pub left_syntax: crate::syntax::Highlighted,
@@ -157,8 +166,35 @@ impl Diff {
         if let Some(start) = start {
             blocks.push(start..rows.len());
         }
+        let mut unified = vec![];
+        let mut i = 0;
+        while i < rows.len() {
+            if rows[i].changed {
+                let start = i;
+                while i < rows.len() && rows[i].changed {
+                    i += 1;
+                }
+                for side in [crate::text::Side::Left, crate::text::Side::Right] {
+                    for (row, item) in rows.iter().enumerate().take(i).skip(start) {
+                        if match side {
+                            crate::text::Side::Left => item.left_no.is_some(),
+                            crate::text::Side::Right => item.right_no.is_some(),
+                        } {
+                            unified.push(UnifiedRow { row, side });
+                        }
+                    }
+                }
+            } else {
+                unified.push(UnifiedRow {
+                    row: i,
+                    side: crate::text::Side::Right,
+                });
+                i += 1;
+            }
+        }
         Self {
-            rows,
+            rows: Arc::new(rows),
+            unified: Arc::new(unified),
             blocks,
             message: None,
             ..Self::default()
@@ -235,6 +271,7 @@ impl Diff {
 pub struct FileTab {
     pub file: FileChange,
     pub comparison: Comparison,
+    pub editable: bool,
     pub detail: Option<CommitDetail>,
     pub diff: Diff,
     pub selection: crate::text::TextSelection,

@@ -2,11 +2,27 @@ use crate::model::{Diff, DiffRow};
 use anyhow::{Context, Result};
 
 pub fn calculate(left: &[u8], right: &[u8]) -> Result<Diff> {
+    calculate_with_limit(left, right, 2_000_000)
+}
+pub fn calculate_with_limit(left: &[u8], right: &[u8], limit: usize) -> Result<Diff> {
+    crate::process::check()?;
     if left.contains(&0) || right.contains(&0) {
         return Ok(Diff::notice("二进制文件：暂不提供内容预览"));
     }
-    if left.len() + right.len() > 2_000_000 {
-        return Ok(Diff::notice("文件超过原型的 2 MB 预览上限"));
+    if left.len() + right.len() > limit {
+        return Ok(Diff::notice(&format!(
+            "文件超过 {} MB 预览上限",
+            limit / 1_000_000
+        )));
+    }
+    if left
+        .iter()
+        .chain(right)
+        .filter(|byte| **byte == b'\n')
+        .count()
+        > 200_000
+    {
+        return Ok(Diff::notice("文本超过 200000 行预览上限，暂不支持分段预览"));
     }
     let left = std::str::from_utf8(left).context("旧版本不是 UTF-8 文本")?;
     let right = std::str::from_utf8(right).context("新版本不是 UTF-8 文本")?;
@@ -44,7 +60,11 @@ fn align(left: &str, right: &str) -> Vec<DiffRow> {
         deleted.clear();
         inserted.clear();
     }
-    for change in TextDiff::from_lines(left, right).iter_all_changes() {
+    for change in TextDiff::configure()
+        .timeout(std::time::Duration::from_millis(200))
+        .diff_lines(left, right)
+        .iter_all_changes()
+    {
         let raw = change.value();
         let text = raw
             .strip_suffix("\r\n")
@@ -93,13 +113,26 @@ fn ending(document: &crate::text::Document, no: usize) -> &'static str {
 }
 
 fn annotate(diff: &mut Diff) {
-    for row in &mut diff.rows {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(150);
+    for row in std::sync::Arc::make_mut(&mut diff.rows) {
         if !row.changed {
             continue;
         }
         match (row.left_no, row.right_no) {
             (Some(l), Some(r)) => {
-                (row.left_inline, row.right_inline) = inline(&row.left, &row.right);
+                if crate::process::check().is_err() {
+                    break;
+                }
+                if std::time::Instant::now() < deadline {
+                    (row.left_inline, row.right_inline) = inline(&row.left, &row.right);
+                } else {
+                    row.left_inline = std::iter::once(0..row.left.len())
+                        .filter(|r| !r.is_empty())
+                        .collect();
+                    row.right_inline = std::iter::once(0..row.right.len())
+                        .filter(|r| !r.is_empty())
+                        .collect();
+                }
                 let le = ending(&diff.left_document, l);
                 let re = ending(&diff.right_document, r);
                 if le != re {
@@ -279,5 +312,29 @@ mod tests {
             tabs.rows[0].right_inline,
             std::iter::once(1..3).collect::<Vec<_>>()
         );
+    }
+    #[test]
+    fn unified_rows_keep_source_mapping_and_group_deleted_before_inserted() {
+        use crate::text::Side;
+        let d = calculate(b"same\nold1\nold2\nend\n", b"same\nnew1\nnew2\nend\n").unwrap();
+        let rows: Vec<_> = d.unified.iter().map(|r| (r.row, r.side)).collect();
+        assert_eq!(
+            rows,
+            [
+                (0, Side::Right),
+                (1, Side::Left),
+                (2, Side::Left),
+                (1, Side::Right),
+                (2, Side::Right),
+                (3, Side::Right)
+            ]
+        );
+        let state = crate::state::AppState {
+            diff: d,
+            unified: true,
+            ..Default::default()
+        };
+        assert_eq!(state.view_row(2, Side::Right), 4);
+        assert_eq!(state.view_count(), 6);
     }
 }

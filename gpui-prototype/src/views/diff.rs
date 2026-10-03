@@ -3,6 +3,26 @@ use crate::{app::MyGit, views::button};
 use gpui::{prelude::*, *};
 use mygit_gpui::text::Side;
 
+fn scroll_area(content: AnyElement, cx: &mut Context<MyGit>) -> Div {
+    let entity = cx.entity();
+    div()
+        .relative()
+        .flex()
+        .flex_col()
+        .flex_1()
+        .min_h_0()
+        .child(content)
+        .child(
+            canvas(
+                |_, _, _| (),
+                move |bounds, _, _, cx| {
+                    entity.update(cx, |this, _| this.diff_bounds = Some(bounds))
+                },
+            )
+            .absolute()
+            .size_full(),
+        )
+}
 fn cell(
     this: &MyGit,
     side: Side,
@@ -64,6 +84,97 @@ fn cell(
             )
         })
 }
+fn unified_cell(this: &MyGit, index: usize, cx: &mut Context<MyGit>) -> Stateful<Div> {
+    let item = &this.state.diff.unified[index];
+    let row = item.row;
+    let source = &this.state.diff.rows[row];
+    let side = if source.changed {
+        item.side
+    } else {
+        this.state.text_selection.side
+    };
+    let changed = source.changed;
+    let active = this.state.active_row(row);
+    let left = if !changed || side == Side::Left {
+        source.left_no
+    } else {
+        None
+    };
+    let right = if !changed || side == Side::Right {
+        source.right_no
+    } else {
+        None
+    };
+    let ending = if side == Side::Left {
+        source.left_ending
+    } else {
+        source.right_ending
+    };
+    div()
+        .id(("unified-row", index))
+        .flex()
+        .w_full()
+        .h(px(this.state.font_size + 12.))
+        .font_family(this.state.font_family.clone())
+        .text_size(px(this.state.font_size))
+        .overflow_hidden()
+        .cursor(CursorStyle::IBeam)
+        .bg(rgb(if active {
+            0x624233
+        } else if changed {
+            if side == Side::Left {
+                0x43262f
+            } else {
+                0x203c32
+            }
+        } else {
+            0x151d29
+        }))
+        .on_mouse_down(
+            MouseButton::Left,
+            cx.listener(move |this, event, window, cx| {
+                this.mouse_down(side, row, event, window, cx)
+            }),
+        )
+        .child(
+            div()
+                .w(px(52.))
+                .flex_shrink_0()
+                .text_color(rgb(0x7f8b9c))
+                .child(left.map(|n| n.to_string()).unwrap_or_default()),
+        )
+        .child(
+            div()
+                .w(px(52.))
+                .flex_shrink_0()
+                .text_color(rgb(0x7f8b9c))
+                .child(right.map(|n| n.to_string()).unwrap_or_default()),
+        )
+        .child(div().w(px(18.)).flex_shrink_0().child(if !changed {
+            " "
+        } else if side == Side::Left {
+            "−"
+        } else {
+            "+"
+        }))
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .h_full()
+                .overflow_hidden()
+                .child(text_line::line(this, side, row, cx)),
+        )
+        .when_some(ending, |s, label| {
+            s.child(
+                div()
+                    .px_1()
+                    .flex_shrink_0()
+                    .text_color(rgb(0xffd479))
+                    .child(label),
+            )
+        })
+}
 pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
     let title = this
         .state
@@ -113,10 +224,12 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         .child(title),
                 )
                 .when(
-                    this.state
-                        .comparison
-                        .as_ref()
-                        .is_some_and(|c| c.right == mygit_gpui::model::Revision::Worktree),
+                    this.state.editable
+                        && this
+                            .state
+                            .comparison
+                            .as_ref()
+                            .is_some_and(|c| c.right == mygit_gpui::model::Revision::Worktree),
                     |s| {
                         s.child(
                             button(
@@ -140,6 +253,18 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                             )),
                         )
                     },
+                )
+                .child(
+                    button(
+                        "diff-layout",
+                        if this.state.unified {
+                            "双栏"
+                        } else {
+                            "统一视图"
+                        },
+                        true,
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.toggle_unified(cx))),
                 )
                 .child(
                     button("previous-diff", "上一处", previous)
@@ -227,6 +352,32 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         .child(right),
                 ),
         )
+        .when_some(this.state.diff.description.clone(), |s, description| {
+            s.child(
+                div()
+                    .px_2()
+                    .py_1()
+                    .text_color(rgb(0x92a2b9))
+                    .child(description),
+            )
+        })
+        .when(
+            this.state
+                .diff
+                .message
+                .as_ref()
+                .is_some_and(|m| m.contains("2 MB 预览上限")),
+            |s| {
+                s.child(
+                    button(
+                        "preview-large-file",
+                        "按需预览（最高 20 MB）",
+                        !this.state.loading,
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.preview_large_file(cx))),
+                )
+            },
+        )
         .when_some(this.current_editor(), |s, editor| s.child(editor))
         .when(
             this.current_editor().is_none() && this.state.diff.rows.is_empty(),
@@ -254,60 +405,78 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             },
         )
         .when(
-            this.current_editor().is_none() && !this.state.diff.rows.is_empty(),
+            this.current_editor().is_none()
+                && !this.state.unified
+                && !this.state.diff.rows.is_empty(),
             |s| {
-                s.child(
-                    uniform_list(
-                        ("diff", this.state.generation as usize),
-                        this.state.diff.rows.len(),
-                        cx.processor(|this, range: std::ops::Range<usize>, _, cx| {
-                            range
-                                .map(|i| {
-                                    let r = &this.state.diff.rows[i];
-                                    let active = this.state.active_row(i);
-                                    div()
-                                        .id(i)
-                                        .flex()
-                                        .w_full()
-                                        .h(px(this.state.font_size + 12.))
-                                        .font_family(this.state.font_family.clone())
-                                        .text_size(px(this.state.font_size))
-                                        .child(cell(
-                                            this,
-                                            Side::Left,
-                                            i,
-                                            if active {
-                                                0x624233
-                                            } else if r.changed && r.left_no.is_some() {
-                                                0x43262f
-                                            } else {
-                                                0x151d29
-                                            },
-                                            active,
-                                            cx,
-                                        ))
-                                        .child(div().w(px(1.)).h_full().bg(rgb(0x354259)))
-                                        .child(cell(
-                                            this,
-                                            Side::Right,
-                                            i,
-                                            if active {
-                                                0x365245
-                                            } else if r.changed && r.right_no.is_some() {
-                                                0x203c32
-                                            } else {
-                                                0x151d29
-                                            },
-                                            active,
-                                            cx,
-                                        ))
-                                })
-                                .collect::<Vec<_>>()
-                        }),
-                    )
-                    .track_scroll(this.diff_scroll.clone())
-                    .flex_1(),
+                let list = uniform_list(
+                    ("diff", this.state.generation as usize),
+                    this.state.diff.rows.len(),
+                    cx.processor(|this, range: std::ops::Range<usize>, _, cx| {
+                        range
+                            .map(|i| {
+                                let r = &this.state.diff.rows[i];
+                                let active = this.state.active_row(i);
+                                div()
+                                    .id(i)
+                                    .flex()
+                                    .w_full()
+                                    .h(px(this.state.font_size + 12.))
+                                    .font_family(this.state.font_family.clone())
+                                    .text_size(px(this.state.font_size))
+                                    .child(cell(
+                                        this,
+                                        Side::Left,
+                                        i,
+                                        if active {
+                                            0x624233
+                                        } else if r.changed && r.left_no.is_some() {
+                                            0x43262f
+                                        } else {
+                                            0x151d29
+                                        },
+                                        active,
+                                        cx,
+                                    ))
+                                    .child(div().w(px(1.)).h_full().bg(rgb(0x354259)))
+                                    .child(cell(
+                                        this,
+                                        Side::Right,
+                                        i,
+                                        if active {
+                                            0x365245
+                                        } else if r.changed && r.right_no.is_some() {
+                                            0x203c32
+                                        } else {
+                                            0x151d29
+                                        },
+                                        active,
+                                        cx,
+                                    ))
+                            })
+                            .collect::<Vec<_>>()
+                    }),
                 )
+                .track_scroll(this.diff_scroll.clone())
+                .flex_1();
+                s.child(scroll_area(list.into_any_element(), cx))
+            },
+        )
+        .when(
+            this.current_editor().is_none()
+                && this.state.unified
+                && !this.state.diff.rows.is_empty(),
+            |s| {
+                let list = uniform_list(
+                    ("unified-diff", this.state.generation as usize),
+                    this.state.diff.unified.len(),
+                    cx.processor(|this, range: std::ops::Range<usize>, _, cx| {
+                        range.map(|i| unified_cell(this, i, cx)).collect::<Vec<_>>()
+                    }),
+                )
+                .track_scroll(this.diff_scroll.clone())
+                .flex_1();
+                s.child(scroll_area(list.into_any_element(), cx))
             },
         )
 }

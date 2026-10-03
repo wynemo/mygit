@@ -4,7 +4,7 @@ use mygit_gpui::text::{DisplayLine, Side};
 
 pub struct LineHit {
     pub side: Side,
-    pub row: usize,
+    pub view_row: usize,
     pub bounds: Bounds<Pixels>,
     pub origin: Point<Pixels>,
     pub line: ShapedLine,
@@ -21,6 +21,7 @@ impl LineHit {
 }
 
 pub fn line(this: &MyGit, side: Side, row: usize, cx: &mut Context<MyGit>) -> impl IntoElement {
+    let view_row = this.state.view_row(row, side);
     let document = this.state.diff.document(side).clone();
     let source_line = this.state.diff.source_line(side, row);
     let range = source_line
@@ -142,7 +143,7 @@ pub fn line(this: &MyGit, side: Side, row: usize, cx: &mut Context<MyGit>) -> im
                     (side, row),
                     LineHit {
                         side,
-                        row,
+                        view_row,
                         bounds: visible,
                         origin,
                         line,

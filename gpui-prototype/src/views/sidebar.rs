@@ -129,6 +129,12 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             )
             .on_click(cx.listener(|this, _, _, cx| this.load_more_history(cx))),
         )
+        .when(this.state.detail.is_some(), |s| {
+            s.child(
+                button("commit-worktree-compare", "选中提交 ↔ 工作区", true)
+                    .on_click(cx.listener(|this, _, _, cx| this.compare_selected_worktree(cx))),
+            )
+        })
         .when_some(this.state.detail.clone(), |s, detail| {
             let sha = detail.sha.clone();
             let message = detail.message.clone();
@@ -203,49 +209,53 @@ pub fn files(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             this.state.mode.label(),
             this.state.files.len()
         )))
-        .when(!matches!(this.state.mode, BrowseMode::History(_)), |s| {
-            s.child(
-                div()
-                    .p_1()
-                    .flex()
-                    .flex_col()
-                    .gap_1()
-                    .child(
-                        div()
-                            .flex()
-                            .gap_1()
-                            .child(
-                                button("stage-selected", "暂存选中", !this.write_busy).on_click(
-                                    cx.listener(|this, _, _, cx| {
-                                        this.change_index(true, false, cx)
-                                    }),
+        .when(
+            matches!(
+                this.state.mode,
+                BrowseMode::Workspace | BrowseMode::Staged | BrowseMode::Unstaged
+            ),
+            |s| {
+                s.child(
+                    div()
+                        .p_1()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(
+                            div()
+                                .flex()
+                                .gap_1()
+                                .child(
+                                    button("stage-selected", "暂存选中", !this.write_busy)
+                                        .on_click(cx.listener(|this, _, _, cx| {
+                                            this.change_index(true, false, cx)
+                                        })),
+                                )
+                                .child(
+                                    button("unstage-selected", "取消暂存", !this.write_busy)
+                                        .on_click(cx.listener(|this, _, _, cx| {
+                                            this.change_index(false, false, cx)
+                                        })),
                                 ),
-                            )
-                            .child(
-                                button("unstage-selected", "取消暂存", !this.write_busy).on_click(
-                                    cx.listener(|this, _, _, cx| {
-                                        this.change_index(false, false, cx)
-                                    }),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .gap_1()
+                                .child(button("stage-all", "暂存全部", !this.write_busy).on_click(
+                                    cx.listener(|this, _, _, cx| this.change_index(true, true, cx)),
+                                ))
+                                .child(
+                                    button("unstage-all", "取消全部", !this.write_busy).on_click(
+                                        cx.listener(|this, _, _, cx| {
+                                            this.change_index(false, true, cx)
+                                        }),
+                                    ),
                                 ),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .gap_1()
-                            .child(button("stage-all", "暂存全部", !this.write_busy).on_click(
-                                cx.listener(|this, _, _, cx| this.change_index(true, true, cx)),
-                            ))
-                            .child(
-                                button("unstage-all", "取消全部", !this.write_busy).on_click(
-                                    cx.listener(|this, _, _, cx| {
-                                        this.change_index(false, true, cx)
-                                    }),
-                                ),
-                            ),
-                    ),
-            )
-        })
+                        ),
+                )
+            },
+        )
         .child(
             uniform_list(
                 ("files", this.state.generation as usize),
@@ -270,23 +280,33 @@ pub fn files(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                 .hover(|s| s.bg(rgb(0x253248)))
                                 .flex()
                                 .gap_1()
-                                .when(!matches!(this.state.mode, BrowseMode::History(_)), |s| {
-                                    s.child(
-                                        div()
-                                            .id(("file-checkbox", i))
-                                            .flex_shrink_0()
-                                            .cursor_pointer()
-                                            .child(if this.file_selection.contains(&file.path) {
-                                                "☑"
-                                            } else {
-                                                "☐"
-                                            })
-                                            .on_click(cx.listener(move |this, _, _, cx| {
-                                                cx.stop_propagation();
-                                                this.toggle_file_selection(i, cx);
-                                            })),
-                                    )
-                                })
+                                .when(
+                                    matches!(
+                                        this.state.mode,
+                                        BrowseMode::Workspace
+                                            | BrowseMode::Staged
+                                            | BrowseMode::Unstaged
+                                    ),
+                                    |s| {
+                                        s.child(
+                                            div()
+                                                .id(("file-checkbox", i))
+                                                .flex_shrink_0()
+                                                .cursor_pointer()
+                                                .child(
+                                                    if this.file_selection.contains(&file.path) {
+                                                        "☑"
+                                                    } else {
+                                                        "☐"
+                                                    },
+                                                )
+                                                .on_click(cx.listener(move |this, _, _, cx| {
+                                                    cx.stop_propagation();
+                                                    this.toggle_file_selection(i, cx);
+                                                })),
+                                        )
+                                    },
+                                )
                                 .child(format!("{}  {}", file.status, file.path))
                                 .on_click(cx.listener(move |this, _, window, cx| {
                                     window.focus(&this.files_focus);

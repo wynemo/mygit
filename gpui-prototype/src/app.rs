@@ -67,6 +67,9 @@ pub struct MyGit {
     pub write_busy: bool,
     pub write_message: String,
     pub show_commit: bool,
+    pub show_compare: bool,
+    pub compare_left: Option<Entity<Editor>>,
+    pub compare_right: Option<Entity<Editor>>,
     pub commit_editor: Option<Entity<Editor>>,
     write_pending: mygit_gpui::process::Cancellation,
     pub active_tab: Option<usize>,
@@ -93,6 +96,7 @@ pub struct MyGit {
     pub repository_epoch: u64,
     pub last_path: Option<PathBuf>,
     pub diff_scroll: UniformListScrollHandle,
+    pub diff_bounds: Option<Bounds<Pixels>>,
     pub focus: FocusHandle,
     pub line_layouts: HashMap<(Side, usize), LineHit>,
     pub dragging: bool,
@@ -129,6 +133,9 @@ impl MyGit {
             write_busy: false,
             write_message: String::new(),
             show_commit: false,
+            show_compare: false,
+            compare_left: None,
+            compare_right: None,
             commit_editor: None,
             write_pending: Default::default(),
             active_tab: None,
@@ -155,6 +162,7 @@ impl MyGit {
             repository_epoch: 0,
             last_path: None,
             diff_scroll: UniformListScrollHandle::new(),
+            diff_bounds: None,
             focus: cx.focus_handle(),
             line_layouts: HashMap::new(),
             dragging: false,
@@ -227,12 +235,14 @@ impl MyGit {
         self.files_scroll = UniformListScrollHandle::new();
         self.last_path = Some(path.clone());
         self.state.detail = None;
+        self.state.listed_detail = None;
         self.state.repo = None;
         self.state.comparison = None;
         self.state.listed_comparison = None;
         self.state.files.clear();
         self.state.selected = None;
         self.state.current_file = None;
+        self.state.editable = false;
         self.state.mode = BrowseMode::Workspace;
         self.state.clear_diff();
         self.line_layouts.clear();
@@ -265,9 +275,11 @@ impl MyGit {
         self.active_tab = None;
         self.file_selection.clear();
         self.state.detail = None;
+        self.state.listed_detail = None;
         self.state.current_file = None;
         self.show_tree = false;
         self.edit_mode = false;
+        self.state.editable = matches!(mode, BrowseMode::Workspace | BrowseMode::Unstaged);
         self.state.mode = mode.clone();
         self.state.comparison = None;
         self.state.listed_comparison = None;
@@ -292,6 +304,7 @@ impl MyGit {
                 Ok((git::selection(&root, &mode)?, detail))
             },
             |this, (selection, detail), cx| {
+                this.state.listed_detail = detail.clone();
                 this.state.detail = detail;
                 this.state.listed_comparison = Some(selection.comparison.clone());
                 this.state.comparison = Some(selection.comparison);
@@ -320,6 +333,16 @@ impl MyGit {
         let file = file.clone();
         self.capture_tab();
         self.active_tab = None;
+        self.state.editable = matches!(
+            self.state.mode,
+            BrowseMode::Workspace | BrowseMode::Unstaged
+        );
+        let previous = self
+            .tabs
+            .iter()
+            .find(|t| t.file.path == file.path && t.comparison == comparison)
+            .cloned();
+        self.state.detail = self.state.listed_detail.clone();
         self.state.comparison = Some(comparison.clone());
         self.edit_mode = false;
         self.state.selected = Some(index);
@@ -337,8 +360,17 @@ impl MyGit {
             generation,
             self.pending.clone(),
             move || git::compare(&root, &comparison, &file),
-            |this, diff, _| {
+            move |this, diff, _| {
                 this.state.set_diff(diff);
+                if let Some(previous) = &previous
+                    && this.state.restore_positions(previous)
+                {
+                    this.diff_scroll = this
+                        .tab_scroll
+                        .get(&previous.file.path)
+                        .cloned()
+                        .unwrap_or_default();
+                }
                 this.remember_tab();
             },
         );
@@ -387,7 +419,8 @@ impl MyGit {
         self.state.loading = false;
         let path = tab.file.path.clone();
         self.state.restore_tab(tab);
-        self.edit_mode = self.editors.contains_key(&path)
+        self.edit_mode = self.state.editable
+            && self.editors.contains_key(&path)
             && self
                 .state
                 .comparison
@@ -495,6 +528,7 @@ impl MyGit {
     }
     pub fn current_editor(&self) -> Option<Entity<Editor>> {
         if !self.edit_mode
+            || !self.state.editable
             || !self
                 .state
                 .comparison
@@ -510,11 +544,12 @@ impl MyGit {
             .cloned()
     }
     pub fn edit_current(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self
-            .state
-            .comparison
-            .as_ref()
-            .is_some_and(|c| c.right == Revision::Worktree)
+        if !self.state.editable
+            || !self
+                .state
+                .comparison
+                .as_ref()
+                .is_some_and(|c| c.right == Revision::Worktree)
         {
             return;
         }
@@ -560,6 +595,30 @@ impl MyGit {
                 this.editor_subscriptions.insert(file.path, subscription);
                 this.edit_mode = true;
                 this.state.message = "编辑器已打开，点击文本开始输入".into();
+            },
+        );
+        cx.notify();
+    }
+    pub fn preview_large_file(&mut self, cx: &mut Context<Self>) {
+        let (Some(repo), Some(file), Some(comparison)) = (
+            &self.state.repo,
+            self.state.current_file.clone(),
+            self.state.comparison.clone(),
+        ) else {
+            return;
+        };
+        let root = repo.root.clone();
+        let generation = self.state.begin("正在按需读取大文件（最高 20 MB）…".into());
+        self.pending.cancel();
+        self.pending = Default::default();
+        tasks::run(
+            cx,
+            generation,
+            self.pending.clone(),
+            move || git::compare_with_limit(&root, &comparison, &file, 20_000_000),
+            |this, diff, _| {
+                this.state.set_diff(diff);
+                this.remember_tab();
             },
         );
         cx.notify();
@@ -664,7 +723,12 @@ impl MyGit {
         cx.notify();
     }
     pub fn change_index(&mut self, stage: bool, all: bool, cx: &mut Context<Self>) {
-        if self.write_busy || matches!(self.state.mode, BrowseMode::History(_)) {
+        if self.write_busy
+            || !matches!(
+                self.state.mode,
+                BrowseMode::Workspace | BrowseMode::Staged | BrowseMode::Unstaged
+            )
+        {
             return;
         }
         let Some(repo) = &self.state.repo else {
@@ -721,6 +785,67 @@ impl MyGit {
                 }
                 Ok("index 已更新".into())
             },
+            cx,
+        );
+    }
+    pub fn toggle_compare(&mut self, cx: &mut Context<Self>) {
+        self.show_compare = !self.show_compare;
+        if self.compare_left.is_none() {
+            let font = self.state.font_family.clone();
+            let size = self.state.font_size;
+            self.compare_left = Some(cx.new(|cx| {
+                let mut e = Editor::new(
+                    mygit_gpui::editor::Buffer::new("HEAD~1"),
+                    font.clone(),
+                    size,
+                    cx,
+                );
+                e.compact = true;
+                e
+            }));
+            self.compare_right = Some(cx.new(|cx| {
+                let mut e = Editor::new(mygit_gpui::editor::Buffer::new("HEAD"), font, size, cx);
+                e.compact = true;
+                e
+            }));
+        }
+        cx.notify();
+    }
+    pub fn compare_inputs(&mut self, cx: &mut Context<Self>) {
+        let (Some(repo), Some(left), Some(right)) =
+            (&self.state.repo, &self.compare_left, &self.compare_right)
+        else {
+            return;
+        };
+        let root = repo.root.clone();
+        let left = left.read(cx).buffer.text().to_owned();
+        let right = right.read(cx).buffer.text().to_owned();
+        let generation = self.state.begin("正在解析比较版本…".into());
+        self.pending.cancel();
+        self.pending = Default::default();
+        tasks::run(
+            cx,
+            generation,
+            self.pending.clone(),
+            move || {
+                Ok(Comparison {
+                    left: git::resolve_revision(&root, &left)?,
+                    right: git::resolve_revision(&root, &right)?,
+                })
+            },
+            |this, comparison, cx| this.select_mode(BrowseMode::Compare(comparison), cx),
+        );
+        cx.notify();
+    }
+    pub fn compare_selected_worktree(&mut self, cx: &mut Context<Self>) {
+        let Some(detail) = &self.state.detail else {
+            return;
+        };
+        self.select_mode(
+            BrowseMode::Compare(Comparison {
+                left: Revision::Commit(detail.sha.clone()),
+                right: Revision::Worktree,
+            }),
             cx,
         );
     }
@@ -891,10 +1016,16 @@ impl MyGit {
         };
         let root = repo.root.clone();
         self.capture_tab();
+        let previous = self
+            .tabs
+            .iter()
+            .find(|t| t.file.path == path && t.comparison.right == Revision::Worktree)
+            .cloned();
         self.active_tab = None;
         self.state.selected = None;
         self.edit_mode = false;
         self.state.detail = None;
+        self.state.editable = true;
         self.state.current_file = Some(FileChange {
             path: path.clone(),
             old_path: path.clone(),
@@ -916,10 +1047,19 @@ impl MyGit {
                 let diff = git::compare(&root, &comparison, &file)?;
                 Ok((comparison, file, diff))
             },
-            |this, (comparison, file, diff), _| {
+            move |this, (comparison, file, diff), _| {
                 this.state.comparison = Some(comparison);
                 this.state.current_file = Some(file);
                 this.state.set_diff(diff);
+                if let Some(previous) = &previous
+                    && this.state.restore_positions(previous)
+                {
+                    this.diff_scroll = this
+                        .tab_scroll
+                        .get(&previous.file.path)
+                        .cloned()
+                        .unwrap_or_default();
+                }
                 this.remember_tab();
             },
         );
@@ -1102,8 +1242,10 @@ impl MyGit {
     }
     pub fn navigate(&mut self, forward: bool, cx: &mut Context<Self>) {
         if let Some(row) = self.state.navigate(forward) {
-            self.diff_scroll
-                .scroll_to_item_strict(row, ScrollStrategy::Center);
+            self.diff_scroll.scroll_to_item_strict(
+                self.state.view_row(row, Side::Left),
+                ScrollStrategy::Center,
+            );
             cx.notify();
         }
     }
@@ -1151,17 +1293,17 @@ impl MyGit {
                         .values()
                         .filter(|hit| hit.side == side && hit.bounds.size.height > px(0.))
                         .collect();
-                    visible.sort_by_key(|hit| hit.row);
+                    visible.sort_by_key(|hit| hit.view_row);
                     let target = match (visible.first(), visible.last()) {
                         (Some(first), Some(_)) if position.y < first.bounds.top() => first
-                            .row
+                            .view_row
                             .checked_sub(1)
                             .map(|row| (row, ScrollStrategy::Top)),
                         (_, Some(last))
                             if position.y > last.bounds.bottom()
-                                && last.row + 1 < this.state.diff.rows.len() =>
+                                && last.view_row + 1 < this.state.view_count() =>
                         {
-                            Some((last.row + 1, ScrollStrategy::Bottom))
+                            Some((last.view_row + 1, ScrollStrategy::Bottom))
                         }
                         _ => None,
                     };
@@ -1258,7 +1400,8 @@ impl MyGit {
             .state
             .diff
             .row_for_offset(side, self.state.text_selection.head);
-        self.diff_scroll.scroll_to_item(row, ScrollStrategy::Center);
+        self.diff_scroll
+            .scroll_to_item(self.state.view_row(row, side), ScrollStrategy::Center);
         window.focus(&self.focus);
         cx.notify();
     }
@@ -1296,6 +1439,30 @@ impl MyGit {
         self.save_settings();
         cx.notify();
     }
+    pub fn toggle_unified(&mut self, cx: &mut Context<Self>) {
+        self.capture_tab();
+        self.state.unified = !self.state.unified;
+        self.tab_scroll.clear();
+        self.dragging = false;
+        self.line_layouts.clear();
+        self.diff_scroll = UniformListScrollHandle::new();
+        let row = self
+            .state
+            .current_block
+            .and_then(|i| self.state.diff.blocks.get(i))
+            .map(|b| b.start)
+            .unwrap_or_else(|| {
+                self.state.diff.row_for_offset(
+                    self.state.text_selection.side,
+                    self.state.text_selection.head,
+                )
+            });
+        self.diff_scroll.scroll_to_item_strict(
+            self.state.view_row(row, self.state.text_selection.side),
+            ScrollStrategy::Center,
+        );
+        cx.notify();
+    }
     pub fn change_font_size(&mut self, increase: bool, cx: &mut Context<Self>) {
         self.state.font_size =
             (self.state.font_size + if increase { 1. } else { -1. }).clamp(10., 22.);
@@ -1309,20 +1476,57 @@ impl MyGit {
         self.save_settings();
         cx.notify();
     }
-    pub fn move_horizontal(&mut self, forward: bool, window: &Window, cx: &mut Context<Self>) {
-        let visible = ((f32::from(window.viewport_size().width) - 520.) / 2. - 52.).max(50.);
-        self.state.horizontal_offset = (self.state.horizontal_offset
-            + if forward { 200. } else { -200. })
-        .clamp(
-            0.,
-            ((self.state.panel_width - 68.) * self.state.font_size / 12. + 68. - visible).max(0.),
-        );
+    pub fn horizontal_delta(&mut self, delta: f32, window: &Window, cx: &mut Context<Self>) {
+        let width = self
+            .diff_bounds
+            .map(|b| f32::from(b.size.width))
+            .unwrap_or_else(|| {
+                f32::from(window.viewport_size().width)
+                    - self.visible_history_width
+                    - self.visible_files_width
+            });
+        let visible = if self.state.unified {
+            width - 122.
+        } else {
+            width / 2. - 52.
+        };
+        let limit = ((self.state.panel_width - 68.) * self.state.font_size / 12. - visible).max(0.);
+        self.state.horizontal_offset = (self.state.horizontal_offset + delta).clamp(0., limit);
         cx.notify();
+    }
+    pub fn move_horizontal(&mut self, forward: bool, window: &Window, cx: &mut Context<Self>) {
+        self.horizontal_delta(if forward { 200. } else { -200. }, window, cx);
     }
 }
 impl Render for MyGit {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.line_layouts.clear();
+        let entity = cx.entity().downgrade();
+        window.on_mouse_event(move |event: &ScrollWheelEvent, phase, window, cx| {
+            if phase != DispatchPhase::Capture {
+                return;
+            }
+            let _ = entity.update(cx, |this, cx| {
+                if this.confirmation.is_some()
+                    || this.current_editor().is_some()
+                    || !this
+                        .diff_bounds
+                        .is_some_and(|bounds| bounds.contains(&event.position))
+                {
+                    return;
+                }
+                let delta = event.delta.pixel_delta(px(this.state.font_size + 12.));
+                let horizontal = if event.modifiers.shift && delta.x == px(0.) {
+                    delta.y
+                } else {
+                    delta.x
+                };
+                if horizontal != px(0.) {
+                    this.horizontal_delta(-f32::from(horizontal), window, cx);
+                    cx.stop_propagation();
+                }
+            });
+        });
         if self.confirmation.is_some() {
             window.focus(&self.focus);
         }
@@ -1449,6 +1653,9 @@ impl Render for MyGit {
             .text_color(rgb(0xdce5f3))
             .text_size(px(13.))
             .child(views::toolbar(self, cx))
+            .when(self.show_compare, |s| {
+                s.child(views::compare::pane(self, cx))
+            })
             .when(self.show_settings, |s| s.child(views::settings(self, cx)))
             .child(
                 div()

@@ -2,6 +2,7 @@ use crate::{diff, model::*};
 use anyhow::{Context, Result, bail};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
+    io::Read,
     path::{Path, PathBuf},
     process::Command,
 };
@@ -187,6 +188,7 @@ fn untracked(root: &Path) -> Result<Vec<FileChange>> {
 }
 pub fn selection(root: &Path, mode: &BrowseMode) -> Result<Selection> {
     let (comparison, mut files) = match mode {
+        BrowseMode::Compare(comparison) => return comparison_selection(root, comparison),
         BrowseMode::History(sha) => {
             let sha = string(git(
                 root,
@@ -285,6 +287,69 @@ pub fn selection(root: &Path, mode: &BrowseMode) -> Result<Selection> {
     files.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(Selection { comparison, files })
 }
+pub fn resolve_revision(root: &Path, reference: &str) -> Result<Revision> {
+    match reference.trim() {
+        "WORKTREE" => Ok(Revision::Worktree),
+        "INDEX" => Ok(Revision::Index),
+        "EMPTY" => Ok(Revision::Empty),
+        reference => {
+            if reference.is_empty() {
+                bail!("比较版本不能为空");
+            }
+            let sha = string(git(
+                root,
+                &[
+                    "rev-parse",
+                    "--verify",
+                    "--end-of-options",
+                    &format!("{reference}^{{commit}}"),
+                ],
+            )?)?;
+            Ok(Revision::Commit(sha.trim().into()))
+        }
+    }
+}
+pub fn comparison_selection(root: &Path, comparison: &Comparison) -> Result<Selection> {
+    // The editable workspace/index modes have their own entry points. Custom comparisons are read-only.
+    let treeish = |revision: &Revision| -> Result<String> {
+        match revision {
+            Revision::Empty => Ok(
+                string(git(root, &["hash-object", "-t", "tree", "--stdin"])?)?
+                    .trim()
+                    .into(),
+            ),
+            Revision::Head(sha) | Revision::Commit(sha) => Ok(sha.clone()),
+            _ => bail!("自定义比较左侧必须是提交或 EMPTY，右侧可用提交或 WORKTREE"),
+        }
+    };
+    let left = treeish(&comparison.left)?;
+    let mut files = if comparison.right == Revision::Worktree {
+        changes(root, &["diff", "--name-status", "-z", "-M", &left, "--"])?
+    } else {
+        let right = treeish(&comparison.right)?;
+        changes(
+            root,
+            &["diff", "--name-status", "-z", "-M", &left, &right, "--"],
+        )?
+    };
+    if comparison.right == Revision::Worktree {
+        for file in untracked(root)? {
+            if let Some(existing) = files.iter_mut().find(|f| f.path == file.path) {
+                if existing.status.starts_with('D') {
+                    existing.status = "M".into();
+                }
+            } else {
+                files.push(file);
+            }
+        }
+    }
+    files.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(Selection {
+        comparison: comparison.clone(),
+        files,
+    })
+}
+
 fn validate_paths(paths: &[String]) -> Result<()> {
     for path in paths {
         if path.is_empty()
@@ -410,33 +475,180 @@ pub fn workspace_file(root: &Path, path: &str) -> Result<(Comparison, FileChange
     ))
 }
 
-fn content(root: &Path, target: &FileTarget) -> Result<Vec<u8>> {
-    match &target.revision {
-        Revision::Empty => Ok(vec![]),
+#[derive(Clone, Debug)]
+struct ContentInfo {
+    kind: &'static str,
+    size: u64,
+    object: Option<String>,
+}
+fn info(root: &Path, target: &FileTarget) -> Result<ContentInfo> {
+    let empty = || ContentInfo {
+        kind: "空内容",
+        size: 0,
+        object: None,
+    };
+    let record = match &target.revision {
+        Revision::Empty => return Ok(empty()),
         Revision::Worktree => {
             let path = root.join(&target.path);
-            if std::fs::symlink_metadata(&path)?.file_type().is_symlink() {
-                return Ok(std::fs::read_link(&path)?
-                    .to_string_lossy()
-                    .as_bytes()
-                    .to_vec());
+            let metadata = std::fs::symlink_metadata(&path)
+                .with_context(|| format!("无法读取工作区 {}", target.path))?;
+            if metadata.file_type().is_symlink() {
+                return Ok(ContentInfo {
+                    kind: "符号链接",
+                    size: metadata.len(),
+                    object: None,
+                });
             }
-            std::fs::read(path).with_context(|| format!("无法读取工作区文件 {}", target.path))
+            if metadata.is_dir() {
+                let indexed = string(git(
+                    root,
+                    &["ls-files", "--stage", "-z", "--", &target.path],
+                )?)?;
+                if indexed.starts_with("160000 ") {
+                    let sha = if path.join(".git").exists() {
+                        git(&path, &["rev-parse", "--verify", "HEAD"])
+                    } else {
+                        Err(anyhow::anyhow!("子模块未检出"))
+                    }
+                    .ok()
+                    .and_then(|b| String::from_utf8(b).ok())
+                    .map(|s| s.trim().into());
+                    return Ok(ContentInfo {
+                        kind: "子模块",
+                        size: 0,
+                        object: sha,
+                    });
+                }
+                bail!("目录不是普通文件或已登记的子模块");
+            }
+            if !metadata.is_file() {
+                bail!("特殊文件不支持预览");
+            }
+            return Ok(ContentInfo {
+                kind: "文本/二进制文件",
+                size: metadata.len(),
+                object: None,
+            });
         }
-        Revision::Index => git(root, &["show", &format!(":{}", target.path)]),
+        Revision::Index => string(git(
+            root,
+            &["ls-files", "--stage", "-z", "--", &target.path],
+        )?)?,
         Revision::Head(sha) | Revision::Commit(sha) => {
-            git(root, &["show", &format!("{sha}:{}", target.path)])
+            string(git(root, &["ls-tree", "-z", sha, "--", &target.path])?)?
         }
+    };
+    let header = record.split('\t').next().context("缺少对象信息")?;
+    let fields: Vec<_> = header.split_whitespace().collect();
+    let mode = *fields.first().context("对象模式无效")?;
+    let object = match target.revision {
+        Revision::Index => fields.get(1),
+        _ => fields.get(2),
     }
+    .context("缺少对象 ID")?
+    .to_string();
+    if mode == "160000" {
+        return Ok(ContentInfo {
+            kind: "子模块",
+            size: 0,
+            object: Some(object),
+        });
+    }
+    if !matches!(mode, "100644" | "100755" | "120000") {
+        bail!("不支持的 Git 对象模式：{mode}");
+    }
+    let size = string(git(root, &["cat-file", "-s", &object])?)?
+        .trim()
+        .parse::<u64>()?;
+    Ok(ContentInfo {
+        kind: if mode == "120000" {
+            "符号链接"
+        } else {
+            "文本/二进制文件"
+        },
+        size,
+        object: Some(object),
+    })
+}
+fn content(root: &Path, target: &FileTarget, info: &ContentInfo, limit: usize) -> Result<Vec<u8>> {
+    if target.revision == Revision::Empty {
+        return Ok(vec![]);
+    }
+    if target.revision == Revision::Worktree {
+        let path = root.join(&target.path);
+        if info.kind == "符号链接" {
+            return Ok(std::fs::read_link(&path)?
+                .to_string_lossy()
+                .as_bytes()
+                .to_vec());
+        }
+        let mut options = std::fs::OpenOptions::new();
+        options.read(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.custom_flags(libc::O_NOFOLLOW);
+        }
+        let file = options.open(&path)?;
+        if !file.metadata()?.is_file() {
+            bail!("特殊文件不支持预览");
+        }
+        let mut bytes = vec![];
+        file.take(limit as u64 + 1).read_to_end(&mut bytes)?;
+        return Ok(bytes);
+    }
+    git(
+        root,
+        &[
+            "cat-file",
+            "blob",
+            info.object.as_ref().context("缺少 blob ID")?,
+        ],
+    )
 }
 pub fn compare(root: &Path, comparison: &Comparison, file: &FileChange) -> Result<Diff> {
+    compare_with_limit(root, comparison, file, 2_000_000)
+}
+pub fn compare_with_limit(
+    root: &Path,
+    comparison: &Comparison,
+    file: &FileChange,
+    limit: usize,
+) -> Result<Diff> {
     if file.status.starts_with('U') {
         return Ok(Diff::notice("冲突文件：暂不支持预览未合并的 index 内容"));
     }
     let (left, right) = comparison.targets(file);
-    let mut diff = diff::calculate(&content(root, &left)?, &content(root, &right)?)?;
+    let li = info(root, &left)?;
+    let ri = info(root, &right)?;
+    let description = format!(
+        "左侧：{} · {} 字节；右侧：{} · {} 字节",
+        li.kind, li.size, ri.kind, ri.size
+    );
+    if li.kind == "子模块" || ri.kind == "子模块" {
+        return Ok(Diff::notice(&format!(
+            "子模块提交引用\n左侧：{}\n右侧：{}\n目录内容不作为普通文本读取",
+            li.object.as_deref().unwrap_or("空/未检出"),
+            ri.object.as_deref().unwrap_or("空/未检出")
+        )));
+    }
+    if li.size.saturating_add(ri.size) > limit.min(20_000_000) as u64 {
+        let mut diff = Diff::notice(&format!(
+            "文件超过 {} MB 预览上限；{description}",
+            limit.min(20_000_000) / 1_000_000
+        ));
+        diff.description = Some(description);
+        return Ok(diff);
+    }
+    let left_bytes = content(root, &left, &li, limit)?;
+    let right_bytes = content(root, &right, &ri, limit)?;
+    let mut diff = diff::calculate_with_limit(&left_bytes, &right_bytes, limit.min(20_000_000))?;
+    diff.description = Some(description.clone());
     if diff.message.is_none() {
         diff::highlight(&mut diff, &file.old_path, &file.path);
+    } else if let Some(message) = &mut diff.message {
+        *message = format!("{message}；{description}");
     }
     Ok(diff)
 }

@@ -465,3 +465,117 @@ fn commit_hook_failure_preserves_head_index_and_worktree() {
         "staged\n"
     );
 }
+
+#[test]
+fn arbitrary_commit_and_worktree_comparisons_preserve_rename_targets() {
+    let f = Fixture::new();
+    std::fs::create_dir(f.0.join("a")).unwrap();
+    std::fs::create_dir(f.0.join("b")).unwrap();
+    std::fs::write(f.0.join("a/same"), "original\n").unwrap();
+    std::fs::write(f.0.join("b/same"), "other\n").unwrap();
+    let first = f.commit();
+    git(&f.0, &["mv", "a/same", "a/renamed"]).unwrap();
+    let second = f.commit();
+    let comparison = Comparison {
+        left: resolve_revision(&f.0, &first).unwrap(),
+        right: resolve_revision(&f.0, &second).unwrap(),
+    };
+    let selection = comparison_selection(&f.0, &comparison).unwrap();
+    assert_eq!(selection.files.len(), 1);
+    assert_eq!(selection.files[0].old_path, "a/same");
+    assert_eq!(selection.files[0].path, "a/renamed");
+    assert!(
+        compare(&f.0, &comparison, &selection.files[0])
+            .unwrap()
+            .blocks
+            .is_empty()
+    );
+    std::fs::write(f.0.join("b/same"), "disk\n").unwrap();
+    std::fs::write(f.0.join("untracked"), "new\n").unwrap();
+    let comparison = Comparison {
+        left: Revision::Commit(second),
+        right: Revision::Worktree,
+    };
+    let selection = comparison_selection(&f.0, &comparison).unwrap();
+    let file = selection.files.iter().find(|f| f.path == "b/same").unwrap();
+    let d = compare(&f.0, &comparison, file).unwrap();
+    assert_eq!(d.rows[0].left, "other");
+    assert_eq!(d.rows[0].right, "disk");
+    assert!(
+        selection
+            .files
+            .iter()
+            .any(|f| f.path == "untracked" && f.status == "??")
+    );
+    assert!(resolve_revision(&f.0, "--not-a-revision").is_err());
+    assert!(resolve_revision(&f.0, "").is_err());
+    let empty = comparison_selection(
+        &f.0,
+        &Comparison {
+            left: Revision::Empty,
+            right: Revision::Commit(first),
+        },
+    )
+    .unwrap();
+    assert_eq!(empty.files.len(), 2);
+}
+
+#[test]
+fn bounded_preview_binary_encoding_large_file_and_submodule_metadata() {
+    let f = Fixture::new();
+    std::fs::write(f.0.join("base"), "base\n").unwrap();
+    let sha = f.commit();
+    std::fs::write(f.0.join("binary"), [1u8, 0, 2]).unwrap();
+    let d = file_diff(&f, BrowseMode::Unstaged, "binary");
+    assert!(d.message.unwrap().contains("二进制"));
+    assert!(d.description.unwrap().contains("3 字节"));
+    std::fs::write(f.0.join("encoding"), [0xffu8]).unwrap();
+    let s = selection(&f.0, &BrowseMode::Unstaged).unwrap();
+    let file = s.files.iter().find(|f| f.path == "encoding").unwrap();
+    assert!(
+        compare(&f.0, &s.comparison, file)
+            .unwrap_err()
+            .to_string()
+            .contains("UTF-8")
+    );
+    let large = format!("{}\n", "a".repeat(1000)).repeat(2100);
+    std::fs::write(f.0.join("large.txt"), large.as_bytes()).unwrap();
+    let s = selection(&f.0, &BrowseMode::Unstaged).unwrap();
+    let file = s.files.iter().find(|f| f.path == "large.txt").unwrap();
+    let d = compare(&f.0, &s.comparison, file).unwrap();
+    assert!(d.message.unwrap().contains("2 MB"));
+    assert!(d.rows.is_empty());
+    let d = compare_with_limit(&f.0, &s.comparison, file, 20_000_000).unwrap();
+    assert_eq!(d.right_document.text.len(), large.len());
+    assert_eq!(d.rows.len(), 2100);
+    git(
+        &f.0,
+        &[
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            &format!("160000,{sha},module"),
+        ],
+    )
+    .unwrap();
+    std::fs::create_dir(f.0.join("module")).unwrap();
+    let d = compare(
+        &f.0,
+        &Comparison {
+            left: Revision::Index,
+            right: Revision::Worktree,
+        },
+        &FileChange {
+            path: "module".into(),
+            old_path: "module".into(),
+            status: "M".into(),
+        },
+    )
+    .unwrap();
+    let message = d.message.unwrap();
+    assert!(message.contains("子模块"));
+    assert!(message.contains(&format!("左侧：{sha}")));
+    assert!(message.contains("右侧：空/未检出"));
+    let d = crate::diff::calculate(b"", &vec![b'\n'; 200_001]).unwrap();
+    assert!(d.message.unwrap().contains("200000 行"));
+}

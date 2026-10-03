@@ -326,7 +326,7 @@ pub fn line_marks(reference: &str, current: &str) -> std::collections::BTreeMap<
         return marks;
     };
     let mut next = 0;
-    for row in diff.rows {
+    for row in diff.rows.iter() {
         if let Some(no) = row.right_no {
             next = no;
         }

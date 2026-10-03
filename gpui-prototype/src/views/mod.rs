@@ -1,4 +1,5 @@
 pub mod commit;
+pub mod compare;
 pub mod diff;
 pub mod editor;
 pub mod sidebar;
@@ -47,6 +48,10 @@ pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     }
                 },
             )),
+        )
+        .child(
+            button("show-compare", "比较版本", this.state.repo.is_some())
+                .on_click(cx.listener(|this, _, _, cx| this.toggle_compare(cx))),
         )
         .child(
             button("show-commit", "提交面板", this.state.repo.is_some())

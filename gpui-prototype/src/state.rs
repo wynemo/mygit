@@ -5,11 +5,13 @@ pub struct AppState {
     pub repo: Option<Snapshot>,
     pub mode: BrowseMode,
     pub detail: Option<CommitDetail>,
+    pub listed_detail: Option<CommitDetail>,
     pub comparison: Option<Comparison>,
     pub listed_comparison: Option<Comparison>,
     pub files: Vec<FileChange>,
     pub selected: Option<usize>,
     pub current_file: Option<FileChange>,
+    pub editable: bool,
     pub diff: Diff,
     pub message: String,
     pub loading: bool,
@@ -19,6 +21,7 @@ pub struct AppState {
     pub current_block: Option<usize>,
     pub text_selection: crate::text::TextSelection,
     pub font_size: f32,
+    pub unified: bool,
     pub font_family: String,
 }
 impl Default for AppState {
@@ -27,11 +30,13 @@ impl Default for AppState {
             repo: None,
             mode: BrowseMode::Workspace,
             detail: None,
+            listed_detail: None,
             comparison: None,
             listed_comparison: None,
             files: vec![],
             selected: None,
             current_file: None,
+            editable: false,
             diff: Diff::default(),
             message: "打开一个 Git 仓库".into(),
             loading: false,
@@ -41,6 +46,7 @@ impl Default for AppState {
             current_block: None,
             text_selection: crate::text::TextSelection::default(),
             font_size: 12.,
+            unified: false,
             font_family: "Menlo".into(),
         }
     }
@@ -93,10 +99,40 @@ impl AppState {
             .and_then(|b| self.diff.blocks.get(b))
             .is_some_and(|b| b.contains(&index))
     }
+    pub fn view_row(&self, row: usize, side: crate::text::Side) -> usize {
+        if !self.unified {
+            return row;
+        }
+        self.diff
+            .unified
+            .iter()
+            .position(|r| r.row == row && r.side == side)
+            .or_else(|| self.diff.unified.iter().position(|r| r.row == row))
+            .unwrap_or(0)
+    }
+    pub fn view_count(&self) -> usize {
+        if self.unified {
+            self.diff.unified.len()
+        } else {
+            self.diff.rows.len()
+        }
+    }
+    pub fn restore_positions(&mut self, previous: &FileTab) -> bool {
+        if self.diff.left_document.text != previous.diff.left_document.text
+            || self.diff.right_document.text != previous.diff.right_document.text
+        {
+            return false;
+        }
+        self.text_selection = previous.selection.clone();
+        self.horizontal_offset = previous.horizontal;
+        self.current_block = previous.block.filter(|i| *i < self.diff.blocks.len());
+        true
+    }
     pub fn tab_snapshot(&self) -> Option<FileTab> {
         Some(FileTab {
             file: self.current_file.clone()?,
             comparison: self.comparison.clone()?,
+            editable: self.editable,
             detail: self.detail.clone(),
             diff: self.diff.clone(),
             selection: self.text_selection.clone(),
@@ -111,6 +147,7 @@ impl AppState {
             .iter()
             .position(|f| listed && f.path == tab.file.path);
         self.current_file = Some(tab.file);
+        self.editable = tab.editable;
         self.comparison = Some(tab.comparison);
         self.detail = tab.detail;
         self.set_diff(tab.diff);
