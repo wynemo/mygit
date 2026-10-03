@@ -1,0 +1,870 @@
+use crate::{app::*, views::button};
+use gpui::{prelude::*, *};
+use mygit_gpui::{
+    editor::{Buffer, to_utf16, utf16_range},
+    syntax::{self, Highlighted},
+    text::{DisplayLine, Motion, Side},
+};
+use std::{
+    collections::{BTreeMap, HashMap},
+    ops::Range,
+};
+actions!(
+    editor_ui,
+    [
+        EditorBackspace,
+        EditorDelete,
+        EditorPaste,
+        EditorCut,
+        EditorUndo,
+        EditorRedo,
+        EditorSave,
+        InsertNewline,
+        InsertTab,
+        FindText,
+        FindNext,
+        FindPrevious,
+        CloseFind
+    ]
+);
+pub enum Changed {
+    Edited,
+    Saved,
+    SearchNext,
+}
+struct Hit {
+    range: Range<usize>,
+    display: DisplayLine,
+    line: ShapedLine,
+    bounds: Bounds<Pixels>,
+    origin: Point<Pixels>,
+}
+pub struct Editor {
+    pub buffer: Buffer,
+    pub focus: FocusHandle,
+    pub font_family: String,
+    pub font_size: f32,
+    pub message: String,
+    pub saving: bool,
+    external_changed: bool,
+    pub reference: mygit_gpui::text::Document,
+    compact: bool,
+    query: Option<Entity<Editor>>,
+    query_subscription: Option<Subscription>,
+    matches: Vec<Range<usize>>,
+    current_match: Option<usize>,
+    marks: BTreeMap<usize, mygit_gpui::editor::LineMark>,
+    generation: u64,
+    syntax: Highlighted,
+    scroll: UniformListScrollHandle,
+    horizontal: f32,
+    hits: HashMap<usize, Hit>,
+    dragging: bool,
+}
+impl EventEmitter<Changed> for Editor {}
+impl Editor {
+    pub fn new(
+        buffer: Buffer,
+        font_family: String,
+        font_size: f32,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        if buffer.path.is_some() {
+            cx.spawn(async move |this, cx| {
+                loop {
+                    Timer::after(std::time::Duration::from_secs(2)).await;
+                    let snapshot = match this.update(cx, |this, _| this.buffer.external_snapshot())
+                    {
+                        Ok(Some(s)) => s,
+                        _ => break,
+                    };
+                    let task = cx
+                        .background_executor()
+                        .spawn(async move { snapshot.changed() });
+                    let changed = task.await.unwrap_or(true);
+                    if this
+                        .update(cx, |this, cx| {
+                            if this.external_changed != changed {
+                                this.external_changed = changed;
+                                cx.notify();
+                            }
+                        })
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+            })
+            .detach();
+        }
+        Self {
+            buffer,
+            focus: cx.focus_handle(),
+            font_family,
+            font_size,
+            message: String::new(),
+            saving: false,
+            external_changed: false,
+            reference: Default::default(),
+            compact: false,
+            query: None,
+            query_subscription: None,
+            matches: vec![],
+            current_match: None,
+            marks: BTreeMap::new(),
+            generation: 0,
+            syntax: Default::default(),
+            scroll: UniformListScrollHandle::new(),
+            horizontal: 0.,
+            hits: HashMap::new(),
+            dragging: false,
+        }
+    }
+    pub fn refresh(&mut self, cx: &mut Context<Self>) {
+        self.generation += 1;
+        let generation = self.generation;
+        let document = self.buffer.document.clone();
+        let reference = self.reference.clone();
+        let compact = self.compact;
+        if let Some(query) = &self.query {
+            self.matches =
+                mygit_gpui::editor::find(self.buffer.text(), query.read(cx).buffer.text());
+        }
+        let path = self
+            .buffer
+            .path
+            .as_ref()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+        self.syntax = Highlighted::default();
+        let task = cx.background_executor().spawn(async move {
+            (
+                syntax::highlight(&document, &path),
+                if compact {
+                    BTreeMap::new()
+                } else {
+                    mygit_gpui::editor::line_marks(&reference.text, &document.text)
+                },
+            )
+        });
+        cx.spawn(async move |this, cx| {
+            let (syntax, marks) = task.await;
+            let _ = this.update(cx, |this, cx| {
+                if this.generation == generation {
+                    this.syntax = syntax;
+                    this.marks = marks;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+        self.reveal();
+        cx.emit(Changed::Edited);
+        cx.notify();
+    }
+    fn reveal(&mut self) {
+        self.scroll
+            .scroll_to_item(self.caret_line(), ScrollStrategy::Center);
+    }
+    fn caret_line(&self) -> usize {
+        if self.buffer.selection.head == self.buffer.text().len()
+            && self.buffer.text().ends_with('\n')
+        {
+            self.buffer.document.lines.len()
+        } else {
+            self.buffer.document.line_index(self.buffer.selection.head)
+        }
+    }
+    fn result(&mut self, result: anyhow::Result<()>, cx: &mut Context<Self>) {
+        match result {
+            Ok(()) => {
+                self.message.clear();
+                self.refresh(cx);
+            }
+            Err(e) => {
+                self.message = format!("{e:#}");
+                cx.notify();
+            }
+        }
+    }
+    fn insert(&mut self, text: &str, cx: &mut Context<Self>) {
+        let result = self.buffer.paste(text);
+        self.result(result, cx);
+    }
+    fn motion(&mut self, motion: Motion, extend: bool, cx: &mut Context<Self>) {
+        self.buffer.move_cursor(motion, extend);
+        self.reveal();
+        cx.notify();
+    }
+    fn copy(&mut self, cx: &mut Context<Self>) {
+        if let Some(text) = self.buffer.selection.copy(&self.buffer.document) {
+            cx.write_to_clipboard(ClipboardItem::new_string(text));
+        }
+    }
+    fn paste(&mut self, cx: &mut Context<Self>) {
+        if let Some(text) = cx.read_from_clipboard().and_then(|c| c.text()) {
+            self.insert(&text, cx);
+        }
+    }
+    pub fn save(&mut self, cx: &mut Context<Self>) {
+        if self.saving {
+            return;
+        }
+        // The file is at most 2 MB. Conflict checks and atomic replacement are in Buffer.
+        self.saving = true;
+        let result = self.buffer.save();
+        self.saving = false;
+        match result {
+            Ok(()) => self.message = "已保存".into(),
+            Err(e) => self.message = format!("{e:#}"),
+        };
+        cx.emit(Changed::Saved);
+        cx.notify();
+    }
+    pub fn reload(&mut self, cx: &mut Context<Self>) {
+        if self.buffer.dirty() {
+            self.message = "当前内容未保存，请先保存或关闭后重新打开".into();
+            cx.notify();
+            return;
+        }
+        if let Some(path) = self.buffer.path.clone() {
+            match Buffer::load(&path) {
+                Ok(buffer) => {
+                    self.buffer = buffer;
+                    self.refresh(cx);
+                }
+                Err(e) => {
+                    self.message = format!("{e:#}");
+                    cx.notify();
+                }
+            }
+        }
+    }
+    fn show_find(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.compact {
+            return;
+        }
+        if self.query.is_none() {
+            let text = self
+                .buffer
+                .selection
+                .copy(&self.buffer.document)
+                .unwrap_or_default();
+            let font = self.font_family.clone();
+            let size = self.font_size;
+            let query = cx.new(|cx| {
+                let mut editor = Editor::new(Buffer::new(&text), font, size, cx);
+                editor.compact = true;
+                editor
+            });
+            self.query_subscription =
+                Some(cx.subscribe(&query, |this, query, event: &Changed, cx| {
+                    if matches!(event, Changed::SearchNext) {
+                        this.find_move(true, cx);
+                        return;
+                    }
+                    let query = query.read(cx).buffer.text().to_owned();
+                    this.matches = mygit_gpui::editor::find(this.buffer.text(), &query);
+                    this.current_match = None;
+                    cx.notify();
+                }));
+            self.matches = mygit_gpui::editor::find(self.buffer.text(), &text);
+            self.query = Some(query);
+        }
+        if let Some(query) = &self.query {
+            window.focus(&query.read(cx).focus);
+        }
+        cx.notify();
+    }
+    fn find_move(&mut self, forward: bool, cx: &mut Context<Self>) {
+        if self.matches.is_empty() {
+            self.current_match = None;
+            cx.notify();
+            return;
+        }
+        let i = match self.current_match {
+            None => {
+                if forward {
+                    0
+                } else {
+                    self.matches.len() - 1
+                }
+            }
+            Some(i) => {
+                if forward {
+                    (i + 1) % self.matches.len()
+                } else {
+                    (i + self.matches.len() - 1) % self.matches.len()
+                }
+            }
+        };
+        self.current_match = Some(i);
+        let range = self.matches[i].clone();
+        self.buffer.selection.anchor = range.start;
+        self.buffer.selection.head = range.end;
+        self.reveal();
+        cx.notify();
+    }
+    fn hit_offset(&self, position: Point<Pixels>) -> Option<usize> {
+        self.hits
+            .values()
+            .min_by(|a, b| {
+                let distance = |h: &Hit| {
+                    if position.y < h.bounds.top() {
+                        h.bounds.top() - position.y
+                    } else if position.y > h.bounds.bottom() {
+                        position.y - h.bounds.bottom()
+                    } else {
+                        px(0.)
+                    }
+                };
+                distance(a)
+                    .partial_cmp(&distance(b))
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .map(|h| {
+                h.range.start
+                    + h.display
+                        .source_offset(h.line.closest_index_for_x(position.x - h.origin.x))
+            })
+    }
+    fn mouse_down(&mut self, event: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        cx.stop_propagation();
+        window.focus(&self.focus);
+        cx.activate(true);
+        self.buffer.finish_composition();
+        self.dragging = true;
+        if let Some(offset) = self.hit_offset(event.position) {
+            self.buffer.selection.point(
+                Side::Right,
+                offset,
+                event.modifiers.shift,
+                &self.buffer.document,
+            );
+            cx.notify();
+        }
+    }
+    fn mouse_move(&mut self, event: &MouseMoveEvent, _: &mut Window, cx: &mut Context<Self>) {
+        if self.dragging
+            && let Some(offset) = self.hit_offset(event.position)
+        {
+            self.buffer
+                .selection
+                .point(Side::Right, offset, true, &self.buffer.document);
+            cx.notify();
+        }
+    }
+}
+impl Focusable for Editor {
+    fn focus_handle(&self, _: &App) -> FocusHandle {
+        self.focus.clone()
+    }
+}
+impl EntityInputHandler for Editor {
+    fn text_for_range(
+        &mut self,
+        range: Range<usize>,
+        actual: &mut Option<Range<usize>>,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<String> {
+        let range = utf16_range(self.buffer.text(), range);
+        *actual = Some(
+            to_utf16(self.buffer.text(), range.start)..to_utf16(self.buffer.text(), range.end),
+        );
+        Some(self.buffer.text()[range].into())
+    }
+    fn selected_text_range(
+        &mut self,
+        _: bool,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<UTF16Selection> {
+        let range = self.buffer.selection.range();
+        Some(UTF16Selection {
+            range: to_utf16(self.buffer.text(), range.start)
+                ..to_utf16(self.buffer.text(), range.end),
+            reversed: self.buffer.selection.head < self.buffer.selection.anchor,
+        })
+    }
+    fn marked_text_range(&self, _: &mut Window, _: &mut Context<Self>) -> Option<Range<usize>> {
+        self.buffer
+            .marked
+            .as_ref()
+            .map(|r| to_utf16(self.buffer.text(), r.start)..to_utf16(self.buffer.text(), r.end))
+    }
+    fn unmark_text(&mut self, _: &mut Window, cx: &mut Context<Self>) {
+        self.buffer.finish_composition();
+        cx.emit(Changed::Edited);
+        cx.notify();
+    }
+    fn replace_text_in_range(
+        &mut self,
+        range: Option<Range<usize>>,
+        text: &str,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let range = range.map(|r| utf16_range(self.buffer.text(), r));
+        let result = self.buffer.replace(range, text);
+        self.result(result, cx);
+    }
+    fn replace_and_mark_text_in_range(
+        &mut self,
+        range: Option<Range<usize>>,
+        text: &str,
+        selected: Option<Range<usize>>,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let range = range.map(|r| utf16_range(self.buffer.text(), r));
+        let result = self.buffer.compose(range, text, selected);
+        self.result(result, cx);
+    }
+    fn bounds_for_range(
+        &mut self,
+        range: Range<usize>,
+        _: Bounds<Pixels>,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<Bounds<Pixels>> {
+        let range = utf16_range(self.buffer.text(), range);
+        let hit = self.hits.get(&self.caret_line())?;
+        let a = range
+            .start
+            .saturating_sub(hit.range.start)
+            .min(hit.range.len());
+        let b = range
+            .end
+            .saturating_sub(hit.range.start)
+            .min(hit.range.len());
+        let x1 = hit.line.x_for_index(hit.display.display_offset(a));
+        let x2 = hit.line.x_for_index(hit.display.display_offset(b));
+        Some(Bounds::new(
+            point(hit.origin.x + x1, hit.bounds.top()),
+            size((x2 - x1).max(px(1.)), hit.bounds.size.height),
+        ))
+    }
+    fn character_index_for_point(
+        &mut self,
+        point: Point<Pixels>,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<usize> {
+        self.hit_offset(point)
+            .map(|offset| to_utf16(self.buffer.text(), offset))
+    }
+}
+fn line(this: &Editor, index: usize, cx: &mut Context<Editor>) -> impl IntoElement {
+    let range = this.buffer.document.display_range(index);
+    let display = DisplayLine::new(&this.buffer.text()[range.clone()]);
+    let tokens = this.syntax.lines.get(index).cloned().unwrap_or_default();
+    let selection = this.buffer.selection.range();
+    let matches = this
+        .matches
+        .iter()
+        .filter(|found| found.start < range.end && found.end > range.start)
+        .cloned()
+        .collect::<Vec<_>>();
+    let marked = this.buffer.marked.clone();
+    let caret = this.buffer.selection.head;
+    let horizontal = this.horizontal;
+    let entity = cx.entity();
+    let newline_selected = this
+        .buffer
+        .document
+        .lines
+        .get(index)
+        .is_some_and(|r| selection.end >= r.end && selection.start < r.end);
+    canvas(
+        move |_, window, _| {
+            let style = window.text_style();
+            let font = style.font();
+            let mut runs: Vec<_> = tokens
+                .iter()
+                .filter_map(|t| {
+                    let len =
+                        display.display_offset(t.range.end) - display.display_offset(t.range.start);
+                    (len > 0).then(|| TextRun {
+                        len,
+                        font: font.clone(),
+                        color: rgb(t.color).into(),
+                        background_color: None,
+                        underline: None,
+                        strikethrough: None,
+                    })
+                })
+                .collect();
+            if runs.is_empty() {
+                runs.push(TextRun {
+                    len: display.text.len(),
+                    font,
+                    color: rgb(0xdce5f3).into(),
+                    background_color: None,
+                    underline: None,
+                    strikethrough: None,
+                });
+            }
+            let line = window.text_system().shape_line(
+                display.text.clone().into(),
+                style.font_size.to_pixels(window.rem_size()),
+                &runs,
+                None,
+            );
+            (line, display)
+        },
+        move |bounds, (line, display), window, cx| {
+            let origin = point(bounds.left() - px(horizontal), bounds.top());
+            let visible = window.content_mask().bounds.intersect(&bounds);
+            window.with_content_mask(Some(ContentMask { bounds }), |window| {
+                for found in &matches {
+                    if found.start < range.end && found.end > range.start {
+                        let a = found.start.saturating_sub(range.start).min(range.len());
+                        let b = found.end.saturating_sub(range.start).min(range.len());
+                        let x1 = line.x_for_index(display.display_offset(a));
+                        let x2 = line.x_for_index(display.display_offset(b));
+                        window.paint_quad(fill(
+                            Bounds::new(
+                                point(origin.x + x1, bounds.top()),
+                                size(x2 - x1, bounds.size.height),
+                            ),
+                            rgb(0x66552c),
+                        ));
+                    }
+                }
+                if selection.start <= range.end
+                    && selection.end > range.start
+                    && !selection.is_empty()
+                {
+                    let a = selection.start.saturating_sub(range.start).min(range.len());
+                    let b = selection.end.saturating_sub(range.start).min(range.len());
+                    let x1 = line.x_for_index(display.display_offset(a));
+                    let x2 = line.x_for_index(display.display_offset(b))
+                        + if newline_selected { px(8.) } else { px(0.) };
+                    window.paint_quad(fill(
+                        Bounds::new(
+                            point(origin.x + x1, bounds.top()),
+                            size((x2 - x1).max(px(0.)), bounds.size.height),
+                        ),
+                        rgb(0x315b92),
+                    ));
+                }
+                if let Some(marked) = &marked
+                    && marked.start < range.end
+                    && marked.end > range.start
+                {
+                    let a = marked.start.saturating_sub(range.start).min(range.len());
+                    let b = marked.end.saturating_sub(range.start).min(range.len());
+                    let x1 = line.x_for_index(display.display_offset(a));
+                    let x2 = line.x_for_index(display.display_offset(b));
+                    window.paint_quad(fill(
+                        Bounds::new(
+                            point(origin.x + x1, bounds.bottom() - px(2.)),
+                            size(x2 - x1, px(1.)),
+                        ),
+                        rgb(0xffd479),
+                    ));
+                }
+                let _ = line.paint(origin, bounds.size.height, window, cx);
+                if selection.is_empty()
+                    && caret >= range.start
+                    && caret <= range.end
+                    && entity.read(cx).focus.is_focused(window)
+                {
+                    let x = line.x_for_index(display.display_offset(caret - range.start));
+                    window.paint_quad(fill(
+                        Bounds::new(
+                            point(origin.x + x, bounds.top() + px(2.)),
+                            size(px(1.), bounds.size.height - px(4.)),
+                        ),
+                        rgb(0xe5edf8),
+                    ));
+                }
+            });
+            entity.update(cx, |this, _| {
+                this.hits.insert(
+                    index,
+                    Hit {
+                        range,
+                        display,
+                        line,
+                        bounds: visible,
+                        origin,
+                    },
+                );
+            });
+        },
+    )
+    .w_full()
+    .h_full()
+}
+impl Render for Editor {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.hits.clear();
+        let entity = cx.entity();
+        let focus = self.focus.clone();
+        let count =
+            self.buffer.document.lines.len() + usize::from(self.buffer.text().ends_with('\n'));
+        div()
+            .relative()
+            .flex()
+            .flex_col()
+            .min_h_0()
+            .when(!self.compact, |s| s.flex_1())
+            .when(self.compact, |s| s.h(px(32.)).flex_shrink_0())
+            .key_context("FileEditor")
+            .track_focus(&self.focus)
+            .on_mouse_down(MouseButton::Left, cx.listener(Self::mouse_down))
+            .on_mouse_move(cx.listener(Self::mouse_move))
+            .on_mouse_up(
+                MouseButton::Left,
+                cx.listener(|this, _, _, _| this.dragging = false),
+            )
+            .on_mouse_up_out(
+                MouseButton::Left,
+                cx.listener(|this, _, _, _| this.dragging = false),
+            )
+            .on_action(cx.listener(|this, _: &FindText, window, cx| this.show_find(window, cx)))
+            .on_action(cx.listener(|this, _: &FindNext, _, cx| {
+                if this.compact {
+                    cx.propagate();
+                } else {
+                    this.find_move(true, cx);
+                }
+            }))
+            .on_action(cx.listener(|this, _: &FindPrevious, _, cx| {
+                if this.compact {
+                    cx.propagate();
+                } else {
+                    this.find_move(false, cx);
+                }
+            }))
+            .on_action(cx.listener(|this, _: &CloseFind, window, cx| {
+                if this.compact {
+                    cx.propagate();
+                    return;
+                }
+                this.query = None;
+                this.query_subscription = None;
+                this.matches.clear();
+                this.current_match = None;
+                window.focus(&this.focus);
+                cx.notify();
+            }))
+            .on_action(cx.listener(|this, _: &CopyText, _, cx| this.copy(cx)))
+            .on_action(cx.listener(|this, _: &SelectAllText, _, cx| {
+                this.buffer.selection.select_all(&this.buffer.document);
+                cx.notify();
+            }))
+            .on_action(cx.listener(|this, _: &EditorPaste, _, cx| this.paste(cx)))
+            .on_action(cx.listener(|this, _: &EditorCut, _, cx| {
+                this.copy(cx);
+                let result = this.buffer.replace(None, "");
+                this.result(result, cx);
+            }))
+            .on_action(cx.listener(|this, _: &EditorUndo, _, cx| {
+                this.buffer.undo();
+                this.refresh(cx);
+            }))
+            .on_action(cx.listener(|this, _: &EditorRedo, _, cx| {
+                this.buffer.redo();
+                this.refresh(cx);
+            }))
+            .on_action(cx.listener(|this, _: &EditorSave, _, cx| this.save(cx)))
+            .on_action(cx.listener(|this, _: &EditorBackspace, _, cx| {
+                let result = this.buffer.delete(true);
+                this.result(result, cx);
+            }))
+            .on_action(cx.listener(|this, _: &EditorDelete, _, cx| {
+                let result = this.buffer.delete(false);
+                this.result(result, cx);
+            }))
+            .on_action(cx.listener(|this, _: &InsertNewline, _, cx| {
+                if this.compact {
+                    cx.emit(Changed::SearchNext);
+                } else {
+                    this.insert("\n", cx);
+                }
+            }))
+            .on_action(cx.listener(|this, _: &InsertTab, _, cx| this.insert("\t", cx)))
+            .on_action(cx.listener(|this, _: &Left, _, cx| this.motion(Motion::Left, false, cx)))
+            .on_action(cx.listener(|this, _: &Right, _, cx| this.motion(Motion::Right, false, cx)))
+            .on_action(cx.listener(|this, _: &Up, _, cx| this.motion(Motion::Up, false, cx)))
+            .on_action(cx.listener(|this, _: &Down, _, cx| this.motion(Motion::Down, false, cx)))
+            .on_action(cx.listener(|this, _: &Home, _, cx| this.motion(Motion::Home, false, cx)))
+            .on_action(cx.listener(|this, _: &End, _, cx| this.motion(Motion::End, false, cx)))
+            .on_action(cx.listener(|this, _: &Start, _, cx| this.motion(Motion::Start, false, cx)))
+            .on_action(
+                cx.listener(|this, _: &Finish, _, cx| this.motion(Motion::Finish, false, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &SelectLeft, _, cx| this.motion(Motion::Left, true, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &SelectRight, _, cx| this.motion(Motion::Right, true, cx)),
+            )
+            .on_action(cx.listener(|this, _: &SelectUp, _, cx| this.motion(Motion::Up, true, cx)))
+            .on_action(
+                cx.listener(|this, _: &SelectDown, _, cx| this.motion(Motion::Down, true, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &SelectHome, _, cx| this.motion(Motion::Home, true, cx)),
+            )
+            .on_action(cx.listener(|this, _: &SelectEnd, _, cx| this.motion(Motion::End, true, cx)))
+            .on_action(
+                cx.listener(|this, _: &SelectStart, _, cx| this.motion(Motion::Start, true, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &SelectFinish, _, cx| this.motion(Motion::Finish, true, cx)),
+            )
+            .when(!self.compact, |s| {
+                s.child(
+                    div()
+                        .flex()
+                        .gap_2()
+                        .p_2()
+                        .when(self.buffer.path.is_some(), |s| {
+                            s.child(
+                                button("save-editor", "保存", !self.saving)
+                                    .on_click(cx.listener(|this, _, _, cx| this.save(cx))),
+                            )
+                            .child(
+                                button("reload-editor", "重新加载", !self.buffer.dirty())
+                                    .on_click(cx.listener(|this, _, _, cx| this.reload(cx))),
+                            )
+                        })
+                        .child(
+                            button("undo-editor", "撤销", self.buffer.can_undo()).on_click(
+                                cx.listener(|this, _, _, cx| {
+                                    this.buffer.undo();
+                                    this.refresh(cx);
+                                }),
+                            ),
+                        )
+                        .child(
+                            button("redo-editor", "重做", self.buffer.can_redo()).on_click(
+                                cx.listener(|this, _, _, cx| {
+                                    this.buffer.redo();
+                                    this.refresh(cx);
+                                }),
+                            ),
+                        )
+                        .child(div().text_color(rgb(0x92a2b9)).child(format!(
+                            "{} · {}",
+                            if self.buffer.dirty() {
+                                "未保存"
+                            } else {
+                                "已保存"
+                            },
+                            if self.buffer.crlf { "CRLF" } else { "LF" }
+                        ))),
+                )
+            })
+            .when(self.external_changed, |s| {
+                s.child(
+                    div()
+                        .p_2()
+                        .text_color(rgb(0xffd479))
+                        .child("磁盘文件已变化。保存会检查冲突；无未保存修改时可重新加载。"),
+                )
+            })
+            .when(!self.message.is_empty(), |s| {
+                s.child(
+                    div()
+                        .p_2()
+                        .text_color(rgb(0xffd479))
+                        .child(self.message.clone()),
+                )
+            })
+            .when_some(self.query.clone(), |s, query| {
+                s.child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .p_2()
+                        .child(div().flex_1().min_w_0().h(px(32.)).child(query))
+                        .child(div().child(format!(
+                            "{} / {}",
+                            self.current_match.map(|i| i + 1).unwrap_or(0),
+                            self.matches.len()
+                        )))
+                        .child(
+                            button("previous-match", "上一处", !self.matches.is_empty())
+                                .on_click(cx.listener(|this, _, _, cx| this.find_move(false, cx))),
+                        )
+                        .child(
+                            button("next-match", "下一处", !self.matches.is_empty())
+                                .on_click(cx.listener(|this, _, _, cx| this.find_move(true, cx))),
+                        )
+                        .child(button("close-find", "关闭查找", true).on_click(cx.listener(
+                            |this, _, _, cx| {
+                                this.query = None;
+                                this.query_subscription = None;
+                                this.matches.clear();
+                                cx.notify();
+                            },
+                        ))),
+                )
+            })
+            .child(
+                uniform_list(
+                    "editor-lines",
+                    count.max(1),
+                    cx.processor(|this, range: Range<usize>, _, cx| {
+                        range
+                            .map(|i| {
+                                div()
+                                    .id(("editor-line", i))
+                                    .flex()
+                                    .h(px(this.font_size + 12.))
+                                    .font_family(this.font_family.clone())
+                                    .text_size(px(this.font_size))
+                                    .child(
+                                        div()
+                                            .w(px(52.))
+                                            .flex_shrink_0()
+                                            .text_color(rgb(0x7f8b9c))
+                                            .child(format!(
+                                                "{} {}",
+                                                this.marks
+                                                    .get(&i)
+                                                    .map(|m| if m.deleted > 0 {
+                                                        format!("−{}", m.deleted)
+                                                    } else if m.added {
+                                                        "+".into()
+                                                    } else {
+                                                        "~".into()
+                                                    })
+                                                    .unwrap_or_default(),
+                                                i + 1
+                                            )),
+                                    )
+                                    .child(
+                                        div()
+                                            .min_w_0()
+                                            .flex_1()
+                                            .h_full()
+                                            .overflow_hidden()
+                                            .child(line(this, i, cx)),
+                                    )
+                            })
+                            .collect::<Vec<_>>()
+                    }),
+                )
+                .track_scroll(self.scroll.clone())
+                .flex_1()
+                .min_h_0(),
+            )
+            .child(
+                canvas(
+                    |_, _, _| (),
+                    move |bounds, _, window, cx| {
+                        window.handle_input(&focus, ElementInputHandler::new(bounds, entity), cx);
+                    },
+                )
+                .absolute()
+                .size_full(),
+            )
+    }
+}

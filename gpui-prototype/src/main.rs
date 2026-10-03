@@ -4,6 +4,7 @@ mod views;
 use app::*;
 use gpui::*;
 use std::path::PathBuf;
+use views::editor::*;
 
 fn main() {
     let path = std::env::args_os()
@@ -15,7 +16,6 @@ fn main() {
         })
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
     Application::new().run(move |cx: &mut App| {
-        cx.on_action(|_: &Quit, cx| cx.quit());
         cx.set_menus(vec![
             Menu {
                 name: "MyGit".into(),
@@ -54,6 +54,25 @@ fn main() {
             },
         ]);
         cx.bind_keys([
+            KeyBinding::new("cmd-f", FindText, Some("FileEditor")),
+            KeyBinding::new("ctrl-f", FindText, Some("FileEditor")),
+            KeyBinding::new("f3", FindNext, Some("FileEditor")),
+            KeyBinding::new("shift-f3", FindPrevious, Some("FileEditor")),
+            KeyBinding::new("escape", CloseFind, Some("FileEditor")),
+            KeyBinding::new("backspace", EditorBackspace, Some("FileEditor")),
+            KeyBinding::new("delete", EditorDelete, Some("FileEditor")),
+            KeyBinding::new("enter", InsertNewline, Some("FileEditor")),
+            KeyBinding::new("tab", InsertTab, Some("FileEditor")),
+            KeyBinding::new("cmd-v", EditorPaste, Some("FileEditor")),
+            KeyBinding::new("ctrl-v", EditorPaste, Some("FileEditor")),
+            KeyBinding::new("cmd-x", EditorCut, Some("FileEditor")),
+            KeyBinding::new("ctrl-x", EditorCut, Some("FileEditor")),
+            KeyBinding::new("cmd-z", EditorUndo, Some("FileEditor")),
+            KeyBinding::new("ctrl-z", EditorUndo, Some("FileEditor")),
+            KeyBinding::new("cmd-shift-z", EditorRedo, Some("FileEditor")),
+            KeyBinding::new("ctrl-shift-z", EditorRedo, Some("FileEditor")),
+            KeyBinding::new("cmd-s", EditorSave, Some("FileEditor")),
+            KeyBinding::new("ctrl-s", EditorSave, Some("FileEditor")),
             KeyBinding::new("cmd-1", ViewWorkspace, Some("MyGit")),
             KeyBinding::new("cmd-2", ViewStaged, Some("MyGit")),
             KeyBinding::new("cmd-3", ViewUnstaged, Some("MyGit")),
@@ -117,12 +136,18 @@ fn main() {
                 ..Default::default()
             },
             |window, cx| {
-                cx.new(|cx| {
+                let entity = cx.new(|cx| {
                     let mut app = MyGit::new(cx);
                     app.load(path, cx);
                     window.focus(&app.history_focus);
                     app
-                })
+                });
+                let weak = entity.downgrade();
+                window.on_window_should_close(cx, move |_, cx| {
+                    weak.update(cx, |this, cx| this.request_close(cx))
+                        .unwrap_or(true)
+                });
+                entity
             },
         )
         .expect("无法创建窗口");

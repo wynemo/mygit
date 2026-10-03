@@ -29,7 +29,15 @@ pub fn bar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                     div()
                                         .id(("activate-tab", i))
                                         .cursor_pointer()
-                                        .child(tab.file.path.clone())
+                                        .child(format!(
+                                            "{}{}",
+                                            if this.is_dirty(&tab.file.path, cx) {
+                                                "● "
+                                            } else {
+                                                ""
+                                            },
+                                            tab.file.path
+                                        ))
                                         .on_click(cx.listener(move |this, _, _, cx| {
                                             this.activate_tab(i, cx)
                                         })),

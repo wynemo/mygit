@@ -1,4 +1,5 @@
 pub mod diff;
+pub mod editor;
 pub mod sidebar;
 pub mod tabs;
 pub mod text_line;
@@ -137,5 +138,57 @@ pub fn settings(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         }))
                 })
                 .collect::<Vec<_>>(),
+        )
+}
+
+pub fn confirmation(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
+    let paths = this
+        .editors
+        .iter()
+        .filter(|(_, e)| e.read(cx).buffer.dirty())
+        .map(|(path, _)| path.clone())
+        .collect::<Vec<_>>();
+    div()
+        .absolute()
+        .inset_0()
+        .flex()
+        .items_center()
+        .justify_center()
+        .bg(rgba(0x000000bb))
+        .child(
+            div()
+                .w(px(520.))
+                .p_4()
+                .rounded_lg()
+                .bg(rgb(0x1b2637))
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child("存在未保存内容")
+                .children(paths.into_iter().map(|path| div().child(path)))
+                .child("保存失败时会保留编辑器内容，并停止关闭或切换。")
+                .child(
+                    div()
+                        .flex()
+                        .gap_2()
+                        .child(
+                            button("save-and-continue", "保存并继续", true).on_click(
+                                cx.listener(|this, _, _, cx| this.confirm_pending(true, cx)),
+                            ),
+                        )
+                        .child(
+                            button("discard-and-continue", "放弃修改并继续", true).on_click(
+                                cx.listener(|this, _, _, cx| this.confirm_pending(false, cx)),
+                            ),
+                        )
+                        .child(
+                            button("cancel-confirmation", "取消", true).on_click(cx.listener(
+                                |this, _, _, cx| {
+                                    this.confirmation = None;
+                                    cx.notify();
+                                },
+                            )),
+                        ),
+                ),
         )
 }

@@ -112,6 +112,35 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         .whitespace_nowrap()
                         .child(title),
                 )
+                .when(
+                    this.state
+                        .comparison
+                        .as_ref()
+                        .is_some_and(|c| c.right == mygit_gpui::model::Revision::Worktree),
+                    |s| {
+                        s.child(
+                            button(
+                                "edit-file",
+                                if this.edit_mode {
+                                    "查看 Diff"
+                                } else {
+                                    "编辑工作区"
+                                },
+                                !this.state.loading,
+                            )
+                            .on_click(cx.listener(
+                                |this, _, window, cx| {
+                                    if this.edit_mode {
+                                        this.edit_mode = false;
+                                        cx.notify();
+                                    } else {
+                                        this.edit_current(window, cx);
+                                    }
+                                },
+                            )),
+                        )
+                    },
+                )
                 .child(
                     button("previous-diff", "上一处", previous)
                         .on_click(cx.listener(|this, _, _, cx| this.navigate(false, cx))),
@@ -198,79 +227,87 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         .child(right),
                 ),
         )
-        .when(this.state.diff.rows.is_empty(), |s| {
-            s.child(
-                div()
-                    .flex_1()
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .p_3()
-                    .text_color(rgb(0x92a2b9))
-                    .child(if this.state.loading {
-                        "正在加载…".into()
-                    } else if this.state.active_file().is_some() || this.state.comparison.is_none()
-                    {
-                        this.state.message.clone()
-                    } else if this.state.repo.is_some() {
-                        format!("{}：没有变更文件", this.state.mode.label())
-                    } else {
-                        "打开一个 Git 仓库开始浏览".into()
-                    }),
-            )
-        })
-        .when(!this.state.diff.rows.is_empty(), |s| {
-            s.child(
-                uniform_list(
-                    ("diff", this.state.generation as usize),
-                    this.state.diff.rows.len(),
-                    cx.processor(|this, range: std::ops::Range<usize>, _, cx| {
-                        range
-                            .map(|i| {
-                                let r = &this.state.diff.rows[i];
-                                let active = this.state.active_row(i);
-                                div()
-                                    .id(i)
-                                    .flex()
-                                    .w_full()
-                                    .h(px(this.state.font_size + 12.))
-                                    .font_family(this.state.font_family.clone())
-                                    .text_size(px(this.state.font_size))
-                                    .child(cell(
-                                        this,
-                                        Side::Left,
-                                        i,
-                                        if active {
-                                            0x624233
-                                        } else if r.changed && r.left_no.is_some() {
-                                            0x43262f
-                                        } else {
-                                            0x151d29
-                                        },
-                                        active,
-                                        cx,
-                                    ))
-                                    .child(div().w(px(1.)).h_full().bg(rgb(0x354259)))
-                                    .child(cell(
-                                        this,
-                                        Side::Right,
-                                        i,
-                                        if active {
-                                            0x365245
-                                        } else if r.changed && r.right_no.is_some() {
-                                            0x203c32
-                                        } else {
-                                            0x151d29
-                                        },
-                                        active,
-                                        cx,
-                                    ))
-                            })
-                            .collect::<Vec<_>>()
-                    }),
+        .when_some(this.current_editor(), |s, editor| s.child(editor))
+        .when(
+            this.current_editor().is_none() && this.state.diff.rows.is_empty(),
+            |s| {
+                s.child(
+                    div()
+                        .flex_1()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .p_3()
+                        .text_color(rgb(0x92a2b9))
+                        .child(if this.state.loading {
+                            "正在加载…".into()
+                        } else if this.state.active_file().is_some()
+                            || this.state.comparison.is_none()
+                        {
+                            this.state.message.clone()
+                        } else if this.state.repo.is_some() {
+                            format!("{}：没有变更文件", this.state.mode.label())
+                        } else {
+                            "打开一个 Git 仓库开始浏览".into()
+                        }),
                 )
-                .track_scroll(this.diff_scroll.clone())
-                .flex_1(),
-            )
-        })
+            },
+        )
+        .when(
+            this.current_editor().is_none() && !this.state.diff.rows.is_empty(),
+            |s| {
+                s.child(
+                    uniform_list(
+                        ("diff", this.state.generation as usize),
+                        this.state.diff.rows.len(),
+                        cx.processor(|this, range: std::ops::Range<usize>, _, cx| {
+                            range
+                                .map(|i| {
+                                    let r = &this.state.diff.rows[i];
+                                    let active = this.state.active_row(i);
+                                    div()
+                                        .id(i)
+                                        .flex()
+                                        .w_full()
+                                        .h(px(this.state.font_size + 12.))
+                                        .font_family(this.state.font_family.clone())
+                                        .text_size(px(this.state.font_size))
+                                        .child(cell(
+                                            this,
+                                            Side::Left,
+                                            i,
+                                            if active {
+                                                0x624233
+                                            } else if r.changed && r.left_no.is_some() {
+                                                0x43262f
+                                            } else {
+                                                0x151d29
+                                            },
+                                            active,
+                                            cx,
+                                        ))
+                                        .child(div().w(px(1.)).h_full().bg(rgb(0x354259)))
+                                        .child(cell(
+                                            this,
+                                            Side::Right,
+                                            i,
+                                            if active {
+                                                0x365245
+                                            } else if r.changed && r.right_no.is_some() {
+                                                0x203c32
+                                            } else {
+                                                0x151d29
+                                            },
+                                            active,
+                                            cx,
+                                        ))
+                                })
+                                .collect::<Vec<_>>()
+                        }),
+                    )
+                    .track_scroll(this.diff_scroll.clone())
+                    .flex_1(),
+                )
+            },
+        )
 }

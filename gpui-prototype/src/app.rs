@@ -1,3 +1,4 @@
+use crate::views::editor::{Changed, Editor};
 use crate::views::text_line::LineHit;
 use crate::{tasks, views};
 use gpui::{prelude::*, *};
@@ -45,9 +46,20 @@ actions!(
     ]
 );
 
+#[derive(Clone)]
+pub enum Confirmation {
+    Close(String),
+    CloseOthers(Option<String>),
+    Load(PathBuf),
+    Quit,
+}
 pub struct MyGit {
     pub state: AppState,
     pub tabs: Vec<FileTab>,
+    pub editors: HashMap<String, Entity<Editor>>,
+    pub editor_subscriptions: HashMap<String, Subscription>,
+    pub edit_mode: bool,
+    pub confirmation: Option<Confirmation>,
     pub active_tab: Option<usize>,
     pub tab_scroll: HashMap<String, UniformListScrollHandle>,
     pub settings: mygit_gpui::settings::Settings,
@@ -99,6 +111,10 @@ impl MyGit {
         Self {
             state,
             tabs: vec![],
+            editors: HashMap::new(),
+            editor_subscriptions: HashMap::new(),
+            edit_mode: false,
+            confirmation: None,
             active_tab: None,
             tab_scroll: HashMap::new(),
             settings,
@@ -154,9 +170,21 @@ impl MyGit {
         .detach();
     }
     pub fn load(&mut self, path: PathBuf, cx: &mut Context<Self>) {
+        let switching = !self.state.repo.as_ref().is_some_and(|r| r.root == path);
+        if switching && self.editors.values().any(|e| e.read(cx).buffer.dirty()) {
+            self.confirmation = Some(Confirmation::Load(path));
+            cx.notify();
+            return;
+        }
+        self.load_unchecked(path, cx);
+    }
+    fn load_unchecked(&mut self, path: PathBuf, cx: &mut Context<Self>) {
+        self.edit_mode = false;
         self.capture_tab();
         self.active_tab = None;
         if !self.state.repo.as_ref().is_some_and(|r| r.root == path) {
+            self.editors.clear();
+            self.editor_subscriptions.clear();
             self.tabs.clear();
             self.active_tab = None;
             self.tab_scroll.clear();
@@ -215,6 +243,7 @@ impl MyGit {
         self.state.detail = None;
         self.state.current_file = None;
         self.show_tree = false;
+        self.edit_mode = false;
         self.state.mode = mode.clone();
         self.state.comparison = None;
         self.state.listed_comparison = None;
@@ -268,6 +297,7 @@ impl MyGit {
         self.capture_tab();
         self.active_tab = None;
         self.state.comparison = Some(comparison.clone());
+        self.edit_mode = false;
         self.state.selected = Some(index);
         self.state.current_file = Some(file.clone());
         self.state.clear_diff();
@@ -333,6 +363,12 @@ impl MyGit {
         self.state.loading = false;
         let path = tab.file.path.clone();
         self.state.restore_tab(tab);
+        self.edit_mode = self.editors.contains_key(&path)
+            && self
+                .state
+                .comparison
+                .as_ref()
+                .is_some_and(|c| c.right == Revision::Worktree);
         self.diff_scroll = self.tab_scroll.get(&path).cloned().unwrap_or_default();
         self.active_tab = Some(index);
         self.line_layouts.clear();
@@ -340,11 +376,23 @@ impl MyGit {
         cx.notify();
     }
     pub fn close_tab(&mut self, index: usize, cx: &mut Context<Self>) {
+        if let Some(tab) = self.tabs.get(index)
+            && self.is_dirty(&tab.file.path, cx)
+        {
+            self.confirmation = Some(Confirmation::Close(tab.file.path.clone()));
+            cx.notify();
+            return;
+        }
+        self.close_tab_unchecked(index, cx);
+    }
+    fn close_tab_unchecked(&mut self, index: usize, cx: &mut Context<Self>) {
         if index >= self.tabs.len() {
             return;
         }
         self.capture_tab();
         let removed = self.tabs.remove(index);
+        self.editors.remove(&removed.file.path);
+        self.editor_subscriptions.remove(&removed.file.path);
         self.tab_scroll.remove(&removed.file.path);
         match self.active_tab {
             Some(active) if active == index => {
@@ -363,6 +411,28 @@ impl MyGit {
         cx.notify();
     }
     pub fn close_other_tabs(&mut self, all: bool, cx: &mut Context<Self>) {
+        let keep = if all {
+            None
+        } else {
+            self.active_tab
+                .and_then(|i| self.tabs.get(i))
+                .map(|t| t.file.path.clone())
+        };
+        if !all && keep.is_none() {
+            return;
+        }
+        if self
+            .editors
+            .iter()
+            .any(|(path, e)| Some(path) != keep.as_ref() && e.read(cx).buffer.dirty())
+        {
+            self.confirmation = Some(Confirmation::CloseOthers(keep));
+            cx.notify();
+            return;
+        }
+        self.close_other_tabs_unchecked(all, cx);
+    }
+    fn close_other_tabs_unchecked(&mut self, all: bool, cx: &mut Context<Self>) {
         if !all && self.active_tab.is_none() {
             return;
         }
@@ -372,6 +442,9 @@ impl MyGit {
         self.state.loading = false;
         if !all && let Some(tab) = self.active_tab.and_then(|i| self.tabs.get(i)).cloned() {
             let scroll = self.tab_scroll.remove(&tab.file.path);
+            self.editors.retain(|path, _| path == &tab.file.path);
+            self.editor_subscriptions
+                .retain(|path, _| path == &tab.file.path);
             self.tabs = vec![tab.clone()];
             self.active_tab = Some(0);
             self.tab_scroll.clear();
@@ -379,12 +452,177 @@ impl MyGit {
                 self.tab_scroll.insert(tab.file.path, scroll);
             }
         } else {
+            self.editors.clear();
+            self.editor_subscriptions.clear();
+            self.edit_mode = false;
             self.tabs.clear();
             self.tab_scroll.clear();
             self.active_tab = None;
             self.state.current_file = None;
             self.state.selected = None;
             self.state.clear_diff();
+        }
+        cx.notify();
+    }
+    pub fn is_dirty(&self, path: &str, cx: &App) -> bool {
+        self.editors
+            .get(path)
+            .is_some_and(|e| e.read(cx).buffer.dirty())
+    }
+    pub fn current_editor(&self) -> Option<Entity<Editor>> {
+        if !self.edit_mode
+            || !self
+                .state
+                .comparison
+                .as_ref()
+                .is_some_and(|c| c.right == Revision::Worktree)
+        {
+            return None;
+        }
+        self.state
+            .current_file
+            .as_ref()
+            .and_then(|f| self.editors.get(&f.path))
+            .cloned()
+    }
+    pub fn edit_current(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self
+            .state
+            .comparison
+            .as_ref()
+            .is_some_and(|c| c.right == Revision::Worktree)
+        {
+            return;
+        }
+        let (Some(repo), Some(file)) = (&self.state.repo, self.state.current_file.as_ref()) else {
+            return;
+        };
+        let path = file.path.clone();
+        if let Some(editor) = self.editors.get(&path) {
+            self.edit_mode = true;
+            window.focus(&editor.read(cx).focus);
+            cx.notify();
+            return;
+        }
+        let root = repo.root.clone();
+        let generation = self.state.begin(format!("正在加载编辑器 {path}…"));
+        self.pending.cancel();
+        self.pending = Default::default();
+        tasks::run(
+            cx,
+            generation,
+            self.pending.clone(),
+            move || mygit_gpui::editor::Buffer::load(&root.join(&path)),
+            |this, buffer, cx| {
+                let Some(file) = this.state.current_file.clone() else {
+                    return;
+                };
+                let font = this.state.font_family.clone();
+                let size = this.state.font_size;
+                let editor = cx.new(|cx| {
+                    let mut editor = Editor::new(buffer, font, size, cx);
+                    editor.reference = this.state.diff.left_document.clone();
+                    editor.refresh(cx);
+                    editor
+                });
+                let subscription = cx.subscribe(&editor, |this, _, event: &Changed, cx| {
+                    if matches!(event, Changed::Saved) {
+                        this.refresh_tree(cx);
+                        this.refresh_visible_diff(cx);
+                    }
+                    cx.notify();
+                });
+                this.editors.insert(file.path.clone(), editor);
+                this.editor_subscriptions.insert(file.path, subscription);
+                this.edit_mode = true;
+                this.state.message = "编辑器已打开，点击文本开始输入".into();
+            },
+        );
+        cx.notify();
+    }
+    pub fn refresh_visible_diff(&mut self, cx: &mut Context<Self>) {
+        let (Some(repo), Some(file), Some(comparison)) = (
+            &self.state.repo,
+            self.state.current_file.clone(),
+            self.state.comparison.clone(),
+        ) else {
+            return;
+        };
+        let root = repo.root.clone();
+        let generation = self.state.begin("正在更新已保存 Diff…".into());
+        self.pending.cancel();
+        self.pending = Default::default();
+        tasks::run(
+            cx,
+            generation,
+            self.pending.clone(),
+            move || git::compare(&root, &comparison, &file),
+            |this, diff, _| {
+                this.state.set_diff(diff);
+                this.remember_tab();
+            },
+        );
+    }
+    pub fn request_close(&mut self, cx: &mut Context<Self>) -> bool {
+        if self.editors.values().any(|e| e.read(cx).buffer.dirty()) {
+            self.confirmation = Some(Confirmation::Quit);
+            cx.notify();
+            false
+        } else {
+            true
+        }
+    }
+    pub fn confirm_pending(&mut self, save: bool, cx: &mut Context<Self>) {
+        let Some(action) = self.confirmation.clone() else {
+            return;
+        };
+        let paths: Vec<_> = self
+            .editors
+            .keys()
+            .filter(|path| match &action {
+                Confirmation::Close(target) => *path == target,
+                Confirmation::CloseOthers(keep) => Some(*path) != keep.as_ref(),
+                _ => true,
+            })
+            .cloned()
+            .collect();
+        if save {
+            for path in &paths {
+                if let Some(editor) = self.editors.get(path)
+                    && editor.read(cx).buffer.dirty()
+                {
+                    editor.update(cx, |editor, cx| editor.save(cx));
+                }
+            }
+            if paths.iter().any(|path| self.is_dirty(path, cx)) {
+                self.state.message = "仍有文件未保存，请处理保存错误或取消关闭".into();
+                cx.notify();
+                return;
+            }
+        }
+        self.confirmation = None;
+        for path in paths {
+            self.editors.remove(&path);
+            self.editor_subscriptions.remove(&path);
+        }
+        match action {
+            Confirmation::Close(path) => {
+                if let Some(index) = self.tabs.iter().position(|t| t.file.path == path) {
+                    self.close_tab_unchecked(index, cx);
+                }
+            }
+            Confirmation::CloseOthers(keep) => {
+                if let Some(path) = keep
+                    && let Some(index) = self.tabs.iter().position(|t| t.file.path == path)
+                {
+                    self.activate_tab(index, cx);
+                    self.close_other_tabs_unchecked(false, cx);
+                } else {
+                    self.close_other_tabs_unchecked(true, cx);
+                }
+            }
+            Confirmation::Load(path) => self.load_unchecked(path, cx),
+            Confirmation::Quit => cx.quit(),
         }
         cx.notify();
     }
@@ -448,6 +686,7 @@ impl MyGit {
         self.capture_tab();
         self.active_tab = None;
         self.state.selected = None;
+        self.edit_mode = false;
         self.state.detail = None;
         self.state.current_file = Some(FileChange {
             path: path.clone(),
@@ -524,6 +763,10 @@ impl MyGit {
         .detach();
     }
     pub fn cancel_task(&mut self, cx: &mut Context<Self>) {
+        if self.confirmation.take().is_some() {
+            cx.notify();
+            return;
+        }
         self.pending.cancel();
         self.history_pending.cancel();
         self.history_pending = Default::default();
@@ -821,6 +1064,12 @@ impl MyGit {
             _ => "Menlo",
         }
         .into();
+        for editor in self.editors.values() {
+            editor.update(cx, |e, cx| {
+                e.font_family = self.state.font_family.clone();
+                cx.notify();
+            });
+        }
         self.save_settings();
         cx.notify();
     }
@@ -839,6 +1088,12 @@ impl MyGit {
         self.state.font_size =
             (self.state.font_size + if increase { 1. } else { -1. }).clamp(10., 22.);
         self.diff_scroll = UniformListScrollHandle::new();
+        for editor in self.editors.values() {
+            editor.update(cx, |e, cx| {
+                e.font_size = self.state.font_size;
+                cx.notify();
+            });
+        }
         self.save_settings();
         cx.notify();
     }
@@ -856,13 +1111,22 @@ impl MyGit {
 impl Render for MyGit {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.line_layouts.clear();
+        if self.confirmation.is_some() {
+            window.focus(&self.focus);
+        }
         let available = (f32::from(window.viewport_size().width) - 420.).max(280.);
         let factor =
             (available / (self.settings.history_width + self.settings.files_width)).min(1.);
         self.visible_history_width = (self.settings.history_width * factor).max(160.);
         self.visible_files_width = (self.settings.files_width * factor).max(120.);
         div()
+            .relative()
             .key_context("MyGit")
+            .on_action(cx.listener(|this, _: &Quit, _, cx| {
+                if this.request_close(cx) {
+                    cx.quit();
+                }
+            }))
             .on_action(cx.listener(|this, _: &ViewWorkspace, _, cx| {
                 this.select_mode(BrowseMode::Workspace, cx)
             }))
@@ -1000,6 +1264,9 @@ impl Render for MyGit {
                         self.state.message
                     )),
             )
+            .when(self.confirmation.is_some(), |s| {
+                s.child(views::confirmation(self, cx))
+            })
     }
 }
 

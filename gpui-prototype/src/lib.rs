@@ -1,4 +1,5 @@
 pub mod diff;
+pub mod editor;
 pub mod git;
 pub mod model;
 pub mod process;
