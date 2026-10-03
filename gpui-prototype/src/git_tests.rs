@@ -1612,3 +1612,195 @@ fn dag_history_keeps_real_merge_parents_and_refreshes_moved_refs_and_tags() {
     let rows = crate::graph::layout(&after.commits, false);
     assert_eq!(crate::graph::layout(&after.commits[..2], false), rows[..2]);
 }
+
+#[test]
+fn merge_three_columns_union_both_parents_and_pin_renamed_deleted_and_added_paths() {
+    let f = Fixture::new();
+    std::fs::write(f.0.join("old name"), "one\ntwo\nthree\nfour\n").unwrap();
+    std::fs::write(f.0.join("deleted"), "gone\n").unwrap();
+    let initial = f.commit();
+    assert!(crate::merge::selection(&f.0, &initial).is_err());
+    git(&f.0, &["switch", "-c", "side"]).unwrap();
+    std::fs::write(f.0.join("side only"), "side\r\n😀").unwrap();
+    let side = f.commit();
+    git(&f.0, &["switch", "main"]).unwrap();
+    git(&f.0, &["mv", "old name", "new name"]).unwrap();
+    std::fs::remove_file(f.0.join("deleted")).unwrap();
+    std::fs::write(f.0.join("main only"), "main\n").unwrap();
+    let main = f.commit();
+    git(
+        &f.0,
+        &[
+            "-c",
+            "commit.gpgsign=false",
+            "merge",
+            "--no-ff",
+            "--no-edit",
+            "side",
+        ],
+    )
+    .unwrap();
+    let sha = string(git(&f.0, &["rev-parse", "HEAD"]).unwrap())
+        .unwrap()
+        .trim()
+        .to_owned();
+    let selection = crate::merge::selection(&f.0, &sha).unwrap();
+    assert_eq!(selection.detail.parents, vec![main.clone(), side.clone()]);
+    assert_eq!(
+        selection
+            .files
+            .iter()
+            .map(|f| f.path.as_str())
+            .collect::<Vec<_>>(),
+        vec!["deleted", "main only", "new name", "side only"]
+    );
+    let load = |path: &str| {
+        crate::merge::load(
+            &f.0,
+            &selection,
+            selection
+                .files
+                .iter()
+                .find(|file| file.path == path)
+                .unwrap(),
+            2_000_000,
+        )
+        .unwrap()
+    };
+    let renamed = load("new name");
+    assert_eq!(renamed.paths, ["new name", "new name", "old name"]);
+    assert_eq!(renamed.revisions, [main, sha, side]);
+    assert!(
+        renamed
+            .documents
+            .iter()
+            .all(|d| &*d.text == "one\ntwo\nthree\nfour\n")
+    );
+    let deleted = load("deleted");
+    assert!(deleted.documents[0].text.is_empty());
+    assert!(deleted.documents[1].text.is_empty());
+    assert_eq!(&*deleted.documents[2].text, "gone\n");
+    let main = load("main only");
+    assert_eq!(&*main.documents[0].text, "main\n");
+    assert_eq!(&*main.documents[1].text, "main\n");
+    assert!(main.documents[2].text.is_empty());
+    let side = load("side only");
+    assert!(side.documents[0].text.is_empty());
+    assert_eq!(&*side.documents[1].text, "side\r\n😀");
+    assert_eq!(&*side.documents[2].text, "side\r\n😀");
+    std::fs::write(f.0.join("side only"), "dirty workspace\n").unwrap();
+    git(&f.0, &["add", "side only"]).unwrap();
+    assert_eq!(&*load("side only").documents[1].text, "side\r\n😀");
+    assert_eq!(
+        std::fs::read_to_string(f.0.join("side only")).unwrap(),
+        "dirty workspace\n"
+    );
+    assert_eq!(
+        git(&f.0, &["show", ":side only"]).unwrap(),
+        b"dirty workspace\n"
+    );
+}
+
+#[test]
+fn merge_three_columns_restricted_contents_return_explicit_notice() {
+    let f = Fixture::new();
+    std::fs::write(f.0.join("binary"), b"a\0b").unwrap();
+    f.commit();
+    git(&f.0, &["switch", "-c", "side"]).unwrap();
+    std::fs::write(f.0.join("binary"), b"c\0d").unwrap();
+    f.commit();
+    git(&f.0, &["switch", "main"]).unwrap();
+    std::fs::write(f.0.join("text"), "abc\n").unwrap();
+    f.commit();
+    git(
+        &f.0,
+        &[
+            "-c",
+            "commit.gpgsign=false",
+            "merge",
+            "--no-ff",
+            "--no-edit",
+            "side",
+        ],
+    )
+    .unwrap();
+    let selection = crate::merge::selection(&f.0, "HEAD").unwrap();
+    let binary = selection.files.iter().find(|f| f.path == "binary").unwrap();
+    let view = crate::merge::load(&f.0, &selection, binary, 2_000_000).unwrap();
+    assert!(view.rows.is_empty());
+    assert!(view.message.unwrap().contains("二进制"));
+    let text = selection.files.iter().find(|f| f.path == "text").unwrap();
+    let view = crate::merge::load(&f.0, &selection, text, 1).unwrap();
+    assert!(view.rows.is_empty());
+    assert!(view.message.unwrap().contains("预览上限"));
+}
+
+#[test]
+fn merge_three_columns_combined_budget_and_octopus_are_explicit() {
+    let f = Fixture::new();
+    std::fs::write(f.0.join("file"), "base\n").unwrap();
+    let base = f.commit();
+    git(&f.0, &["switch", "-c", "side"]).unwrap();
+    std::fs::write(f.0.join("file"), "side\n").unwrap();
+    let side = f.commit();
+    git(&f.0, &["switch", "main"]).unwrap();
+    std::fs::write(f.0.join("file"), "main\n").unwrap();
+    let main = f.commit();
+    assert!(
+        git(
+            &f.0,
+            &[
+                "-c",
+                "commit.gpgsign=false",
+                "merge",
+                "--no-ff",
+                "--no-edit",
+                "side"
+            ]
+        )
+        .is_err()
+    );
+    std::fs::write(f.0.join("file"), "done\n").unwrap();
+    let merged = f.commit();
+    let selection = crate::merge::selection(&f.0, &merged).unwrap();
+    let view = crate::merge::load(&f.0, &selection, &selection.files[0], 12).unwrap();
+    assert!(view.rows.is_empty());
+    assert!(view.documents.iter().all(|d| d.text.is_empty()));
+    assert!(view.message.unwrap().contains("三侧内容合计"));
+    let view = crate::merge::load(&f.0, &selection, &selection.files[0], 15).unwrap();
+    assert_eq!(
+        view.documents
+            .iter()
+            .map(|d| d.text.as_ref())
+            .collect::<Vec<_>>(),
+        vec!["main\n", "done\n", "side\n"]
+    );
+    let tree = string(git(&f.0, &["rev-parse", "HEAD^{tree}"]).unwrap()).unwrap();
+    let octopus = string(
+        git(
+            &f.0,
+            &[
+                "-c",
+                "commit.gpgsign=false",
+                "commit-tree",
+                tree.trim(),
+                "-p",
+                &main,
+                "-p",
+                &side,
+                "-p",
+                &base,
+                "-m",
+                "octopus",
+            ],
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert!(
+        crate::merge::selection(&f.0, octopus.trim())
+            .unwrap_err()
+            .to_string()
+            .contains("3 个父提交")
+    );
+}
