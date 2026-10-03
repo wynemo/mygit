@@ -293,7 +293,26 @@ fn disk(path: &Path) -> Result<Vec<u8>> {
     if metadata.len() > 2_000_000 {
         bail!("编辑文件超过 2 MB 上限");
     }
-    fs::read(path).with_context(|| format!("无法读取 {}", path.display()))
+    let mut options = fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
+    }
+    let file = options
+        .open(path)
+        .with_context(|| format!("无法读取 {}", path.display()))?;
+    if !file.metadata()?.is_file() {
+        bail!("仅可编辑普通文件");
+    }
+    use std::io::Read;
+    let mut bytes = vec![];
+    file.take(2_000_001).read_to_end(&mut bytes)?;
+    if bytes.len() > 2_000_000 {
+        bail!("编辑文件超过 2 MB 上限");
+    }
+    Ok(bytes)
 }
 pub fn to_utf16(text: &str, offset: usize) -> usize {
     text[..offset.min(text.len())].encode_utf16().count()

@@ -350,7 +350,7 @@ pub fn comparison_selection(root: &Path, comparison: &Comparison) -> Result<Sele
     })
 }
 
-fn validate_paths(paths: &[String]) -> Result<()> {
+pub(crate) fn validate_paths(paths: &[String]) -> Result<()> {
     for path in paths {
         if path.is_empty()
             || Path::new(path).is_absolute()
@@ -588,7 +588,7 @@ fn content(root: &Path, target: &FileTarget, info: &ContentInfo, limit: usize) -
         #[cfg(unix)]
         {
             use std::os::unix::fs::OpenOptionsExt;
-            options.custom_flags(libc::O_NOFOLLOW);
+            options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
         }
         let file = options.open(&path)?;
         if !file.metadata()?.is_file() {
@@ -606,6 +606,57 @@ fn content(root: &Path, target: &FileTarget, info: &ContentInfo, limit: usize) -
             info.object.as_ref().context("缺少 blob ID")?,
         ],
     )
+}
+pub struct VersionContent {
+    pub bytes: Vec<u8>,
+    pub symlink: bool,
+    pub executable: bool,
+}
+pub fn version_content(
+    root: &Path,
+    revision: &Revision,
+    path: &str,
+) -> Result<Option<VersionContent>> {
+    if *revision == Revision::Empty {
+        return Ok(None);
+    }
+    let record = match revision {
+        Revision::Index => string(git(root, &["ls-files", "--stage", "-z", "--", path])?)?,
+        Revision::Head(sha) | Revision::Commit(sha) => {
+            string(git(root, &["ls-tree", "-z", sha, "--", path])?)?
+        }
+        _ => bail!("还原来源必须是提交、index 或空内容"),
+    };
+    if record.is_empty() {
+        return Ok(None);
+    }
+    let fields: Vec<_> = record
+        .split('\t')
+        .next()
+        .unwrap_or("")
+        .split_whitespace()
+        .collect();
+    let mode = fields.first().copied().context("还原来源缺少模式")?;
+    if *revision == Revision::Index && fields.get(2) != Some(&"0") {
+        bail!("未合并 index 不能作为还原来源");
+    }
+    if mode == "160000" {
+        bail!("子模块目录不能使用文件还原操作");
+    }
+    let target = FileTarget {
+        revision: revision.clone(),
+        path: path.into(),
+    };
+    let metadata = info(root, &target)?;
+    if metadata.size > 20_000_000 {
+        bail!("还原文件超过 20 MB 恢复记录上限");
+    }
+    let bytes = content(root, &target, &metadata, 20_000_000)?;
+    Ok(Some(VersionContent {
+        bytes,
+        symlink: mode == "120000",
+        executable: mode == "100755",
+    }))
 }
 pub fn compare(root: &Path, comparison: &Comparison, file: &FileChange) -> Result<Diff> {
     compare_with_limit(root, comparison, file, 2_000_000)

@@ -55,6 +55,12 @@ pub enum Confirmation {
     CloseOthers(Option<String>),
     Load(PathBuf),
     Quit,
+    Restore {
+        file: FileChange,
+        comparison: Comparison,
+        diff: Box<Diff>,
+        block: Option<usize>,
+    },
 }
 pub struct MyGit {
     pub state: AppState,
@@ -646,6 +652,125 @@ impl MyGit {
             },
         );
     }
+    pub fn request_restore(&mut self, block: bool, cx: &mut Context<Self>) {
+        if self.write_busy
+            || !self.state.editable
+            || !matches!(
+                self.state.mode,
+                BrowseMode::Workspace | BrowseMode::Unstaged
+            )
+        {
+            return;
+        }
+        let (Some(file), Some(comparison)) = (
+            self.state.current_file.clone(),
+            self.state.comparison.clone(),
+        ) else {
+            return;
+        };
+        if comparison.right != Revision::Worktree {
+            return;
+        }
+        if self.is_dirty(&file.path, cx)
+            || (file.old_path != file.path && self.is_dirty(&file.old_path, cx))
+        {
+            self.write_message = "还原涉及未保存文件，请先保存或关闭编辑器修改".into();
+            cx.notify();
+            return;
+        }
+        if block && self.state.current_block.is_none() {
+            self.write_message = "请先定位要还原的差异块".into();
+            cx.notify();
+            return;
+        }
+        self.confirmation = Some(Confirmation::Restore {
+            file,
+            comparison,
+            diff: Box::new(self.state.diff.clone()),
+            block: if block {
+                self.state.current_block
+            } else {
+                None
+            },
+        });
+        cx.notify();
+    }
+    fn execute_restore(
+        &mut self,
+        file: FileChange,
+        comparison: Comparison,
+        diff: Box<Diff>,
+        block: Option<usize>,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(repo) = &self.state.repo else {
+            return;
+        };
+        let root = repo.root.clone();
+        let store = self
+            .settings
+            .path
+            .parent()
+            .unwrap_or(std::path::Path::new("."))
+            .join("recovery");
+        self.run_write(
+            "正在保存恢复记录并还原…",
+            self.state.mode.clone(),
+            false,
+            move || {
+                let record = if let Some(block) = block {
+                    let source = git::version_content(&root, &comparison.left, &file.old_path)?
+                        .map(|v| v.bytes)
+                        .unwrap_or_default();
+                    if source != diff.left_document.text.as_bytes() {
+                        anyhow::bail!("还原来源已变化，请刷新 Diff 后重新选择块");
+                    }
+                    mygit_gpui::recovery::restore_block(&root, &file.path, &diff, block, &store)?
+                } else {
+                    let mut paths = vec![file.path];
+                    if file.old_path != paths[0] {
+                        paths.push(file.old_path);
+                    }
+                    mygit_gpui::recovery::restore_files(&root, &comparison.left, &paths, &store)?
+                };
+                Ok(format!(
+                    "已还原，index 保持原样；恢复记录：{}",
+                    record.display()
+                ))
+            },
+            cx,
+        );
+    }
+    pub fn undo_restore(&mut self, cx: &mut Context<Self>) {
+        if self.write_busy {
+            return;
+        }
+        if self.editors.values().any(|e| e.read(cx).buffer.dirty()) {
+            self.write_message = "请先保存未保存的编辑，再撤销还原".into();
+            cx.notify();
+            return;
+        }
+        let Some(repo) = &self.state.repo else {
+            return;
+        };
+        let root = repo.root.clone();
+        let store = self
+            .settings
+            .path
+            .parent()
+            .unwrap_or(std::path::Path::new("."))
+            .join("recovery");
+        self.run_write(
+            "正在撤销最近还原…",
+            self.state.mode.clone(),
+            false,
+            move || {
+                let record = mygit_gpui::recovery::undo_latest(&root, &store)?;
+                Ok(format!("已撤销还原：{}", record.display()))
+            },
+            cx,
+        );
+    }
     pub fn request_close(&mut self, cx: &mut Context<Self>) -> bool {
         if self.write_busy {
             self.state.message = "Git 写操作执行中，请等待完成后退出".into();
@@ -664,6 +789,17 @@ impl MyGit {
         let Some(action) = self.confirmation.clone() else {
             return;
         };
+        if let Confirmation::Restore {
+            file,
+            comparison,
+            diff,
+            block,
+        } = action
+        {
+            self.confirmation = None;
+            self.execute_restore(file, comparison, diff, block, cx);
+            return;
+        }
         let paths: Vec<_> = self
             .editors
             .keys()
@@ -711,6 +847,7 @@ impl MyGit {
             }
             Confirmation::Load(path) => self.load_unchecked(path, cx),
             Confirmation::Quit => cx.quit(),
+            Confirmation::Restore { .. } => unreachable!("handled before editor closure"),
         }
         cx.notify();
     }
@@ -949,6 +1086,11 @@ impl MyGit {
                 }
                 if let Ok(repo) = snapshot {
                     this.state.repo = Some(repo);
+                }
+                for editor in this.editors.values() {
+                    if !editor.read(cx).buffer.dirty() {
+                        editor.update(cx, |e, cx| e.reload(cx));
+                    }
                 }
                 this.refresh_tree(cx);
                 this.select_mode(mode, cx);

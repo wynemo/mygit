@@ -3235,6 +3235,7 @@ dependencies = [
  "anyhow",
  "gpui",
  "libc",
+ "serde",
  "serde_json",
  "similar",
  "syntect",

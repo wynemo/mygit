@@ -50,6 +50,14 @@ pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             )),
         )
         .child(
+            button(
+                "undo-restore",
+                "撤销还原",
+                !this.write_busy && this.state.repo.is_some(),
+            )
+            .on_click(cx.listener(|this, _, _, cx| this.undo_restore(cx))),
+        )
+        .child(
             button("show-compare", "比较版本", this.state.repo.is_some())
                 .on_click(cx.listener(|this, _, _, cx| this.toggle_compare(cx))),
         )
@@ -152,6 +160,29 @@ pub fn settings(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
 }
 
 pub fn confirmation(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
+    let restore = match &this.confirmation {
+        Some(crate::app::Confirmation::Restore {
+            file,
+            comparison,
+            block,
+            ..
+        }) => Some(format!(
+            "{}：{} → 工作区磁盘\n目标：{}{}\nindex 保持原样；先保存恢复记录，可用“撤销还原”恢复。",
+            if block.is_some() {
+                "还原当前差异块"
+            } else {
+                "还原整文件"
+            },
+            comparison.left.label(),
+            file.path,
+            if file.old_path != file.path {
+                format!("、{}", file.old_path)
+            } else {
+                String::new()
+            }
+        )),
+        _ => None,
+    };
     let paths = this
         .editors
         .iter()
@@ -174,23 +205,44 @@ pub fn confirmation(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .flex()
                 .flex_col()
                 .gap_3()
-                .child("存在未保存内容")
-                .children(paths.into_iter().map(|path| div().child(path)))
-                .child("保存失败时会保留编辑器内容，并停止关闭或切换。")
+                .child(if restore.is_some() {
+                    "确认还原"
+                } else {
+                    "存在未保存内容"
+                })
+                .when_some(restore.clone(), |s, text| s.child(text))
+                .children(
+                    paths
+                        .into_iter()
+                        .filter(|_| restore.is_none())
+                        .map(|path| div().child(path)),
+                )
+                .when(restore.is_none(), |s| {
+                    s.child("保存失败时会保留编辑器内容，并停止关闭或切换。")
+                })
                 .child(
                     div()
                         .flex()
                         .gap_2()
                         .child(
-                            button("save-and-continue", "保存并继续", true).on_click(
-                                cx.listener(|this, _, _, cx| this.confirm_pending(true, cx)),
-                            ),
+                            button(
+                                "save-and-continue",
+                                if restore.is_some() {
+                                    "确认还原"
+                                } else {
+                                    "保存并继续"
+                                },
+                                true,
+                            )
+                            .on_click(cx.listener(|this, _, _, cx| this.confirm_pending(true, cx))),
                         )
-                        .child(
-                            button("discard-and-continue", "放弃修改并继续", true).on_click(
-                                cx.listener(|this, _, _, cx| this.confirm_pending(false, cx)),
-                            ),
-                        )
+                        .when(restore.is_none(), |s| {
+                            s.child(
+                                button("discard-and-continue", "放弃修改并继续", true).on_click(
+                                    cx.listener(|this, _, _, cx| this.confirm_pending(false, cx)),
+                                ),
+                            )
+                        })
                         .child(
                             button("cancel-confirmation", "取消", true).on_click(cx.listener(
                                 |this, _, _, cx| {

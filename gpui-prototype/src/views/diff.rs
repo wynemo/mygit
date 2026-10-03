@@ -1,7 +1,7 @@
 use crate::views::text_line;
 use crate::{app::MyGit, views::button};
 use gpui::{prelude::*, *};
-use mygit_gpui::text::Side;
+use mygit_gpui::{model::BrowseMode, text::Side};
 
 fn scroll_area(content: AnyElement, cx: &mut Context<MyGit>) -> Div {
     let entity = cx.entity();
@@ -251,6 +251,28 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                     }
                                 },
                             )),
+                        )
+                    },
+                )
+                .when(
+                    this.state.editable
+                        && matches!(
+                            this.state.mode,
+                            BrowseMode::Workspace | BrowseMode::Unstaged
+                        ),
+                    |s| {
+                        s.child(
+                            button("restore-file", "还原文件", !this.write_busy).on_click(
+                                cx.listener(|this, _, _, cx| this.request_restore(false, cx)),
+                            ),
+                        )
+                        .child(
+                            button(
+                                "restore-block",
+                                "还原当前块",
+                                !this.write_busy && this.state.current_block.is_some(),
+                            )
+                            .on_click(cx.listener(|this, _, _, cx| this.request_restore(true, cx))),
                         )
                     },
                 )
