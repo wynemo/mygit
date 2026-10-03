@@ -2,6 +2,8 @@ use std::{ops::Range, path::PathBuf, sync::Arc};
 
 #[derive(Clone, Debug)]
 pub struct Commit {
+    pub parents: Vec<String>,
+    pub references: String,
     pub sha: String,
     pub subject: String,
     pub author: String,
@@ -15,6 +17,7 @@ pub struct FileChange {
 }
 #[derive(Clone, Debug)]
 pub struct Snapshot {
+    pub references: std::collections::HashMap<String, String>,
     pub root: PathBuf,
     pub branch: String,
     pub detached: bool,

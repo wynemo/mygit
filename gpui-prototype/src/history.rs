@@ -138,7 +138,8 @@ pub fn page(root: &Path, query: &Query, mut offset: usize) -> Result<Page> {
             "-512".into(),
             format!("--skip={offset}"),
             "-z".into(),
-            "--format=%H%x00%B%x00%an%x00%aI".into(),
+            "--format=%H%x00%B%x00%an%x00%aI%x00%P%x00%D".into(),
+            "--topo-order".into(),
             "--fixed-strings".into(),
             "--regexp-ignore-case".into(),
         ];
@@ -169,12 +170,16 @@ pub fn page(root: &Path, query: &Query, mut offset: usize) -> Result<Page> {
                 more: false,
             });
         }
-        let fields: Vec<_> = text.trim_end_matches('\0').split('\0').collect();
-        if !fields.len().is_multiple_of(4) {
+        let fields: Vec<_> = text
+            .strip_suffix('\0')
+            .unwrap_or(text)
+            .split('\0')
+            .collect();
+        if !fields.len().is_multiple_of(6) {
             bail!("历史记录格式无效");
         }
-        let count = fields.len() / 4;
-        for record in fields.as_chunks::<4>().0 {
+        let count = fields.len() / 6;
+        for record in fields.as_chunks::<6>().0 {
             let matches = query.text.is_empty()
                 || record[0].to_lowercase().contains(&query.text)
                 || record[1].to_lowercase().contains(&query.text)
@@ -192,6 +197,8 @@ pub fn page(root: &Path, query: &Query, mut offset: usize) -> Result<Page> {
                     subject: record[1].lines().next().unwrap_or("").into(),
                     author: record[2].into(),
                     date: record[3].into(),
+                    parents: record[4].split_whitespace().map(String::from).collect(),
+                    references: record[5].into(),
                 });
             }
             offset += 1;

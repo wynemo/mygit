@@ -138,7 +138,9 @@ pub fn snapshot(path: &Path) -> Result<Snapshot> {
         },
     };
     let branches = crate::branches::list(&root)?;
+    let references = reference_labels(&root, history_tip.as_deref(), &branch, detached)?;
     Ok(Snapshot {
+        references,
         branches,
         root,
         branch,
@@ -147,6 +149,56 @@ pub fn snapshot(path: &Path) -> Result<Snapshot> {
         history_tip,
         history_more: page.more,
     })
+}
+/// Current labels are separate from pinned history, so moving/deleting a ref
+/// updates even commits on previously loaded pages.
+pub fn reference_labels(
+    root: &Path,
+    head: Option<&str>,
+    branch: &str,
+    detached: bool,
+) -> Result<std::collections::HashMap<String, String>> {
+    let output = string(git(
+        root,
+        &[
+            "for-each-ref",
+            "--format=%(objectname)%00%(*objectname)%00%(refname:short)%00%(refname)",
+        ],
+    )?)?;
+    let mut labels: std::collections::HashMap<String, Vec<String>> = Default::default();
+    for line in output.lines() {
+        let fields: Vec<_> = line.split('\0').collect();
+        if fields.len() != 4 {
+            bail!("引用标签格式无效");
+        }
+        let sha = if fields[1].is_empty() {
+            fields[0]
+        } else {
+            fields[1]
+        };
+        labels
+            .entry(sha.into())
+            .or_default()
+            .push(if fields[3].starts_with("refs/tags/") {
+                format!("tag: {}", fields[2])
+            } else {
+                fields[2].into()
+            });
+    }
+    if let Some(head) = head {
+        labels.entry(head.into()).or_default().insert(
+            0,
+            if detached {
+                "HEAD".into()
+            } else {
+                format!("HEAD → {branch}")
+            },
+        );
+    }
+    Ok(labels
+        .into_iter()
+        .map(|(sha, labels)| (sha, labels.join(", ")))
+        .collect())
 }
 /// All pages use the same pinned tip, even when HEAD changes between requests.
 pub fn history_page(root: &Path, tip: &str, skip: usize) -> Result<HistoryPage> {
@@ -157,23 +209,28 @@ pub fn history_page(root: &Path, tip: &str, skip: usize) -> Result<HistoryPage> 
             "-101",
             &format!("--skip={skip}"),
             "-z",
-            "--format=%H%x00%s%x00%an%x00%aI",
+            "--format=%H%x00%s%x00%an%x00%aI%x00%P%x00%D",
+            "--topo-order",
             tip,
             "--",
         ],
     )?)?;
-    let fields: Vec<_> = output.trim_end_matches('\0').split('\0').collect();
+    let fields: Vec<_> = output
+        .strip_suffix('\0')
+        .unwrap_or(&output)
+        .split('\0')
+        .collect();
     if output.is_empty() {
         return Ok(HistoryPage {
             commits: vec![],
             more: false,
         });
     }
-    if !fields.len().is_multiple_of(4) {
+    if !fields.len().is_multiple_of(6) {
         bail!("提交历史格式无效");
     }
     let mut commits: Vec<_> = fields
-        .as_chunks::<4>()
+        .as_chunks::<6>()
         .0
         .iter()
         .map(|f| Commit {
@@ -181,6 +238,8 @@ pub fn history_page(root: &Path, tip: &str, skip: usize) -> Result<HistoryPage> 
             subject: f[1].into(),
             author: f[2].into(),
             date: f[3].into(),
+            parents: f[4].split_whitespace().map(String::from).collect(),
+            references: f[5].into(),
         })
         .collect();
     let more = commits.len() > 100;

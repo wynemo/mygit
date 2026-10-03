@@ -1539,3 +1539,76 @@ fn blame_accepts_sha256_object_ids() {
     .unwrap();
     assert_eq!(lines[0].commit.sha, sha);
 }
+
+#[test]
+fn dag_history_keeps_real_merge_parents_and_refreshes_moved_refs_and_tags() {
+    let f = Fixture::new();
+    std::fs::write(f.0.join("root"), "root\n").unwrap();
+    let root = f.commit();
+    git(&f.0, &["switch", "-c", "side"]).unwrap();
+    std::fs::write(f.0.join("side"), "side\n").unwrap();
+    let side = f.commit();
+    git(&f.0, &["switch", "main"]).unwrap();
+    std::fs::write(f.0.join("main"), "main\n").unwrap();
+    let main = f.commit();
+    git(
+        &f.0,
+        &[
+            "-c",
+            "commit.gpgsign=false",
+            "merge",
+            "--no-ff",
+            "--no-edit",
+            "side",
+        ],
+    )
+    .unwrap();
+    let tip = string(git(&f.0, &["rev-parse", "HEAD"]).unwrap())
+        .unwrap()
+        .trim()
+        .to_owned();
+    git(
+        &f.0,
+        &[
+            "-c",
+            "tag.gpgsign=false",
+            "tag",
+            "-a",
+            "release",
+            "-m",
+            "release",
+            &root,
+        ],
+    )
+    .unwrap();
+    let before = snapshot(&f.0).unwrap();
+    assert_eq!(before.commits[0].parents, vec![main.clone(), side.clone()]);
+    for (i, commit) in before.commits.iter().enumerate() {
+        assert_eq!(
+            commit.parents,
+            commit_detail(&f.0, &commit.sha).unwrap().parents
+        );
+        for parent in &commit.parents {
+            assert!(
+                before
+                    .commits
+                    .iter()
+                    .position(|c| &c.sha == parent)
+                    .unwrap()
+                    > i
+            );
+        }
+    }
+    assert!(before.references[&root].contains("tag: release"));
+    assert!(before.references[&tip].contains("HEAD"));
+    assert!(before.references[&side].contains("side"));
+    git(&f.0, &["branch", "-f", "side", &main]).unwrap();
+    git(&f.0, &["tag", "-d", "release"]).unwrap();
+    let after = snapshot(&f.0).unwrap();
+    assert_eq!(before.history_tip, after.history_tip);
+    assert!(!after.references.contains_key(&root));
+    assert!(!after.references.contains_key(&side));
+    assert!(after.references[&main].contains("side"));
+    let rows = crate::graph::layout(&after.commits, false);
+    assert_eq!(crate::graph::layout(&after.commits[..2], false), rows[..2]);
+}

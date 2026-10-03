@@ -58,9 +58,18 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             if this.history_query.is_some() {
                 "查询结果"
             } else {
-                "提交历史"
+                "提交 DAG"
             }
         )))
+        .when(this.history_graph.iter().any(|row| row.omitted > 0), |s| {
+            s.child(
+                div()
+                    .px_2()
+                    .text_xs()
+                    .text_color(rgb(0x8995a8))
+                    .child("短灰线：父提交未包含在结果中"),
+            )
+        })
         .child(
             uniform_list(
                 "history",
@@ -78,10 +87,17 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     range
                         .map(|i| {
                             let c = &this.history_commits()[i];
+                            let references = this
+                                .state
+                                .repo
+                                .as_ref()
+                                .and_then(|repo| repo.references.get(&c.sha))
+                                .cloned()
+                                .unwrap_or_default();
                             div()
                                 .id(i)
-                                .h(px(64.))
-                                .p_2()
+                                .h(px(76.))
+                                .flex()
                                 .overflow_hidden()
                                 .cursor_pointer()
                                 .bg(rgb(
@@ -92,13 +108,36 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                     },
                                 ))
                                 .hover(|s| s.bg(rgb(0x253248)))
-                                .child(div().whitespace_nowrap().child(c.subject.clone()))
-                                .child(div().text_color(rgb(0x92a2b9)).child(format!(
-                                    "{}  {}  {}",
-                                    short_sha(&c.sha),
-                                    c.author,
-                                    c.date
-                                )))
+                                .when_some(this.history_graph.get(i).cloned(), |s, row| {
+                                    s.child(crate::views::graph::row(row))
+                                })
+                                .child(
+                                    div()
+                                        .p_2()
+                                        .min_w_0()
+                                        .overflow_hidden()
+                                        .child(div().whitespace_nowrap().child(c.subject.clone()))
+                                        .child(
+                                            div()
+                                                .whitespace_nowrap()
+                                                .text_color(rgb(0x92a2b9))
+                                                .child(format!(
+                                                    "{}  {}  {}",
+                                                    short_sha(&c.sha),
+                                                    c.author,
+                                                    c.date
+                                                )),
+                                        )
+                                        .when(!references.is_empty(), |s| {
+                                            s.child(
+                                                div()
+                                                    .text_xs()
+                                                    .whitespace_nowrap()
+                                                    .text_color(rgb(0x70d6a5))
+                                                    .child(references),
+                                            )
+                                        }),
+                                )
                                 .on_mouse_down(
                                     MouseButton::Right,
                                     cx.listener(move |this, _, window, cx| {

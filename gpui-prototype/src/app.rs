@@ -116,6 +116,8 @@ pub struct MyGit {
     pub history_path: Option<(String, bool)>,
     pub history_search_error: Option<String>,
     filtered_commits: Vec<Commit>,
+    pub history_graph: Vec<mygit_gpui::graph::Row>,
+    history_graph_key: Option<(usize, String, String, u64, u64)>,
     filtered_next: usize,
     filtered_more: bool,
     pub show_branches: bool,
@@ -226,6 +228,8 @@ impl MyGit {
             history_path: None,
             history_search_error: None,
             filtered_commits: vec![],
+            history_graph: vec![],
+            history_graph_key: None,
             filtered_next: 0,
             filtered_more: false,
             show_branches: false,
@@ -1801,6 +1805,27 @@ impl MyGit {
 impl Render for MyGit {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.ensure_blame(cx);
+        let commits = self.history_commits();
+        let graph_key = (
+            commits.len(),
+            commits.first().map(|c| c.sha.clone()).unwrap_or_default(),
+            commits.last().map(|c| c.sha.clone()).unwrap_or_default(),
+            self.history_query_generation,
+            self.repository_epoch,
+        );
+        if self.history_graph_key.as_ref() != Some(&graph_key) {
+            self.history_graph = mygit_gpui::graph::layout(
+                commits,
+                self.history_query.as_ref().is_some_and(|q| {
+                    !q.text.is_empty()
+                        || !q.author.is_empty()
+                        || !q.since.is_empty()
+                        || !q.until.is_empty()
+                        || q.path.is_some()
+                }),
+            );
+            self.history_graph_key = Some(graph_key);
+        }
         self.line_layouts.clear();
         let entity = cx.entity().downgrade();
         window.on_mouse_event(move |event: &ScrollWheelEvent, phase, window, cx| {
