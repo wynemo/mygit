@@ -4,6 +4,22 @@ pub fn bar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
     div()
         .flex()
         .flex_col()
+        .min_h(px(30.))
+        .drag_over::<crate::views::tree::DraggedFile>(|s, _, _, _| s.bg(rgb(0x263b56)))
+        .on_drop(
+            cx.listener(|this, file: &crate::views::tree::DraggedFile, window, cx| {
+                this.drop_tree_file(file, window, cx)
+            }),
+        )
+        .when(this.tabs.is_empty(), |s| {
+            s.child(
+                div()
+                    .p_2()
+                    .text_xs()
+                    .text_color(rgb(0x92a2b9))
+                    .child(mygit_gpui::i18n::text("将文件拖到此处打开")),
+            )
+        })
         .border_b_1()
         .border_color(rgb(0x2b3545))
         .when(!this.tabs.is_empty(), |s| {
@@ -29,6 +45,10 @@ pub fn bar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                     div()
                                         .id(("activate-tab", i))
                                         .cursor_pointer()
+                                        .flex()
+                                        .items_center()
+                                        .gap_2()
+                                        .child(crate::views::icons::file(&tab.file.path))
                                         .child(format!(
                                             "{}{}",
                                             if this.is_dirty(&tab.file.path, cx) {

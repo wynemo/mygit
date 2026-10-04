@@ -6,6 +6,7 @@ pub mod diff;
 pub mod editor;
 pub mod hints;
 pub mod history;
+pub mod icons;
 pub mod notifications;
 pub mod sidebar;
 pub mod tabs;
@@ -26,9 +27,13 @@ pub fn button(id: &'static str, label: &'static str, enabled: bool) -> Stateful<
             s.hover(|s| s.bg(rgb(0x344962))).cursor_pointer()
         })
         .when(!enabled, |s| s.opacity(0.35))
+        .flex()
+        .items_center()
+        .gap_2()
+        .when_some(icons::button_icon(id), |s, path| s.child(icons::icon(path)))
         .child(label)
         .when_some(hints::button_hint(id), |s, text| {
-            s.tooltip(move |_, cx| cx.new(|_| hints::Hint(text)).into())
+            s.tooltip(move |_, cx| cx.new(|_| hints::Hint(text.into())).into())
         })
 }
 pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {

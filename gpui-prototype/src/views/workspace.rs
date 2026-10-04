@@ -57,11 +57,51 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         .on_click(cx.listener(|this, _, window, cx| this.edit_current(window, cx))),
                     )
                 })
+                .when(can_edit && !this.state.loading, |s| {
+                    s.child(
+                        button(
+                            "workspace-blame",
+                            if this.show_blame {
+                                i18n::text("隐藏 Blame")
+                            } else {
+                                "Blame"
+                            },
+                            true,
+                        )
+                        .on_click(cx.listener(|this, _, _, cx| this.toggle_blame(cx))),
+                    )
+                    .child(
+                        button(
+                            "workspace-history",
+                            i18n::text("历史"),
+                            this.state.current_file.is_some(),
+                        )
+                        .on_click(cx.listener(|this, _, _, cx| this.current_file_history(cx))),
+                    )
+                })
                 .child(
                     button("workspace-show-git", i18n::text("显示 Git 面板"), true)
                         .on_click(cx.listener(|this, _, _, cx| this.reveal_git_panel(cx))),
                 ),
         )
+        .when(this.blame_loading, |s| {
+            s.child(
+                div()
+                    .px_2()
+                    .text_xs()
+                    .text_color(rgb(0x92a2b9))
+                    .child(i18n::text("正在读取两侧 Blame…")),
+            )
+        })
+        .when(!this.blame_error.is_empty() && this.show_blame, |s| {
+            s.child(
+                div()
+                    .px_2()
+                    .text_xs()
+                    .text_color(rgb(0xffd479))
+                    .child(this.blame_error.clone()),
+            )
+        })
         .when_some(editor.clone(), |s, editor| s.child(editor))
         .when(editor.is_none(), |s| {
             s.child(

@@ -3286,6 +3286,7 @@ dependencies = [
  "gpui",
  "libc",
  "notify",
+ "resvg",
  "serde",
  "serde_json",
  "similar",

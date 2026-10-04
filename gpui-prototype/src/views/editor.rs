@@ -60,7 +60,7 @@ pub struct Editor {
     query_subscription: Option<Subscription>,
     matches: Vec<Range<usize>>,
     current_match: Option<usize>,
-    marks: BTreeMap<usize, mygit_gpui::editor::LineMark>,
+    marks: std::sync::Arc<BTreeMap<usize, mygit_gpui::editor::LineMark>>,
     generation: u64,
     syntax: Highlighted,
     scroll: UniformListScrollHandle,
@@ -135,7 +135,7 @@ impl Editor {
             query_subscription: None,
             matches: vec![],
             current_match: None,
-            marks: BTreeMap::new(),
+            marks: Default::default(),
             generation: 0,
             syntax: Default::default(),
             scroll: UniformListScrollHandle::new(),
@@ -193,7 +193,7 @@ impl Editor {
             let _ = this.update(cx, |this, cx| {
                 if this.generation == generation {
                     this.syntax = syntax;
-                    this.marks = marks;
+                    this.marks = std::sync::Arc::new(marks);
                     cx.notify();
                 }
             });
@@ -675,6 +675,58 @@ fn line(this: &Editor, index: usize, cx: &mut Context<Editor>) -> impl IntoEleme
     .w_full()
     .h_full()
 }
+fn overview(editor: &Editor) -> impl IntoElement {
+    let marks = editor.marks.clone();
+    let count = (editor.buffer.document.lines.len()
+        + usize::from(editor.buffer.text().ends_with('\n')))
+    .max(1);
+    canvas(
+        |_, _, _| (),
+        move |bounds, _, window, _| {
+            let height = f32::from(bounds.size.height).max(0.);
+            // Aggregate into pixel bands: overlapping lines use deleted > modified > added.
+            let mut bands = vec![0u8; (height.ceil() as usize).min(8192)];
+            for (line, mark) in marks.iter() {
+                let index = ((*line).min(count - 1) as f32 / count as f32 * height) as usize;
+                let priority = if mark.deleted > 0 {
+                    3
+                } else if mark.modified {
+                    2
+                } else if mark.added {
+                    1
+                } else {
+                    0
+                };
+                if let Some(band) = bands.get_mut(index) {
+                    *band = (*band).max(priority);
+                }
+            }
+            for (index, priority) in bands.into_iter().enumerate() {
+                let color = match priority {
+                    3 => 0xf44336,
+                    2 => 0xffc107,
+                    1 => 0x4caf50,
+                    _ => continue,
+                };
+                let y = index as f32;
+                window.paint_quad(fill(
+                    Bounds::new(
+                        point(bounds.left() + px(2.), bounds.top() + px(y)),
+                        size(
+                            px(6.),
+                            px((height / count as f32).max(3.).min((height - y).max(0.))),
+                        ),
+                    ),
+                    rgb(color),
+                ));
+            }
+        },
+    )
+    .w(px(10.))
+    .h_full()
+    .flex_shrink_0()
+}
+
 impl Render for Editor {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let weak = cx.entity().downgrade();
@@ -969,68 +1021,78 @@ impl Render for Editor {
                 )
             })
             .child(
-                uniform_list(
-                    "editor-lines",
-                    count.max(1),
-                    cx.processor(|this, range: Range<usize>, _, cx| {
-                        range
-                            .map(|i| {
-                                div()
-                                    .id(("editor-line", i))
-                                    .w_full()
-                                    .flex()
-                                    .h(px(this.font_size + 12.))
-                                    .font_family(this.font_family.clone())
-                                    .text_size(px(this.font_size))
-                                    .when(!this.compact, |s| {
-                                        s.child(
-                                            div()
-                                                .w(px(52.))
-                                                .flex_shrink_0()
-                                                .text_color(rgb(0x7f8b9c))
-                                                .child(format!(
-                                                    "{} {}",
-                                                    this.marks
-                                                        .get(&i)
-                                                        .map(|m| if m.deleted > 0 {
-                                                            format!("−{}", m.deleted)
-                                                        } else if m.added {
-                                                            "+".into()
-                                                        } else {
-                                                            "~".into()
-                                                        })
-                                                        .unwrap_or_default(),
-                                                    i + 1
-                                                )),
-                                        )
-                                    })
-                                    .when(this.show_blame && !this.compact, |s| {
-                                        if let Some(owner) = &this.blame_owner {
-                                            s.child(crate::views::blame::gutter(
-                                                owner.clone(),
-                                                this.blame_lines.get(i).cloned(),
-                                                i,
-                                            ))
-                                        } else {
-                                            s
-                                        }
-                                    })
-                                    .child(
+                div()
+                    .flex()
+                    .flex_1()
+                    .min_h_0()
+                    .min_w_0()
+                    .child(
+                        uniform_list(
+                            "editor-lines",
+                            count.max(1),
+                            cx.processor(|this, range: Range<usize>, _, cx| {
+                                range
+                                    .map(|i| {
                                         div()
-                                            .min_w_0()
-                                            .flex_1()
-                                            .h_full()
-                                            .overflow_hidden()
-                                            .child(line(this, i, cx)),
-                                    )
-                            })
-                            .collect::<Vec<_>>()
+                                            .id(("editor-line", i))
+                                            .w_full()
+                                            .flex()
+                                            .h(px(this.font_size + 12.))
+                                            .font_family(this.font_family.clone())
+                                            .text_size(px(this.font_size))
+                                            .when(!this.compact, |s| {
+                                                s.child(
+                                                    div()
+                                                        .w(px(52.))
+                                                        .flex_shrink_0()
+                                                        .text_color(rgb(0x7f8b9c))
+                                                        .child(format!(
+                                                            "{} {}",
+                                                            this.marks
+                                                                .get(&i)
+                                                                .map(|m| if m.deleted > 0 {
+                                                                    format!("−{}", m.deleted)
+                                                                } else if m.added {
+                                                                    "+".into()
+                                                                } else {
+                                                                    "~".into()
+                                                                })
+                                                                .unwrap_or_default(),
+                                                            i + 1
+                                                        )),
+                                                )
+                                            })
+                                            .when(this.show_blame && !this.compact, |s| {
+                                                if let Some(owner) = &this.blame_owner {
+                                                    s.child(crate::views::blame::gutter(
+                                                        owner.clone(),
+                                                        this.blame_lines.get(i).cloned(),
+                                                        i,
+                                                    ))
+                                                } else {
+                                                    s
+                                                }
+                                            })
+                                            .child(
+                                                div()
+                                                    .min_w_0()
+                                                    .flex_1()
+                                                    .h_full()
+                                                    .overflow_hidden()
+                                                    .child(line(this, i, cx)),
+                                            )
+                                    })
+                                    .collect::<Vec<_>>()
+                            }),
+                        )
+                        .track_scroll(self.scroll.clone())
+                        .w_full()
+                        .flex_1()
+                        .min_h_0(),
+                    )
+                    .when(!self.compact && !self.sensitive, |s| {
+                        s.child(overview(self))
                     }),
-                )
-                .track_scroll(self.scroll.clone())
-                .w_full()
-                .flex_1()
-                .min_h_0(),
             )
             .child(
                 canvas(

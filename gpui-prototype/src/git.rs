@@ -666,6 +666,7 @@ pub fn workspace_status(root: &Path) -> Result<BTreeMap<String, String>> {
     Ok(result)
 }
 pub fn workspace_file(root: &Path, path: &str) -> Result<(Comparison, FileChange)> {
+    validate_paths(&[path.to_owned()])?;
     let left = head(root)?;
     let exists_in_head = match &left {
         Revision::Head(sha) => git(root, &["cat-file", "-e", &format!("{sha}:{path}")]).is_ok(),
@@ -682,6 +683,47 @@ pub fn workspace_file(root: &Path, path: &str) -> Result<(Comparison, FileChange
             status: if exists_in_head { "M" } else { "A" }.into(),
         },
     ))
+}
+
+/// A single historical path can be compared even when it is absent from a changed-file list.
+pub fn file_against_worktree(
+    root: &Path,
+    revision: Revision,
+    path: &str,
+) -> Result<(Comparison, FileChange, Diff)> {
+    validate_paths(&[path.to_owned()])?;
+    let sha = match &revision {
+        Revision::Commit(sha) | Revision::Head(sha) => sha,
+        _ => bail!(crate::i18n::text("请选择已提交的文件版本")),
+    };
+    // Inspect the tree entry, not its contents: large files and submodules keep preview handling.
+    let left_exists = !git(root, &["ls-tree", "-z", sha, "--", path])?.is_empty();
+    let right_exists = match std::fs::symlink_metadata(root.join(path)) {
+        Ok(_) => true,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+        Err(error) => return Err(error.into()),
+    };
+    if !left_exists && !right_exists {
+        bail!(crate::i18n::text("两端均没有此文件"));
+    }
+    let comparison = Comparison {
+        left: revision,
+        right: Revision::Worktree,
+    };
+    let file = FileChange {
+        path: path.into(),
+        old_path: path.into(),
+        status: if !left_exists {
+            "A"
+        } else if !right_exists {
+            "D"
+        } else {
+            "M"
+        }
+        .into(),
+    };
+    let diff = compare(root, &comparison, &file)?;
+    Ok((comparison, file, diff))
 }
 
 #[derive(Clone, Debug)]

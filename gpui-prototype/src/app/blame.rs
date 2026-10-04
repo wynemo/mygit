@@ -64,7 +64,8 @@ impl MyGit {
             return;
         };
         let root = repo.root.clone();
-        let right = if self.edit_mode {
+        let editing = self.current_editor().is_some();
+        let right = if editing {
             self.current_editor()
                 .map(|editor| editor.read(cx).buffer.document.text.clone())
                 .unwrap_or_else(|| self.state.diff.right_document.text.clone())
@@ -76,7 +77,7 @@ impl MyGit {
             comparison: comparison.clone(),
             left: self.state.diff.left_document.text.clone(),
             right,
-            editing: self.edit_mode,
+            editing,
             merge: self.state.merge.clone(),
         };
         if self
@@ -196,7 +197,7 @@ impl MyGit {
         let Some(editor) = self.current_editor() else {
             return;
         };
-        let enabled = self.show_blame && self.edit_mode;
+        let enabled = self.show_blame;
         let current = editor.read(cx);
         if current.show_blame != enabled
             || !Arc::ptr_eq(&current.blame_lines, &self.blame_right)

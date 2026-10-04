@@ -158,6 +158,7 @@ impl MyGit {
         cx.notify();
     }
     pub fn toggle_files_panel(&mut self, cx: &mut Context<Self>) {
+        self.tree_menu = None;
         self.settings.files_visible = !self.settings.files_visible;
         self.save_settings();
         cx.notify();

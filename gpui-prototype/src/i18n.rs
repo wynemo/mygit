@@ -44,6 +44,27 @@ pub fn translate(language: Language, value: &str) -> &str {
         return value;
     }
     match value {
+        "文件历史" => "File history",
+        "编辑工作区文件" => "Edit worktree file",
+        "当前文件与工作区比较" => "Compare file with worktree",
+        "正在比较文件与工作区…" => "Comparing file with worktree…",
+        "请选择已提交的文件版本" => "Select a committed file version",
+        "两端均没有此文件" => "The file is missing on both sides",
+        "剪切" => "Cut",
+        "粘贴" => "Paste",
+        "查找" => "Find",
+        "打开文件" => "Open file",
+        "还原磁盘文件到 HEAD；index 保持原样；新文件将删除，先保存恢复记录，可撤销" => {
+            "Restore the file on disk from HEAD; keep the index. New files are removed. Recovery data is saved first and can be undone."
+        }
+        "复制相对路径" => "Copy relative path",
+        "复制完整路径" => "Copy full path",
+        "在文件管理器中显示" => "Reveal in file manager",
+        "显示 / 隐藏 Blame" => "Show / hide Blame",
+        "还原到 HEAD" => "Restore from HEAD",
+        "正在准备文件还原…" => "Preparing file restore…",
+        "将文件拖到此处打开" => "Drop a file here to open it",
+        "文件操作" => "File actions",
         "提交信息 · 仅提交暂存区内容，未保存编辑不包含在内" => {
             "Commit message · Only staged changes are committed; unsaved edits are excluded"
         }

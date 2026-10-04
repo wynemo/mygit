@@ -1,4 +1,5 @@
 mod app;
+mod assets;
 mod tasks;
 mod views;
 use app::*;
@@ -15,7 +16,8 @@ fn main() {
         .map(PathBuf::from)
         .or(startup_settings.last)
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
-    Application::new().run(move |cx: &mut App| {
+    let application = Application::new().with_assets(assets::Embedded);
+    application.run(move |cx: &mut App| {
         cx.set_menus(vec![
             Menu {
                 name: "MyGit".into(),
@@ -66,8 +68,14 @@ fn main() {
             Menu {
                 name: mygit_gpui::i18n::text("编辑").into(),
                 items: vec![
+                    MenuItem::action(mygit_gpui::i18n::text("撤销"), EditorUndo),
+                    MenuItem::action(mygit_gpui::i18n::text("重做"), EditorRedo),
+                    MenuItem::separator(),
+                    MenuItem::action(mygit_gpui::i18n::text("剪切"), EditorCut),
+                    MenuItem::action(mygit_gpui::i18n::text("粘贴"), EditorPaste),
                     MenuItem::action(mygit_gpui::i18n::text("复制"), CopyText),
                     MenuItem::action(mygit_gpui::i18n::text("全选"), SelectAllText),
+                    MenuItem::action(mygit_gpui::i18n::text("查找"), FindText),
                 ],
             },
             Menu {
@@ -127,6 +135,11 @@ fn main() {
             KeyBinding::new("escape", CancelTask, Some("MyGit")),
             KeyBinding::new("tab", FocusNext, Some("MyGit")),
             KeyBinding::new("shift-tab", FocusPrevious, Some("MyGit")),
+            KeyBinding::new("shift-f10", OpenTreeMenu, Some("FilesList")),
+            KeyBinding::new("up", TreeMenuUp, Some("TreeMenu")),
+            KeyBinding::new("down", TreeMenuDown, Some("TreeMenu")),
+            KeyBinding::new("enter", TreeMenuAccept, Some("TreeMenu")),
+            KeyBinding::new("escape", DismissTreeMenu, Some("TreeMenu")),
             KeyBinding::new("up", ListUp, Some("HistoryList || FilesList || BranchList")),
             KeyBinding::new(
                 "down",

@@ -41,7 +41,7 @@ def main():
         resources = contents / "Resources"
         resources.mkdir()
         shutil.copy2(pathlib.Path(metadata["target_directory"]) / profile / "mygit-gpui", executable)
-        shutil.copy2(root.parent / "icons" / "mygit.icns", resources / "mygit.icns")
+        shutil.copy2(root / "assets" / "icons" / "mygit.icns", resources / "mygit.icns")
         info = {
             "CFBundleExecutable": "MyGit", "CFBundleName": "MyGit",
             "CFBundleDisplayName": "MyGit", "CFBundleIdentifier": "local.mygit.gpui",

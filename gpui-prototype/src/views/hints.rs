@@ -1,5 +1,5 @@
 use gpui::{prelude::*, *};
-pub struct Hint(pub &'static str);
+pub struct Hint(pub SharedString);
 impl Render for Hint {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         div()
@@ -9,11 +9,31 @@ impl Render for Hint {
             .bg(rgb(0x263449))
             .text_color(rgb(0xdce5f3))
             .text_size(px(12.))
-            .child(self.0)
+            .child(self.0.clone())
     }
 }
 pub fn button_hint(id: &str) -> Option<&'static str> {
     let (zh, en) = match id {
+        "tree-actions" => (
+            "选中文件的历史、路径、显示位置和还原操作 · Shift+F10",
+            "History, paths, reveal and restore for the selected file · Shift+F10",
+        ),
+        "current-file-history" | "workspace-history" => (
+            "查看当前完整路径的历史，跟随文件重命名",
+            "View history for the current full path, following file renames",
+        ),
+        "workspace-blame" => (
+            "显示或隐藏当前编辑缓冲区的逐行归属",
+            "Show or hide line attribution for the current editing buffer",
+        ),
+        "edit-current-worktree" => (
+            "打开同一路径的磁盘文件编辑；历史版本保持只读",
+            "Edit the file at the same path on disk; historical versions remain read-only",
+        ),
+        "compare-current-worktree" => (
+            "当前已提交文件版本与磁盘内容比较；不改写文件",
+            "Compare this committed file version with its content on disk without writing files",
+        ),
         "open" => (
             "打开本地 Git 仓库 · Cmd/Ctrl+O",
             "Open a local Git repository · Cmd/Ctrl+O",

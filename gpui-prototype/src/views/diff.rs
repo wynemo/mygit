@@ -242,6 +242,50 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         .whitespace_nowrap()
                         .child(title),
                 )
+                .when(this.state.current_file.is_some(), |s| {
+                    s.child(
+                        button(
+                            "current-file-history",
+                            mygit_gpui::i18n::text("文件历史"),
+                            !this.state.loading,
+                        )
+                        .on_click(cx.listener(|this, _, _, cx| this.current_file_history(cx))),
+                    )
+                })
+                .when(
+                    !this.state.editable && this.state.current_file.is_some(),
+                    |s| {
+                        s.child(
+                            button(
+                                "edit-current-worktree",
+                                mygit_gpui::i18n::text("编辑工作区文件"),
+                                !this.state.loading,
+                            )
+                            .on_click(cx.listener(|this, _, _, cx| this.edit_current_worktree(cx))),
+                        )
+                    },
+                )
+                .when(
+                    this.state.comparison.as_ref().is_some_and(|c| {
+                        matches!(
+                            c.right,
+                            mygit_gpui::model::Revision::Commit(_)
+                                | mygit_gpui::model::Revision::Head(_)
+                        )
+                    }),
+                    |s| {
+                        s.child(
+                            button(
+                                "compare-current-worktree",
+                                mygit_gpui::i18n::text("当前文件与工作区比较"),
+                                !this.state.loading,
+                            )
+                            .on_click(
+                                cx.listener(|this, _, _, cx| this.compare_current_worktree(cx)),
+                            ),
+                        )
+                    },
+                )
                 .when(
                     this.state.editable
                         && this

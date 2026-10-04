@@ -2102,3 +2102,79 @@ fn ai_staged_diff_rejects_conflicts_and_oversized_payload_without_touching_index
     );
     assert_eq!(before, crate::ai::fingerprint(&f.0).unwrap());
 }
+
+#[test]
+fn tree_file_restore_uses_head_preserves_index_and_can_recover_new_files() {
+    let f = Fixture::new();
+    let path = "中文 file.txt";
+    std::fs::write(f.0.join(path), "committed\r\n").unwrap();
+    let sha = f.commit();
+    std::fs::write(f.0.join(path), "staged\r\n").unwrap();
+    git(&f.0, &["add", "--", path]).unwrap();
+    std::fs::write(f.0.join(path), "worktree🙂\r\n").unwrap();
+    let (comparison, file) = workspace_file(&f.0, path).unwrap();
+    assert_eq!(comparison.left, Revision::Head(sha));
+    assert_eq!(comparison.right, Revision::Worktree);
+    let diff = compare(&f.0, &comparison, &file).unwrap();
+    assert_eq!(&*diff.left_document.text, "committed\r\n");
+    assert_eq!(&*diff.right_document.text, "worktree🙂\r\n");
+    let index_before = git(&f.0, &["show", &format!(":{path}")]).unwrap();
+    let store = f.0.join("recovery-fixture");
+    crate::recovery::restore_files(&f.0, &comparison.left, &[path.into()], &store).unwrap();
+    assert_eq!(std::fs::read(f.0.join(path)).unwrap(), b"committed\r\n");
+    assert_eq!(
+        git(&f.0, &["show", &format!(":{path}")]).unwrap(),
+        index_before
+    );
+    crate::recovery::undo_latest(&f.0, &store).unwrap();
+    assert_eq!(
+        std::fs::read_to_string(f.0.join(path)).unwrap(),
+        "worktree🙂\r\n"
+    );
+    std::fs::write(f.0.join("new.txt"), "untracked\n").unwrap();
+    let (comparison, file) = workspace_file(&f.0, "new.txt").unwrap();
+    assert_eq!(file.status, "A");
+    crate::recovery::restore_files(&f.0, &comparison.left, &[file.path], &store).unwrap();
+    assert!(!f.0.join("new.txt").exists());
+    crate::recovery::undo_latest(&f.0, &store).unwrap();
+    assert_eq!(std::fs::read(f.0.join("new.txt")).unwrap(), b"untracked\n");
+    assert_eq!(
+        git(&f.0, &["show", &format!(":{path}")]).unwrap(),
+        index_before
+    );
+    for invalid in ["", "../outside", "/tmp/outside"] {
+        assert!(workspace_file(&f.0, invalid).is_err());
+    }
+}
+
+#[test]
+fn individual_file_worktree_comparison_handles_unchanged_added_deleted_and_missing_paths() {
+    let f = Fixture::new();
+    let path = "nested/中文 file.txt";
+    std::fs::create_dir_all(f.0.join("nested")).unwrap();
+    std::fs::write(f.0.join(path), "same\n").unwrap();
+    std::fs::write(f.0.join("large.txt"), vec![b'x'; 3_000_000]).unwrap();
+    let revision = Revision::Commit(f.commit());
+    let (_, _, large) = file_against_worktree(&f.0, revision.clone(), "large.txt").unwrap();
+    assert!(large.message.is_some());
+    assert!(large.can_expand_preview);
+    let (comparison, file, diff) = file_against_worktree(&f.0, revision.clone(), path).unwrap();
+    assert_eq!(comparison.left, revision);
+    assert_eq!(comparison.right, Revision::Worktree);
+    assert_eq!(file.status, "M");
+    assert!(diff.blocks.is_empty());
+    assert_eq!(&*diff.left_document.text, "same\n");
+    std::fs::remove_file(f.0.join(path)).unwrap();
+    let (_, file, diff) = file_against_worktree(&f.0, revision.clone(), path).unwrap();
+    assert_eq!(file.status, "D");
+    assert_eq!(&*diff.left_document.text, "same\n");
+    assert!(diff.right_document.text.is_empty());
+    std::fs::write(f.0.join("new.txt"), "new🙂\n").unwrap();
+    let (_, file, diff) = file_against_worktree(&f.0, revision.clone(), "new.txt").unwrap();
+    assert_eq!(file.status, "A");
+    assert!(diff.left_document.text.is_empty());
+    assert_eq!(&*diff.right_document.text, "new🙂\n");
+    assert!(file_against_worktree(&f.0, revision.clone(), "missing").is_err());
+    assert!(file_against_worktree(&f.0, revision.clone(), "../outside").is_err());
+    assert!(file_against_worktree(&f.0, Revision::Index, "new.txt").is_err());
+}

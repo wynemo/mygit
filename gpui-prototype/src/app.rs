@@ -7,6 +7,7 @@ mod preferences;
 mod quick_open;
 mod refresh;
 mod search;
+pub(crate) mod tree_actions;
 use crate::views::editor::{Changed, Editor};
 use crate::views::text_line::LineHit;
 use crate::{tasks, views};
@@ -36,6 +37,11 @@ actions!(
         ToggleFilesPanel,
         ToggleGitPanel,
         ToggleNotifications,
+        OpenTreeMenu,
+        TreeMenuUp,
+        TreeMenuDown,
+        TreeMenuAccept,
+        DismissTreeMenu,
         ToggleBranches,
         ToggleHistorySearch,
         ToggleProjectSearch,
@@ -100,6 +106,8 @@ pub enum Confirmation {
 pub struct MyGit {
     pub notifications: mygit_gpui::notifications::Notifications,
     pub show_notifications: bool,
+    pub tree_menu: Option<tree_actions::Menu>,
+    pub tree_menu_focus: FocusHandle,
     pub ai: ai::State,
     pub quick: quick_open::State,
     pub search: search::State,
@@ -226,6 +234,8 @@ impl MyGit {
         Self {
             notifications: Default::default(),
             show_notifications: false,
+            tree_menu: None,
+            tree_menu_focus: cx.focus_handle(),
             watcher: None,
             refresh_debounce: Default::default(),
             refresh_pending: Default::default(),
@@ -363,6 +373,7 @@ impl MyGit {
         self.load_unchecked(path, cx);
     }
     fn load_unchecked(&mut self, path: PathBuf, cx: &mut Context<Self>) {
+        self.tree_menu = None;
         self.restore_main_focus = true;
         self.reset_refresh();
         self.reset_blame();
@@ -976,6 +987,22 @@ impl MyGit {
         block: Option<usize>,
         cx: &mut Context<Self>,
     ) {
+        if self.write_busy
+            || [&file.path, &file.old_path].iter().any(|path| {
+                self.is_dirty(path, cx)
+                    || self
+                        .editors
+                        .get(*path)
+                        .is_some_and(|editor| editor.read(cx).buffer.marked.is_some())
+            })
+        {
+            self.notify_result(
+                mygit_gpui::notifications::Kind::Error,
+                mygit_gpui::i18n::text("还原涉及未保存文件，请先保存或关闭编辑器修改").into(),
+                cx,
+            );
+            return;
+        }
         let Some(repo) = &self.state.repo else {
             return;
         };
@@ -1508,15 +1535,74 @@ impl MyGit {
         cx.notify();
     }
     pub fn open_workspace_file(&mut self, path: String, cx: &mut Context<Self>) {
-        self.open_workspace_target(path, None, cx);
+        self.open_workspace_target(path, None, false, cx);
+    }
+    pub fn edit_current_worktree(&mut self, cx: &mut Context<Self>) {
+        if self.confirmation.is_some() || self.state.loading {
+            return;
+        }
+        if let Some(file) = &self.state.current_file {
+            self.open_workspace_target(file.path.clone(), None, true, cx);
+        }
+    }
+    pub fn compare_current_worktree(&mut self, cx: &mut Context<Self>) {
+        if self.confirmation.is_some() || self.state.loading {
+            return;
+        }
+        let (Some(repo), Some(file), Some(comparison)) = (
+            &self.state.repo,
+            &self.state.current_file,
+            &self.state.comparison,
+        ) else {
+            return;
+        };
+        let revision = comparison.right.clone();
+        if !matches!(revision, Revision::Commit(_) | Revision::Head(_)) {
+            return;
+        }
+        let root = repo.root.clone();
+        let path = file.path.clone();
+        self.capture_tab();
+        let generation = self
+            .state
+            .begin(mygit_gpui::i18n::text("正在比较文件与工作区…").into());
+        self.pending.cancel();
+        self.pending = Default::default();
+        tasks::run(
+            cx,
+            generation,
+            self.pending.clone(),
+            move || git::file_against_worktree(&root, revision, &path),
+            |this, (comparison, file, diff), _| {
+                this.active_tab = None;
+                this.state.mode = BrowseMode::Compare(comparison.clone());
+                this.state.detail = None;
+                this.state.listed_detail = None;
+                this.state.comparison = Some(comparison.clone());
+                this.state.listed_comparison = Some(comparison);
+                this.state.files = vec![file.clone()];
+                this.state.selected = Some(0);
+                this.state.current_file = Some(file);
+                this.state.editable = false;
+                this.edit_mode = false;
+                this.file_selection.clear();
+                this.diff_scroll = UniformListScrollHandle::new();
+                this.line_layouts.clear();
+                this.dragging = false;
+                this.state.set_diff(diff);
+                this.remember_tab();
+            },
+        );
+        cx.notify();
     }
     pub fn open_workspace_hit(&mut self, hit: mygit_gpui::search::Hit, cx: &mut Context<Self>) {
-        self.open_workspace_target(hit.path.clone(), Some(hit), cx);
+        self.open_workspace_target(hit.path.clone(), Some(hit), false, cx);
     }
     fn open_workspace_target(
         &mut self,
         path: String,
         hit: Option<mygit_gpui::search::Hit>,
+        prefer_edit: bool,
         cx: &mut Context<Self>,
     ) {
         self.hide_quick_open();
@@ -1619,7 +1705,9 @@ impl MyGit {
                     }
                 }
                 this.remember_tab();
-                if !this.settings.git_panel_visible && this.state.diff.message.is_none() {
+                if (prefer_edit || !this.settings.git_panel_visible)
+                    && this.state.diff.message.is_none()
+                {
                     this.open_current_editor(cx);
                 }
                 if !this.settings.git_panel_visible
@@ -1704,6 +1792,11 @@ impl MyGit {
         .detach();
     }
     pub fn cancel_task(&mut self, cx: &mut Context<Self>) {
+        if self.tree_menu.take().is_some() {
+            self.restore_main_focus = true;
+            cx.notify();
+            return;
+        }
         if self.show_notifications {
             self.show_notifications = false;
             self.restore_main_focus = true;
@@ -1890,7 +1983,7 @@ impl MyGit {
         cx.notify();
     }
     pub fn navigate(&mut self, forward: bool, cx: &mut Context<Self>) {
-        if !self.settings.git_panel_visible || self.show_notifications {
+        if !self.settings.git_panel_visible || self.show_notifications || self.tree_menu.is_some() {
             return;
         }
         if let Some(row) = self.state.navigate(forward) {
@@ -2031,7 +2124,7 @@ impl MyGit {
             }
             return;
         }
-        if !self.settings.git_panel_visible || self.show_notifications {
+        if !self.settings.git_panel_visible || self.show_notifications || self.tree_menu.is_some() {
             return;
         }
         if let Some(text) = self
@@ -2043,7 +2136,7 @@ impl MyGit {
         }
     }
     pub fn select_all_text(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.settings.git_panel_visible || self.show_notifications {
+        if !self.settings.git_panel_visible || self.show_notifications || self.tree_menu.is_some() {
             return;
         }
         self.state
@@ -2060,7 +2153,7 @@ impl MyGit {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if !self.settings.git_panel_visible || self.show_notifications {
+        if !self.settings.git_panel_visible || self.show_notifications || self.tree_menu.is_some() {
             return;
         }
         let side = self.state.text_selection.side;
@@ -2166,9 +2259,7 @@ impl MyGit {
 }
 impl Render for MyGit {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        if self.settings.git_panel_visible {
-            self.ensure_blame(cx);
-        }
+        self.ensure_blame(cx);
         let commits = self.history_commits();
         let graph_key = (
             commits.len(),
@@ -2202,6 +2293,7 @@ impl Render for MyGit {
                     let _ = entity.update(cx, |this, cx| {
                         if !this.settings.git_panel_visible
                             || this.show_notifications
+                            || this.tree_menu.is_some()
                             || this.confirmation.is_some()
                             || this.current_editor().is_some()
                             || !this
@@ -2227,7 +2319,11 @@ impl Render for MyGit {
         .absolute()
         .size_full();
         if std::mem::take(&mut self.restore_main_focus) || self.confirmation.is_some() {
-            window.focus(&self.focus);
+            window.focus(if self.tree_menu.is_some() && self.confirmation.is_none() {
+                &self.tree_menu_focus
+            } else {
+                &self.focus
+            });
         }
         let available = (f32::from(window.viewport_size().width) - 420.).max(280.);
         let requested_width = if self.settings.git_panel_visible {
@@ -2246,6 +2342,11 @@ impl Render for MyGit {
             .relative()
             .child(scroll_listener)
             .key_context("MyGit")
+            .on_action(
+                cx.listener(|this, _: &OpenTreeMenu, window, cx| {
+                    this.selected_tree_menu(window, cx)
+                }),
+            )
             .on_action(cx.listener(|this, _: &Quit, _, cx| {
                 if this.request_close(cx) {
                     cx.quit();
@@ -2537,6 +2638,10 @@ impl Render for MyGit {
                 self.confirmation.is_none()
                     && (self.show_notifications || self.notifications.active().is_some()),
                 |s| s.child(views::notifications::pane(self, window, cx)),
+            )
+            .when(
+                self.confirmation.is_none() && self.tree_menu.is_some(),
+                |s| s.child(views::tree::menu(self, window, cx)),
             )
             .when(self.confirmation.is_some(), |s| {
                 s.child(views::confirmation(self, cx))

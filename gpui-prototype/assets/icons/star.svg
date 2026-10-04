@@ -1,0 +1,44 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 主要的大星光 -->
+  <path d="M12 2L13.2 8.8L20 10L13.2 11.2L12 18L10.8 11.2L4 10L10.8 8.8L12 2Z" 
+        fill="url(#gradient1)" 
+        stroke="#333" 
+        stroke-width="0.5"/>
+  
+  <!-- 右上角小星光 - 明显一些 -->
+  <path d="M18 3L19 7L23 8L19 9L18 13L17 9L13 8L17 7L18 3Z" 
+        fill="url(#gradient3)" 
+        opacity="0.9"/>
+  
+  <!-- 左下角小星光 -->
+  <path d="M6 14L6.5 16.5L9 17L6.5 17.5L6 20L5.5 17.5L3 17L5.5 16.5L6 14Z" 
+        fill="url(#gradient4)" 
+        opacity="0.6"/>
+  
+  <!-- 右下角微小星光 -->
+  <path d="M19 16L19.3 17.7L21 18L19.3 18.3L19 20L18.7 18.3L17 18L18.7 17.7L19 16Z" 
+        fill="#666" 
+        opacity="0.5"/>
+  
+  <defs>
+    <!-- 主星光渐变 - 黑白 -->
+    <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#CCCCCC;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#666666;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- 右上小星光渐变 - 明显的黑白 -->
+    <radialGradient id="gradient3" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:1" />
+      <stop offset="60%" style="stop-color:#AAAAAA;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#333333;stop-opacity:1" />
+    </radialGradient>
+    
+    <!-- 左下小星光渐变 - 黑白 -->
+    <radialGradient id="gradient4" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#F0F0F0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#888888;stop-opacity:1" />
+    </radialGradient>
+  </defs>
+</svg>

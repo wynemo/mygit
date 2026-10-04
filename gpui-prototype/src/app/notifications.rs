@@ -24,6 +24,7 @@ impl MyGit {
         if self.confirmation.is_some() {
             return;
         }
+        self.tree_menu = None;
         self.show_notifications = !self.show_notifications;
         self.restore_main_focus = true;
         cx.notify();
