@@ -55,7 +55,7 @@ impl MyGit {
         self.show_history_search = false;
         self.show_compare = false;
         self.show_settings = false;
-        self.show_commit = false;
+        self.hide_commit();
         if self.quick.input.is_none() {
             let font = self.state.font_family.clone();
             let size = self.state.font_size;

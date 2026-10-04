@@ -12,7 +12,7 @@ impl MyGit {
             self.hide_project_search();
             self.show_history_search = false;
             self.show_compare = false;
-            self.show_commit = false;
+            self.hide_commit();
             self.show_settings = false;
         }
         cx.notify();
@@ -51,7 +51,7 @@ impl MyGit {
         self.branch_filter_sha = Some(sha);
         self.prepare_branch_inputs(cx);
         self.show_compare = false;
-        self.show_commit = false;
+        self.hide_commit();
         self.show_settings = false;
         cx.notify();
     }

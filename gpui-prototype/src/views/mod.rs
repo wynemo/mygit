@@ -137,7 +137,9 @@ pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 || this.blame_loading
                 || this.quick.indexing
                 || this.quick.searching
-                || this.search.loading,
+                || this.search.loading
+                || this.ai.loading
+                || this.ai.applying,
             |s| {
                 s.child(
                     button("cancel-task", "取消加载", true)
@@ -194,6 +196,11 @@ pub fn settings(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         .on_click(cx.listener(|this, _, _, cx| this.resize_panel(false, true, cx))),
                 ),
         )
+        .child(
+            button("ai-config-toggle", "AI API 配置", true)
+                .on_click(cx.listener(|this, _, _, cx| this.toggle_ai_settings(cx))),
+        )
+        .when(this.ai.config_shown, |s| s.child(ai_settings(this, cx)))
         .when_some(this.settings.warning.clone(), |s, warning| {
             s.child(div().text_color(rgb(0xffd479)).child(warning))
         })
@@ -346,3 +353,29 @@ pub mod merge;
 
 pub mod quick_open;
 pub mod search;
+
+fn ai_settings(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
+    let mut pane = div()
+        .flex()
+        .flex_col()
+        .gap_1()
+        .child("AI API 配置 · 基础 URL 自动追加 /chat/completions");
+    for (i, label) in ["API URL", "API 密钥", "模型名称", "提示词"]
+        .iter()
+        .enumerate()
+    {
+        if let Some(input) = this.ai.config_inputs.get(i) {
+            pane = pane.child(
+                div().flex().gap_2().items_center().child(*label).child(
+                    div()
+                        .flex_1()
+                        .h(px(if i == 3 { 85. } else { 32. }))
+                        .child(input.clone()),
+                ),
+            );
+        }
+    }
+    pane.child(div().text_xs().child("密钥保存在兼容 JSON 中；Unix 文件权限 0600。MYGIT_AI_API_SECRET 可覆盖密钥且无需写入配置。"))
+        .child(button("ai-config-save", "保存 AI 配置", this.ai.config_inputs.len() == 4).on_click(cx.listener(|this, _, _, cx| this.save_ai_settings(cx))))
+        .when(!this.ai.config_message.is_empty(), |s| s.child(div().text_color(rgb(0xffd479)).child(this.ai.config_message.clone())))
+}

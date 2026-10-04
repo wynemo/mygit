@@ -31,7 +31,7 @@ impl MyGit {
             self.show_branches = false;
             self.show_compare = false;
             self.show_settings = false;
-            self.show_commit = false;
+            self.hide_commit();
         }
         cx.notify();
     }

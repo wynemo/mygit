@@ -52,6 +52,7 @@ pub struct Editor {
     pub blame_lines: std::sync::Arc<Vec<mygit_gpui::blame::Line>>,
     pub blame_owner: Option<WeakEntity<MyGit>>,
     pub compact: bool,
+    pub sensitive: bool,
     query: Option<Entity<Editor>>,
     query_subscription: Option<Subscription>,
     matches: Vec<Range<usize>>,
@@ -122,6 +123,7 @@ impl Editor {
             external_changed: false,
             reference: Default::default(),
             compact: false,
+            sensitive: false,
             show_blame: false,
             blame_lines: Default::default(),
             blame_owner: None,
@@ -138,8 +140,25 @@ impl Editor {
             dragging: false,
         }
     }
+    pub fn replace_all(&mut self, text: &str, cx: &mut Context<Self>) -> anyhow::Result<()> {
+        if self.buffer.marked.is_some() {
+            anyhow::bail!("请先完成输入法组合");
+        }
+        self.buffer
+            .replace(Some(0..self.buffer.text().len()), text)?;
+        self.refresh(cx);
+        Ok(())
+    }
     pub fn refresh(&mut self, cx: &mut Context<Self>) {
         self.generation += 1;
+        if self.sensitive {
+            self.syntax = Highlighted::default();
+            self.matches.clear();
+            self.reveal();
+            cx.emit(Changed::Edited);
+            cx.notify();
+            return;
+        }
         let generation = self.generation;
         let document = self.buffer.document.clone();
         let reference = self.reference.clone();
@@ -215,6 +234,9 @@ impl Editor {
         cx.notify();
     }
     fn copy(&mut self, cx: &mut Context<Self>) {
+        if self.sensitive {
+            return;
+        }
         if let Some(text) = self.buffer.selection.copy(&self.buffer.document) {
             cx.write_to_clipboard(ClipboardItem::new_string(text));
         }
@@ -264,7 +286,7 @@ impl Editor {
         }
     }
     fn show_find(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.compact {
+        if self.compact || self.sensitive {
             return;
         }
         if self.query.is_none() {
@@ -391,6 +413,9 @@ impl EntityInputHandler for Editor {
         _: &mut Window,
         _: &mut Context<Self>,
     ) -> Option<String> {
+        if self.sensitive {
+            return None;
+        }
         let range = utf16_range(self.buffer.text(), range);
         *actual = Some(
             to_utf16(self.buffer.text(), range.start)..to_utf16(self.buffer.text(), range.end),
@@ -480,8 +505,16 @@ impl EntityInputHandler for Editor {
 }
 fn line(this: &Editor, index: usize, cx: &mut Context<Editor>) -> impl IntoElement {
     let range = this.buffer.document.display_range(index);
-    let display = DisplayLine::new(&this.buffer.text()[range.clone()]);
-    let tokens = this.syntax.lines.get(index).cloned().unwrap_or_default();
+    let display = if this.sensitive {
+        DisplayLine::masked(&this.buffer.text()[range.clone()])
+    } else {
+        DisplayLine::new(&this.buffer.text()[range.clone()])
+    };
+    let tokens = if this.sensitive {
+        vec![]
+    } else {
+        this.syntax.lines.get(index).cloned().unwrap_or_default()
+    };
     let selection = this.buffer.selection.range();
     let matches = this
         .matches

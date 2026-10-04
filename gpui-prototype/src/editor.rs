@@ -400,6 +400,22 @@ pub fn find(text: &str, query: &str) -> Vec<Range<usize>> {
 mod tests {
     use super::*;
     #[test]
+    fn replacing_a_commit_draft_is_one_undo_step_and_keeps_exact_unicode_text() {
+        let mut draft = Buffer::new("手动标题\n\n原始详细说明🙂");
+        draft.selection.anchor = 3;
+        draft.selection.head = draft.text().len();
+        let selection = draft.selection.clone();
+        let message = "feat: 新标题\n\nAI 草稿仍可编辑 e\u{301}\n";
+        draft.replace(Some(0..draft.text().len()), message).unwrap();
+        assert_eq!(draft.text(), message);
+        draft.undo();
+        assert_eq!(draft.text(), "手动标题\n\n原始详细说明🙂");
+        assert_eq!(draft.selection.anchor, selection.anchor);
+        assert_eq!(draft.selection.head, selection.head);
+        draft.redo();
+        assert_eq!(draft.text(), message);
+    }
+    #[test]
     fn external_refresh_preserves_clean_selection_and_protects_local_edits() {
         let mut buffer = Buffer::new("🙂original");
         buffer.selection.anchor = 4;

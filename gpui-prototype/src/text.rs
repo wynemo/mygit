@@ -160,6 +160,25 @@ pub struct DisplayLine {
     to_display: Vec<usize>,
 }
 impl DisplayLine {
+    /// Password rendering keeps grapheme-to-source mapping without retaining
+    /// source text in the shaped line sent to the window text system.
+    pub fn masked(source: &str) -> Self {
+        let mut text = String::new();
+        let mut to_source = vec![0];
+        let mut to_display = vec![0; source.len() + 1];
+        for (index, grapheme) in source.grapheme_indices(true) {
+            let start = text.len();
+            text.push('•');
+            to_source.extend([index, index, index + grapheme.len()]);
+            to_display[index..index + grapheme.len()].fill(start);
+            to_display[index + grapheme.len()] = text.len();
+        }
+        Self {
+            text,
+            to_source,
+            to_display,
+        }
+    }
     pub fn new(source: &str) -> Self {
         let mut text = String::new();
         let mut to_source = vec![0];
@@ -198,6 +217,22 @@ impl DisplayLine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn password_display_masks_graphemes_and_maps_caret_without_plaintext() {
+        let raw = "密钥e\u{301}👩‍💻\t";
+        let display = DisplayLine::masked(raw);
+        assert_eq!(display.text, "•••••");
+        for (i, grapheme) in raw.grapheme_indices(true) {
+            let offset = display.display_offset(i);
+            assert_eq!(display.source_offset(offset), i);
+            assert_eq!(display.source_offset(offset + 3), i + grapheme.len());
+            for byte in i..i + grapheme.len() {
+                assert_eq!(display.display_offset(byte), offset);
+            }
+        }
+        assert_eq!(display.source_offset(display.text.len()), raw.len());
+        assert_eq!(DisplayLine::masked("").text, "");
+    }
     #[test]
     fn copy_preserves_tabs_crlf_blank_lines_and_direction() {
         let document = Document::new("a\t中文\r\n\r\nz🙂\n");

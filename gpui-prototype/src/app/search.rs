@@ -43,7 +43,7 @@ impl MyGit {
         self.show_history_search = false;
         self.show_compare = false;
         self.show_settings = false;
-        self.show_commit = false;
+        self.hide_commit();
         self.search.shown = true;
         if self.search.inputs.is_empty() {
             for _ in 0..3 {

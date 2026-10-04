@@ -44,13 +44,16 @@ impl Config {
             prompt: data["prompt"].as_str().unwrap_or(DEFAULT_PROMPT).to_owned(),
         }
     }
-    pub fn load(path: &Path) -> Result<Self> {
+    pub fn load_stored(path: &Path) -> Result<Self> {
         let data = match std::fs::read(path) {
             Ok(bytes) => serde_json::from_slice(&bytes).context("无法读取 AI 配置 JSON")?,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => json!({}),
             Err(_) => bail!("无法读取 AI 配置"),
         };
-        let mut config = Self::from_json(&data);
+        Ok(Self::from_json(&data))
+    }
+    pub fn load(path: &Path) -> Result<Self> {
+        let mut config = Self::load_stored(path)?;
         if let Ok(secret) = std::env::var("MYGIT_AI_API_SECRET") {
             config.api_secret = secret;
         }

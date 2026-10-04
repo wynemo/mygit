@@ -1,3 +1,4 @@
+mod ai;
 mod blame;
 mod branches;
 mod history;
@@ -87,6 +88,7 @@ pub enum Confirmation {
     },
 }
 pub struct MyGit {
+    pub ai: ai::State,
     pub quick: quick_open::State,
     pub search: search::State,
     watcher: Option<mygit_gpui::watch::RepositoryWatch>,
@@ -189,6 +191,7 @@ impl MyGit {
         };
         Self::start_refresh_loop(cx);
         cx.on_app_quit(|this, _| {
+            this.ai.cancel();
             this.quick.cancel();
             this.search.cancel();
             this.blame_pending.cancel();
@@ -225,6 +228,7 @@ impl MyGit {
             show_commit: false,
             show_compare: false,
             show_blame: false,
+            ai: Default::default(),
             quick: Default::default(),
             search: Default::default(),
             blame_key: None,
@@ -337,6 +341,7 @@ impl MyGit {
         self.reset_refresh();
         self.reset_blame();
         self.reset_history_search();
+        self.ai.reset();
         self.quick.reset();
         self.search.reset();
         self.edit_mode = false;
@@ -350,7 +355,7 @@ impl MyGit {
             self.branch_selected = None;
             self.branch_filter_sha = None;
             self.commit_editor = None;
-            self.show_commit = false;
+            self.hide_commit();
             self.editors.clear();
             self.editor_subscriptions.clear();
             self.tabs.clear();
@@ -1203,7 +1208,11 @@ impl MyGit {
         );
     }
     pub fn toggle_commit(&mut self, cx: &mut Context<Self>) {
-        self.show_commit = !self.show_commit;
+        if self.show_commit {
+            self.hide_commit();
+        } else {
+            self.show_commit = true;
+        }
         if self.show_commit {
             self.hide_quick_open();
             self.hide_project_search();
@@ -1278,6 +1287,7 @@ impl MyGit {
         self.pending.cancel();
         self.state.generation += 1;
         self.state.loading = false;
+        self.ai.reset();
         self.write_busy = true;
         self.write_message = label.into();
         self.write_progress = Default::default();
@@ -1565,12 +1575,16 @@ impl MyGit {
             cx.notify();
             return;
         }
+        if self.ai.loading || self.ai.applying {
+            self.ai.message = "AI 任务已取消，手动草稿保留".into();
+        }
         if self.search.loading {
             self.search.error = Some("已取消搜索，可修改查询或点击重新搜索重试".into());
         }
         if self.quick.indexing || self.quick.searching {
             self.quick.error = Some("已取消文件定位任务，可刷新索引重试".into());
         }
+        self.ai.cancel();
         self.quick.cancel();
         self.search.cancel();
         self.blame_pending.cancel();
@@ -2277,6 +2291,7 @@ impl Render for MyGit {
 
 impl Drop for MyGit {
     fn drop(&mut self) {
+        self.ai.cancel();
         self.quick.cancel();
         self.search.cancel();
         self.blame_pending.cancel();
