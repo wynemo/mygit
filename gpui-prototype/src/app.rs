@@ -2009,31 +2009,38 @@ impl Render for MyGit {
         }
         self.line_layouts.clear();
         let entity = cx.entity().downgrade();
-        window.on_mouse_event(move |event: &ScrollWheelEvent, phase, window, cx| {
-            if phase != DispatchPhase::Capture {
-                return;
-            }
-            let _ = entity.update(cx, |this, cx| {
-                if this.confirmation.is_some()
-                    || this.current_editor().is_some()
-                    || !this
-                        .diff_bounds
-                        .is_some_and(|bounds| bounds.contains(&event.position))
-                {
-                    return;
-                }
-                let delta = event.delta.pixel_delta(px(this.state.font_size + 12.));
-                let horizontal = if event.modifiers.shift && delta.x == px(0.) {
-                    delta.y
-                } else {
-                    delta.x
-                };
-                if horizontal != px(0.) {
-                    this.horizontal_delta(-f32::from(horizontal), window, cx);
-                    cx.stop_propagation();
-                }
-            });
-        });
+        let scroll_listener = canvas(
+            |_, _, _| (),
+            move |_, _, window, _| {
+                window.on_mouse_event(move |event: &ScrollWheelEvent, phase, window, cx| {
+                    if phase != DispatchPhase::Capture {
+                        return;
+                    }
+                    let _ = entity.update(cx, |this, cx| {
+                        if this.confirmation.is_some()
+                            || this.current_editor().is_some()
+                            || !this
+                                .diff_bounds
+                                .is_some_and(|bounds| bounds.contains(&event.position))
+                        {
+                            return;
+                        }
+                        let delta = event.delta.pixel_delta(px(this.state.font_size + 12.));
+                        let horizontal = if event.modifiers.shift && delta.x == px(0.) {
+                            delta.y
+                        } else {
+                            delta.x
+                        };
+                        if horizontal != px(0.) {
+                            this.horizontal_delta(-f32::from(horizontal), window, cx);
+                            cx.stop_propagation();
+                        }
+                    });
+                });
+            },
+        )
+        .absolute()
+        .size_full();
         if self.confirmation.is_some() {
             window.focus(&self.focus);
         }
@@ -2044,6 +2051,7 @@ impl Render for MyGit {
         self.visible_files_width = (self.settings.files_width * factor).max(120.);
         div()
             .relative()
+            .child(scroll_listener)
             .key_context("MyGit")
             .on_action(cx.listener(|this, _: &Quit, _, cx| {
                 if this.request_close(cx) {

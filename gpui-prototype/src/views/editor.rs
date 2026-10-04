@@ -52,6 +52,7 @@ pub struct Editor {
     pub blame_lines: std::sync::Arc<Vec<mygit_gpui::blame::Line>>,
     pub blame_owner: Option<WeakEntity<MyGit>>,
     pub compact: bool,
+    pub show_toolbar: bool,
     pub sensitive: bool,
     query: Option<Entity<Editor>>,
     query_subscription: Option<Subscription>,
@@ -123,6 +124,7 @@ impl Editor {
             external_changed: false,
             reference: Default::default(),
             compact: false,
+            show_toolbar: true,
             sensitive: false,
             show_blame: false,
             blame_lines: Default::default(),
@@ -655,53 +657,60 @@ fn line(this: &Editor, index: usize, cx: &mut Context<Editor>) -> impl IntoEleme
     .h_full()
 }
 impl Render for Editor {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let weak = cx.entity().downgrade();
-        window.on_mouse_event(move |event: &ScrollWheelEvent, phase, _, cx| {
-            if phase != DispatchPhase::Capture {
-                return;
-            }
-            let _ = weak.update(cx, |this, cx| {
-                if !this
-                    .hits
-                    .values()
-                    .any(|h| h.bounds.contains(&event.position))
-                {
-                    return;
-                }
-                let delta = event.delta.pixel_delta(px(this.font_size + 12.));
-                let dx = if event.modifiers.shift && delta.x == px(0.) {
-                    delta.y
-                } else {
-                    delta.x
-                };
-                if dx != px(0.) {
-                    let visible = this
-                        .hits
-                        .values()
-                        .map(|h| f32::from(h.bounds.size.width))
-                        .fold(0., f32::max);
-                    let longest = this
-                        .buffer
-                        .text()
-                        .lines()
-                        .map(|s| {
-                            DisplayLine::new(s)
-                                .text
-                                .chars()
-                                .map(|c| if c.is_ascii() { 1 } else { 2 })
-                                .sum::<usize>()
-                        })
-                        .max()
-                        .unwrap_or(0) as f32
-                        * this.font_size;
-                    this.horizontal =
-                        (this.horizontal - f32::from(dx)).clamp(0., (longest - visible).max(0.));
-                    cx.stop_propagation();
-                    cx.notify();
-                }
-            });
-        });
+        let scroll_listener = canvas(
+            |_, _, _| (),
+            move |_, _, window, _| {
+                window.on_mouse_event(move |event: &ScrollWheelEvent, phase, _, cx| {
+                    if phase != DispatchPhase::Capture {
+                        return;
+                    }
+                    let _ = weak.update(cx, |this, cx| {
+                        if !this
+                            .hits
+                            .values()
+                            .any(|h| h.bounds.contains(&event.position))
+                        {
+                            return;
+                        }
+                        let delta = event.delta.pixel_delta(px(this.font_size + 12.));
+                        let dx = if event.modifiers.shift && delta.x == px(0.) {
+                            delta.y
+                        } else {
+                            delta.x
+                        };
+                        if dx != px(0.) {
+                            let visible = this
+                                .hits
+                                .values()
+                                .map(|h| f32::from(h.bounds.size.width))
+                                .fold(0., f32::max);
+                            let longest = this
+                                .buffer
+                                .text()
+                                .lines()
+                                .map(|s| {
+                                    DisplayLine::new(s)
+                                        .text
+                                        .chars()
+                                        .map(|c| if c.is_ascii() { 1 } else { 2 })
+                                        .sum::<usize>()
+                                })
+                                .max()
+                                .unwrap_or(0) as f32
+                                * this.font_size;
+                            this.horizontal = (this.horizontal - f32::from(dx))
+                                .clamp(0., (longest - visible).max(0.));
+                            cx.stop_propagation();
+                            cx.notify();
+                        }
+                    });
+                });
+            },
+        )
+        .absolute()
+        .size_full();
         self.hits.clear();
         let entity = cx.entity();
         let focus = self.focus.clone();
@@ -709,11 +718,19 @@ impl Render for Editor {
             self.buffer.document.lines.len() + usize::from(self.buffer.text().ends_with('\n'));
         div()
             .relative()
+            .w_full()
+            .child(scroll_listener)
             .flex()
             .flex_col()
             .min_h_0()
             .when(!self.compact, |s| s.flex_1())
-            .when(self.compact, |s| s.h(px(32.)).flex_shrink_0())
+            .when(self.compact, |s| {
+                s.h(px(32.))
+                    .flex_shrink_0()
+                    .border_1()
+                    .border_color(rgb(0x3a4d68))
+                    .bg(rgb(0x172131))
+            })
             .key_context("FileEditor")
             .track_focus(&self.focus)
             .on_mouse_down(MouseButton::Left, cx.listener(Self::mouse_down))
@@ -819,7 +836,7 @@ impl Render for Editor {
             .on_action(
                 cx.listener(|this, _: &SelectFinish, _, cx| this.motion(Motion::Finish, true, cx)),
             )
-            .when(!self.compact, |s| {
+            .when(!self.compact && self.show_toolbar, |s| {
                 s.child(
                     div()
                         .flex()
@@ -920,30 +937,33 @@ impl Render for Editor {
                             .map(|i| {
                                 div()
                                     .id(("editor-line", i))
+                                    .w_full()
                                     .flex()
                                     .h(px(this.font_size + 12.))
                                     .font_family(this.font_family.clone())
                                     .text_size(px(this.font_size))
-                                    .child(
-                                        div()
-                                            .w(px(52.))
-                                            .flex_shrink_0()
-                                            .text_color(rgb(0x7f8b9c))
-                                            .child(format!(
-                                                "{} {}",
-                                                this.marks
-                                                    .get(&i)
-                                                    .map(|m| if m.deleted > 0 {
-                                                        format!("−{}", m.deleted)
-                                                    } else if m.added {
-                                                        "+".into()
-                                                    } else {
-                                                        "~".into()
-                                                    })
-                                                    .unwrap_or_default(),
-                                                i + 1
-                                            )),
-                                    )
+                                    .when(!this.compact, |s| {
+                                        s.child(
+                                            div()
+                                                .w(px(52.))
+                                                .flex_shrink_0()
+                                                .text_color(rgb(0x7f8b9c))
+                                                .child(format!(
+                                                    "{} {}",
+                                                    this.marks
+                                                        .get(&i)
+                                                        .map(|m| if m.deleted > 0 {
+                                                            format!("−{}", m.deleted)
+                                                        } else if m.added {
+                                                            "+".into()
+                                                        } else {
+                                                            "~".into()
+                                                        })
+                                                        .unwrap_or_default(),
+                                                    i + 1
+                                                )),
+                                        )
+                                    })
                                     .when(this.show_blame && !this.compact, |s| {
                                         if let Some(owner) = &this.blame_owner {
                                             s.child(crate::views::blame::gutter(
@@ -968,6 +988,7 @@ impl Render for Editor {
                     }),
                 )
                 .track_scroll(self.scroll.clone())
+                .w_full()
                 .flex_1()
                 .min_h_0(),
             )

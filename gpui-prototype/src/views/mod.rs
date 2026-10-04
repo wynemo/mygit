@@ -369,6 +369,8 @@ fn ai_settings(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 div().flex().gap_2().items_center().child(*label).child(
                     div()
                         .flex_1()
+                        .flex()
+                        .flex_col()
                         .h(px(if i == 3 { 85. } else { 32. }))
                         .child(input.clone()),
                 ),

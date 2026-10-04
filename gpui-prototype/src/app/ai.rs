@@ -67,12 +67,14 @@ impl MyGit {
                         let font = this.state.font_family.clone();
                         let size = this.state.font_size;
                         this.ai.candidate = Some(cx.new(|cx| {
-                            Editor::new(
+                            let mut editor = Editor::new(
                                 mygit_gpui::editor::Buffer::new(&generated.message),
                                 font,
                                 size,
                                 cx,
-                            )
+                            );
+                            editor.show_toolbar = false;
+                            editor
                         }));
                         this.ai.fingerprint = Some(generated.fingerprint);
                         this.ai.message = "生成草稿可编辑；点击应用将替换手动草稿，可撤销".into();
@@ -174,6 +176,7 @@ impl MyGit {
                             let mut editor =
                                 Editor::new(mygit_gpui::editor::Buffer::new(text), font, size, cx);
                             editor.compact = i != 3;
+                            editor.show_toolbar = false;
                             editor.sensitive = i == 1;
                             editor
                         }));

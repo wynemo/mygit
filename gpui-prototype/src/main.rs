@@ -60,28 +60,8 @@ fn main() {
         cx.bind_keys([
             KeyBinding::new("cmd-shift-f", ToggleProjectSearch, Some("MyGit")),
             KeyBinding::new("ctrl-shift-f", ToggleProjectSearch, Some("MyGit")),
-            KeyBinding::new("up", ProjectSearchUp, Some("ProjectSearch && FileEditor")),
-            KeyBinding::new(
-                "down",
-                ProjectSearchDown,
-                Some("ProjectSearch && FileEditor"),
-            ),
-            KeyBinding::new(
-                "enter",
-                ProjectSearchAccept,
-                Some("ProjectSearch && FileEditor"),
-            ),
-            KeyBinding::new(
-                "escape",
-                ProjectSearchDismiss,
-                Some("ProjectSearch && FileEditor"),
-            ),
             KeyBinding::new("cmd-p", ToggleQuickOpen, Some("MyGit")),
             KeyBinding::new("ctrl-p", ToggleQuickOpen, Some("MyGit")),
-            KeyBinding::new("up", QuickUp, Some("QuickOpen && FileEditor")),
-            KeyBinding::new("down", QuickDown, Some("QuickOpen && FileEditor")),
-            KeyBinding::new("enter", QuickAccept, Some("QuickOpen && FileEditor")),
-            KeyBinding::new("escape", QuickDismiss, Some("QuickOpen && FileEditor")),
             KeyBinding::new("cmd-f", FindText, Some("FileEditor")),
             KeyBinding::new("ctrl-f", FindText, Some("FileEditor")),
             KeyBinding::new("f3", FindNext, Some("FileEditor")),
@@ -239,6 +219,26 @@ fn main() {
                 SelectFinish,
                 Some("DiffText || FileEditor || MergeHistory"),
             ),
+            KeyBinding::new("up", ProjectSearchUp, Some("ProjectSearch > FileEditor")),
+            KeyBinding::new(
+                "down",
+                ProjectSearchDown,
+                Some("ProjectSearch > FileEditor"),
+            ),
+            KeyBinding::new(
+                "enter",
+                ProjectSearchAccept,
+                Some("ProjectSearch > FileEditor"),
+            ),
+            KeyBinding::new(
+                "escape",
+                ProjectSearchDismiss,
+                Some("ProjectSearch > FileEditor"),
+            ),
+            KeyBinding::new("up", QuickUp, Some("QuickOpen > FileEditor")),
+            KeyBinding::new("down", QuickDown, Some("QuickOpen > FileEditor")),
+            KeyBinding::new("enter", QuickAccept, Some("QuickOpen > FileEditor")),
+            KeyBinding::new("escape", QuickDismiss, Some("QuickOpen > FileEditor")),
         ]);
         cx.on_window_closed(|cx| cx.quit()).detach();
         cx.open_window(
