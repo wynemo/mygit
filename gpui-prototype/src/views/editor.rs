@@ -9,6 +9,8 @@ use std::{
     collections::{BTreeMap, HashMap},
     ops::Range,
 };
+pub struct CodePalette(pub usize);
+impl gpui::Global for CodePalette {}
 actions!(
     editor_ui,
     [
@@ -506,6 +508,7 @@ impl EntityInputHandler for Editor {
     }
 }
 fn line(this: &Editor, index: usize, cx: &mut Context<Editor>) -> impl IntoElement {
+    let palette = cx.try_global::<CodePalette>().map_or(0, |p| p.0);
     let range = this.buffer.document.display_range(index);
     let display = if this.sensitive {
         DisplayLine::masked(&this.buffer.text()[range.clone()])
@@ -546,7 +549,7 @@ fn line(this: &Editor, index: usize, cx: &mut Context<Editor>) -> impl IntoEleme
                     (len > 0).then(|| TextRun {
                         len,
                         font: font.clone(),
-                        color: rgb(t.color).into(),
+                        color: rgb(t.color_for(palette)).into(),
                         background_color: None,
                         underline: None,
                         strikethrough: None,

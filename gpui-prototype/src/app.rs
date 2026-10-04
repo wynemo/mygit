@@ -193,6 +193,9 @@ impl MyGit {
     pub fn new(cx: &mut Context<Self>) -> Self {
         let settings =
             mygit_gpui::settings::Settings::load(mygit_gpui::settings::Settings::default_path());
+        cx.set_global(crate::views::editor::CodePalette(
+            mygit_gpui::syntax::palette_index(&settings.code_theme),
+        ));
         let state = AppState {
             font_size: settings.font_size,
             font_family: settings.font_family.clone(),

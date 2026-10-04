@@ -199,6 +199,31 @@ pub fn settings(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             button("ai-config-toggle", "AI API 配置", true)
                 .on_click(cx.listener(|this, _, _, cx| this.toggle_ai_settings(cx))),
         )
+        .child(
+            div()
+                .flex()
+                .gap_2()
+                .items_center()
+                .child("代码配色")
+                .children(
+                    mygit_gpui::syntax::PALETTES
+                        .iter()
+                        .enumerate()
+                        .map(|(index, name)| {
+                            button(
+                                ["palette-ocean", "palette-eighties", "palette-solarized"][index],
+                                name,
+                                true,
+                            )
+                            .when(this.settings.code_theme == *name, |s| {
+                                s.border_1().border_color(rgb(0x80bfff))
+                            })
+                            .on_click(cx.listener(
+                                move |this, _, _, cx| this.select_code_palette(index, cx),
+                            ))
+                        }),
+                ),
+        )
         .when(this.font_inputs.len() == 2, |s| {
             s.child(
                 div()

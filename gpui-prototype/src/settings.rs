@@ -26,6 +26,7 @@ pub struct Settings {
     pub history_width: f32,
     pub files_width: f32,
     pub files_visible: bool,
+    pub code_theme: String,
     pub recent: Vec<PathBuf>,
     pub last: Option<PathBuf>,
     pub warning: Option<String>,
@@ -74,6 +75,12 @@ impl Settings {
             font_size: number("/font_size", 12., 10., 22.),
             history_width: number("/gpui/history_width", 260., 160., 600.),
             files_width: number("/gpui/files_width", 220., 120., 600.),
+            code_theme: crate::syntax::PALETTES[crate::syntax::palette_index(
+                data.pointer("/gpui/code_theme")
+                    .and_then(Value::as_str)
+                    .unwrap_or(""),
+            )]
+            .into(),
             files_visible: data
                 .pointer("/gpui/files_visible")
                 .and_then(Value::as_bool)
@@ -152,6 +159,7 @@ impl Settings {
         }
         data["gpui"]["history_width"] = json!(self.history_width);
         data["gpui"]["files_width"] = json!(self.files_width);
+        data["gpui"]["code_theme"] = json!(self.code_theme);
         data["gpui"]["files_visible"] = json!(self.files_visible);
         if let Some((root, text)) = &self.draft {
             if !data["gpui"]["commit_drafts"].is_object() {
@@ -190,6 +198,28 @@ impl Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn code_palette_round_trips_and_preserves_legacy_style() {
+        let dir = std::env::temp_dir().join(format!("mygit-palette-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("settings.json");
+        fs::write(
+            &path,
+            br#"{"code_style":"friendly","gpui":{"code_theme":"unknown"}}"#,
+        )
+        .unwrap();
+        let mut settings = Settings::load(path.clone());
+        assert_eq!(settings.code_theme, crate::syntax::THEME);
+        settings.code_theme = crate::syntax::PALETTES[2].into();
+        settings.save().unwrap();
+        assert_eq!(
+            Settings::load(path.clone()).code_theme,
+            crate::syntax::PALETTES[2]
+        );
+        let data: Value = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
+        assert_eq!(data["code_style"], "friendly");
+        fs::remove_dir_all(dir).unwrap();
+    }
     #[test]
     fn font_validation_and_legacy_visibility_preserve_settings_and_drafts() {
         assert_eq!(validate_font("自定义字体", Some(16.5)).unwrap(), 16.5);

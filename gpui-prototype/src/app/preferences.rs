@@ -1,6 +1,17 @@
 use super::*;
 
 impl MyGit {
+    pub fn select_code_palette(&mut self, index: usize, cx: &mut Context<Self>) {
+        let Some(name) = mygit_gpui::syntax::PALETTES.get(index) else {
+            return;
+        };
+        self.settings.code_theme = (*name).into();
+        cx.set_global(crate::views::editor::CodePalette(index));
+        self.line_layouts.clear();
+        self.update_editor_fonts(cx);
+        self.save_settings();
+        cx.notify();
+    }
     pub fn toggle_settings(&mut self, cx: &mut Context<Self>) {
         self.show_settings = !self.show_settings;
         self.restore_main_focus = true;

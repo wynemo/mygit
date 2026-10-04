@@ -4,13 +4,27 @@ use std::{
     path::Path,
     sync::{Arc, OnceLock},
 };
-use syntect::{easy::HighlightLines, highlighting::ThemeSet, parsing::SyntaxSet};
+use syntect::{
+    easy::ScopeRangeIterator,
+    highlighting::{Highlighter, ThemeSet},
+    parsing::{ParseState, ScopeStack, SyntaxSet},
+};
 
 pub const THEME: &str = "base16-ocean.dark";
+pub const PALETTES: [&str; 3] = [THEME, "base16-eighties.dark", "Solarized (dark)"];
+pub fn palette_index(name: &str) -> usize {
+    PALETTES.iter().position(|p| *p == name).unwrap_or(0)
+}
 #[derive(Clone, Debug)]
 pub struct Token {
     pub range: Range<usize>,
     pub color: u32,
+    colors: [u32; 3],
+}
+impl Token {
+    pub fn color_for(&self, palette: usize) -> u32 {
+        self.colors.get(palette).copied().unwrap_or(self.color)
+    }
 }
 #[derive(Clone, Debug, Default)]
 pub struct Highlighted {
@@ -36,7 +50,10 @@ pub fn highlight(document: &Document, path: &str) -> Highlighted {
                 .and_then(|line| syntaxes.find_syntax_by_first_line(line))
         })
         .unwrap_or_else(|| syntaxes.find_syntax_plain_text());
-    let mut highlighter = HighlightLines::new(syntax, &themes.themes[THEME]);
+    let highlighters = PALETTES.map(|name| Highlighter::new(&themes.themes[name]));
+    let mut parser = ParseState::new(syntax);
+    let mut stack = ScopeStack::new();
+    let mut cache = std::collections::HashMap::new();
     let lines = document
         .lines
         .iter()
@@ -44,24 +61,32 @@ pub fn highlight(document: &Document, path: &str) -> Highlighted {
         .map(|(i, range)| {
             let text = &document.text[range.clone()];
             let visible_len = document.display_range(i).len();
-            let Ok(tokens) = highlighter.highlight_line(text, syntaxes) else {
+            let Ok(ops) = parser.parse_line(text, syntaxes) else {
                 return vec![Token {
                     range: 0..visible_len,
                     color: 0xdce5f3,
+                    colors: [0xdce5f3; 3],
                 }];
             };
-            let mut offset = 0;
             let mut result = vec![];
-            for (style, text) in tokens {
-                let end = offset + text.len();
-                if offset < visible_len {
-                    let color = style.foreground;
-                    result.push(Token {
-                        range: offset..end.min(visible_len),
-                        color: ((color.r as u32) << 16) | ((color.g as u32) << 8) | color.b as u32,
-                    });
+            for (range, op) in ScopeRangeIterator::new(&ops, text) {
+                if stack.apply(op).is_err() {
+                    continue;
                 }
-                offset = end;
+                if range.is_empty() || range.start >= visible_len {
+                    continue;
+                }
+                let colors = *cache.entry(stack.as_slice().to_vec()).or_insert_with(|| {
+                    std::array::from_fn(|i| {
+                        let color = highlighters[i].style_for_stack(stack.as_slice()).foreground;
+                        ((color.r as u32) << 16) | ((color.g as u32) << 8) | color.b as u32
+                    })
+                });
+                result.push(Token {
+                    range: range.start..range.end.min(visible_len),
+                    color: colors[0],
+                    colors,
+                });
             }
             result
         })
@@ -105,6 +130,31 @@ mod tests {
                 }));
             }
         }
+    }
+    #[test]
+    fn palettes_preserve_ranges_and_multiline_context() {
+        let doc = Document::new("/* 中文🙂\r\n middle */\r\nlet x = \"value\";\r\n");
+        let h = highlight(&doc, "file.rs");
+        for index in 0..PALETTES.len() {
+            assert_eq!(
+                h.lines[0][0].color_for(index),
+                h.lines[1][0].color_for(index)
+            );
+            for (line, tokens) in h.lines.iter().enumerate() {
+                assert_eq!(
+                    tokens.iter().map(|t| t.range.len()).sum::<usize>(),
+                    doc.display_range(line).len()
+                );
+            }
+        }
+        assert!(
+            h.lines
+                .iter()
+                .flatten()
+                .any(|t| t.color_for(0) != t.color_for(1))
+        );
+        assert_eq!(palette_index("unsupported"), 0);
+        assert_eq!(h.lines[0][0].color_for(99), h.lines[0][0].color);
     }
     #[test]
     fn multiline_context_and_plain_text_fallback() {

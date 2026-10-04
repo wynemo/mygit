@@ -21,6 +21,7 @@ impl LineHit {
 }
 
 pub fn line(this: &MyGit, side: Side, row: usize, cx: &mut Context<MyGit>) -> impl IntoElement {
+    let palette = mygit_gpui::syntax::palette_index(&this.settings.code_theme);
     let view_row = this.state.view_row(row, side);
     let document = this.state.diff.document(side).clone();
     let source_line = this.state.diff.source_line(side, row);
@@ -55,7 +56,7 @@ pub fn line(this: &MyGit, side: Side, row: usize, cx: &mut Context<MyGit>) -> im
                     (len > 0).then(|| TextRun {
                         len,
                         font: font.clone(),
-                        color: rgb(token.color).into(),
+                        color: rgb(token.color_for(palette)).into(),
                         background_color: None,
                         underline: None,
                         strikethrough: None,
