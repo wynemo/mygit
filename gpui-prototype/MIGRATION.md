@@ -316,3 +316,9 @@
 
 - W03 关闭提醒的取消、放弃及保存失败阻止关闭通过；外部磁盘修改不会覆盖脏缓冲区，保存拒绝覆盖新磁盘版本。
 - W08 的整文件/当前单块确认、HEAD 来源还原与撤销恢复通过，磁盘/index 与 Git CLI 核对。其余范围继续保留待验，详见 NATIVE_VALIDATION.md。
+
+## macOS 打包基础
+
+- 增加可复现的 macOS app 构建脚本，锁定依赖、应用图标、版本信息、plist 校验与 ad-hoc 签名；拒绝覆盖既有输出。debug 包结构、签名与动态依赖校验通过，运行不链接 Python 或开发目录动态库。
+- 外部 Git/rg/curl、Finder PATH、构建依赖和发布签名边界已记录到 PACKAGING.md。release 与干净环境启动、其他平台仍待验，R06 不整体勾选。
+- 当前 Computer Use 多次连接验证 app 返回 cgWindowNotFound（进程仍存活），此时不新增原生验收结论。
