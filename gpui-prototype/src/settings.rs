@@ -6,6 +6,18 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
 };
+pub fn validate_font(family: &str, size: Option<f32>) -> Result<f32> {
+    anyhow::ensure!(
+        !family.is_empty() && family.len() < 256 && !family.chars().any(char::is_control),
+        "字体名称必须为 1–255 字节且不含控制字符"
+    );
+    let size = size.context("字号必须为数字")?;
+    anyhow::ensure!(
+        size.is_finite() && (10.0..=22.0).contains(&size),
+        "字号必须为 10–22"
+    );
+    Ok(size)
+}
 #[derive(Clone)]
 pub struct Settings {
     pub path: PathBuf,
@@ -13,6 +25,7 @@ pub struct Settings {
     pub font_size: f32,
     pub history_width: f32,
     pub files_width: f32,
+    pub files_visible: bool,
     pub recent: Vec<PathBuf>,
     pub last: Option<PathBuf>,
     pub warning: Option<String>,
@@ -61,6 +74,11 @@ impl Settings {
             font_size: number("/font_size", 12., 10., 22.),
             history_width: number("/gpui/history_width", 260., 160., 600.),
             files_width: number("/gpui/files_width", 220., 120., 600.),
+            files_visible: data
+                .pointer("/gpui/files_visible")
+                .and_then(Value::as_bool)
+                .or_else(|| data["left_panel_visible"].as_bool())
+                .unwrap_or(true),
             recent: data["recent_folders"]
                 .as_array()
                 .map(|a| {
@@ -94,6 +112,10 @@ impl Settings {
         self.recent.retain(|p| p != path);
         self.recent.insert(0, path.to_owned());
         self.recent.truncate(10);
+    }
+    pub fn clear_recent(&mut self) {
+        self.recent.clear();
+        self.last = None;
     }
     pub fn save(&self) -> Result<()> {
         let parent = self.path.parent().context("配置路径缺少目录")?;
@@ -130,6 +152,7 @@ impl Settings {
         }
         data["gpui"]["history_width"] = json!(self.history_width);
         data["gpui"]["files_width"] = json!(self.files_width);
+        data["gpui"]["files_visible"] = json!(self.files_visible);
         if let Some((root, text)) = &self.draft {
             if !data["gpui"]["commit_drafts"].is_object() {
                 data["gpui"]["commit_drafts"] = json!({});
@@ -167,6 +190,46 @@ impl Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn font_validation_and_legacy_visibility_preserve_settings_and_drafts() {
+        assert_eq!(validate_font("自定义字体", Some(16.5)).unwrap(), 16.5);
+        for size in [
+            None,
+            Some(f32::NAN),
+            Some(f32::INFINITY),
+            Some(9.0),
+            Some(23.0),
+        ] {
+            assert!(validate_font("Menlo", size).is_err());
+        }
+        assert!(validate_font("", Some(12.0)).is_err());
+        assert!(validate_font("bad\nfont", Some(12.0)).is_err());
+        let dir = std::env::temp_dir().join(format!(
+            "mygit-preferences-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir(&dir).unwrap();
+        let path = dir.join("settings.json");
+        fs::write(&path, br#"{"left_panel_visible":false,"recent_folders":["/tmp/a"],"last_folder":"/tmp/a","code_style":"friendly","gpui":{"commit_drafts":{"/tmp/a":"KEEP"}}}"#).unwrap();
+        let mut settings = Settings::load(path.clone());
+        assert!(!settings.files_visible);
+        settings.clear_recent();
+        settings.files_visible = true;
+        settings.save().unwrap();
+        let loaded = Settings::load(path.clone());
+        assert!(loaded.files_visible);
+        assert!(loaded.recent.is_empty());
+        assert!(loaded.last.is_none());
+        assert_eq!(loaded.draft_for(Path::new("/tmp/a")), "KEEP");
+        let data: Value = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
+        assert_eq!(data["code_style"], "friendly");
+        assert_eq!(data["left_panel_visible"], false);
+        fs::remove_dir_all(dir).unwrap();
+    }
     #[test]
     fn ai_configuration_updates_are_explicit_private_and_preserve_legacy_fields() {
         let dir = std::env::temp_dir().join(format!(

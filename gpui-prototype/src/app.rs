@@ -2,6 +2,7 @@ mod ai;
 mod blame;
 mod branches;
 mod history;
+mod preferences;
 mod quick_open;
 mod refresh;
 mod search;
@@ -31,6 +32,7 @@ actions!(
         OpenRepo,
         RefreshRepo,
         ToggleSettings,
+        ToggleFilesPanel,
         ToggleBranches,
         ToggleHistorySearch,
         ToggleProjectSearch,
@@ -116,6 +118,7 @@ pub struct MyGit {
     pub write_progress_text: String,
     pub show_commit: bool,
     pub show_compare: bool,
+    pub font_inputs: Vec<Entity<Editor>>,
     restore_main_focus: bool,
     pub show_blame: bool,
     blame_key: Option<blame::Key>,
@@ -233,6 +236,7 @@ impl MyGit {
             write_progress_text: String::new(),
             show_commit: false,
             show_compare: false,
+            font_inputs: vec![],
             restore_main_focus: false,
             show_blame: false,
             ai: Default::default(),
@@ -1402,7 +1406,11 @@ impl MyGit {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        window.focus(&self.files_focus);
+        window.focus(if self.settings.files_visible {
+            &self.files_focus
+        } else {
+            &self.focus
+        });
         cx.activate(true);
         self.tree.selected = Some(entry.path.clone());
         if entry.directory {
@@ -1703,7 +1711,11 @@ impl MyGit {
         if self.show_branches && self.branch_focus.is_focused(window) {
             self.switch_branch(cx);
         } else if self.history_focus.is_focused(window) {
-            window.focus(&self.files_focus);
+            window.focus(if self.settings.files_visible {
+                &self.files_focus
+            } else {
+                &self.focus
+            });
         } else if self.files_focus.is_focused(window) {
             if self.show_tree
                 && let Some((entry, _)) = self
@@ -1720,14 +1732,18 @@ impl MyGit {
         cx.notify();
     }
     pub fn cycle_focus(&mut self, reverse: bool, window: &mut Window, cx: &mut Context<Self>) {
-        let mut handles = vec![&self.history_focus, &self.files_focus, &self.focus];
+        let mut handles = vec![&self.history_focus];
+        if self.settings.files_visible {
+            handles.push(&self.files_focus);
+        }
+        handles.push(&self.focus);
         if self.show_branches {
             handles.push(&self.branch_focus);
         }
         let index = handles
             .iter()
             .position(|focus| focus.is_focused(window))
-            .unwrap_or(2);
+            .unwrap_or(handles.len() - 1);
         let next = (index + if reverse { handles.len() - 1 } else { 1 }) % handles.len();
         window.focus(handles[next]);
         cx.notify();
@@ -1915,12 +1931,7 @@ impl MyGit {
             _ => "Menlo",
         }
         .into();
-        for editor in self.editors.values() {
-            editor.update(cx, |e, cx| {
-                e.font_family = self.state.font_family.clone();
-                cx.notify();
-            });
-        }
+        self.update_editor_fonts(cx);
         self.save_settings();
         cx.notify();
     }
@@ -1963,12 +1974,7 @@ impl MyGit {
         self.state.font_size =
             (self.state.font_size + if increase { 1. } else { -1. }).clamp(10., 22.);
         self.diff_scroll = UniformListScrollHandle::new();
-        for editor in self.editors.values() {
-            editor.update(cx, |e, cx| {
-                e.font_size = self.state.font_size;
-                cx.notify();
-            });
-        }
+        self.update_editor_fonts(cx);
         self.save_settings();
         cx.notify();
     }
@@ -2168,12 +2174,11 @@ impl Render for MyGit {
                 }
             }))
             .on_action(cx.listener(|this, _: &ToggleSettings, _, cx| {
-                this.show_settings = !this.show_settings;
-                if this.show_settings {
-                    this.hide_quick_open();
-                    this.hide_project_search();
-                }
-                cx.notify();
+                this.toggle_settings(cx);
+            }))
+            .on_action(cx.listener(|this, _: &ToggleFilesPanel, window, cx| {
+                this.toggle_files_panel(cx);
+                window.focus(&this.focus);
             }))
             .on_action(cx.listener(|this, _: &CancelTask, _, cx| this.cancel_task(cx)))
             .on_action(
@@ -2283,10 +2288,12 @@ impl Render for MyGit {
                     .flex_1()
                     .min_h_0()
                     .child(views::sidebar::history(self, cx))
-                    .child(if self.show_tree {
-                        views::tree::pane(self, cx).into_any_element()
-                    } else {
-                        views::sidebar::files(self, cx).into_any_element()
+                    .when(self.settings.files_visible, |s| {
+                        s.child(if self.show_tree {
+                            views::tree::pane(self, cx).into_any_element()
+                        } else {
+                            views::sidebar::files(self, cx).into_any_element()
+                        })
                     })
                     .child(if self.state.merge.is_some() {
                         views::merge::pane(self, cx).into_any_element()

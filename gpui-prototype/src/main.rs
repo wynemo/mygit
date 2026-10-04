@@ -35,6 +35,7 @@ fn main() {
                     MenuItem::action("项目内容搜索", ToggleProjectSearch),
                     MenuItem::action("文件快速定位", ToggleQuickOpen),
                     MenuItem::action("取消加载", CancelTask),
+                    MenuItem::action("显示 / 隐藏文件栏", ToggleFilesPanel),
                     MenuItem::separator(),
                     MenuItem::action("全部变更", ViewWorkspace),
                     MenuItem::action("已暂存", ViewStaged),
@@ -70,6 +71,8 @@ fn main() {
             },
         ]);
         cx.bind_keys([
+            KeyBinding::new("cmd-b", ToggleFilesPanel, Some("MyGit")),
+            KeyBinding::new("ctrl-b", ToggleFilesPanel, Some("MyGit")),
             KeyBinding::new("cmd-k", ToggleCommitPanel, Some("MyGit")),
             KeyBinding::new("ctrl-k", ToggleCommitPanel, Some("MyGit")),
             KeyBinding::new("cmd-shift-f", ToggleProjectSearch, Some("MyGit")),

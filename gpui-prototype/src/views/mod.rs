@@ -123,12 +123,7 @@ pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         )
         .child(
             button("settings", "设置 / 最近仓库", true).on_click(cx.listener(|this, _, _, cx| {
-                this.show_settings = !this.show_settings;
-                if this.show_settings {
-                    this.hide_quick_open();
-                    this.hide_project_search();
-                }
-                cx.notify();
+                this.toggle_settings(cx);
             })),
         )
         .when(
@@ -159,6 +154,10 @@ pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
 
 pub fn settings(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
     div()
+        .id("settings-pane")
+        .max_h(px(400.))
+        .overflow_y_scroll()
+        .flex_shrink_0()
         .flex()
         .flex_col()
         .p_2()
@@ -199,6 +198,51 @@ pub fn settings(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .child(
             button("ai-config-toggle", "AI API 配置", true)
                 .on_click(cx.listener(|this, _, _, cx| this.toggle_ai_settings(cx))),
+        )
+        .when(this.font_inputs.len() == 2, |s| {
+            s.child(
+                div()
+                    .flex()
+                    .gap_2()
+                    .items_center()
+                    .child("字体名称")
+                    .child(div().w(px(240.)).child(this.font_inputs[0].clone()))
+                    .child("字号")
+                    .child(div().w(px(90.)).child(this.font_inputs[1].clone()))
+                    .child(
+                        button("apply-font", "应用字体", true)
+                            .on_click(cx.listener(|this, _, _, cx| this.apply_font_settings(cx))),
+                    ),
+            )
+        })
+        .child(
+            div()
+                .flex()
+                .gap_2()
+                .flex_wrap()
+                .child(
+                    button(
+                        "clear-recent",
+                        "清空最近仓库",
+                        !this.settings.recent.is_empty(),
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.clear_recent_repositories(cx))),
+                )
+                .child(
+                    button(
+                        "toggle-files-panel",
+                        if this.settings.files_visible {
+                            "隐藏文件栏"
+                        } else {
+                            "显示文件栏"
+                        },
+                        true,
+                    )
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.toggle_files_panel(cx);
+                        window.focus(&this.focus);
+                    })),
+                ),
         )
         .when(this.ai.config_shown, |s| s.child(ai_settings(this, cx)))
         .when_some(this.settings.warning.clone(), |s, warning| {
