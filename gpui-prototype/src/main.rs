@@ -43,6 +43,18 @@ fn main() {
                 ],
             },
             Menu {
+                name: "工作区".into(),
+                items: vec![
+                    MenuItem::action("暂存选中文件", StageSelected),
+                    MenuItem::action("取消暂存选中文件", UnstageSelected),
+                    MenuItem::separator(),
+                    MenuItem::action("暂存全部文件", StageAll),
+                    MenuItem::action("取消全部暂存", UnstageAll),
+                    MenuItem::separator(),
+                    MenuItem::action("提交面板", ToggleCommitPanel),
+                ],
+            },
+            Menu {
                 name: "编辑".into(),
                 items: vec![
                     MenuItem::action("复制", CopyText),
@@ -58,6 +70,8 @@ fn main() {
             },
         ]);
         cx.bind_keys([
+            KeyBinding::new("cmd-k", ToggleCommitPanel, Some("MyGit")),
+            KeyBinding::new("ctrl-k", ToggleCommitPanel, Some("MyGit")),
             KeyBinding::new("cmd-shift-f", ToggleProjectSearch, Some("MyGit")),
             KeyBinding::new("ctrl-shift-f", ToggleProjectSearch, Some("MyGit")),
             KeyBinding::new("cmd-p", ToggleQuickOpen, Some("MyGit")),

@@ -22,6 +22,11 @@ actions!(
         ViewWorkspace,
         ViewStaged,
         ViewUnstaged,
+        StageSelected,
+        UnstageSelected,
+        StageAll,
+        UnstageAll,
+        ToggleCommitPanel,
         CopyCommitSha,
         OpenRepo,
         RefreshRepo,
@@ -2066,6 +2071,38 @@ impl Render for MyGit {
             )
             .on_action(cx.listener(|this, _: &ViewUnstaged, _, cx| {
                 this.select_mode(BrowseMode::Unstaged, cx)
+            }))
+            .on_action(cx.listener(|this, _: &StageSelected, _, cx| {
+                if this.confirmation.is_none() {
+                    this.change_index(true, false, cx);
+                }
+            }))
+            .on_action(cx.listener(|this, _: &UnstageSelected, _, cx| {
+                if this.confirmation.is_none() {
+                    this.change_index(false, false, cx);
+                }
+            }))
+            .on_action(cx.listener(|this, _: &StageAll, _, cx| {
+                if this.confirmation.is_none() {
+                    this.change_index(true, true, cx);
+                }
+            }))
+            .on_action(cx.listener(|this, _: &UnstageAll, _, cx| {
+                if this.confirmation.is_none() {
+                    this.change_index(false, true, cx);
+                }
+            }))
+            .on_action(cx.listener(|this, _: &ToggleCommitPanel, window, cx| {
+                if this.confirmation.is_none() {
+                    this.toggle_commit(cx);
+                    if this.show_commit {
+                        if let Some(editor) = &this.commit_editor {
+                            window.focus(&editor.read(cx).focus);
+                        }
+                    } else {
+                        window.focus(&this.focus);
+                    }
+                }
             }))
             .on_action(cx.listener(|this, _: &CopyCommitSha, _, cx| {
                 if let Some(detail) = &this.state.detail {
