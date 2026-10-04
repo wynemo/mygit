@@ -116,6 +116,7 @@ pub struct MyGit {
     pub write_progress_text: String,
     pub show_commit: bool,
     pub show_compare: bool,
+    restore_main_focus: bool,
     pub show_blame: bool,
     blame_key: Option<blame::Key>,
     blame_pending: mygit_gpui::process::Cancellation,
@@ -232,6 +233,7 @@ impl MyGit {
             write_progress_text: String::new(),
             show_commit: false,
             show_compare: false,
+            restore_main_focus: false,
             show_blame: false,
             ai: Default::default(),
             quick: Default::default(),
@@ -343,6 +345,7 @@ impl MyGit {
         self.load_unchecked(path, cx);
     }
     fn load_unchecked(&mut self, path: PathBuf, cx: &mut Context<Self>) {
+        self.restore_main_focus = true;
         self.reset_refresh();
         self.reset_blame();
         self.reset_history_search();
@@ -353,6 +356,11 @@ impl MyGit {
         self.capture_tab();
         self.active_tab = None;
         if !self.state.repo.as_ref().is_some_and(|r| r.root == path) {
+            self.show_compare = false;
+            self.compare_left = None;
+            self.compare_right = None;
+            self.file_selection.clear();
+            self.write_message.clear();
             self.show_branches = false;
             self.branch_name = None;
             self.branch_base = None;
@@ -2046,7 +2054,7 @@ impl Render for MyGit {
         )
         .absolute()
         .size_full();
-        if self.confirmation.is_some() {
+        if std::mem::take(&mut self.restore_main_focus) || self.confirmation.is_some() {
             window.focus(&self.focus);
         }
         let available = (f32::from(window.viewport_size().width) - 420.).max(280.);
