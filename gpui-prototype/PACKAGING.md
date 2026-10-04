@@ -18,4 +18,4 @@ gpui-prototype/dist/MyGit.app/Contents/MacOS/MyGit /路径/仓库
 
 本机 ad-hoc 签名用于本机验证，不等同于 Developer ID 签名或公证；分发前需要独立完成签名、公证及干净机器启动验收。当前只生成宿主机架构，尚无 universal、Windows 或 Linux 安装包。
 
-已验证 debug 包的 plist、签名及动态依赖：仅链接 macOS 系统库/框架，没有 Python 或开发目录动态库依赖。release 构建及完整启动验收另行记录，不能据此勾选整个 R06。
+已验证 debug 包的 plist、签名及动态依赖：仅链接 macOS 系统库/框架，没有 Python 或开发目录动态库依赖。release 包亦已构建并通过 plist 和签名校验，二进制为 arm64。干净环境及完整启动验收尚待完成，不能据此勾选整个 R06。

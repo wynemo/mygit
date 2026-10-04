@@ -322,3 +322,8 @@
 - 增加可复现的 macOS app 构建脚本，锁定依赖、应用图标、版本信息、plist 校验与 ad-hoc 签名；拒绝覆盖既有输出。debug 包结构、签名与动态依赖校验通过，运行不链接 Python 或开发目录动态库。
 - 外部 Git/rg/curl、Finder PATH、构建依赖和发布签名边界已记录到 PACKAGING.md。release 与干净环境启动、其他平台仍待验，R06 不整体勾选。
 - 当前 Computer Use 多次连接验证 app 返回 cgWindowNotFound（进程仍存活），此时不新增原生验收结论。
+
+## 性能基准起步与 release 包验证
+
+- release app 构建、plist 和 ad-hoc 签名校验通过，宿主架构 arm64；干净环境启动仍待验。
+- 加入只读的 Rust/Python Diff 基准，使用同一万行 Unicode/CRLF 文本、两处修改和 20 次迭代，记录实际时间与进程峰值 RSS。两种计算范围不同，不宣称框架速度优势；数据及复现见 PERFORMANCE.md。R01 的启动、历史、滚动和常驻内存仍待补齐。
