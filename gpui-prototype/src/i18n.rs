@@ -767,6 +767,15 @@ pub fn translate(language: Language, value: &str) -> &str {
         "工作区内容已变化或正在输入，保留编辑器位置" => {
             "Worktree content changed or text is being composed; editor position preserved."
         }
+        "通知" => "Notifications",
+        "最近通知" => "Recent notifications",
+        "暂无通知" => "No notifications",
+        "清空" => "Clear",
+        "操作完成" => "Operation complete",
+        "操作失败" => "Operation failed",
+        "提示" => "Information",
+        "查看详情" => "View details",
+        "复制详情" => "Copy details",
         _ => value,
     }
 }

@@ -86,7 +86,12 @@ impl MyGit {
                         this.ai.message = mygit_gpui::localized_format!(
                             "AI 生成失败：{error:#}；可继续手动提交",
                             "AI generation failed: {error:#}; you can still commit manually"
-                        )
+                        );
+                        this.notify_result(
+                            mygit_gpui::notifications::Kind::Error,
+                            this.ai.message.clone(),
+                            cx,
+                        );
                     }
                 }
                 cx.notify();

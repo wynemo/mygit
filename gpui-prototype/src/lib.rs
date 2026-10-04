@@ -10,6 +10,7 @@ pub mod history;
 pub mod i18n;
 pub mod merge;
 pub mod model;
+pub mod notifications;
 pub mod operations;
 pub mod process;
 pub mod quick_open;

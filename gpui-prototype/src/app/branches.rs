@@ -97,7 +97,11 @@ impl MyGit {
         {
             self.write_message =
                 mygit_gpui::i18n::text("请先保存或关闭未保存的编辑内容，再执行此 Git 操作").into();
-            cx.notify();
+            self.notify_result(
+                mygit_gpui::notifications::Kind::Error,
+                self.write_message.clone(),
+                cx,
+            );
             return false;
         }
         true

@@ -2,6 +2,7 @@ mod ai;
 mod blame;
 mod branches;
 mod history;
+mod notifications;
 mod preferences;
 mod quick_open;
 mod refresh;
@@ -34,6 +35,7 @@ actions!(
         ToggleSettings,
         ToggleFilesPanel,
         ToggleGitPanel,
+        ToggleNotifications,
         ToggleBranches,
         ToggleHistorySearch,
         ToggleProjectSearch,
@@ -96,6 +98,8 @@ pub enum Confirmation {
     },
 }
 pub struct MyGit {
+    pub notifications: mygit_gpui::notifications::Notifications,
+    pub show_notifications: bool,
     pub ai: ai::State,
     pub quick: quick_open::State,
     pub search: search::State,
@@ -220,6 +224,8 @@ impl MyGit {
         })
         .detach();
         Self {
+            notifications: Default::default(),
+            show_notifications: false,
             watcher: None,
             refresh_debounce: Default::default(),
             refresh_pending: Default::default(),
@@ -1398,6 +1404,15 @@ impl MyGit {
                         )
                     }
                 });
+                this.notify_result(
+                    if succeeded {
+                        mygit_gpui::notifications::Kind::Success
+                    } else {
+                        mygit_gpui::notifications::Kind::Error
+                    },
+                    this.write_message.clone(),
+                    cx,
+                );
                 if succeeded
                     && clear_message
                     && let Some(editor) = &this.commit_editor
@@ -1689,6 +1704,12 @@ impl MyGit {
         .detach();
     }
     pub fn cancel_task(&mut self, cx: &mut Context<Self>) {
+        if self.show_notifications {
+            self.show_notifications = false;
+            self.restore_main_focus = true;
+            cx.notify();
+            return;
+        }
         if self.write_busy {
             self.state.message = mygit_gpui::i18n::text("Git 写操作执行中，请等待结果").into();
             cx.notify();
@@ -1869,7 +1890,7 @@ impl MyGit {
         cx.notify();
     }
     pub fn navigate(&mut self, forward: bool, cx: &mut Context<Self>) {
-        if !self.settings.git_panel_visible {
+        if !self.settings.git_panel_visible || self.show_notifications {
             return;
         }
         if let Some(row) = self.state.navigate(forward) {
@@ -2004,7 +2025,13 @@ impl MyGit {
         }
     }
     pub fn copy_text(&mut self, cx: &mut Context<Self>) {
-        if !self.settings.git_panel_visible {
+        if self.show_notifications {
+            if let Some(notice) = self.notifications.entries().front() {
+                self.copy_notification(notice.id, cx);
+            }
+            return;
+        }
+        if !self.settings.git_panel_visible || self.show_notifications {
             return;
         }
         if let Some(text) = self
@@ -2016,7 +2043,7 @@ impl MyGit {
         }
     }
     pub fn select_all_text(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.settings.git_panel_visible {
+        if !self.settings.git_panel_visible || self.show_notifications {
             return;
         }
         self.state
@@ -2033,7 +2060,7 @@ impl MyGit {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if !self.settings.git_panel_visible {
+        if !self.settings.git_panel_visible || self.show_notifications {
             return;
         }
         let side = self.state.text_selection.side;
@@ -2174,6 +2201,7 @@ impl Render for MyGit {
                     }
                     let _ = entity.update(cx, |this, cx| {
                         if !this.settings.git_panel_visible
+                            || this.show_notifications
                             || this.confirmation.is_some()
                             || this.current_editor().is_some()
                             || !this
@@ -2325,6 +2353,9 @@ impl Render for MyGit {
             .on_action(cx.listener(|this, _: &ToggleSettings, _, cx| {
                 this.toggle_settings(cx);
             }))
+            .on_action(
+                cx.listener(|this, _: &ToggleNotifications, _, cx| this.toggle_notifications(cx)),
+            )
             .on_action(cx.listener(|this, _: &ToggleGitPanel, window, cx| {
                 this.toggle_git_panel(window, cx);
             }))
@@ -2502,6 +2533,11 @@ impl Render for MyGit {
                         .child(self.write_message.clone()),
                 )
             })
+            .when(
+                self.confirmation.is_none()
+                    && (self.show_notifications || self.notifications.active().is_some()),
+                |s| s.child(views::notifications::pane(self, window, cx)),
+            )
             .when(self.confirmation.is_some(), |s| {
                 s.child(views::confirmation(self, cx))
             })

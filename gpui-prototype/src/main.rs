@@ -21,6 +21,7 @@ fn main() {
                 name: "MyGit".into(),
                 items: vec![
                     MenuItem::action(mygit_gpui::i18n::text("设置"), ToggleSettings),
+                    MenuItem::action(mygit_gpui::i18n::text("通知"), ToggleNotifications),
                     MenuItem::separator(),
                     MenuItem::action(mygit_gpui::i18n::text("退出"), Quit),
                 ],
@@ -78,6 +79,8 @@ fn main() {
             },
         ]);
         cx.bind_keys([
+            KeyBinding::new("cmd-shift-m", ToggleNotifications, Some("MyGit")),
+            KeyBinding::new("ctrl-shift-m", ToggleNotifications, Some("MyGit")),
             KeyBinding::new("cmd-j", ToggleGitPanel, Some("MyGit")),
             KeyBinding::new("ctrl-j", ToggleGitPanel, Some("MyGit")),
             KeyBinding::new("cmd-b", ToggleFilesPanel, Some("MyGit")),

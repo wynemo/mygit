@@ -22,7 +22,18 @@ pub fn run<T: Send + 'static>(
             this.state.loading = false;
             match result {
                 Ok(value) => apply(this, value, cx),
-                Err(error) => this.state.message = format!("{error:#}"),
+                Err(error) => {
+                    this.state.message = format!("{error:#}");
+                    if error.downcast_ref::<mygit_gpui::process::Failure>()
+                        != Some(&mygit_gpui::process::Failure::Cancelled)
+                    {
+                        this.notify_result(
+                            mygit_gpui::notifications::Kind::Error,
+                            this.state.message.clone(),
+                            cx,
+                        );
+                    }
+                }
             }
             cx.notify();
         });

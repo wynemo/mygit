@@ -4,7 +4,9 @@ pub mod commit;
 pub mod compare;
 pub mod diff;
 pub mod editor;
+pub mod hints;
 pub mod history;
+pub mod notifications;
 pub mod sidebar;
 pub mod tabs;
 pub mod text_line;
@@ -25,6 +27,9 @@ pub fn button(id: &'static str, label: &'static str, enabled: bool) -> Stateful<
         })
         .when(!enabled, |s| s.opacity(0.35))
         .child(label)
+        .when_some(hints::button_hint(id), |s, text| {
+            s.tooltip(move |_, cx| cx.new(|_| hints::Hint(text)).into())
+        })
 }
 pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
     let title = this
@@ -165,6 +170,10 @@ pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 true,
             )
             .on_click(cx.listener(|this, _, window, cx| this.toggle_git_panel(window, cx))),
+        )
+        .child(
+            button("notifications", mygit_gpui::i18n::text("通知"), true)
+                .on_click(cx.listener(|this, _, _, cx| this.toggle_notifications(cx))),
         )
         .child(
             button("settings", mygit_gpui::i18n::text("设置 / 最近仓库"), true).on_click(
