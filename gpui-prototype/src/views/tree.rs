@@ -18,22 +18,26 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .flex()
                 .items_center()
                 .gap_2()
-                .child("工作区文件树")
+                .child(mygit_gpui::i18n::text("工作区文件树"))
                 .child(
                     button(
                         "selected-tree-history",
-                        "历史",
+                        mygit_gpui::i18n::text("历史"),
                         this.tree.selected.is_some(),
                     )
                     .on_click(cx.listener(|this, _, _, cx| this.selected_tree_history(cx))),
                 )
                 .child(
-                    button("refresh-tree", "刷新", !this.tree_loading)
-                        .on_click(cx.listener(|this, _, _, cx| this.refresh_tree(cx))),
+                    button(
+                        "refresh-tree",
+                        mygit_gpui::i18n::text("刷新"),
+                        !this.tree_loading,
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.refresh_tree(cx))),
                 ),
         )
         .when(this.tree_loading, |s| {
-            s.child(div().p_2().child("正在读取目录…"))
+            s.child(div().p_2().child(mygit_gpui::i18n::text("正在读取目录…")))
         })
         .when_some(this.tree_error.clone(), |s, e| {
             s.child(div().p_2().text_color(rgb(0xffd479)).child(e))

@@ -18,19 +18,27 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .flex_wrap()
                 .items_center()
                 .gap_2()
-                .child("项目内容搜索 · Cmd/Ctrl+Shift+F · ↑↓ 选择 · Enter 打开")
+                .child(mygit_gpui::i18n::text(
+                    "项目内容搜索 · Cmd/Ctrl+Shift+F · ↑↓ 选择 · Enter 打开",
+                ))
                 .child(
-                    button("project-search-run", "重新搜索", true)
-                        .on_click(cx.listener(|this, _, _, cx| this.search_project(cx))),
+                    button(
+                        "project-search-run",
+                        mygit_gpui::i18n::text("重新搜索"),
+                        true,
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.search_project(cx))),
                 )
-                .child(button("project-search-close", "关闭", true).on_click(
-                    cx.listener(|this, _, window, cx| this.close_project_search(window, cx)),
-                )),
+                .child(
+                    button("project-search-close", mygit_gpui::i18n::text("关闭"), true).on_click(
+                        cx.listener(|this, _, window, cx| this.close_project_search(window, cx)),
+                    ),
+                ),
         );
     for (index, label) in [
-        "查询",
-        "包含 glob（例如 *.rs）",
-        "排除 glob（例如 target/**）",
+        mygit_gpui::i18n::text("查询"),
+        mygit_gpui::i18n::text("包含 glob（例如 *.rs）"),
+        mygit_gpui::i18n::text("排除 glob（例如 target/**）"),
     ]
     .iter()
     .enumerate()
@@ -51,29 +59,29 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         (
             0,
             "search-case",
-            "大小写",
-            "✓ 大小写",
+            mygit_gpui::i18n::text("大小写"),
+            mygit_gpui::i18n::text("✓ 大小写"),
             this.search.options.case_sensitive,
         ),
         (
             1,
             "search-regex",
-            "正则",
-            "✓ 正则",
+            mygit_gpui::i18n::text("正则"),
+            mygit_gpui::i18n::text("✓ 正则"),
             this.search.options.regex,
         ),
         (
             2,
             "search-word",
-            "整词",
-            "✓ 整词",
+            mygit_gpui::i18n::text("整词"),
+            mygit_gpui::i18n::text("✓ 整词"),
             this.search.options.whole_word,
         ),
         (
             3,
             "search-hidden",
-            "隐藏文件",
-            "✓ 隐藏文件",
+            mygit_gpui::i18n::text("隐藏文件"),
+            mygit_gpui::i18n::text("✓ 隐藏文件"),
             this.search.options.hidden,
         ),
     ] {
@@ -98,15 +106,16 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .text_xs()
                 .text_color(rgb(0x92a2b9))
                 .child(if this.search.loading {
-                    "正在搜索磁盘内容…".into()
+                    mygit_gpui::i18n::text("正在搜索磁盘内容…").into()
                 } else {
-                    format!(
+                    mygit_gpui::localized_format!(
                         "显示 {} 个文件 / {} 个匹配行 / {} 处匹配{} · 跳过编码 {} 项",
+                        "{} files / {} matching lines / {} matches{} · {} skipped for encoding",
                         results.files,
                         results.hits.len(),
                         results.occurrences,
                         if results.truncated {
-                            "（已达上限，请缩小范围）"
+                            mygit_gpui::i18n::text("（已达上限，请缩小范围）")
                         } else {
                             ""
                         },
@@ -118,7 +127,9 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             div()
                 .text_xs()
                 .text_color(rgb(0x92a2b9))
-                .child("遵循 rg 忽略规则 · 单文件 ≤20 MB · 最多 2,000 行 · 搜索磁盘内容"),
+                .child(mygit_gpui::i18n::text(
+                    "遵循 rg 忽略规则 · 单文件 ≤20 MB · 最多 2,000 行 · 搜索磁盘内容",
+                )),
         )
         .when_some(this.search.error.clone(), |s, error| {
             s.child(div().text_color(rgb(0xffd479)).child(error))
@@ -132,7 +143,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         })
         .when(
             !this.search.loading && results.hits.is_empty() && this.search.error.is_none(),
-            |s| s.child("请输入查询；没有匹配结果"),
+            |s| s.child(mygit_gpui::i18n::text("请输入查询；没有匹配结果")),
         )
         .when(!results.hits.is_empty(), |s| {
             s.child(
@@ -160,9 +171,12 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                         0x151d29
                                     }))
                                     .hover(|s| s.bg(rgb(0x253248)))
-                                    .child(format!(
+                                    .child(mygit_gpui::localized_format!(
                                         "{}:{} · {} 处",
-                                        hit.path, hit.line, hit.occurrences
+                                        "{}:{} · {} matches",
+                                        hit.path,
+                                        hit.line,
+                                        hit.occurrences
                                     ))
                                     .child(
                                         div()

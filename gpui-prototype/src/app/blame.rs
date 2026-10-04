@@ -152,7 +152,11 @@ impl MyGit {
                     Err(error) => {
                         errors.push(format!(
                             "{} Blame：{error:#}",
-                            if is_merge { "父提交 1" } else { "左侧" }
+                            if is_merge {
+                                mygit_gpui::i18n::text("父提交 1")
+                            } else {
+                                mygit_gpui::i18n::text("左侧")
+                            }
                         ));
                         Default::default()
                     }
@@ -162,7 +166,11 @@ impl MyGit {
                     Err(error) => {
                         errors.push(format!(
                             "{} Blame：{error:#}",
-                            if is_merge { "合并结果" } else { "右侧" }
+                            if is_merge {
+                                mygit_gpui::i18n::text("合并结果")
+                            } else {
+                                mygit_gpui::i18n::text("右侧")
+                            }
                         ));
                         Default::default()
                     }
@@ -170,7 +178,10 @@ impl MyGit {
                 this.blame_third = match third {
                     Ok(lines) => Arc::new(lines),
                     Err(error) => {
-                        errors.push(format!("父提交 2 Blame：{error:#}"));
+                        errors.push(mygit_gpui::localized_format!(
+                            "父提交 2 Blame：{error:#}",
+                            "Parent 2 Blame: {error:#}"
+                        ));
                         Default::default()
                     }
                 };

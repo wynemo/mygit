@@ -7,6 +7,7 @@ mod external;
 pub mod git;
 pub mod graph;
 pub mod history;
+pub mod i18n;
 pub mod merge;
 pub mod model;
 pub mod operations;

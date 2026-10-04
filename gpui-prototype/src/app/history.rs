@@ -161,7 +161,10 @@ impl MyGit {
                     }
                     Err(error) => {
                         this.history_failed = true;
-                        this.history_search_error = Some(format!("历史查询失败：{error:#}"));
+                        this.history_search_error = Some(mygit_gpui::localized_format!(
+                            "历史查询失败：{error:#}",
+                            "History search failed: {error:#}"
+                        ));
                     }
                 }
                 cx.notify();
@@ -205,7 +208,10 @@ impl MyGit {
                     }
                     Err(error) => {
                         this.history_failed = true;
-                        this.history_search_error = Some(format!("历史分页失败：{error:#}"));
+                        this.history_search_error = Some(mygit_gpui::localized_format!(
+                            "历史分页失败：{error:#}",
+                            "Unable to load more history: {error:#}"
+                        ));
                     }
                 }
                 cx.notify();

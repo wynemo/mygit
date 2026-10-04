@@ -42,12 +42,19 @@ impl Buffer {
     pub fn load(path: &Path) -> Result<Self> {
         let bytes = disk(path)?;
         if bytes.len() > 2_000_000 {
-            bail!("编辑文件超过 2 MB 上限");
+            bail!(crate::localized_format!(
+                "编辑文件超过 2 MB 上限",
+                "Editable file exceeds the 2 MB limit"
+            ));
         }
         if bytes.contains(&0) {
-            bail!("二进制文件不可编辑");
+            bail!(crate::localized_format!(
+                "二进制文件不可编辑",
+                "Binary files cannot be edited"
+            ));
         }
-        let text = std::str::from_utf8(&bytes).context("编辑仅支持 UTF-8 文本")?;
+        let text =
+            std::str::from_utf8(&bytes).context(crate::i18n::text("编辑仅支持 UTF-8 文本"))?;
         let mut buffer = Self::new(text);
         buffer.path = Some(path.into());
         buffer.canonical = Some(path.canonicalize()?);
@@ -160,10 +167,16 @@ impl Buffer {
             || !self.document.text.is_char_boundary(range.start)
             || !self.document.text.is_char_boundary(range.end)
         {
-            bail!("输入范围无效");
+            bail!(crate::localized_format!(
+                "输入范围无效",
+                "Invalid input range"
+            ));
         }
         if self.document.text.len() - range.len() + text.len() > 2_000_000 {
-            bail!("编辑文件超过 2 MB 上限");
+            bail!(crate::localized_format!(
+                "编辑文件超过 2 MB 上限",
+                "Editable file exceeds the 2 MB limit"
+            ));
         }
         Ok(())
     }
@@ -249,16 +262,24 @@ impl Buffer {
     }
     pub fn external_change(&self) -> Result<bool> {
         self.external_snapshot()
-            .context("缓冲区没有文件路径")?
+            .context(crate::i18n::text("缓冲区没有文件路径"))?
             .changed()
     }
     pub fn save(&mut self) -> Result<()> {
         self.finish_composition();
-        let path = self.path.clone().context("缓冲区没有文件路径")?;
+        let path = self
+            .path
+            .clone()
+            .context(crate::i18n::text("缓冲区没有文件路径"))?;
         if self.external_change()? {
-            bail!("磁盘文件已被外部修改，未覆盖；请重新加载或另存内容");
+            bail!(crate::localized_format!(
+                "磁盘文件已被外部修改，未覆盖；请重新加载或另存内容",
+                "The disk file changed externally and was not overwritten; reload or save the content elsewhere"
+            ));
         }
-        let parent = path.parent().context("文件路径缺少目录")?;
+        let parent = path
+            .parent()
+            .context(crate::i18n::text("文件路径缺少目录"))?;
         let temporary = parent.join(format!(
             ".mygit-save-{}-{}",
             std::process::id(),
@@ -276,7 +297,10 @@ impl Buffer {
             file.write_all(self.text().as_bytes())?;
             file.sync_all()?;
             if self.external_change()? {
-                bail!("保存期间文件发生外部修改，未覆盖");
+                bail!(crate::localized_format!(
+                    "保存期间文件发生外部修改，未覆盖",
+                    "The file changed externally during save and was not overwritten"
+                ));
             }
             fs::rename(&temporary, &path)?;
             Ok(())
@@ -310,13 +334,20 @@ impl ExternalSnapshot {
     }
 }
 fn disk(path: &Path) -> Result<Vec<u8>> {
-    let metadata =
-        fs::symlink_metadata(path).with_context(|| format!("无法读取 {}", path.display()))?;
+    let metadata = fs::symlink_metadata(path).with_context(|| {
+        crate::localized_format!("无法读取 {}", "Unable to read {}", path.display())
+    })?;
     if !metadata.is_file() || metadata.file_type().is_symlink() {
-        bail!("仅可编辑普通文件，符号链接及目录保持只读");
+        bail!(crate::localized_format!(
+            "仅可编辑普通文件，符号链接及目录保持只读",
+            "Only regular files can be edited; symbolic links and directories are read-only"
+        ));
     }
     if metadata.len() > 2_000_000 {
-        bail!("编辑文件超过 2 MB 上限");
+        bail!(crate::localized_format!(
+            "编辑文件超过 2 MB 上限",
+            "Editable file exceeds the 2 MB limit"
+        ));
     }
     let mut options = fs::OpenOptions::new();
     options.read(true);
@@ -325,17 +356,23 @@ fn disk(path: &Path) -> Result<Vec<u8>> {
         use std::os::unix::fs::OpenOptionsExt;
         options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
     }
-    let file = options
-        .open(path)
-        .with_context(|| format!("无法读取 {}", path.display()))?;
+    let file = options.open(path).with_context(|| {
+        crate::localized_format!("无法读取 {}", "Unable to read {}", path.display())
+    })?;
     if !file.metadata()?.is_file() {
-        bail!("仅可编辑普通文件");
+        bail!(crate::localized_format!(
+            "仅可编辑普通文件",
+            "Only regular files can be edited"
+        ));
     }
     use std::io::Read;
     let mut bytes = vec![];
     file.take(2_000_001).read_to_end(&mut bytes)?;
     if bytes.len() > 2_000_000 {
-        bail!("编辑文件超过 2 MB 上限");
+        bail!(crate::localized_format!(
+            "编辑文件超过 2 MB 上限",
+            "Editable file exceeds the 2 MB limit"
+        ));
     }
     Ok(bytes)
 }

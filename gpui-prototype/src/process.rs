@@ -11,6 +11,24 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// Stable error identity, independent of the language used to display it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Failure {
+    Cancelled,
+    GitTimeout,
+    SubprocessTimeout,
+}
+impl std::fmt::Display for Failure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(crate::i18n::text(match self {
+            Self::Cancelled => "任务已取消",
+            Self::GitTimeout => "Git 操作超时，请重试",
+            Self::SubprocessTimeout => "子进程操作超时，请重试",
+        }))
+    }
+}
+impl std::error::Error for Failure {}
+
 #[derive(Clone, Default)]
 pub struct Cancellation(Arc<AtomicBool>);
 impl Cancellation {
@@ -33,8 +51,9 @@ pub fn display_diagnostic(text: String) -> String {
     while !text.is_char_boundary(last) {
         last += 1;
     }
-    format!(
+    crate::localized_format!(
         "{}\n…输出较长，显示首尾…\n{}",
+        "{}\n…Long output; showing the beginning and end…\n{}",
         &text[..first],
         &text[last..]
     )
@@ -81,7 +100,7 @@ pub fn scope<T>(token: Cancellation, job: impl FnOnce() -> T) -> T {
 }
 pub fn check() -> Result<()> {
     if CURRENT.with(|c| c.borrow().cancelled()) {
-        bail!("任务已取消");
+        return Err(Failure::Cancelled.into());
     }
     Ok(())
 }
@@ -116,7 +135,9 @@ pub fn output(command: &mut Command, timeout: Duration) -> Result<Output> {
         use std::os::unix::process::CommandExt;
         command.process_group(0);
     }
-    let mut child = command.spawn().context("无法启动子进程")?;
+    let mut child = command
+        .spawn()
+        .context(crate::i18n::text("无法启动子进程"))?;
     let stdout = child.stdout.take().unwrap();
     let stderr = child.stderr.take().unwrap();
     let started = Instant::now();
@@ -134,9 +155,9 @@ pub fn output(command: &mut Command, timeout: Duration) -> Result<Output> {
             }
             if check().is_err() || started.elapsed() >= timeout {
                 reason = Some(if started.elapsed() >= timeout {
-                    "Git 操作超时，请重试"
+                    Failure::GitTimeout
                 } else {
-                    "任务已取消"
+                    Failure::Cancelled
                 });
                 #[cfg(unix)]
                 unsafe {
@@ -156,17 +177,26 @@ pub fn output(command: &mut Command, timeout: Duration) -> Result<Output> {
             let _ = child.kill();
             let _ = child.wait();
         }
-        let (stdout, stdout_exceeded) = out
-            .join()
-            .map_err(|_| anyhow::anyhow!("读取标准输出失败"))??;
-        let (stderr, stderr_exceeded) = err
-            .join()
-            .map_err(|_| anyhow::anyhow!("读取错误输出失败"))??;
+        let (stdout, stdout_exceeded) = out.join().map_err(|_| {
+            anyhow::anyhow!(crate::localized_format!(
+                "读取标准输出失败",
+                "Unable to read standard output"
+            ))
+        })??;
+        let (stderr, stderr_exceeded) = err.join().map_err(|_| {
+            anyhow::anyhow!(crate::localized_format!(
+                "读取错误输出失败",
+                "Unable to read standard error"
+            ))
+        })??;
         if let Some(reason) = reason {
-            bail!("{reason}");
+            return Err(reason.into());
         }
         if stdout_exceeded || stderr_exceeded {
-            bail!("Git 输出超过 64 MB 上限");
+            bail!(crate::localized_format!(
+                "Git 输出超过 64 MB 上限",
+                "Git output exceeds the 64 MB limit"
+            ));
         }
         Ok(Output {
             status: status?,
@@ -214,7 +244,9 @@ pub fn lines_with_input(
         use std::os::unix::process::CommandExt;
         command.process_group(0);
     }
-    let mut child = command.spawn().context("无法启动子进程")?;
+    let mut child = command
+        .spawn()
+        .context(crate::i18n::text("无法启动子进程"))?;
     let stdin = child.stdin.take();
     let stdout = child.stdout.take().unwrap();
     let stderr = child.stderr.take().unwrap();
@@ -273,9 +305,9 @@ pub fn lines_with_input(
             }
             if check().is_err() || started.elapsed() >= timeout || stop.load(Ordering::Acquire) {
                 if check().is_err() {
-                    reason = Some("任务已取消");
+                    reason = Some(Failure::Cancelled);
                 } else if started.elapsed() >= timeout {
-                    reason = Some("子进程操作超时，请重试");
+                    reason = Some(Failure::SubprocessTimeout);
                 }
                 #[cfg(unix)]
                 unsafe {
@@ -294,17 +326,26 @@ pub fn lines_with_input(
             let _ = child.kill();
             let _ = child.wait();
         }
-        let read = out
-            .join()
-            .map_err(|_| anyhow::anyhow!("读取标准输出失败"))?;
-        let (stderr, exceeded) = err
-            .join()
-            .map_err(|_| anyhow::anyhow!("读取错误输出失败"))??;
-        let written = writer
-            .join()
-            .map_err(|_| anyhow::anyhow!("写入标准输入失败"))?;
+        let read = out.join().map_err(|_| {
+            anyhow::anyhow!(crate::localized_format!(
+                "读取标准输出失败",
+                "Unable to read standard output"
+            ))
+        })?;
+        let (stderr, exceeded) = err.join().map_err(|_| {
+            anyhow::anyhow!(crate::localized_format!(
+                "读取错误输出失败",
+                "Unable to read standard error"
+            ))
+        })??;
+        let written = writer.join().map_err(|_| {
+            anyhow::anyhow!(crate::localized_format!(
+                "写入标准输入失败",
+                "Unable to write standard input"
+            ))
+        })?;
         if let Some(reason) = reason {
-            bail!("{reason}");
+            return Err(reason.into());
         }
         check()?;
         let (stopped, record_exceeded) = read?;
@@ -315,7 +356,10 @@ pub fn lines_with_input(
             return Err(error.into());
         }
         if exceeded {
-            bail!("错误输出超过 64 MB 上限");
+            bail!(crate::localized_format!(
+                "错误输出超过 64 MB 上限",
+                "Error output exceeds the 64 MB limit"
+            ));
         }
         Ok(LineOutput {
             status: status?,

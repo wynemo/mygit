@@ -259,7 +259,7 @@ impl Editor {
         let result = self.buffer.save();
         self.saving = false;
         match result {
-            Ok(()) => self.message = "已保存".into(),
+            Ok(()) => self.message = mygit_gpui::i18n::text("已保存").into(),
             Err(e) => self.message = format!("{e:#}"),
         };
         cx.emit(Changed::Saved);
@@ -267,7 +267,8 @@ impl Editor {
     }
     pub fn reload(&mut self, cx: &mut Context<Self>) {
         if self.buffer.dirty() {
-            self.message = "当前内容未保存，请先保存或关闭后重新打开".into();
+            self.message =
+                mygit_gpui::i18n::text("当前内容未保存，请先保存或关闭后重新打开").into();
             cx.notify();
             return;
         }
@@ -278,7 +279,9 @@ impl Editor {
                         self.external_changed = false;
                         self.refresh(cx);
                     } else {
-                        self.message = "文件目标已变化或正在输入，请关闭后重新打开".into();
+                        self.message =
+                            mygit_gpui::i18n::text("文件目标已变化或正在输入，请关闭后重新打开")
+                                .into();
                         cx.notify();
                     }
                 }
@@ -847,38 +850,48 @@ impl Render for Editor {
                         .p_2()
                         .when(self.buffer.path.is_some(), |s| {
                             s.child(
-                                button("save-editor", "保存", !self.saving)
+                                button("save-editor", mygit_gpui::i18n::text("保存"), !self.saving)
                                     .on_click(cx.listener(|this, _, _, cx| this.save(cx))),
                             )
                             .child(
-                                button("reload-editor", "重新加载", !self.buffer.dirty())
-                                    .on_click(cx.listener(|this, _, _, cx| this.reload(cx))),
+                                button(
+                                    "reload-editor",
+                                    mygit_gpui::i18n::text("重新加载"),
+                                    !self.buffer.dirty(),
+                                )
+                                .on_click(cx.listener(|this, _, _, cx| this.reload(cx))),
                             )
                         })
                         .child(
-                            button("undo-editor", "撤销", self.buffer.can_undo()).on_click(
-                                cx.listener(|this, _, _, cx| {
-                                    this.buffer.undo();
-                                    this.refresh(cx);
-                                }),
-                            ),
+                            button(
+                                "undo-editor",
+                                mygit_gpui::i18n::text("撤销"),
+                                self.buffer.can_undo(),
+                            )
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.buffer.undo();
+                                this.refresh(cx);
+                            })),
                         )
                         .child(
-                            button("redo-editor", "重做", self.buffer.can_redo()).on_click(
-                                cx.listener(|this, _, _, cx| {
-                                    this.buffer.redo();
-                                    this.refresh(cx);
-                                }),
-                            ),
+                            button(
+                                "redo-editor",
+                                mygit_gpui::i18n::text("重做"),
+                                self.buffer.can_redo(),
+                            )
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.buffer.redo();
+                                this.refresh(cx);
+                            })),
                         )
                         .child(div().text_color(rgb(0x92a2b9)).child(format!(
                             "{} · {}",
                             if self.buffer.path.is_none() {
-                                "提交信息"
+                                mygit_gpui::i18n::text("提交信息")
                             } else if self.buffer.dirty() {
-                                "未保存"
+                                mygit_gpui::i18n::text("未保存")
                             } else {
-                                "已保存"
+                                mygit_gpui::i18n::text("已保存")
                             },
                             if self.buffer.crlf { "CRLF" } else { "LF" }
                         ))),
@@ -889,7 +902,9 @@ impl Render for Editor {
                     div()
                         .p_2()
                         .text_color(rgb(0xffd479))
-                        .child("磁盘文件已变化。保存会检查冲突；无未保存修改时可重新加载。"),
+                        .child(mygit_gpui::i18n::text(
+                            "磁盘文件已变化。保存会检查冲突；无未保存修改时可重新加载。",
+                        )),
                 )
             })
             .when(!self.message.is_empty(), |s| {
@@ -914,21 +929,30 @@ impl Render for Editor {
                             self.matches.len()
                         )))
                         .child(
-                            button("previous-match", "上一处", !self.matches.is_empty())
-                                .on_click(cx.listener(|this, _, _, cx| this.find_move(false, cx))),
+                            button(
+                                "previous-match",
+                                mygit_gpui::i18n::text("上一处"),
+                                !self.matches.is_empty(),
+                            )
+                            .on_click(cx.listener(|this, _, _, cx| this.find_move(false, cx))),
                         )
                         .child(
-                            button("next-match", "下一处", !self.matches.is_empty())
-                                .on_click(cx.listener(|this, _, _, cx| this.find_move(true, cx))),
+                            button(
+                                "next-match",
+                                mygit_gpui::i18n::text("下一处"),
+                                !self.matches.is_empty(),
+                            )
+                            .on_click(cx.listener(|this, _, _, cx| this.find_move(true, cx))),
                         )
-                        .child(button("close-find", "关闭查找", true).on_click(cx.listener(
-                            |this, _, _, cx| {
-                                this.query = None;
-                                this.query_subscription = None;
-                                this.matches.clear();
-                                cx.notify();
-                            },
-                        ))),
+                        .child(
+                            button("close-find", mygit_gpui::i18n::text("关闭查找"), true)
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.query = None;
+                                    this.query_subscription = None;
+                                    this.matches.clear();
+                                    cx.notify();
+                                })),
+                        ),
                 )
             })
             .child(

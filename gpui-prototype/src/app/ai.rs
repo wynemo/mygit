@@ -30,7 +30,7 @@ impl State {
 impl MyGit {
     pub fn cancel_ai(&mut self, cx: &mut Context<Self>) {
         self.ai.cancel();
-        self.ai.message = "AI 任务已取消，手动草稿保留".into();
+        self.ai.message = mygit_gpui::i18n::text("AI 任务已取消，手动草稿保留").into();
         cx.notify();
     }
     pub fn generate_ai(&mut self, cx: &mut Context<Self>) {
@@ -45,7 +45,7 @@ impl MyGit {
         self.ai.reset();
         self.ai.pending = Default::default();
         self.ai.loading = true;
-        self.ai.message = "正在按当前暂存 Diff 生成…（15 秒超时）".into();
+        self.ai.message = mygit_gpui::i18n::text("正在按当前暂存 Diff 生成…（15 秒超时）").into();
         let serial = self.ai.serial;
         let epoch = self.repository_epoch;
         let token = self.ai.pending.clone();
@@ -77,10 +77,16 @@ impl MyGit {
                             editor
                         }));
                         this.ai.fingerprint = Some(generated.fingerprint);
-                        this.ai.message = "生成草稿可编辑；点击应用将替换手动草稿，可撤销".into();
+                        this.ai.message = mygit_gpui::i18n::text(
+                            "生成草稿可编辑；点击应用将替换手动草稿，可撤销",
+                        )
+                        .into();
                     }
                     Err(error) => {
-                        this.ai.message = format!("AI 生成失败：{error:#}；可继续手动提交")
+                        this.ai.message = mygit_gpui::localized_format!(
+                            "AI 生成失败：{error:#}；可继续手动提交",
+                            "AI generation failed: {error:#}; you can still commit manually"
+                        )
                     }
                 }
                 cx.notify();
@@ -102,7 +108,7 @@ impl MyGit {
             return;
         };
         if candidate.read(cx).buffer.marked.is_some() || editor.read(cx).buffer.marked.is_some() {
-            self.ai.message = "请先完成输入法组合，再应用草稿".into();
+            self.ai.message = mygit_gpui::i18n::text("请先完成输入法组合，再应用草稿").into();
             cx.notify();
             return;
         }
@@ -130,7 +136,8 @@ impl MyGit {
                 this.ai.applying = false;
                 this.ai.message = match result {
                     Ok(current) if current != expected => {
-                        "暂存区或 HEAD 已改变，请重新生成；当前草稿保留".into()
+                        mygit_gpui::i18n::text("暂存区或 HEAD 已改变，请重新生成；当前草稿保留")
+                            .into()
                     }
                     Ok(_)
                         if editor.read(cx).buffer.marked.is_some()
@@ -138,14 +145,27 @@ impl MyGit {
                             || editor.read(cx).buffer.text() != original
                             || candidate.read(cx).buffer.text() != message =>
                     {
-                        "校验期间草稿有修改，请再次点击应用".into()
+                        mygit_gpui::i18n::text("校验期间草稿有修改，请再次点击应用").into()
                     }
                     Ok(_) => match editor.update(cx, |editor, cx| editor.replace_all(&message, cx))
                     {
-                        Ok(()) => "已应用 AI 草稿，可继续编辑或撤销；尚未提交".into(),
-                        Err(error) => format!("无法应用草稿：{error:#}"),
+                        Ok(()) => {
+                            mygit_gpui::i18n::text("已应用 AI 草稿，可继续编辑或撤销；尚未提交")
+                                .into()
+                        }
+                        Err(error) => {
+                            mygit_gpui::localized_format!(
+                                "无法应用草稿：{error:#}",
+                                "Unable to apply draft: {error:#}"
+                            )
+                        }
                     },
-                    Err(error) => format!("无法校验暂存区：{error:#}"),
+                    Err(error) => {
+                        mygit_gpui::localized_format!(
+                            "无法校验暂存区：{error:#}",
+                            "Unable to validate index: {error:#}"
+                        )
+                    }
                 };
                 cx.notify();
             });
@@ -182,7 +202,12 @@ impl MyGit {
                         }));
                     }
                 }
-                Err(error) => self.ai.config_message = format!("无法加载 AI 配置：{error:#}"),
+                Err(error) => {
+                    self.ai.config_message = mygit_gpui::localized_format!(
+                        "无法加载 AI 配置：{error:#}",
+                        "Unable to load AI settings: {error:#}"
+                    )
+                }
             }
         }
         cx.notify();
@@ -197,7 +222,8 @@ impl MyGit {
             .iter()
             .any(|e| e.read(cx).buffer.marked.is_some())
         {
-            self.ai.config_message = "请先完成输入法组合，再保存配置".into();
+            self.ai.config_message =
+                mygit_gpui::i18n::text("请先完成输入法组合，再保存配置").into();
             cx.notify();
             return;
         }
@@ -209,7 +235,10 @@ impl MyGit {
             prompt: text(3),
         };
         if let Err(error) = config.validate() {
-            self.ai.config_message = format!("AI 配置无效：{error:#}");
+            self.ai.config_message = mygit_gpui::localized_format!(
+                "AI 配置无效：{error:#}",
+                "Invalid AI settings: {error:#}"
+            );
             cx.notify();
             return;
         }
@@ -220,8 +249,8 @@ impl MyGit {
         let result = self.settings.save();
         self.settings.ai_update = None;
         self.ai.config_message = match result {
-            Ok(()) => "AI 配置已保存；尚未发送请求".into(),
-            Err(_) => "无法保存 AI 配置，请检查文件权限；输入保留".into(),
+            Ok(()) => mygit_gpui::i18n::text("AI 配置已保存；尚未发送请求").into(),
+            Err(_) => mygit_gpui::i18n::text("无法保存 AI 配置，请检查文件权限；输入保留").into(),
         };
         cx.notify();
     }
@@ -232,7 +261,7 @@ impl MyGit {
         self.show_commit = false;
         if self.ai.loading || self.ai.applying {
             self.ai.cancel();
-            self.ai.message = "AI 任务已取消，草稿保留".into();
+            self.ai.message = mygit_gpui::i18n::text("AI 任务已取消，草稿保留").into();
         }
     }
     pub fn open_ai_settings(&mut self, cx: &mut Context<Self>) {

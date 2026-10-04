@@ -76,14 +76,16 @@ pub fn read(root: &Path, expanded: &BTreeSet<String>) -> Result<BTreeMap<String,
         if !canonical.starts_with(root.canonicalize()?) {
             continue;
         }
-        for entry in
-            std::fs::read_dir(&directory).with_context(|| format!("无法读取目录 {parent}"))?
-        {
+        for entry in std::fs::read_dir(&directory).with_context(|| {
+            crate::localized_format!("无法读取目录 {parent}", "Unable to read directory {parent}")
+        })? {
             let entry = entry?;
-            let name = entry
-                .file_name()
-                .into_string()
-                .map_err(|_| anyhow::anyhow!("目录存在非 UTF-8 文件名"))?;
+            let name = entry.file_name().into_string().map_err(|_| {
+                anyhow::anyhow!(crate::localized_format!(
+                    "目录存在非 UTF-8 文件名",
+                    "Directory contains a non-UTF-8 file name"
+                ))
+            })?;
             if parent.is_empty() && name == ".git" {
                 continue;
             }
@@ -105,7 +107,7 @@ pub fn read(root: &Path, expanded: &BTreeSet<String>) -> Result<BTreeMap<String,
                     status = if nested.iter().all(|s| *s == "!!") {
                         "!!"
                     } else {
-                        "变更"
+                        crate::i18n::text("变更")
                     }
                     .into();
                 }

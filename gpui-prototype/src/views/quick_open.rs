@@ -17,15 +17,21 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .flex_wrap()
                 .gap_2()
                 .items_center()
-                .child("文件快速定位 · Cmd/Ctrl+P · ↑↓ 选择 · Enter 打开 · Esc 关闭")
+                .child(mygit_gpui::i18n::text(
+                    "文件快速定位 · Cmd/Ctrl+P · ↑↓ 选择 · Enter 打开 · Esc 关闭",
+                ))
                 .child(
-                    button("quick-open-refresh", "刷新索引", !this.quick.indexing)
-                        .on_click(cx.listener(|this, _, _, cx| this.refresh_quick_index(cx))),
+                    button(
+                        "quick-open-refresh",
+                        mygit_gpui::i18n::text("刷新索引"),
+                        !this.quick.indexing,
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.refresh_quick_index(cx))),
                 )
                 .child(
                     button(
                         "quick-open-accept",
-                        "打开",
+                        mygit_gpui::i18n::text("打开"),
                         !this.quick.indexing
                             && !this.quick.searching
                             && !this.quick.matches.paths.is_empty(),
@@ -34,9 +40,11 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         cx.listener(|this, _, window, cx| this.accept_quick_open(window, cx)),
                     ),
                 )
-                .child(button("quick-open-close", "关闭", true).on_click(
-                    cx.listener(|this, _, window, cx| this.close_quick_open(window, cx)),
-                )),
+                .child(
+                    button("quick-open-close", mygit_gpui::i18n::text("关闭"), true).on_click(
+                        cx.listener(|this, _, window, cx| this.close_quick_open(window, cx)),
+                    ),
+                ),
         )
         .when_some(this.quick.input.clone(), |s, input| {
             s.child(div().h(px(32.)).child(input))
@@ -46,12 +54,13 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .text_xs()
                 .text_color(rgb(0x92a2b9))
                 .child(if this.quick.indexing {
-                    "正在更新文件索引…".into()
+                    mygit_gpui::i18n::text("正在更新文件索引…").into()
                 } else if this.quick.searching {
-                    "正在匹配…".into()
+                    mygit_gpui::i18n::text("正在匹配…").into()
                 } else {
-                    format!(
+                    mygit_gpui::localized_format!(
                         "索引 {} 个文件 · 匹配 {} 项 · 显示 {} 项",
+                        "{} indexed files · {} matches · {} displayed",
                         this.quick.count(),
                         this.quick.matches.total,
                         this.quick.matches.paths.len()
@@ -66,7 +75,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 && !this.quick.searching
                 && this.quick.matches.paths.is_empty()
                 && this.quick.error.is_none(),
-            |s| s.child("没有匹配文件"),
+            |s| s.child(mygit_gpui::i18n::text("没有匹配文件")),
         )
         .when(!this.quick.matches.paths.is_empty(), |s| {
             s.child(

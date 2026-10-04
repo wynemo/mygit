@@ -24,10 +24,10 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .flex()
                 .gap_2()
                 .items_center()
-                .child(format!("分支 · {} 个引用", rows.len()))
+                .child(mygit_gpui::localized_format!("分支 · {} 个引用", "Branches · {} refs", rows.len()))
                 .when(this.branch_filter_sha.is_some(), |s| {
                     s.child(
-                        button("all-branches", "显示所有分支", true).on_click(cx.listener(
+                        button("all-branches", mygit_gpui::i18n::text("显示所有分支"), true).on_click(cx.listener(
                             |this, _, _, cx| {
                                 this.branch_filter_sha = None;
                                 cx.notify();
@@ -39,15 +39,15 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     button(
                         "switch-branch",
                         if selected.is_some_and(|b| b.remote) {
-                            "建立跟踪并切换"
+                            mygit_gpui::i18n::text("建立跟踪并切换")
                         } else {
-                            "切换选中分支"
+                            mygit_gpui::i18n::text("切换选中分支")
                         },
                         !this.write_busy && selected.is_some(),
                     )
                     .on_click(cx.listener(|this, _, _, cx| this.switch_branch(cx))),
                 )
-                .child(button("close-branches", "关闭", true).on_click(cx.listener(
+                .child(button("close-branches", mygit_gpui::i18n::text("关闭"), true).on_click(cx.listener(
                     |this, _, _, cx| {
                         this.show_branches = false;
                         cx.notify();
@@ -88,9 +88,9 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                                 if branch.current {
                                                     "● "
                                                 } else if branch.remote {
-                                                    "远程 "
+                                                    mygit_gpui::i18n::text("远程 ")
                                                 } else {
-                                                    "本地 "
+                                                    mygit_gpui::i18n::text("本地 ")
                                                 },
                                                 branch.name,
                                                 short_sha(&branch.sha)
@@ -114,14 +114,14 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 ),
         )
         .when(rows.is_empty(), |s| {
-            s.child("没有分支引用；空仓库可输入新分支名，起点用 HEAD。")
+            s.child(mygit_gpui::i18n::text("没有分支引用；空仓库可输入新分支名，起点用 HEAD。"))
         })
         .child(
             div()
                 .flex()
                 .gap_2()
                 .items_center()
-                .child("新分支名 / 远程本地名")
+                .child(mygit_gpui::i18n::text("新分支名 / 远程本地名"))
                 .when_some(this.branch_name.clone(), |s, e| {
                     s.child(div().flex_1().min_w_0().h(px(32.)).child(e))
                 }),
@@ -131,12 +131,12 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .flex()
                 .gap_2()
                 .items_center()
-                .child("新分支起点 / Reset 目标")
+                .child(mygit_gpui::i18n::text("新分支起点 / Reset 目标"))
                 .when_some(this.branch_base.clone(), |s, e| {
                     s.child(div().flex_1().min_w_0().h(px(32.)).child(e))
                 })
                 .child(
-                    button("create-branch", "创建并切换", !this.write_busy)
+                    button("create-branch", mygit_gpui::i18n::text("创建并切换"), !this.write_busy)
                         .on_click(cx.listener(|this, _, _, cx| this.create_branch(cx))),
                 ),
         )
@@ -146,7 +146,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .flex_wrap()
                 .gap_2()
                 .items_center()
-                .child("远程")
+                .child(mygit_gpui::i18n::text("远程"))
                 .when_some(this.remote_name.clone(), |s, e| {
                     s.child(div().w(px(180.)).h(px(32.)).child(e))
                 })
@@ -177,7 +177,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .child(
                     button(
                         "merge-branch",
-                        "合并选中到当前",
+                        mygit_gpui::i18n::text("合并选中到当前"),
                         !this.write_busy && selected.is_some(),
                     )
                     .on_click(cx.listener(|this, _, _, cx| this.merge_branch(cx))),
@@ -189,7 +189,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .flex_wrap()
                 .gap_2()
                 .items_center()
-                .child("Reset 至上方目标：")
+                .child(mygit_gpui::i18n::text("Reset 至上方目标："))
                 .child(
                     button("reset-soft", "soft…", !this.write_busy).on_click(cx.listener(
                         |this, _, _, cx| {
@@ -213,6 +213,6 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 ),
         )
         .child(div().text_color(rgb(0x92a2b9)).child(
-            "选择引用可设为新分支起点。切换沿用 Git 对未提交内容的保护；远程检出建立本地跟踪分支。",
+            mygit_gpui::i18n::text("选择引用可设为新分支起点。切换沿用 Git 对未提交内容的保护；远程检出建立本地跟踪分支。"),
         ))
 }

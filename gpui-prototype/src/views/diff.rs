@@ -88,7 +88,7 @@ fn cell(
                     .flex_shrink_0()
                     .text_color(rgb(0xffd479))
                     .bg(rgb(0x283346))
-                    .child(label),
+                    .child(mygit_gpui::i18n::text(label)),
             )
         })
 }
@@ -189,7 +189,7 @@ fn unified_cell(this: &MyGit, index: usize, cx: &mut Context<MyGit>) -> Stateful
                     .px_1()
                     .flex_shrink_0()
                     .text_color(rgb(0xffd479))
-                    .child(label),
+                    .child(mygit_gpui::i18n::text(label)),
             )
         })
 }
@@ -204,7 +204,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 f.path.clone()
             }
         })
-        .unwrap_or_else(|| "选择文件查看差异".into());
+        .unwrap_or_else(|| mygit_gpui::i18n::text("选择文件查看差异").into());
     let (left, right) = this.state.labels();
     let previous = this.state.navigation_target(false).is_some();
     let next = this.state.navigation_target(true).is_some();
@@ -254,9 +254,9 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                             button(
                                 "edit-file",
                                 if this.edit_mode {
-                                    "查看 Diff"
+                                    mygit_gpui::i18n::text("查看 Diff")
                                 } else {
-                                    "编辑工作区"
+                                    mygit_gpui::i18n::text("编辑工作区")
                                 },
                                 !this.state.loading,
                             )
@@ -281,14 +281,19 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         ),
                     |s| {
                         s.child(
-                            button("restore-file", "还原文件", !this.write_busy).on_click(
+                            button(
+                                "restore-file",
+                                mygit_gpui::i18n::text("还原文件"),
+                                !this.write_busy,
+                            )
+                            .on_click(
                                 cx.listener(|this, _, _, cx| this.request_restore(false, cx)),
                             ),
                         )
                         .child(
                             button(
                                 "restore-block",
-                                "还原当前块",
+                                mygit_gpui::i18n::text("还原当前块"),
                                 !this.write_busy && this.state.current_block.is_some(),
                             )
                             .on_click(cx.listener(|this, _, _, cx| this.request_restore(true, cx))),
@@ -299,9 +304,9 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     button(
                         "diff-layout",
                         if this.state.unified {
-                            "双栏"
+                            mygit_gpui::i18n::text("双栏")
                         } else {
-                            "统一视图"
+                            mygit_gpui::i18n::text("统一视图")
                         },
                         true,
                     )
@@ -311,7 +316,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     button(
                         "toggle-blame",
                         if this.show_blame {
-                            "隐藏 Blame"
+                            mygit_gpui::i18n::text("隐藏 Blame")
                         } else {
                             "Blame"
                         },
@@ -320,12 +325,12 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     .on_click(cx.listener(|this, _, _, cx| this.toggle_blame(cx))),
                 )
                 .child(
-                    button("previous-diff", "上一处", previous)
+                    button("previous-diff", mygit_gpui::i18n::text("上一处"), previous)
                         .on_click(cx.listener(|this, _, _, cx| this.navigate(false, cx))),
                 )
                 .child(div().text_color(rgb(0x92a2b9)).child(counter))
                 .child(
-                    button("next-diff", "下一处", next)
+                    button("next-diff", mygit_gpui::i18n::text("下一处"), next)
                         .on_click(cx.listener(|this, _, _, cx| this.navigate(true, cx))),
                 )
                 .child(button("scroll-left", "←", true).on_click(
@@ -343,14 +348,17 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .px_2()
                 .py_1()
                 .child(
-                    button("select-all-text", "全选", !this.state.diff.rows.is_empty()).on_click(
-                        cx.listener(|this, _, window, cx| this.select_all_text(window, cx)),
-                    ),
+                    button(
+                        "select-all-text",
+                        mygit_gpui::i18n::text("全选"),
+                        !this.state.diff.rows.is_empty(),
+                    )
+                    .on_click(cx.listener(|this, _, window, cx| this.select_all_text(window, cx))),
                 )
                 .child(
                     button(
                         "copy-text",
-                        "复制",
+                        mygit_gpui::i18n::text("复制"),
                         !this.state.text_selection.range().is_empty(),
                     )
                     .on_click(cx.listener(|this, _, _, cx| this.copy_text(cx))),
@@ -362,25 +370,34 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         .overflow_hidden()
                         .whitespace_nowrap()
                         .text_color(rgb(0x92a2b9))
-                        .child(format!(
+                        .child(mygit_gpui::localized_format!(
                             "{} · {} · 选区 {} 字节",
+                            "{} · {} · {} selected bytes",
                             this.state.diff.right_syntax.language,
                             if this.state.text_selection.side == Side::Left {
-                                "左侧"
+                                mygit_gpui::i18n::text("左侧")
                             } else {
-                                "右侧"
+                                mygit_gpui::i18n::text("右侧")
                             },
                             this.state.text_selection.range().len()
                         )),
                 )
                 .child(
-                    button("font-smaller", "字号 −", this.state.font_size > 10.)
-                        .on_click(cx.listener(|this, _, _, cx| this.change_font_size(false, cx))),
+                    button(
+                        "font-smaller",
+                        mygit_gpui::i18n::text("字号 −"),
+                        this.state.font_size > 10.,
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.change_font_size(false, cx))),
                 )
                 .child(div().child(format!("{}", this.state.font_size)))
                 .child(
-                    button("font-larger", "字号 +", this.state.font_size < 22.)
-                        .on_click(cx.listener(|this, _, _, cx| this.change_font_size(true, cx))),
+                    button(
+                        "font-larger",
+                        mygit_gpui::i18n::text("字号 +"),
+                        this.state.font_size < 22.,
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.change_font_size(true, cx))),
                 ),
         )
         .child(
@@ -414,25 +431,22 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     .child(description),
             )
         })
-        .when(
-            this.state
-                .diff
-                .message
-                .as_ref()
-                .is_some_and(|m| m.contains("2 MB 预览上限")),
-            |s| {
-                s.child(
-                    button(
-                        "preview-large-file",
-                        "按需预览（最高 20 MB）",
-                        !this.state.loading,
-                    )
-                    .on_click(cx.listener(|this, _, _, cx| this.preview_large_file(cx))),
+        .when(this.state.diff.can_expand_preview, |s| {
+            s.child(
+                button(
+                    "preview-large-file",
+                    mygit_gpui::i18n::text("按需预览（最高 20 MB）"),
+                    !this.state.loading,
                 )
-            },
-        )
+                .on_click(cx.listener(|this, _, _, cx| this.preview_large_file(cx))),
+            )
+        })
         .when(this.show_blame && this.blame_loading, |s| {
-            s.child(div().px_2().child("正在读取两侧 Blame…"))
+            s.child(
+                div()
+                    .px_2()
+                    .child(mygit_gpui::i18n::text("正在读取两侧 Blame…")),
+            )
         })
         .when(this.show_blame && !this.blame_error.is_empty(), |s| {
             s.child(
@@ -455,15 +469,19 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         .p_3()
                         .text_color(rgb(0x92a2b9))
                         .child(if this.state.loading {
-                            "正在加载…".into()
+                            mygit_gpui::i18n::text("正在加载…").into()
                         } else if this.state.active_file().is_some()
                             || this.state.comparison.is_none()
                         {
                             this.state.message.clone()
                         } else if this.state.repo.is_some() {
-                            format!("{}：没有变更文件", this.state.mode.label())
+                            mygit_gpui::localized_format!(
+                                "{}：没有变更文件",
+                                "{}: no changed files",
+                                this.state.mode.label()
+                            )
                         } else {
-                            "打开一个 Git 仓库开始浏览".into()
+                            mygit_gpui::i18n::text("打开一个 Git 仓库开始浏览").into()
                         }),
                 )
             },

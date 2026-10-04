@@ -71,10 +71,12 @@ impl Revision {
     pub fn label(&self) -> String {
         match self {
             Self::Head(sha) => format!("HEAD · {}", short_sha(sha)),
-            Self::Commit(sha) => format!("提交 · {}", short_sha(sha)),
-            Self::Index => "暂存区（index）".into(),
-            Self::Worktree => "工作区（磁盘）".into(),
-            Self::Empty => "空内容".into(),
+            Self::Commit(sha) => {
+                crate::localized_format!("提交 · {}", "Commit · {}", short_sha(sha))
+            }
+            Self::Index => crate::i18n::text("暂存区（index）").into(),
+            Self::Worktree => crate::i18n::text("工作区（磁盘）").into(),
+            Self::Empty => crate::i18n::text("空内容").into(),
         }
     }
 }
@@ -93,12 +95,12 @@ pub enum BrowseMode {
 impl BrowseMode {
     pub fn label(&self) -> &'static str {
         match self {
-            Self::Workspace => "全部变更",
-            Self::Staged => "已暂存",
-            Self::Unstaged => "未暂存",
-            Self::History(_) => "提交变更",
-            Self::Merge(_) => "合并提交三栏",
-            Self::Compare(_) => "自定义比较",
+            Self::Workspace => crate::i18n::text("全部变更"),
+            Self::Staged => crate::i18n::text("已暂存"),
+            Self::Unstaged => crate::i18n::text("未暂存"),
+            Self::History(_) => crate::i18n::text("提交变更"),
+            Self::Merge(_) => crate::i18n::text("合并提交三栏"),
+            Self::Compare(_) => crate::i18n::text("自定义比较"),
         }
     }
 }
@@ -173,6 +175,8 @@ pub struct Diff {
     pub blocks: Vec<Range<usize>>,
     pub message: Option<String>,
     pub description: Option<String>,
+    /// Size-limit notices may offer a larger bounded preview, independent of message text.
+    pub can_expand_preview: bool,
     pub left_document: crate::text::Document,
     pub right_document: crate::text::Document,
     pub left_syntax: crate::syntax::Highlighted,

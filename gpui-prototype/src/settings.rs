@@ -9,12 +9,15 @@ use std::{
 pub fn validate_font(family: &str, size: Option<f32>) -> Result<f32> {
     anyhow::ensure!(
         !family.is_empty() && family.len() < 256 && !family.chars().any(char::is_control),
-        "字体名称必须为 1–255 字节且不含控制字符"
+        crate::localized_format!(
+            "字体名称必须为 1–255 字节且不含控制字符",
+            "Font family must be 1–255 bytes without control characters"
+        )
     );
-    let size = size.context("字号必须为数字")?;
+    let size = size.context(crate::i18n::text("字号必须为数字"))?;
     anyhow::ensure!(
         size.is_finite() && (10.0..=22.0).contains(&size),
-        "字号必须为 10–22"
+        crate::localized_format!("字号必须为 10–22", "Font size must be between 10 and 22")
     );
     Ok(size)
 }
@@ -27,6 +30,7 @@ pub struct Settings {
     pub files_width: f32,
     pub files_visible: bool,
     pub code_theme: String,
+    pub language: crate::i18n::Language,
     pub recent: Vec<PathBuf>,
     pub last: Option<PathBuf>,
     pub warning: Option<String>,
@@ -51,11 +55,16 @@ impl Settings {
                 Ok(value) if value.is_object() => (value, None),
                 _ => (
                     json!({}),
-                    Some("配置损坏，已使用默认设置；保存时保留原文件备份".into()),
+                    Some(
+                        crate::i18n::text("配置损坏，已使用默认设置；保存时保留原文件备份").into(),
+                    ),
                 ),
             },
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => (json!({}), None),
-            Err(_) => (json!({}), Some("无法读取配置，已使用默认设置".into())),
+            Err(_) => (
+                json!({}),
+                Some(crate::i18n::text("无法读取配置，已使用默认设置").into()),
+            ),
         };
         let number = |key: &str, default: f32, min: f32, max: f32| {
             data.pointer(key)
@@ -75,6 +84,9 @@ impl Settings {
             font_size: number("/font_size", 12., 10., 22.),
             history_width: number("/gpui/history_width", 260., 160., 600.),
             files_width: number("/gpui/files_width", 220., 120., 600.),
+            language: crate::i18n::Language::from_saved(
+                data["language"].as_str().unwrap_or("中文"),
+            ),
             code_theme: crate::syntax::PALETTES[crate::syntax::palette_index(
                 data.pointer("/gpui/code_theme")
                     .and_then(Value::as_str)
@@ -125,7 +137,10 @@ impl Settings {
         self.last = None;
     }
     pub fn save(&self) -> Result<()> {
-        let parent = self.path.parent().context("配置路径缺少目录")?;
+        let parent = self
+            .path
+            .parent()
+            .context(crate::i18n::text("配置路径缺少目录"))?;
         fs::create_dir_all(parent)?;
         let mut data = match fs::read(&self.path) {
             Ok(bytes) => match serde_json::from_slice::<Value>(&bytes) {
@@ -137,7 +152,8 @@ impl Settings {
                             .duration_since(std::time::UNIX_EPOCH)?
                             .as_nanos()
                     ));
-                    fs::copy(&self.path, backup).context("无法备份损坏配置，未覆盖原文件")?;
+                    fs::copy(&self.path, backup)
+                        .context(crate::i18n::text("无法备份损坏配置，未覆盖原文件"))?;
                     json!({})
                 }
             },
@@ -150,6 +166,7 @@ impl Settings {
             data["model_name"] = json!(config.model_name);
             data["prompt"] = json!(config.prompt);
         }
+        data["language"] = json!(self.language.saved());
         data["font_family"] = json!(self.font_family);
         data["font_size"] = json!(self.font_size);
         data["recent_folders"] = json!(self.recent);
@@ -198,6 +215,41 @@ impl Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn language_preferences_round_trip_without_changing_drafts_or_prompt() {
+        let dir = std::env::temp_dir().join(format!("mygit-language-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("settings.json");
+        fs::write(
+            &path,
+            serde_json::to_vec(&json!({
+                "language": "English", "prompt": "打开仓库",
+                "code_style": "friendly", "custom": {"keep": true},
+                "gpui": {"commit_drafts": {"/tmp/中文": "打开仓库"}}
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let mut settings = Settings::load(path.clone());
+        assert_eq!(settings.language, crate::i18n::Language::English);
+        settings.language = crate::i18n::Language::Chinese;
+        settings.save().unwrap();
+        let data: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        assert_eq!(data["language"], "中文");
+        assert_eq!(data["prompt"], "打开仓库");
+        assert_eq!(data["custom"]["keep"], true);
+        assert_eq!(data["code_style"], "friendly");
+        assert_eq!(
+            Settings::load(path.clone()).draft_for(Path::new("/tmp/中文")),
+            "打开仓库"
+        );
+        fs::write(&path, br#"{"language":"unknown"}"#).unwrap();
+        assert_eq!(
+            Settings::load(path).language,
+            crate::i18n::Language::Chinese
+        );
+        fs::remove_dir_all(dir).unwrap();
+    }
     #[test]
     fn code_palette_round_trips_and_preserves_legacy_style() {
         let dir = std::env::temp_dir().join(format!("mygit-palette-{}", std::process::id()));

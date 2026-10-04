@@ -7,66 +7,69 @@ use std::path::PathBuf;
 use views::editor::*;
 
 fn main() {
+    let startup_settings =
+        mygit_gpui::settings::Settings::load(mygit_gpui::settings::Settings::default_path());
+    mygit_gpui::i18n::initialize(startup_settings.language);
     let path = std::env::args_os()
         .nth(1)
         .map(PathBuf::from)
-        .or_else(|| {
-            mygit_gpui::settings::Settings::load(mygit_gpui::settings::Settings::default_path())
-                .last
-        })
+        .or(startup_settings.last)
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
     Application::new().run(move |cx: &mut App| {
         cx.set_menus(vec![
             Menu {
                 name: "MyGit".into(),
                 items: vec![
-                    MenuItem::action("设置", ToggleSettings),
+                    MenuItem::action(mygit_gpui::i18n::text("设置"), ToggleSettings),
                     MenuItem::separator(),
-                    MenuItem::action("退出", Quit),
+                    MenuItem::action(mygit_gpui::i18n::text("退出"), Quit),
                 ],
             },
             Menu {
-                name: "仓库".into(),
+                name: mygit_gpui::i18n::text("仓库").into(),
                 items: vec![
-                    MenuItem::action("打开仓库", OpenRepo),
-                    MenuItem::action("刷新", RefreshRepo),
-                    MenuItem::action("分支管理", ToggleBranches),
-                    MenuItem::action("历史搜索", ToggleHistorySearch),
-                    MenuItem::action("项目内容搜索", ToggleProjectSearch),
-                    MenuItem::action("文件快速定位", ToggleQuickOpen),
-                    MenuItem::action("取消加载", CancelTask),
-                    MenuItem::action("显示 / 隐藏文件栏", ToggleFilesPanel),
+                    MenuItem::action(mygit_gpui::i18n::text("打开仓库"), OpenRepo),
+                    MenuItem::action(mygit_gpui::i18n::text("刷新"), RefreshRepo),
+                    MenuItem::action(mygit_gpui::i18n::text("分支管理"), ToggleBranches),
+                    MenuItem::action(mygit_gpui::i18n::text("历史搜索"), ToggleHistorySearch),
+                    MenuItem::action(mygit_gpui::i18n::text("项目内容搜索"), ToggleProjectSearch),
+                    MenuItem::action(mygit_gpui::i18n::text("文件快速定位"), ToggleQuickOpen),
+                    MenuItem::action(mygit_gpui::i18n::text("取消加载"), CancelTask),
+                    MenuItem::action(
+                        mygit_gpui::i18n::text("显示 / 隐藏文件栏"),
+                        ToggleFilesPanel,
+                    ),
                     MenuItem::separator(),
-                    MenuItem::action("全部变更", ViewWorkspace),
-                    MenuItem::action("已暂存", ViewStaged),
-                    MenuItem::action("未暂存", ViewUnstaged),
-                    MenuItem::action("复制提交 SHA", CopyCommitSha),
+                    MenuItem::action(mygit_gpui::i18n::text("全部变更"), ViewWorkspace),
+                    MenuItem::action(mygit_gpui::i18n::text("已暂存"), ViewStaged),
+                    MenuItem::action(mygit_gpui::i18n::text("未暂存"), ViewUnstaged),
+                    MenuItem::action(mygit_gpui::i18n::text("复制提交 SHA"), CopyCommitSha),
                 ],
             },
             Menu {
-                name: "工作区".into(),
+                name: mygit_gpui::i18n::text("工作区").into(),
                 items: vec![
-                    MenuItem::action("暂存选中文件", StageSelected),
-                    MenuItem::action("取消暂存选中文件", UnstageSelected),
+                    MenuItem::action(mygit_gpui::i18n::text("暂存选中文件"), StageSelected),
+                    MenuItem::action(mygit_gpui::i18n::text("取消暂存选中文件"), UnstageSelected),
                     MenuItem::separator(),
-                    MenuItem::action("暂存全部文件", StageAll),
-                    MenuItem::action("取消全部暂存", UnstageAll),
+                    MenuItem::action(mygit_gpui::i18n::text("暂存全部文件"), StageAll),
+                    MenuItem::action(mygit_gpui::i18n::text("取消全部暂存"), UnstageAll),
                     MenuItem::separator(),
-                    MenuItem::action("提交面板", ToggleCommitPanel),
+                    MenuItem::action(mygit_gpui::i18n::text("提交面板"), ToggleCommitPanel),
                 ],
             },
             Menu {
-                name: "编辑".into(),
+                name: mygit_gpui::i18n::text("编辑").into(),
                 items: vec![
-                    MenuItem::action("复制", CopyText),
-                    MenuItem::action("全选", SelectAllText),
+                    MenuItem::action(mygit_gpui::i18n::text("复制"), CopyText),
+                    MenuItem::action(mygit_gpui::i18n::text("全选"), SelectAllText),
                 ],
             },
             Menu {
-                name: "差异".into(),
+                name: mygit_gpui::i18n::text("差异").into(),
                 items: vec![
-                    MenuItem::action("上一处", PreviousDiff),
-                    MenuItem::action("下一处", NextDiff),
+                    MenuItem::action(mygit_gpui::i18n::text("上一处"), PreviousDiff),
+                    MenuItem::action(mygit_gpui::i18n::text("下一处"), NextDiff),
                 ],
             },
         ]);
@@ -288,7 +291,7 @@ fn main() {
                 entity
             },
         )
-        .expect("无法创建窗口");
+        .expect("Unable to create window");
         cx.activate(true);
     });
 }

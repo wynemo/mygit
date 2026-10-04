@@ -52,11 +52,17 @@ fn date(value: &str) -> Result<()> {
         .bytes()
         .all(|byte| byte.is_ascii_digit() || byte == b'-')
     {
-        bail!("日期请使用 YYYY-MM-DD");
+        bail!(crate::localized_format!(
+            "日期请使用 YYYY-MM-DD",
+            "Use YYYY-MM-DD for dates"
+        ));
     }
     let parts: Vec<_> = value.split('-').collect();
     if parts.len() != 3 || parts[0].len() != 4 || parts[1].len() != 2 || parts[2].len() != 2 {
-        bail!("日期请使用 YYYY-MM-DD");
+        bail!(crate::localized_format!(
+            "日期请使用 YYYY-MM-DD",
+            "Use YYYY-MM-DD for dates"
+        ));
     }
     let year: u32 = parts[0].parse()?;
     let month: u32 = parts[1].parse()?;
@@ -71,7 +77,7 @@ fn date(value: &str) -> Result<()> {
         _ => 0,
     };
     if year == 0 || day == 0 || day > days {
-        bail!("日期无效");
+        bail!(crate::localized_format!("日期无效", "Invalid date"));
     }
     Ok(())
 }
@@ -86,12 +92,18 @@ pub fn prepare(root: &Path, filter: Filter) -> Result<Query> {
         follow,
     } = filter;
     if text.len() > 4096 || author.len() > 4096 {
-        bail!("搜索内容超过 4096 字节上限");
+        bail!(crate::localized_format!(
+            "搜索内容超过 4096 字节上限",
+            "Search text exceeds the 4096-byte limit"
+        ));
     }
     date(&since)?;
     date(&until)?;
     if !since.is_empty() && !until.is_empty() && since > until {
-        bail!("开始日期不能晚于结束日期");
+        bail!(crate::localized_format!(
+            "开始日期不能晚于结束日期",
+            "Start date cannot be after end date"
+        ));
     }
     if let Some(path) = &path {
         crate::git::validate_paths(std::slice::from_ref(path))?;
@@ -109,7 +121,10 @@ pub fn prepare(root: &Path, filter: Filter) -> Result<Query> {
     } else {
         match crate::git::resolve_revision(root, scope.trim())? {
             Revision::Commit(sha) => vec![sha],
-            _ => bail!("历史范围必须是提交/分支/标签或 ALL"),
+            _ => bail!(crate::localized_format!(
+                "历史范围必须是提交/分支/标签或 ALL",
+                "History scope must be a commit, branch, tag or ALL"
+            )),
         }
     };
     Ok(Query {
@@ -162,7 +177,8 @@ pub fn page(root: &Path, query: &Query, mut offset: usize) -> Result<Page> {
         }
         let borrowed: Vec<_> = arguments.iter().map(String::as_str).collect();
         let bytes = git(root, &borrowed)?;
-        let text = std::str::from_utf8(&bytes).context("历史包含非 UTF-8 文本")?;
+        let text =
+            std::str::from_utf8(&bytes).context(crate::i18n::text("历史包含非 UTF-8 文本"))?;
         if text.is_empty() {
             return Ok(Page {
                 commits,
@@ -176,7 +192,10 @@ pub fn page(root: &Path, query: &Query, mut offset: usize) -> Result<Page> {
             .split('\0')
             .collect();
         if !fields.len().is_multiple_of(6) {
-            bail!("历史记录格式无效");
+            bail!(crate::localized_format!(
+                "历史记录格式无效",
+                "Invalid history record format"
+            ));
         }
         let count = fields.len() / 6;
         for record in fields.as_chunks::<6>().0 {

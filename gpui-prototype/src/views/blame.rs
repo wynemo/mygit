@@ -11,7 +11,7 @@ pub fn gutter(owner: WeakEntity<MyGit>, line: Option<Line>, index: usize) -> Div
 pub fn annotation(owner: WeakEntity<MyGit>, line: Line, index: usize) -> Stateful<Div> {
     let pending = line.commit.uncommitted();
     let label = if pending {
-        "未提交".into()
+        mygit_gpui::i18n::text("未提交").into()
     } else {
         format!("{} {}", short_sha(&line.commit.sha), line.commit.author)
     };
@@ -103,19 +103,21 @@ impl Render for Tooltip {
             .text_color(rgb(0xdce5f3))
             .text_size(px(13.))
             .child(if self.line.commit.uncommitted() {
-                "未提交".to_owned()
+                mygit_gpui::i18n::text("未提交").to_owned()
             } else {
                 self.line.commit.sha.clone()
             })
-            .child(format!(
+            .child(mygit_gpui::localized_format!(
                 "来源：{} : {}",
-                self.line.path, self.line.original_line
+                "Source: {} : {}",
+                self.line.path,
+                self.line.original_line
             ))
             .child(message)
             .child(if self.line.commit.uncommitted() {
-                "该行尚无提交归属"
+                mygit_gpui::i18n::text("该行尚无提交归属")
             } else {
-                "单击查看历史，右击复制 SHA"
+                mygit_gpui::i18n::text("单击查看历史，右击复制 SHA")
             })
     }
 }

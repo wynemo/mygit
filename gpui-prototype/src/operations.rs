@@ -27,11 +27,11 @@ impl ResetMode {
     }
     pub fn description(self) -> &'static str {
         match self {
-            Self::Soft => "soft：移动 HEAD，保留暂存区及工作区内容。",
-            Self::Mixed => "mixed：移动 HEAD 并重置暂存区，保留工作区磁盘内容。",
-            Self::Hard => {
-                "hard：移动 HEAD、重置暂存区及工作区；丢弃未提交的 tracked 修改，并可能删除妨碍检出的未跟踪文件。未提交内容无法用 Git reflog 恢复。"
-            }
+            Self::Soft => crate::i18n::text("soft：移动 HEAD，保留暂存区及工作区内容。"),
+            Self::Mixed => crate::i18n::text("mixed：移动 HEAD 并重置暂存区，保留工作区磁盘内容。"),
+            Self::Hard => crate::i18n::text(
+                "hard：移动 HEAD、重置暂存区及工作区；丢弃未提交的 tracked 修改，并可能删除妨碍检出的未跟踪文件。未提交内容无法用 Git reflog 恢复。",
+            ),
         }
     }
 }
@@ -41,7 +41,10 @@ pub fn remote(root: &Path, operation: RemoteOperation, name: &str) -> Result<Str
         .lines()
         .any(|remote| remote == name)
     {
-        bail!("远程 {name} 不存在，请检查仓库配置");
+        bail!(crate::localized_format!(
+            "远程 {name} 不存在，请检查仓库配置",
+            "Remote {name} does not exist; check repository configuration"
+        ));
     }
     let mut arguments = match operation {
         RemoteOperation::Fetch => vec!["fetch", "--progress", "--", name],
@@ -52,8 +55,9 @@ pub fn remote(root: &Path, operation: RemoteOperation, name: &str) -> Result<Str
     let branch = branches.iter().find(|branch| branch.current);
     let refspec;
     if operation != RemoteOperation::Fetch {
-        let branch =
-            branch.context("当前没有已提交的本地分支，detached HEAD/空仓库不能 Pull 或 Push")?;
+        let branch = branch.context(crate::i18n::text(
+            "当前没有已提交的本地分支，detached HEAD/空仓库不能 Pull 或 Push",
+        ))?;
         if operation == RemoteOperation::Push && branch.upstream.is_empty() {
             refspec = format!("{}:{}", branch.reference, branch.reference);
             arguments = vec!["push", "--progress", "--set-upstream", "--", name, &refspec];
@@ -65,8 +69,9 @@ pub fn remote(root: &Path, operation: RemoteOperation, name: &str) -> Result<Str
         RemoteOperation::Pull => "Pull",
         RemoteOperation::Push => "Push",
     };
-    Ok(format!(
+    Ok(crate::localized_format!(
         "{verb} 完成 · {name}\n{}",
+        "{verb} complete · {name}\n{}",
         String::from_utf8_lossy(&output).trim()
     ))
 }
@@ -74,14 +79,15 @@ pub fn merge(root: &Path, reference: &str) -> Result<String> {
     let branch = crate::branches::list(root)?
         .into_iter()
         .find(|branch| branch.reference == reference)
-        .context("合并目标分支已不存在，请刷新")?;
+        .context(crate::i18n::text("合并目标分支已不存在，请刷新"))?;
     let output = git_timeout(
         root,
         &["merge", "--no-edit", "--", &branch.reference],
         Duration::from_secs(120),
     )?;
-    Ok(format!(
+    Ok(crate::localized_format!(
         "合并完成 · {}\n{}",
+        "Merge complete · {}\n{}",
         branch.name,
         String::from_utf8_lossy(&output).trim()
     ))
@@ -89,7 +95,10 @@ pub fn merge(root: &Path, reference: &str) -> Result<String> {
 pub fn reset_target(root: &Path, target: &str) -> Result<String> {
     match crate::git::resolve_revision(root, target)? {
         Revision::Commit(sha) => Ok(sha),
-        _ => bail!("Reset 目标必须是提交/分支/标签"),
+        _ => bail!(crate::localized_format!(
+            "Reset 目标必须是提交/分支/标签",
+            "Reset target must be a commit, branch or tag"
+        )),
     }
 }
 pub fn reset(
@@ -102,7 +111,10 @@ pub fn reset(
     let snapshot = crate::git::snapshot(root)?;
     let current_branch = (!snapshot.detached).then_some(snapshot.branch.as_str());
     if snapshot.history_tip.as_deref() != expected_head || current_branch != expected_branch {
-        bail!("HEAD 或当前分支在确认后改变，请重新选择 Reset 目标");
+        bail!(crate::localized_format!(
+            "HEAD 或当前分支在确认后改变，请重新选择 Reset 目标",
+            "HEAD or the current branch changed after confirmation; select the reset target again"
+        ));
     }
     let target = reset_target(root, sha)?;
     let output = git_timeout(
@@ -110,8 +122,9 @@ pub fn reset(
         &["reset", mode.argument(), &target, "--"],
         Duration::from_secs(120),
     )?;
-    Ok(format!(
+    Ok(crate::localized_format!(
         "Reset 完成 · {} · {}\n{}",
+        "Reset complete · {} · {}\n{}",
         mode.argument(),
         crate::model::short_sha(&target),
         String::from_utf8_lossy(&output).trim()

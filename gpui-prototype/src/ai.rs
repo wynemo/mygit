@@ -45,9 +45,13 @@ impl Config {
     }
     pub fn load_stored(path: &Path) -> Result<Self> {
         let data = match std::fs::read(path) {
-            Ok(bytes) => serde_json::from_slice(&bytes).context("无法读取 AI 配置 JSON")?,
+            Ok(bytes) => serde_json::from_slice(&bytes)
+                .context(crate::i18n::text("无法读取 AI 配置 JSON"))?,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => json!({}),
-            Err(_) => bail!("无法读取 AI 配置"),
+            Err(_) => bail!(crate::localized_format!(
+                "无法读取 AI 配置",
+                "Unable to read AI settings"
+            )),
         };
         Ok(Self::from_json(&data))
     }
@@ -64,18 +68,31 @@ impl Config {
             || self.prompt.len() > 32768
             || self.api_secret.len() > 8192
         {
-            bail!("AI 配置超过长度上限");
+            bail!(crate::localized_format!(
+                "AI 配置超过长度上限",
+                "AI settings exceed the length limit"
+            ));
         }
         if self.api_secret.chars().any(char::is_control)
             || self.model_name.chars().any(char::is_control)
         {
-            bail!("AI 密钥或模型名称含不支持的控制字符");
+            bail!(crate::localized_format!(
+                "AI 密钥或模型名称含不支持的控制字符",
+                "AI key or model name contains unsupported control characters"
+            ));
         }
         if self.model_name.trim().is_empty() {
-            bail!("请先配置 AI 模型名称");
+            bail!(crate::localized_format!(
+                "请先配置 AI 模型名称",
+                "Configure the AI model name first"
+            ));
         }
-        let mut endpoint = url::Url::parse(self.api_url.trim())
-            .map_err(|_| anyhow::anyhow!("请配置有效的 AI API 基础 URL"))?;
+        let mut endpoint = url::Url::parse(self.api_url.trim()).map_err(|_| {
+            anyhow::anyhow!(crate::localized_format!(
+                "请配置有效的 AI API 基础 URL",
+                "Configure a valid AI API base URL"
+            ))
+        })?;
         if !matches!(endpoint.scheme(), "http" | "https")
             || endpoint.host_str().is_none()
             || !endpoint.username().is_empty()
@@ -83,7 +100,10 @@ impl Config {
             || endpoint.query().is_some()
             || endpoint.fragment().is_some()
         {
-            bail!("AI API URL 需为 HTTP/HTTPS 基础地址，不能包含登录信息、查询或片段");
+            bail!(crate::localized_format!(
+                "AI API URL 需为 HTTP/HTTPS 基础地址，不能包含登录信息、查询或片段",
+                "The AI API URL must use HTTP/HTTPS and contain no credentials, query or fragment"
+            ));
         }
         let path = format!("{}/chat/completions", endpoint.path().trim_end_matches('/'));
         endpoint.set_path(&path);
@@ -125,7 +145,10 @@ pub fn fingerprint(root: &Path) -> Result<Fingerprint> {
 pub fn staged(root: &Path) -> Result<Staged> {
     let before = fingerprint(root)?;
     if !crate::git::git(root, &["ls-files", "--unmerged", "-z"])?.is_empty() {
-        bail!("暂存区存在未解决冲突，无法生成提交信息");
+        bail!(crate::localized_format!(
+            "暂存区存在未解决冲突，无法生成提交信息",
+            "The index has unresolved conflicts; unable to generate a commit message"
+        ));
     }
     let diff = crate::git::git(
         root,
@@ -142,14 +165,24 @@ pub fn staged(root: &Path) -> Result<Staged> {
         ],
     )?;
     if diff.is_empty() {
-        bail!("没有已暂存的变更");
+        bail!(crate::localized_format!(
+            "没有已暂存的变更",
+            "No staged changes"
+        ));
     }
     if diff.len() > 1_000_000 {
-        bail!("暂存 Diff 超过 1 MB，未发送请求；请拆分提交");
+        bail!(crate::localized_format!(
+            "暂存 Diff 超过 1 MB，未发送请求；请拆分提交",
+            "Staged Diff exceeds 1 MB; no request was sent. Split the commit."
+        ));
     }
-    let diff = String::from_utf8(diff).context("暂存 Diff 不是 UTF-8，无法生成提交信息")?;
+    let diff = String::from_utf8(diff)
+        .context(crate::i18n::text("暂存 Diff 不是 UTF-8，无法生成提交信息"))?;
     if fingerprint(root)? != before {
-        bail!("暂存区或 HEAD 在读取期间改变，请重试");
+        bail!(crate::localized_format!(
+            "暂存区或 HEAD 在读取期间改变，请重试",
+            "The index or HEAD changed while reading; retry"
+        ));
     }
     Ok(Staged {
         diff,
@@ -167,7 +200,10 @@ pub fn generate_staged(root: &Path, config: &Config) -> Result<Generated> {
     let staged = staged(root)?;
     let message = generate(config, &staged.diff)?;
     if fingerprint(root)? != staged.fingerprint {
-        bail!("暂存区或 HEAD 在生成期间改变，未应用结果，请重试");
+        bail!(crate::localized_format!(
+            "暂存区或 HEAD 在生成期间改变，未应用结果，请重试",
+            "The index or HEAD changed during generation; the result was not applied. Retry."
+        ));
     }
     Ok(Generated {
         message,
@@ -187,14 +223,27 @@ fn quote(value: &str) -> String {
 }
 /// Uses curl's config-on-stdin support, with no default curlrc or redirects.
 /// HTTP errors deliberately omit server bodies which may echo credentials.
+fn request_error(error: anyhow::Error) -> anyhow::Error {
+    let message = match error.downcast_ref::<crate::process::Failure>() {
+        Some(crate::process::Failure::Cancelled) => crate::i18n::text("AI 请求已取消"),
+        Some(crate::process::Failure::GitTimeout | crate::process::Failure::SubprocessTimeout) => {
+            crate::i18n::text("AI 请求超时")
+        }
+        None => crate::i18n::text("无法执行 AI 请求，请检查 curl 安装与网络"),
+    };
+    anyhow::anyhow!(message)
+}
 pub fn generate(config: &Config, diff: &str) -> Result<String> {
     generate_with_timeout(config, diff, Duration::from_secs(15))
 }
 fn generate_with_timeout(config: &Config, diff: &str, timeout: Duration) -> Result<String> {
-    crate::process::check()?;
+    crate::process::check().map_err(request_error)?;
     let endpoint = config.validate()?;
     if diff.is_empty() || diff.len() > 1_000_000 {
-        bail!("AI 请求需要 1 MB 以内的非空暂存 Diff");
+        bail!(crate::localized_format!(
+            "AI 请求需要 1 MB 以内的非空暂存 Diff",
+            "AI requests require a nonempty staged Diff within 1 MB"
+        ));
     }
     let body = serde_json::to_string(
         &json!({"model": config.model_name, "messages": [{"role":"system", "content":config.prompt}, {"role":"user", "content":diff}]}),
@@ -223,40 +272,50 @@ fn generate_with_timeout(config: &Config, diff: &str, timeout: Duration) -> Resu
             Ok(true)
         },
     )
-    .map_err(|error| {
-        let text = error.to_string();
-        if text.contains("已取消") {
-            anyhow::anyhow!("AI 请求已取消")
-        } else if text.contains("超时") {
-            anyhow::anyhow!("AI 请求超时")
-        } else {
-            anyhow::anyhow!("无法执行 AI 请求，请检查 curl 安装与网络")
-        }
-    })?;
+    .map_err(request_error)?;
     if output.stopped || output.record_exceeded {
-        bail!("AI 响应超过 1 MB 上限");
+        bail!(crate::localized_format!(
+            "AI 响应超过 1 MB 上限",
+            "AI response exceeds the 1 MB limit"
+        ));
     }
     if !output.status.success() {
         if output.status.code() == Some(28) {
-            bail!("AI 请求超时（15 秒）");
+            bail!(crate::localized_format!(
+                "AI 请求超时（15 秒）",
+                "AI request timed out (15 seconds)"
+            ));
         }
-        bail!("AI 请求失败，请检查网络、证书与 API 配置");
+        bail!(crate::localized_format!(
+            "AI 请求失败，请检查网络、证书与 API 配置",
+            "AI request failed; check the network, certificates and API settings"
+        ));
     }
     let split = response
         .iter()
         .rposition(|byte| *byte == b'\n')
-        .context("AI 响应缺少 HTTP 状态")?;
+        .context(crate::i18n::text("AI 响应缺少 HTTP 状态"))?;
     let status = std::str::from_utf8(&response[split + 1..]).unwrap_or("");
     if status != "200" {
-        bail!("AI API 调用失败：HTTP {status}");
+        bail!(crate::localized_format!(
+            "AI API 调用失败：HTTP {status}",
+            "AI API request failed: HTTP {status}"
+        ));
     }
-    let data: Value = serde_json::from_slice(&response[..split])
-        .map_err(|_| anyhow::anyhow!("AI API 返回无效 JSON"))?;
+    let data: Value = serde_json::from_slice(&response[..split]).map_err(|_| {
+        anyhow::anyhow!(crate::localized_format!(
+            "AI API 返回无效 JSON",
+            "AI API returned invalid JSON"
+        ))
+    })?;
     let content = data["choices"][0]["message"]["content"]
         .as_str()
-        .context("AI API 未返回文本提交信息")?;
+        .context(crate::i18n::text("AI API 未返回文本提交信息"))?;
     if content.trim().is_empty() || content.len() > 32768 || content.contains('\0') {
-        bail!("AI 提交信息为空、过长或包含 NUL");
+        bail!(crate::localized_format!(
+            "AI 提交信息为空、过长或包含 NUL",
+            "AI commit message is empty, too long or contains NUL"
+        ));
     }
     Ok(content.to_owned())
 }
@@ -345,6 +404,29 @@ mod tests {
             request
         });
         (url, task)
+    }
+    #[test]
+    fn request_errors_use_stable_process_identity() {
+        let cancelled =
+            anyhow::Error::new(crate::process::Failure::Cancelled).context("outer diagnostic");
+        assert_eq!(
+            request_error(cancelled).to_string(),
+            crate::i18n::text("AI 请求已取消")
+        );
+        for kind in [
+            crate::process::Failure::GitTimeout,
+            crate::process::Failure::SubprocessTimeout,
+        ] {
+            assert_eq!(
+                request_error(kind.into()).to_string(),
+                crate::i18n::text("AI 请求超时")
+            );
+        }
+        // Child diagnostics are not interpreted as cancellation or timeout markers.
+        assert_eq!(
+            request_error(anyhow::anyhow!("超时 已取消 timed out cancelled")).to_string(),
+            crate::i18n::text("无法执行 AI 请求，请检查 curl 安装与网络")
+        );
     }
     #[test]
     fn generated_message_belongs_to_current_index_and_rejects_changes_during_request() {

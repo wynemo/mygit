@@ -7,13 +7,18 @@ pub fn calculate(left: &[u8], right: &[u8]) -> Result<Diff> {
 pub fn calculate_with_limit(left: &[u8], right: &[u8], limit: usize) -> Result<Diff> {
     crate::process::check()?;
     if left.contains(&0) || right.contains(&0) {
-        return Ok(Diff::notice("二进制文件：暂不提供内容预览"));
+        return Ok(Diff::notice(crate::i18n::text(
+            "二进制文件：暂不提供内容预览",
+        )));
     }
     if left.len() + right.len() > limit {
-        return Ok(Diff::notice(&format!(
+        let mut diff = Diff::notice(&crate::localized_format!(
             "文件超过 {} MB 预览上限",
+            "File exceeds the {} MB preview limit",
             limit / 1_000_000
-        )));
+        ));
+        diff.can_expand_preview = limit < 20_000_000;
+        return Ok(diff);
     }
     if left
         .iter()
@@ -22,10 +27,12 @@ pub fn calculate_with_limit(left: &[u8], right: &[u8], limit: usize) -> Result<D
         .count()
         > 200_000
     {
-        return Ok(Diff::notice("文本超过 200000 行预览上限，暂不支持分段预览"));
+        return Ok(Diff::notice(crate::i18n::text(
+            "文本超过 200000 行预览上限，暂不支持分段预览",
+        )));
     }
-    let left = std::str::from_utf8(left).context("旧版本不是 UTF-8 文本")?;
-    let right = std::str::from_utf8(right).context("新版本不是 UTF-8 文本")?;
+    let left = std::str::from_utf8(left).context(crate::i18n::text("旧版本不是 UTF-8 文本"))?;
+    let right = std::str::from_utf8(right).context(crate::i18n::text("新版本不是 UTF-8 文本"))?;
     let mut diff = Diff::from_rows(align(left, right));
     diff.left_document = crate::text::Document::new(left);
     diff.right_document = crate::text::Document::new(right);

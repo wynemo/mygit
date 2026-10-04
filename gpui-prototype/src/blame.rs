@@ -35,11 +35,11 @@ pub struct Line {
 fn uncommitted(path: &str, text: &str) -> Vec<Line> {
     let commit = Arc::new(Commit {
         sha: "0".repeat(40),
-        author: "未提交".into(),
+        author: crate::i18n::text("未提交").into(),
         email: String::new(),
         time: String::new(),
         timezone: String::new(),
-        summary: "当前文件尚无提交归属".into(),
+        summary: crate::i18n::text("当前文件尚无提交归属").into(),
     });
     let path: Arc<str> = path.into();
     text.split_inclusive('\n')

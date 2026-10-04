@@ -14,7 +14,7 @@ pub fn list(root: &Path) -> Result<Vec<BranchRef>> {
             "refs/remotes/",
         ],
     )?;
-    let text = std::str::from_utf8(&output).context("分支引用不是 UTF-8")?;
+    let text = std::str::from_utf8(&output).context(crate::i18n::text("分支引用不是 UTF-8"))?;
     let remote_output = git(root, &["remote"])?;
     let mut remotes: Vec<_> = std::str::from_utf8(&remote_output)?.lines().collect();
     remotes.sort_by_key(|name| std::cmp::Reverse(name.len()));
@@ -22,7 +22,10 @@ pub fn list(root: &Path) -> Result<Vec<BranchRef>> {
     for line in text.lines() {
         let fields: Vec<_> = line.split('\0').collect();
         if fields.len() != 6 {
-            bail!("无法读取完整分支引用");
+            bail!(crate::localized_format!(
+                "无法读取完整分支引用",
+                "Unable to read complete branch refs"
+            ));
         }
         if !fields[5].is_empty() {
             continue;
@@ -34,7 +37,7 @@ pub fn list(root: &Path) -> Result<Vec<BranchRef>> {
             } else {
                 "refs/heads/"
             })
-            .context("未知分支引用")?;
+            .context(crate::i18n::text("未知分支引用"))?;
         let local_name = if remote {
             remotes
                 .iter()
@@ -57,7 +60,10 @@ pub fn list(root: &Path) -> Result<Vec<BranchRef>> {
 }
 fn validate_name(root: &Path, name: &str) -> Result<()> {
     if name.is_empty() || name.starts_with('-') || name == "HEAD" {
-        bail!("请输入有效分支名");
+        bail!(crate::localized_format!(
+            "请输入有效分支名",
+            "Enter a valid branch name"
+        ));
     }
     git(root, &["check-ref-format", &format!("refs/heads/{name}")])?;
     Ok(())
@@ -66,19 +72,27 @@ pub fn switch(root: &Path, reference: &str, local_name: Option<&str>) -> Result<
     let branch = list(root)?
         .into_iter()
         .find(|b| b.reference == reference)
-        .context("目标分支已不存在，请刷新列表")?;
+        .context(crate::i18n::text("目标分支已不存在，请刷新列表"))?;
     if branch.remote {
         let name = local_name
             .filter(|s| !s.is_empty())
             .or(branch.local_name.as_deref())
-            .context("远程配置已不存在，请先检查远程")?;
+            .context(crate::i18n::text("远程配置已不存在，请先检查远程"))?;
         validate_name(root, name)?;
         // -c creates and switches as one operation; checkout failure leaves no new branch.
         git(root, &["switch", "--track", "-c", name, &branch.reference])?;
-        Ok(format!("已建立跟踪分支 {name} → {}", branch.name))
+        Ok(crate::localized_format!(
+            "已建立跟踪分支 {name} → {}",
+            "Created tracking branch {name} → {}",
+            branch.name
+        ))
     } else {
         git(root, &["switch", "--no-guess", "--", &branch.name])?;
-        Ok(format!("已切换到 {}", branch.name))
+        Ok(crate::localized_format!(
+            "已切换到 {}",
+            "Switched to {}",
+            branch.name
+        ))
     }
 }
 pub fn create(root: &Path, name: &str, base: &str) -> Result<String> {
@@ -89,9 +103,15 @@ pub fn create(root: &Path, name: &str, base: &str) -> Result<String> {
     } else {
         let revision = crate::git::resolve_revision(root, base)?;
         let crate::model::Revision::Commit(sha) = revision else {
-            bail!("新分支起点必须是提交/分支/标签");
+            bail!(crate::localized_format!(
+                "新分支起点必须是提交/分支/标签",
+                "The branch base must be a commit, branch or tag"
+            ));
         };
         git(root, &["switch", "-c", name, &sha])?;
     }
-    Ok(format!("已创建并切换到 {name}"))
+    Ok(crate::localized_format!(
+        "已创建并切换到 {name}",
+        "Created and switched to {name}"
+    ))
 }

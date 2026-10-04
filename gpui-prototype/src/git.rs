@@ -32,7 +32,9 @@ pub(crate) fn git_timeout(
     Ok(output.stdout)
 }
 fn string(bytes: Vec<u8>) -> Result<String> {
-    String::from_utf8(bytes).context("Git 返回非 UTF-8 文本，暂不支持该路径或编码")
+    String::from_utf8(bytes).context(crate::i18n::text(
+        "Git 返回非 UTF-8 文本，暂不支持该路径或编码",
+    ))
 }
 pub(crate) fn head(root: &Path) -> Result<Revision> {
     match git(root, &["rev-parse", "--verify", "HEAD"]) {
@@ -61,7 +63,10 @@ pub fn refresh_snapshot(
     if let Revision::Head(sha) = &selection.comparison.left
         && repo.history_tip.as_ref() != Some(sha)
     {
-        bail!("HEAD 在刷新期间改变，稍后重试");
+        bail!(crate::localized_format!(
+            "HEAD 在刷新期间改变，稍后重试",
+            "HEAD changed during refresh; retry later"
+        ));
     }
     let active = if let Some((mut file, mut comparison)) = active {
         if follows_list {
@@ -168,7 +173,10 @@ pub fn reference_labels(
     for line in output.lines() {
         let fields: Vec<_> = line.split('\0').collect();
         if fields.len() != 4 {
-            bail!("引用标签格式无效");
+            bail!(crate::localized_format!(
+                "引用标签格式无效",
+                "Invalid ref label format"
+            ));
         }
         let sha = if fields[1].is_empty() {
             fields[0]
@@ -226,7 +234,10 @@ pub fn history_page(root: &Path, tip: &str, skip: usize) -> Result<HistoryPage> 
         });
     }
     if !fields.len().is_multiple_of(6) {
-        bail!("提交历史格式无效");
+        bail!(crate::localized_format!(
+            "提交历史格式无效",
+            "Invalid commit history format"
+        ));
     }
     let mut commits: Vec<_> = fields
         .as_chunks::<6>()
@@ -268,7 +279,10 @@ pub fn commit_detail(root: &Path, sha: &str) -> Result<CommitDetail> {
     )?)?;
     let f: Vec<_> = output.trim_end_matches('\n').split('\0').collect();
     if f.len() != 10 {
-        bail!("提交详情格式无效");
+        bail!(crate::localized_format!(
+            "提交详情格式无效",
+            "Invalid commit detail format"
+        ));
     }
     Ok(CommitDetail {
         sha: f[0].into(),
@@ -285,16 +299,20 @@ pub fn commit_detail(root: &Path, sha: &str) -> Result<CommitDetail> {
 }
 
 fn parse_files(bytes: &[u8]) -> Result<Vec<FileChange>> {
-    let text = std::str::from_utf8(bytes).context("文件路径不是 UTF-8，暂不支持预览")?;
+    let text = std::str::from_utf8(bytes)
+        .context(crate::i18n::text("文件路径不是 UTF-8，暂不支持预览"))?;
     let mut records = text.split('\0').filter(|r| !r.is_empty());
     let mut files = vec![];
     let mut seen = HashSet::new();
     while let Some(status) = records.next() {
-        let first = records.next().context("Git 文件列表缺少路径")?.to_string();
+        let first = records
+            .next()
+            .context(crate::i18n::text("Git 文件列表缺少路径"))?
+            .to_string();
         let path = if status.starts_with('R') || status.starts_with('C') {
             records
                 .next()
-                .context("重命名记录缺少目标路径")?
+                .context(crate::i18n::text("重命名记录缺少目标路径"))?
                 .to_string()
         } else {
             first.clone()
@@ -315,7 +333,8 @@ fn changes(root: &Path, args: &[&str]) -> Result<Vec<FileChange>> {
 }
 fn untracked(root: &Path) -> Result<Vec<FileChange>> {
     let output = git(root, &["ls-files", "--others", "--exclude-standard", "-z"])?;
-    let text = std::str::from_utf8(&output).context("未跟踪文件路径不是 UTF-8")?;
+    let text =
+        std::str::from_utf8(&output).context(crate::i18n::text("未跟踪文件路径不是 UTF-8"))?;
     Ok(text
         .split('\0')
         .filter(|p| !p.is_empty())
@@ -452,7 +471,10 @@ pub fn resolve_revision(root: &Path, reference: &str) -> Result<Revision> {
         "EMPTY" => Ok(Revision::Empty),
         reference => {
             if reference.is_empty() {
-                bail!("比较版本不能为空");
+                bail!(crate::localized_format!(
+                    "比较版本不能为空",
+                    "Comparison revisions cannot be empty"
+                ));
             }
             let sha = string(git(
                 root,
@@ -477,7 +499,10 @@ pub fn comparison_selection(root: &Path, comparison: &Comparison) -> Result<Sele
                     .into(),
             ),
             Revision::Head(sha) | Revision::Commit(sha) => Ok(sha.clone()),
-            _ => bail!("自定义比较左侧必须是提交或 EMPTY，右侧可用提交或 WORKTREE"),
+            _ => bail!(crate::localized_format!(
+                "自定义比较左侧必须是提交或 EMPTY，右侧可用提交或 WORKTREE",
+                "The left revision must be a commit or EMPTY; the right may be a commit or WORKTREE"
+            )),
         }
     };
     let left = treeish(&comparison.left)?;
@@ -519,7 +544,10 @@ pub(crate) fn validate_paths(paths: &[String]) -> Result<()> {
                 )
             })
         {
-            bail!("文件路径必须位于当前仓库");
+            bail!(crate::localized_format!(
+                "文件路径必须位于当前仓库",
+                "The file path must be inside the current repository"
+            ));
         }
     }
     Ok(())
@@ -527,7 +555,10 @@ pub(crate) fn validate_paths(paths: &[String]) -> Result<()> {
 pub fn stage(root: &Path, paths: &[String], all: bool) -> Result<()> {
     validate_paths(paths)?;
     if !all && paths.is_empty() {
-        bail!("请选择要暂存的文件");
+        bail!(crate::localized_format!(
+            "请选择要暂存的文件",
+            "Select files to stage"
+        ));
     }
     let mut filtered = vec![];
     if !all {
@@ -539,7 +570,10 @@ pub fn stage(root: &Path, paths: &[String], all: bool) -> Result<()> {
             }
         }
         if filtered.is_empty() {
-            bail!("所选路径已不存在，请刷新状态");
+            bail!(crate::localized_format!(
+                "所选路径已不存在，请刷新状态",
+                "The selected path no longer exists; refresh status"
+            ));
         }
     }
     let mut args = vec!["add", "--all", "--"];
@@ -554,7 +588,10 @@ pub fn stage(root: &Path, paths: &[String], all: bool) -> Result<()> {
 pub fn unstage(root: &Path, paths: &[String], all: bool) -> Result<()> {
     validate_paths(paths)?;
     if !all && paths.is_empty() {
-        bail!("请选择要取消暂存的文件");
+        bail!(crate::localized_format!(
+            "请选择要取消暂存的文件",
+            "Select files to unstage"
+        ));
     }
     let mut args = match head(root)? {
         Revision::Empty => vec!["rm", "--cached", "-r", "--ignore-unmatch", "--"],
@@ -570,13 +607,22 @@ pub fn unstage(root: &Path, paths: &[String], all: bool) -> Result<()> {
 }
 pub fn commit_index(root: &Path, message: &str) -> Result<String> {
     if message.trim().is_empty() {
-        bail!("提交信息不能为空");
+        bail!(crate::localized_format!(
+            "提交信息不能为空",
+            "Commit message cannot be empty"
+        ));
     }
     if !git(root, &["ls-files", "--unmerged", "-z"])?.is_empty() {
-        bail!("仍有未解决的冲突，不能提交");
+        bail!(crate::localized_format!(
+            "仍有未解决的冲突，不能提交",
+            "Unresolved conflicts remain; cannot commit"
+        ));
     }
     if git(root, &["diff", "--cached", "--name-only", "-z", "--"])?.is_empty() {
-        bail!("暂存区为空，请先暂存文件");
+        bail!(crate::localized_format!(
+            "暂存区为空，请先暂存文件",
+            "The index is empty; stage files first"
+        ));
     }
     let output = string(git_timeout(
         root,
@@ -597,18 +643,23 @@ pub fn workspace_status(root: &Path) -> Result<BTreeMap<String, String>> {
             "--untracked-files=all",
         ],
     )?;
-    let text = std::str::from_utf8(&bytes).context("状态路径不是 UTF-8")?;
+    let text = std::str::from_utf8(&bytes).context(crate::i18n::text("状态路径不是 UTF-8"))?;
     let mut records = text.split('\0').filter(|r| !r.is_empty());
     let mut result = BTreeMap::new();
     while let Some(record) = records.next() {
         if record.len() < 4 || !record.is_char_boundary(3) {
-            bail!("状态记录无效");
+            bail!(crate::localized_format!(
+                "状态记录无效",
+                "Invalid status record"
+            ));
         }
         let status = &record[..2];
         let path = record[3..].trim_end_matches('/');
         result.insert(path.to_owned(), status.to_owned());
         if status.contains('R') || status.contains('C') {
-            let old = records.next().context("重命名缺少原路径")?;
+            let old = records
+                .next()
+                .context(crate::i18n::text("重命名缺少原路径"))?;
             result.insert(old.into(), "D".into());
         }
     }
@@ -641,7 +692,7 @@ struct ContentInfo {
 }
 fn info(root: &Path, target: &FileTarget) -> Result<ContentInfo> {
     let empty = || ContentInfo {
-        kind: "空内容",
+        kind: crate::i18n::text("空内容"),
         size: 0,
         object: None,
     };
@@ -649,11 +700,16 @@ fn info(root: &Path, target: &FileTarget) -> Result<ContentInfo> {
         Revision::Empty => return Ok(empty()),
         Revision::Worktree => {
             let path = root.join(&target.path);
-            let metadata = std::fs::symlink_metadata(&path)
-                .with_context(|| format!("无法读取工作区 {}", target.path))?;
+            let metadata = std::fs::symlink_metadata(&path).with_context(|| {
+                crate::localized_format!(
+                    "无法读取工作区 {}",
+                    "Unable to read worktree {}",
+                    target.path
+                )
+            })?;
             if metadata.file_type().is_symlink() {
                 return Ok(ContentInfo {
-                    kind: "符号链接",
+                    kind: crate::i18n::text("符号链接"),
                     size: metadata.len(),
                     object: None,
                 });
@@ -667,24 +723,33 @@ fn info(root: &Path, target: &FileTarget) -> Result<ContentInfo> {
                     let sha = if path.join(".git").exists() {
                         git(&path, &["rev-parse", "--verify", "HEAD"])
                     } else {
-                        Err(anyhow::anyhow!("子模块未检出"))
+                        Err(anyhow::anyhow!(crate::localized_format!(
+                            "子模块未检出",
+                            "Submodule not checked out"
+                        )))
                     }
                     .ok()
                     .and_then(|b| String::from_utf8(b).ok())
                     .map(|s| s.trim().into());
                     return Ok(ContentInfo {
-                        kind: "子模块",
+                        kind: crate::i18n::text("子模块"),
                         size: 0,
                         object: sha,
                     });
                 }
-                bail!("目录不是普通文件或已登记的子模块");
+                bail!(crate::localized_format!(
+                    "目录不是普通文件或已登记的子模块",
+                    "The directory is not a regular file or registered submodule"
+                ));
             }
             if !metadata.is_file() {
-                bail!("特殊文件不支持预览");
+                bail!(crate::localized_format!(
+                    "特殊文件不支持预览",
+                    "Special files cannot be previewed"
+                ));
             }
             return Ok(ContentInfo {
-                kind: "文本/二进制文件",
+                kind: crate::i18n::text("文本/二进制文件"),
                 size: metadata.len(),
                 object: None,
             });
@@ -697,33 +762,39 @@ fn info(root: &Path, target: &FileTarget) -> Result<ContentInfo> {
             string(git(root, &["ls-tree", "-z", sha, "--", &target.path])?)?
         }
     };
-    let header = record.split('\t').next().context("缺少对象信息")?;
+    let header = record
+        .split('\t')
+        .next()
+        .context(crate::i18n::text("缺少对象信息"))?;
     let fields: Vec<_> = header.split_whitespace().collect();
-    let mode = *fields.first().context("对象模式无效")?;
+    let mode = *fields.first().context(crate::i18n::text("对象模式无效"))?;
     let object = match target.revision {
         Revision::Index => fields.get(1),
         _ => fields.get(2),
     }
-    .context("缺少对象 ID")?
+    .context(crate::i18n::text("缺少对象 ID"))?
     .to_string();
     if mode == "160000" {
         return Ok(ContentInfo {
-            kind: "子模块",
+            kind: crate::i18n::text("子模块"),
             size: 0,
             object: Some(object),
         });
     }
     if !matches!(mode, "100644" | "100755" | "120000") {
-        bail!("不支持的 Git 对象模式：{mode}");
+        bail!(crate::localized_format!(
+            "不支持的 Git 对象模式：{mode}",
+            "Unsupported Git object mode: {mode}"
+        ));
     }
     let size = string(git(root, &["cat-file", "-s", &object])?)?
         .trim()
         .parse::<u64>()?;
     Ok(ContentInfo {
         kind: if mode == "120000" {
-            "符号链接"
+            crate::i18n::text("符号链接")
         } else {
-            "文本/二进制文件"
+            crate::i18n::text("文本/二进制文件")
         },
         size,
         object: Some(object),
@@ -735,7 +806,7 @@ fn content(root: &Path, target: &FileTarget, info: &ContentInfo, limit: usize) -
     }
     if target.revision == Revision::Worktree {
         let path = root.join(&target.path);
-        if info.kind == "符号链接" {
+        if info.kind == crate::i18n::text("符号链接") {
             return Ok(std::fs::read_link(&path)?
                 .to_string_lossy()
                 .as_bytes()
@@ -750,7 +821,10 @@ fn content(root: &Path, target: &FileTarget, info: &ContentInfo, limit: usize) -
         }
         let file = options.open(&path)?;
         if !file.metadata()?.is_file() {
-            bail!("特殊文件不支持预览");
+            bail!(crate::localized_format!(
+                "特殊文件不支持预览",
+                "Special files cannot be previewed"
+            ));
         }
         let mut bytes = vec![];
         file.take(limit as u64 + 1).read_to_end(&mut bytes)?;
@@ -761,7 +835,9 @@ fn content(root: &Path, target: &FileTarget, info: &ContentInfo, limit: usize) -
         &[
             "cat-file",
             "blob",
-            info.object.as_ref().context("缺少 blob ID")?,
+            info.object
+                .as_ref()
+                .context(crate::i18n::text("缺少 blob ID"))?,
         ],
     )
 }
@@ -783,7 +859,10 @@ pub fn version_content(
         Revision::Head(sha) | Revision::Commit(sha) => {
             string(git(root, &["ls-tree", "-z", sha, "--", path])?)?
         }
-        _ => bail!("还原来源必须是提交、index 或空内容"),
+        _ => bail!(crate::localized_format!(
+            "还原来源必须是提交、index 或空内容",
+            "The restore source must be a commit, index or empty content"
+        )),
     };
     if record.is_empty() {
         return Ok(None);
@@ -794,12 +873,21 @@ pub fn version_content(
         .unwrap_or("")
         .split_whitespace()
         .collect();
-    let mode = fields.first().copied().context("还原来源缺少模式")?;
+    let mode = fields
+        .first()
+        .copied()
+        .context(crate::i18n::text("还原来源缺少模式"))?;
     if *revision == Revision::Index && fields.get(2) != Some(&"0") {
-        bail!("未合并 index 不能作为还原来源");
+        bail!(crate::localized_format!(
+            "未合并 index 不能作为还原来源",
+            "An unmerged index cannot be used as a restore source"
+        ));
     }
     if mode == "160000" {
-        bail!("子模块目录不能使用文件还原操作");
+        bail!(crate::localized_format!(
+            "子模块目录不能使用文件还原操作",
+            "Submodule directories cannot be restored as files"
+        ));
     }
     let target = FileTarget {
         revision: revision.clone(),
@@ -807,7 +895,10 @@ pub fn version_content(
     };
     let metadata = info(root, &target)?;
     if metadata.size > 20_000_000 {
-        bail!("还原文件超过 20 MB 恢复记录上限");
+        bail!(crate::localized_format!(
+            "还原文件超过 20 MB 恢复记录上限",
+            "Restore file exceeds the 20 MB recovery limit"
+        ));
     }
     let bytes = content(root, &target, &metadata, 20_000_000)?;
     Ok(Some(VersionContent {
@@ -827,11 +918,17 @@ pub fn text_version(root: &Path, revision: &Revision, path: &str, limit: usize) 
         path: path.into(),
     };
     let metadata = info(root, &target)?;
-    if metadata.kind != "文本/二进制文件" {
-        bail!("逐行归属仅支持普通文本文件");
+    if metadata.kind != crate::i18n::text("文本/二进制文件") {
+        bail!(crate::localized_format!(
+            "逐行归属仅支持普通文本文件",
+            "Blame requires a regular text file"
+        ));
     }
     if metadata.size > limit as u64 {
-        bail!("文件超过逐行归属读取上限");
+        bail!(crate::localized_format!(
+            "文件超过逐行归属读取上限",
+            "File exceeds the Blame size limit"
+        ));
     }
     content(root, &target, &metadata, limit)
 }
@@ -845,28 +942,41 @@ pub fn compare_with_limit(
     limit: usize,
 ) -> Result<Diff> {
     if file.status.starts_with('U') {
-        return Ok(Diff::notice("冲突文件：暂不支持预览未合并的 index 内容"));
+        return Ok(Diff::notice(crate::i18n::text(
+            "冲突文件：暂不支持预览未合并的 index 内容",
+        )));
     }
     let (left, right) = comparison.targets(file);
     let li = info(root, &left)?;
     let ri = info(root, &right)?;
-    let description = format!(
+    let description = crate::localized_format!(
         "左侧：{} · {} 字节；右侧：{} · {} 字节",
-        li.kind, li.size, ri.kind, ri.size
+        "Left: {} · {} bytes; right: {} · {} bytes",
+        li.kind,
+        li.size,
+        ri.kind,
+        ri.size
     );
-    if li.kind == "子模块" || ri.kind == "子模块" {
-        return Ok(Diff::notice(&format!(
+    if li.kind == crate::i18n::text("子模块") || ri.kind == crate::i18n::text("子模块") {
+        return Ok(Diff::notice(&crate::localized_format!(
             "子模块提交引用\n左侧：{}\n右侧：{}\n目录内容不作为普通文本读取",
-            li.object.as_deref().unwrap_or("空/未检出"),
-            ri.object.as_deref().unwrap_or("空/未检出")
+            "Submodule commit refs\nLeft: {}\nRight: {}\nDirectory content is not read as ordinary text",
+            li.object
+                .as_deref()
+                .unwrap_or(crate::i18n::text("空/未检出")),
+            ri.object
+                .as_deref()
+                .unwrap_or(crate::i18n::text("空/未检出"))
         )));
     }
     if li.size.saturating_add(ri.size) > limit.min(20_000_000) as u64 {
-        let mut diff = Diff::notice(&format!(
+        let mut diff = Diff::notice(&crate::localized_format!(
             "文件超过 {} MB 预览上限；{description}",
+            "File exceeds the {} MB preview limit; {description}",
             limit.min(20_000_000) / 1_000_000
         ));
         diff.description = Some(description);
+        diff.can_expand_preview = limit < 20_000_000;
         return Ok(diff);
     }
     let left_bytes = content(root, &left, &li, limit)?;

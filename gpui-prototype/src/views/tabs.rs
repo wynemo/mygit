@@ -64,14 +64,18 @@ pub fn bar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     .px_2()
                     .py_1()
                     .child(
-                        button("close-other-tabs", "关闭其他", this.active_tab.is_some()).on_click(
-                            cx.listener(|this, _, _, cx| this.close_other_tabs(false, cx)),
-                        ),
+                        button(
+                            "close-other-tabs",
+                            mygit_gpui::i18n::text("关闭其他"),
+                            this.active_tab.is_some(),
+                        )
+                        .on_click(cx.listener(|this, _, _, cx| this.close_other_tabs(false, cx))),
                     )
                     .child(
-                        button("close-all-tabs", "关闭全部", true).on_click(
-                            cx.listener(|this, _, _, cx| this.close_other_tabs(true, cx)),
-                        ),
+                        button("close-all-tabs", mygit_gpui::i18n::text("关闭全部"), true)
+                            .on_click(
+                                cx.listener(|this, _, _, cx| this.close_other_tabs(true, cx)),
+                            ),
                     ),
             )
         })

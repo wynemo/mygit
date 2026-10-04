@@ -319,7 +319,7 @@ impl MyGit {
             files: false,
             directories: true,
             multiple: false,
-            prompt: Some("选择 Git 仓库".into()),
+            prompt: Some(mygit_gpui::i18n::text("选择 Git 仓库").into()),
         });
         cx.spawn(async move |this, cx| match picker.await {
             Ok(Ok(Some(paths))) => {
@@ -330,7 +330,10 @@ impl MyGit {
             Ok(Ok(None)) => {}
             other => {
                 let _ = this.update(cx, |this, cx| {
-                    this.state.message = format!("无法打开目录选择器：{other:?}");
+                    this.state.message = mygit_gpui::localized_format!(
+                        "无法打开目录选择器：{other:?}",
+                        "Unable to open directory picker: {other:?}"
+                    );
                     cx.notify();
                 });
             }
@@ -339,7 +342,8 @@ impl MyGit {
     }
     pub fn load(&mut self, path: PathBuf, cx: &mut Context<Self>) {
         if self.write_busy {
-            self.state.message = "Git 写操作正在执行，请等待完成后再切换或刷新仓库".into();
+            self.state.message =
+                mygit_gpui::i18n::text("Git 写操作正在执行，请等待完成后再切换或刷新仓库").into();
             cx.notify();
             return;
         }
@@ -410,7 +414,9 @@ impl MyGit {
         self.line_layouts.clear();
         self.dragging = false;
         self.diff_scroll = UniformListScrollHandle::new();
-        let generation = self.state.begin("正在读取仓库…".into());
+        let generation = self
+            .state
+            .begin(mygit_gpui::i18n::text("正在读取仓库…").into());
         cx.notify();
         self.pending.cancel();
         self.pending = Default::default();
@@ -453,7 +459,11 @@ impl MyGit {
         self.state.clear_diff();
         self.line_layouts.clear();
         self.dragging = false;
-        let generation = self.state.begin(format!("正在读取{}…", mode.label()));
+        let generation = self.state.begin(mygit_gpui::localized_format!(
+            "正在读取{}…",
+            "Loading {}…",
+            mode.label()
+        ));
         cx.notify();
         self.pending.cancel();
         self.pending = Default::default();
@@ -476,8 +486,9 @@ impl MyGit {
                 this.state.listed_comparison = Some(selection.comparison.clone());
                 this.state.comparison = Some(selection.comparison);
                 this.state.files = selection.files;
-                this.state.message = format!(
+                this.state.message = mygit_gpui::localized_format!(
                     "{} · {} 个文件",
+                    "{} · {} files",
                     this.state.mode.label(),
                     this.state.files.len()
                 );
@@ -522,7 +533,11 @@ impl MyGit {
         self.line_layouts.clear();
         self.dragging = false;
         self.diff_scroll = UniformListScrollHandle::new();
-        let generation = self.state.begin(format!("正在比较 {}…", file.path));
+        let generation = self.state.begin(mygit_gpui::localized_format!(
+            "正在比较 {}…",
+            "Comparing {}…",
+            file.path
+        ));
         cx.notify();
         self.pending.cancel();
         self.pending = Default::default();
@@ -752,7 +767,10 @@ impl MyGit {
             return;
         }
         let root = repo.root.clone();
-        let generation = self.state.begin(format!("正在加载编辑器 {path}…"));
+        let generation = self.state.begin(mygit_gpui::localized_format!(
+            "正在加载编辑器 {path}…",
+            "Loading editor for {path}…"
+        ));
         self.pending.cancel();
         self.pending = Default::default();
         tasks::run(
@@ -782,7 +800,8 @@ impl MyGit {
                 this.editors.insert(file.path.clone(), editor);
                 this.editor_subscriptions.insert(file.path, subscription);
                 this.edit_mode = true;
-                this.state.message = "编辑器已打开，点击文本开始输入".into();
+                this.state.message =
+                    mygit_gpui::i18n::text("编辑器已打开，点击文本开始输入").into();
             },
         );
         cx.notify();
@@ -801,7 +820,9 @@ impl MyGit {
             .merge
             .as_ref()
             .map(|view| view.revisions[1].clone());
-        let generation = self.state.begin("正在按需读取大文件（最高 20 MB）…".into());
+        let generation = self
+            .state
+            .begin(mygit_gpui::i18n::text("正在按需读取大文件（最高 20 MB）…").into());
         self.pending.cancel();
         self.pending = Default::default();
         tasks::run(
@@ -858,7 +879,9 @@ impl MyGit {
             return;
         };
         let root = repo.root.clone();
-        let generation = self.state.begin("正在更新已保存 Diff…".into());
+        let generation = self
+            .state
+            .begin(mygit_gpui::i18n::text("正在更新已保存 Diff…").into());
         self.pending.cancel();
         self.pending = Default::default();
         tasks::run(
@@ -894,12 +917,13 @@ impl MyGit {
         if self.is_dirty(&file.path, cx)
             || (file.old_path != file.path && self.is_dirty(&file.old_path, cx))
         {
-            self.write_message = "还原涉及未保存文件，请先保存或关闭编辑器修改".into();
+            self.write_message =
+                mygit_gpui::i18n::text("还原涉及未保存文件，请先保存或关闭编辑器修改").into();
             cx.notify();
             return;
         }
         if block && self.state.current_block.is_none() {
-            self.write_message = "请先定位要还原的差异块".into();
+            self.write_message = mygit_gpui::i18n::text("请先定位要还原的差异块").into();
             cx.notify();
             return;
         }
@@ -934,7 +958,7 @@ impl MyGit {
             .unwrap_or(std::path::Path::new("."))
             .join("recovery");
         self.run_write(
-            "正在保存恢复记录并还原…",
+            mygit_gpui::i18n::text("正在保存恢复记录并还原…"),
             self.state.mode.clone(),
             false,
             move || {
@@ -953,8 +977,9 @@ impl MyGit {
                     }
                     mygit_gpui::recovery::restore_files(&root, &comparison.left, &paths, &store)?
                 };
-                Ok(format!(
+                Ok(mygit_gpui::localized_format!(
                     "已还原，index 保持原样；恢复记录：{}",
+                    "Restored; index preserved. Recovery data: {}",
                     record.display()
                 ))
             },
@@ -966,7 +991,7 @@ impl MyGit {
             return;
         }
         if self.editors.values().any(|e| e.read(cx).buffer.dirty()) {
-            self.write_message = "请先保存未保存的编辑，再撤销还原".into();
+            self.write_message = mygit_gpui::i18n::text("请先保存未保存的编辑，再撤销还原").into();
             cx.notify();
             return;
         }
@@ -981,19 +1006,24 @@ impl MyGit {
             .unwrap_or(std::path::Path::new("."))
             .join("recovery");
         self.run_write(
-            "正在撤销最近还原…",
+            mygit_gpui::i18n::text("正在撤销最近还原…"),
             self.state.mode.clone(),
             false,
             move || {
                 let record = mygit_gpui::recovery::undo_latest(&root, &store)?;
-                Ok(format!("已撤销还原：{}", record.display()))
+                Ok(mygit_gpui::localized_format!(
+                    "已撤销还原：{}",
+                    "Restore undone: {}",
+                    record.display()
+                ))
             },
             cx,
         );
     }
     pub fn request_close(&mut self, cx: &mut Context<Self>) -> bool {
         if self.write_busy {
-            self.state.message = "Git 写操作执行中，请等待完成后退出".into();
+            self.state.message =
+                mygit_gpui::i18n::text("Git 写操作执行中，请等待完成后退出").into();
             cx.notify();
             return false;
         }
@@ -1052,7 +1082,8 @@ impl MyGit {
                 }
             }
             if paths.iter().any(|path| self.is_dirty(path, cx)) {
-                self.state.message = "仍有文件未保存，请处理保存错误或取消关闭".into();
+                self.state.message =
+                    mygit_gpui::i18n::text("仍有文件未保存，请处理保存错误或取消关闭").into();
                 cx.notify();
                 return;
             }
@@ -1133,15 +1164,16 @@ impl MyGit {
                 .iter()
                 .any(|(path, e)| (all || paths.contains(path)) && e.read(cx).buffer.dirty())
         {
-            self.write_message = "所选文件有未保存修改，请先保存后再暂存".into();
+            self.write_message =
+                mygit_gpui::i18n::text("所选文件有未保存修改，请先保存后再暂存").into();
             cx.notify();
             return;
         }
         self.run_write(
             if stage {
-                "正在暂存…"
+                mygit_gpui::i18n::text("正在暂存…")
             } else {
-                "正在取消暂存…"
+                mygit_gpui::i18n::text("正在取消暂存…")
             },
             if stage {
                 BrowseMode::Staged
@@ -1155,7 +1187,7 @@ impl MyGit {
                 } else {
                     git::unstage(&root, &paths, all)?;
                 }
-                Ok("index 已更新".into())
+                Ok(mygit_gpui::i18n::text("index 已更新").into())
             },
             cx,
         );
@@ -1198,7 +1230,9 @@ impl MyGit {
         let root = repo.root.clone();
         let left = left.read(cx).buffer.text().to_owned();
         let right = right.read(cx).buffer.text().to_owned();
-        let generation = self.state.begin("正在解析比较版本…".into());
+        let generation = self
+            .state
+            .begin(mygit_gpui::i18n::text("正在解析比较版本…").into());
         self.pending.cancel();
         self.pending = Default::default();
         tasks::run(
@@ -1274,7 +1308,7 @@ impl MyGit {
         let root = repo.root.clone();
         let message = editor.read(cx).buffer.text().to_owned();
         self.run_write(
-            "正在提交暂存内容…",
+            mygit_gpui::i18n::text("正在提交暂存内容…"),
             BrowseMode::Workspace,
             true,
             move || git::commit_index(&root, &message),
@@ -1330,7 +1364,12 @@ impl MyGit {
                 let succeeded = result.is_ok();
                 this.write_message = mygit_gpui::process::display_diagnostic(match result {
                     Ok(message) => message,
-                    Err(error) => format!("Git 操作失败：{error:#}"),
+                    Err(error) => {
+                        mygit_gpui::localized_format!(
+                            "Git 操作失败：{error:#}",
+                            "Git operation failed: {error:#}"
+                        )
+                    }
                 });
                 if succeeded
                     && clear_message
@@ -1464,7 +1503,10 @@ impl MyGit {
         self.line_layouts.clear();
         self.dragging = false;
         self.diff_scroll = UniformListScrollHandle::new();
-        let generation = self.state.begin(format!("正在打开 {path}…"));
+        let generation = self.state.begin(mygit_gpui::localized_format!(
+            "正在打开 {path}…",
+            "Opening {path}…"
+        ));
         self.pending.cancel();
         self.pending = Default::default();
         tasks::run(
@@ -1479,7 +1521,10 @@ impl MyGit {
                     (
                         line,
                         match &diff.message {
-                            Some(message) => Err(format!("{message}；请使用文件预览入口")),
+                            Some(message) => Err(mygit_gpui::localized_format!(
+                                "{message}；请使用文件预览入口",
+                                "{message}; use the file preview action"
+                            )),
                             None => hit
                                 .locate(&diff.right_document)
                                 .map_err(|error| format!("{error:#}")),
@@ -1523,7 +1568,10 @@ impl MyGit {
                             }
                         }
                         Err(error) => {
-                            this.state.message = format!("文件已打开，但无法定位：{error}")
+                            this.state.message = mygit_gpui::localized_format!(
+                                "文件已打开，但无法定位：{error}",
+                                "File opened, but unable to navigate: {error}"
+                            )
                         }
                     }
                 }
@@ -1581,7 +1629,10 @@ impl MyGit {
                     }
                     Err(e) => {
                         this.history_failed = true;
-                        this.state.message = format!("加载历史失败：{e:#}");
+                        this.state.message = mygit_gpui::localized_format!(
+                            "加载历史失败：{e:#}",
+                            "Unable to load history: {e:#}"
+                        );
                     }
                 }
                 cx.notify();
@@ -1591,7 +1642,7 @@ impl MyGit {
     }
     pub fn cancel_task(&mut self, cx: &mut Context<Self>) {
         if self.write_busy {
-            self.state.message = "Git 写操作执行中，请等待结果".into();
+            self.state.message = mygit_gpui::i18n::text("Git 写操作执行中，请等待结果").into();
             cx.notify();
             return;
         }
@@ -1600,13 +1651,15 @@ impl MyGit {
             return;
         }
         if self.ai.loading || self.ai.applying {
-            self.ai.message = "AI 任务已取消，手动草稿保留".into();
+            self.ai.message = mygit_gpui::i18n::text("AI 任务已取消，手动草稿保留").into();
         }
         if self.search.loading {
-            self.search.error = Some("已取消搜索，可修改查询或点击重新搜索重试".into());
+            self.search.error =
+                Some(mygit_gpui::i18n::text("已取消搜索，可修改查询或点击重新搜索重试").into());
         }
         if self.quick.indexing || self.quick.searching {
-            self.quick.error = Some("已取消文件定位任务，可刷新索引重试".into());
+            self.quick.error =
+                Some(mygit_gpui::i18n::text("已取消文件定位任务，可刷新索引重试").into());
         }
         self.ai.cancel();
         self.quick.cancel();
@@ -1614,7 +1667,7 @@ impl MyGit {
         self.blame_pending.cancel();
         self.blame_epoch += 1;
         if self.blame_loading {
-            self.blame_error = "已取消 Blame，可隐藏后重新显示重试".into();
+            self.blame_error = mygit_gpui::i18n::text("已取消 Blame，可隐藏后重新显示重试").into();
         }
         self.blame_loading = false;
         self.blame_detail_pending.cancel();
@@ -1637,7 +1690,7 @@ impl MyGit {
         self.history_search_pending = false;
         self.state.generation += 1;
         self.state.loading = false;
-        self.state.message = "已取消，可刷新或重新选择".into();
+        self.state.message = mygit_gpui::i18n::text("已取消，可刷新或重新选择").into();
         cx.notify();
     }
     pub fn choose_history(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
@@ -1924,7 +1977,10 @@ impl MyGit {
         self.settings.font_size = self.state.font_size;
         self.settings.font_family = self.state.font_family.clone();
         if let Err(e) = self.settings.save() {
-            self.state.message = format!("无法保存设置：{e:#}");
+            self.state.message = mygit_gpui::localized_format!(
+                "无法保存设置：{e:#}",
+                "Unable to save settings: {e:#}"
+            );
         }
     }
     pub fn cycle_font(&mut self, cx: &mut Context<Self>) {

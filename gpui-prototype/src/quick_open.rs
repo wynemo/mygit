@@ -30,7 +30,10 @@ impl Index {
     pub fn from_paths(paths: impl IntoIterator<Item = String>) -> Result<Self> {
         let paths: BTreeSet<_> = paths.into_iter().collect();
         if paths.len() > 200_000 || paths.iter().map(String::len).sum::<usize>() > 16_000_000 {
-            bail!("文件索引超过 200000 项或 16 MB 路径上限");
+            bail!(crate::localized_format!(
+                "文件索引超过 200000 项或 16 MB 路径上限",
+                "File index exceeds 200000 entries or the 16 MB path limit"
+            ));
         }
         crate::git::validate_paths(&paths.iter().cloned().collect::<Vec<_>>())?;
         Ok(Self {
@@ -47,7 +50,10 @@ impl Index {
     pub fn search(&self, query: &str, limit: usize) -> Result<Matches> {
         let query = query.trim().to_lowercase();
         if query.chars().count() > 256 {
-            bail!("文件查询最多支持 256 个字符");
+            bail!(crate::localized_format!(
+                "文件查询最多支持 256 个字符",
+                "File queries support up to 256 characters"
+            ));
         }
         let limit = limit.min(1000);
         if query.is_empty() {
@@ -102,7 +108,8 @@ pub fn read(root: &Path) -> Result<Index> {
             "-z",
         ],
     )?;
-    let text = std::str::from_utf8(&bytes).context("文件索引包含非 UTF-8 路径")?;
+    let text =
+        std::str::from_utf8(&bytes).context(crate::i18n::text("文件索引包含非 UTF-8 路径"))?;
     let canonical_root = root.canonicalize()?;
     let mut paths = vec![];
     let mut directories = HashMap::new();
@@ -110,7 +117,7 @@ pub fn read(root: &Path) -> Result<Index> {
         crate::process::check()?;
         crate::git::validate_paths(&[path.into()])?;
         let full = canonical_root.join(path);
-        let parent = full.parent().context("文件缺少父目录")?;
+        let parent = full.parent().context(crate::i18n::text("文件缺少父目录"))?;
         if !safe_directory(&canonical_root, parent, &mut directories)? {
             continue;
         }
@@ -122,7 +129,10 @@ pub fn read(root: &Path) -> Result<Index> {
         if !metadata.is_file() && !metadata.file_type().is_symlink() {
             continue;
         }
-        let parent = full.parent().context("文件缺少父目录")?.canonicalize()?;
+        let parent = full
+            .parent()
+            .context(crate::i18n::text("文件缺少父目录"))?
+            .canonicalize()?;
         if parent.starts_with(&canonical_root) {
             paths.push(path.into());
         }

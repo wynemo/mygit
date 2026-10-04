@@ -1,6 +1,16 @@
 use super::*;
 
 impl MyGit {
+    pub fn select_language(
+        &mut self,
+        language: mygit_gpui::i18n::Language,
+        cx: &mut Context<Self>,
+    ) {
+        self.settings.language = language;
+        self.state.message = mygit_gpui::i18n::text("语言设置已保存，请重启应用生效").into();
+        self.save_settings();
+        cx.notify();
+    }
     pub fn select_code_palette(&mut self, index: usize, cx: &mut Context<Self>) {
         let Some(name) = mygit_gpui::syntax::PALETTES.get(index) else {
             return;
@@ -49,7 +59,7 @@ impl MyGit {
             .iter()
             .any(|e| e.read(cx).buffer.marked.is_some())
         {
-            self.state.message = "请先完成字体设置输入".into();
+            self.state.message = mygit_gpui::i18n::text("请先完成字体设置输入").into();
             cx.notify();
             return;
         }
@@ -66,7 +76,7 @@ impl MyGit {
                 self.state.font_size = size;
                 self.line_layouts.clear();
                 self.update_editor_fonts(cx);
-                self.state.message = "字体设置已应用".into();
+                self.state.message = mygit_gpui::i18n::text("字体设置已应用").into();
                 self.save_settings();
             }
             Err(error) => self.state.message = error.to_string(),

@@ -40,7 +40,7 @@ impl Default for AppState {
             current_file: None,
             editable: false,
             diff: Diff::default(),
-            message: "打开一个 Git 仓库".into(),
+            message: crate::i18n::text("打开一个 Git 仓库").into(),
             loading: false,
             generation: 0,
             panel_width: 420.,
@@ -74,9 +74,14 @@ impl AppState {
         self.panel_width = diff.panel_width();
         self.message = diff.message.clone().unwrap_or_else(|| {
             if diff.blocks.is_empty() {
-                "无内容差异".into()
+                crate::i18n::text("无内容差异").into()
             } else {
-                format!("{} 行 · {} 处差异", diff.rows.len(), diff.blocks.len())
+                crate::localized_format!(
+                    "{} 行 · {} 处差异",
+                    "{} lines · {} changes",
+                    diff.rows.len(),
+                    diff.blocks.len()
+                )
             }
         });
         self.diff = diff;
@@ -228,7 +233,10 @@ impl AppState {
                 (left.revision.label(), right.revision.label())
             }
             (Some(comparison), None) => (comparison.left.label(), comparison.right.label()),
-            _ => ("旧版本".into(), "新版本".into()),
+            _ => (
+                crate::i18n::text("旧版本").into(),
+                crate::i18n::text("新版本").into(),
+            ),
         }
     }
 }

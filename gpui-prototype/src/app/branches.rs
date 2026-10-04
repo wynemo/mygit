@@ -91,7 +91,8 @@ impl MyGit {
             .values()
             .any(|editor| editor.read(cx).buffer.dirty() || editor.read(cx).buffer.marked.is_some())
         {
-            self.write_message = "请先保存或关闭未保存的编辑内容，再执行此 Git 操作".into();
+            self.write_message =
+                mygit_gpui::i18n::text("请先保存或关闭未保存的编辑内容，再执行此 Git 操作").into();
             cx.notify();
             return false;
         }
@@ -130,7 +131,7 @@ impl MyGit {
             .as_ref()
             .map(|e| e.read(cx).buffer.text().trim().to_owned());
         self.run_write(
-            "正在切换分支…",
+            mygit_gpui::i18n::text("正在切换分支…"),
             BrowseMode::Workspace,
             false,
             move || mygit_gpui::branches::switch(&root, &reference, name.as_deref()),
@@ -148,7 +149,7 @@ impl MyGit {
         let base = base.read(cx).buffer.text().trim().to_owned();
         let root = self.state.repo.as_ref().unwrap().root.clone();
         self.run_write(
-            "正在创建分支…",
+            mygit_gpui::i18n::text("正在创建分支…"),
             BrowseMode::Workspace,
             false,
             move || mygit_gpui::branches::create(&root, &name, &base),
@@ -177,9 +178,9 @@ impl MyGit {
             .map(|e| e.read(cx).buffer.text().trim().to_owned())
             .unwrap_or_else(|| "origin".into());
         let label = match operation {
-            RemoteOperation::Fetch => "正在 Fetch…",
-            RemoteOperation::Pull => "正在 Pull…",
-            RemoteOperation::Push => "正在 Push…",
+            RemoteOperation::Fetch => mygit_gpui::i18n::text("正在 Fetch…"),
+            RemoteOperation::Pull => mygit_gpui::i18n::text("正在 Pull…"),
+            RemoteOperation::Push => mygit_gpui::i18n::text("正在 Push…"),
         };
         let mode = if operation == RemoteOperation::Pull {
             BrowseMode::Workspace
@@ -206,7 +207,7 @@ impl MyGit {
         }
         let root = self.state.repo.as_ref().unwrap().root.clone();
         self.run_write(
-            "正在合并分支…",
+            mygit_gpui::i18n::text("正在合并分支…"),
             BrowseMode::Workspace,
             false,
             move || mygit_gpui::operations::merge(&root, &reference),
@@ -226,7 +227,9 @@ impl MyGit {
         };
         let target = input.read(cx).buffer.text().trim().to_owned();
         let root = self.state.repo.as_ref().unwrap().root.clone();
-        let generation = self.state.begin("正在检查 Reset 目标…".into());
+        let generation = self
+            .state
+            .begin(mygit_gpui::i18n::text("正在检查 Reset 目标…").into());
         self.pending.cancel();
         self.pending = Default::default();
         tasks::run(
@@ -264,7 +267,7 @@ impl MyGit {
         }
         let root = self.state.repo.as_ref().unwrap().root.clone();
         self.run_write(
-            "正在 Reset…",
+            mygit_gpui::i18n::text("正在 Reset…"),
             BrowseMode::Workspace,
             false,
             move || {

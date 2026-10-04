@@ -68,7 +68,10 @@ impl MyGit {
                 match result {
                     Ok(watcher) => this.watcher = Some(watcher),
                     Err(error) => {
-                        this.write_message = format!("文件监听不可用，将定期刷新：{error:#}")
+                        this.write_message = mygit_gpui::localized_format!(
+                            "文件监听不可用，将定期刷新：{error:#}",
+                            "File watching unavailable; periodic refresh enabled: {error:#}"
+                        )
                     }
                 }
                 this.last_reconcile = Instant::now();
@@ -182,7 +185,12 @@ impl MyGit {
                         }
                         this.refresh_tree(cx);
                     }
-                    Err(error) => this.write_message = format!("刷新失败：{error:#}"),
+                    Err(error) => {
+                        this.write_message = mygit_gpui::localized_format!(
+                            "刷新失败：{error:#}",
+                            "Refresh failed: {error:#}"
+                        )
+                    }
                 }
                 this.refresh_quick_index(cx);
                 this.search_project(cx);

@@ -22,10 +22,11 @@ pub struct Selection {
 pub fn selection(root: &Path, sha: &str) -> Result<Selection> {
     let detail = git::commit_detail(root, sha)?;
     if detail.parents.len() != 2 {
-        bail!(
+        bail!(crate::localized_format!(
             "三栏历史查看需要恰好两个父提交；当前提交有 {} 个父提交",
+            "Three-column history requires exactly two parents; this commit has {} parents",
             detail.parents.len()
-        );
+        ));
     }
     let mut files: BTreeMap<String, [Option<String>; 2]> = BTreeMap::new();
     for (side, parent) in detail.parents.iter().enumerate() {
@@ -66,6 +67,7 @@ pub struct View {
     pub rows: Arc<Vec<Row>>,
     pub blocks: Vec<Range<usize>>,
     pub message: Option<String>,
+    pub can_expand_preview: bool,
 }
 impl View {
     /// A two-side projection shares existing selection, block navigation and tab
@@ -108,6 +110,7 @@ impl View {
             rows: self.rows.clone(),
         }));
         diff.message = self.message.clone();
+        diff.can_expand_preview = self.can_expand_preview;
         diff
     }
 }
@@ -121,7 +124,10 @@ fn revision(root: &Path, sha: &str, path: &str) -> Result<Revision> {
 }
 pub fn load(root: &Path, selection: &Selection, file: &File, limit: usize) -> Result<View> {
     if selection.detail.parents.len() != 2 {
-        bail!("三栏历史查看需要恰好两个父提交");
+        bail!(crate::localized_format!(
+            "三栏历史查看需要恰好两个父提交",
+            "Three-column history requires exactly two parents"
+        ));
     }
     let revisions = [
         selection.detail.parents[0].clone(),
@@ -166,8 +172,10 @@ pub fn load(root: &Path, selection: &Selection, file: &File, limit: usize) -> Re
         view.syntax = Default::default();
         view.rows = Default::default();
         view.blocks.clear();
-        view.message = Some(format!(
+        view.can_expand_preview = limit < 20_000_000;
+        view.message = Some(crate::localized_format!(
             "三侧内容合计超过 {} MB 预览上限",
+            "Total content across three sides exceeds the {} MB preview limit",
             limit / 1_000_000
         ));
     }
@@ -195,7 +203,10 @@ fn project(diff: &Diff) -> Result<Projection> {
         crate::process::check()?;
         if let Some(result) = row.right_no {
             if result != consumed + 1 || result > count {
-                bail!("合并结果行映射无效");
+                bail!(crate::localized_format!(
+                    "合并结果行映射无效",
+                    "Invalid merge-result line mapping"
+                ));
             }
             projection.lines[result - 1] = row.left_no;
             projection.changed[result - 1] = row.changed;
@@ -205,7 +216,10 @@ fn project(diff: &Diff) -> Result<Projection> {
         }
     }
     if consumed != count {
-        bail!("合并结果行映射不完整");
+        bail!(crate::localized_format!(
+            "合并结果行映射不完整",
+            "Incomplete merge-result line mapping"
+        ));
     }
     Ok(projection)
 }
@@ -213,9 +227,12 @@ fn project(diff: &Diff) -> Result<Projection> {
 /// deletion groups occupy shared gaps before/between/after result lines.
 pub fn align(left: &Diff, right: &Diff) -> Result<View> {
     let message = match (&left.message, &right.message) {
-        (Some(l), Some(r)) => Some(format!("父提交 1：{l}\n父提交 2：{r}")),
-        (Some(l), _) => Some(format!("父提交 1：{l}")),
-        (_, Some(r)) => Some(format!("父提交 2：{r}")),
+        (Some(l), Some(r)) => Some(crate::localized_format!(
+            "父提交 1：{l}\n父提交 2：{r}",
+            "Parent 1: {l}\nParent 2: {r}"
+        )),
+        (Some(l), _) => Some(crate::localized_format!("父提交 1：{l}", "Parent 1: {l}")),
+        (_, Some(r)) => Some(crate::localized_format!("父提交 2：{r}", "Parent 2: {r}")),
         _ => None,
     };
     let mut view = View {
@@ -231,12 +248,16 @@ pub fn align(left: &Diff, right: &Diff) -> Result<View> {
         rows: Default::default(),
         blocks: vec![],
         message,
+        can_expand_preview: left.can_expand_preview || right.can_expand_preview,
     };
     if view.message.is_some() {
         return Ok(view);
     }
     if left.right_document.text != right.right_document.text {
-        bail!("两侧比较的合并结果不一致");
+        bail!(crate::localized_format!(
+            "两侧比较的合并结果不一致",
+            "The merge results in the two comparisons do not match"
+        ));
     }
     let l = project(left)?;
     let r = project(right)?;

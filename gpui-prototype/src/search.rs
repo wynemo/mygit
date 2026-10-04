@@ -54,10 +54,13 @@ impl Hit {
         let source = document
             .lines
             .get(self.line.saturating_sub(1))
-            .context("匹配行已不存在，请重新搜索")?;
+            .context(crate::i18n::text("匹配行已不存在，请重新搜索"))?;
         let raw = &document.text[source.clone()];
         if raw.len() != self.line_length || hash(raw) != self.line_hash {
-            bail!("文件内容在搜索后改变，请重新搜索");
+            bail!(crate::localized_format!(
+                "文件内容在搜索后改变，请重新搜索",
+                "The file changed after searching; search again"
+            ));
         }
         let range = self
             .ranges
@@ -82,7 +85,8 @@ struct Collector {
 }
 impl Collector {
     fn consume(&mut self, record: &[u8]) -> Result<bool> {
-        let value: Value = serde_json::from_slice(record).context("ripgrep 返回无效 JSON")?;
+        let value: Value =
+            serde_json::from_slice(record).context(crate::i18n::text("ripgrep 返回无效 JSON"))?;
         if value["type"] != "match" {
             return Ok(true);
         }
@@ -96,24 +100,40 @@ impl Collector {
         };
         let path = path.strip_prefix("./").unwrap_or(path);
         crate::git::validate_paths(&[path.into()])?;
-        let line = data["line_number"].as_u64().context("搜索结果缺少行号")?;
-        let line = usize::try_from(line).context("搜索行号超出范围")?;
+        let line = data["line_number"]
+            .as_u64()
+            .context(crate::i18n::text("搜索结果缺少行号"))?;
+        let line = usize::try_from(line).context(crate::i18n::text("搜索行号超出范围"))?;
         if line == 0 {
-            bail!("搜索行号必须从 1 开始");
+            bail!(crate::localized_format!(
+                "搜索行号必须从 1 开始",
+                "Search line numbers must start at 1"
+            ));
         }
         let matches = data["submatches"]
             .as_array()
-            .context("搜索结果缺少匹配范围")?;
+            .context(crate::i18n::text("搜索结果缺少匹配范围"))?;
         let mut ranges = vec![];
         for found in matches {
-            let start = usize::try_from(found["start"].as_u64().context("匹配起点无效")?)?;
-            let end = usize::try_from(found["end"].as_u64().context("匹配终点无效")?)?;
+            let start = usize::try_from(
+                found["start"]
+                    .as_u64()
+                    .context(crate::i18n::text("匹配起点无效"))?,
+            )?;
+            let end = usize::try_from(
+                found["end"]
+                    .as_u64()
+                    .context(crate::i18n::text("匹配终点无效"))?,
+            )?;
             if start > end
                 || end > raw.len()
                 || !raw.is_char_boundary(start)
                 || !raw.is_char_boundary(end)
             {
-                bail!("匹配范围不在 UTF-8 文本边界内");
+                bail!(crate::localized_format!(
+                    "匹配范围不在 UTF-8 文本边界内",
+                    "Match range is not on UTF-8 text boundaries"
+                ));
             }
             if ranges.len() < 128 {
                 ranges.push(start..end);
@@ -160,7 +180,10 @@ pub fn run_with_limit(root: &Path, options: &Options, limit: usize) -> Result<Re
         .iter()
         .any(|s| s.chars().count() > 4096 || s.contains('\0'))
     {
-        bail!("查询最多 4096 字符，查询与过滤不能含 NUL");
+        bail!(crate::localized_format!(
+            "查询最多 4096 字符，查询与过滤不能含 NUL",
+            "Queries support up to 4096 characters; queries and filters cannot contain NUL"
+        ));
     }
     let mut command = crate::external::command("rg");
     command.current_dir(root).args([
@@ -208,12 +231,13 @@ pub fn run_with_limit(root: &Path, options: &Options, limit: usize) -> Result<Re
         64 * 1024 * 1024,
         |record| collector.consume(record),
     )
-    .context("项目搜索失败（需要可执行的 ripgrep/rg）")?;
+    .context(crate::i18n::text("项目搜索失败（需要可执行的 ripgrep/rg）"))?;
     if !output.stopped && !matches!(output.status.code(), Some(0 | 1)) {
-        bail!(
+        bail!(crate::localized_format!(
             "ripgrep 搜索失败：{}",
+            "ripgrep search failed: {}",
             String::from_utf8_lossy(&output.stderr).trim()
-        );
+        ));
     }
     collector.results.truncated |= output.stopped;
     collector.results.files = collector.files.len();
@@ -223,7 +247,7 @@ pub fn run_with_limit(root: &Path, options: &Options, limit: usize) -> Result<Re
         collector
             .results
             .diagnostic
-            .push_str("\n单条搜索输出超过 64 MB，已停止读取");
+            .push_str(crate::i18n::text("\n单条搜索输出超过 64 MB，已停止读取"));
     }
     Ok(collector.results)
 }

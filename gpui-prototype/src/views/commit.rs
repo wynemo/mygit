@@ -20,22 +20,20 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .items_center()
                 .gap_2()
                 .p_2()
+                .child(div().flex_1().child(mygit_gpui::i18n::text(
+                    "提交信息 · 仅提交暂存区内容，未保存编辑不包含在内",
+                )))
                 .child(
-                    div()
-                        .flex_1()
-                        .child("提交信息 · 仅提交暂存区内容，未保存编辑不包含在内"),
-                )
-                .child(
-                    button("ai-config-open", "AI 配置", true)
+                    button("ai-config-open", mygit_gpui::i18n::text("AI 配置"), true)
                         .on_click(cx.listener(|this, _, _, cx| this.open_ai_settings(cx))),
                 )
                 .child(
                     button(
                         "ai-generate",
                         if this.ai.loading {
-                            "生成中…"
+                            mygit_gpui::i18n::text("生成中…")
                         } else {
-                            "AI 生成"
+                            mygit_gpui::i18n::text("AI 生成")
                         },
                         !this.write_busy && !this.ai.loading && !this.ai.applying,
                     )
@@ -43,7 +41,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 )
                 .when(this.ai.loading || this.ai.applying, |s| {
                     s.child(
-                        button("ai-cancel", "取消 AI", true)
+                        button("ai-cancel", mygit_gpui::i18n::text("取消 AI"), true)
                             .on_click(cx.listener(|this, _, _, cx| this.cancel_ai(cx))),
                     )
                 })
@@ -51,9 +49,9 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     button(
                         "commit-index",
                         if this.write_busy {
-                            "执行中…"
+                            mygit_gpui::i18n::text("执行中…")
                         } else {
-                            "提交暂存内容"
+                            mygit_gpui::i18n::text("提交暂存内容")
                         },
                         !this.write_busy,
                     )
@@ -83,11 +81,11 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                             .gap_2()
                             .items_center()
                             .px_2()
-                            .child("AI 生成草稿（可编辑）")
+                            .child(mygit_gpui::i18n::text("AI 生成草稿（可编辑）"))
                             .child(
                                 button(
                                     "ai-apply",
-                                    "应用到提交信息（替换）",
+                                    mygit_gpui::i18n::text("应用到提交信息（替换）"),
                                     !this.write_busy && !this.ai.loading && !this.ai.applying,
                                 )
                                 .on_click(cx.listener(|this, _, _, cx| this.apply_ai(cx))),
@@ -96,6 +94,11 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     .child(candidate),
             )
         })
-        .child(div().px_2().text_xs().child("提交信息（手动草稿）"))
+        .child(
+            div()
+                .px_2()
+                .text_xs()
+                .child(mygit_gpui::i18n::text("提交信息（手动草稿）")),
+        )
         .when_some(this.commit_editor.clone(), |s, editor| s.child(editor))
 }

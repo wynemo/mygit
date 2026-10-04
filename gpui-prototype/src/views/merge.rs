@@ -14,7 +14,7 @@ fn cell(this: &MyGit, side: usize, row: usize, cx: &mut Context<MyGit>) -> impl 
         } else if raw.ends_with('\n') {
             "LF"
         } else {
-            "无末尾换行"
+            mygit_gpui::i18n::text("无末尾换行")
         }
     });
     let source_side = [Side::Left, Side::Right, Side::Third][side];
@@ -118,7 +118,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             button(
                 "merge-blame-toggle",
                 if this.show_blame {
-                    "隐藏 Blame"
+                    mygit_gpui::i18n::text("隐藏 Blame")
                 } else {
                     "Blame"
                 },
@@ -127,7 +127,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             .on_click(cx.listener(|this, _, _, cx| this.toggle_blame(cx))),
         )
         .when(this.show_blame && this.blame_loading, |s| {
-            s.child(div().px_2().child("正在读取三侧 Blame…"))
+            s.child(div().px_2().child(mygit_gpui::i18n::text("正在读取三侧 Blame…")))
         })
         .when(this.show_blame && !this.blame_error.is_empty(), |s| {
             s.child(
@@ -145,7 +145,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .gap_2()
                 .child(div().child(view.paths[1].clone()))
                 .child(
-                    button("merge-first-parent", "首父双栏", true).on_click(cx.listener(
+                    button("merge-first-parent", mygit_gpui::i18n::text("首父双栏"), true).on_click(cx.listener(
                         move |this, _, _, cx| {
                             this.select_mode(BrowseMode::History(sha.clone()), cx)
                         },
@@ -154,7 +154,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .child(
                     button(
                         "merge-prev",
-                        "上一处",
+                        mygit_gpui::i18n::text("上一处"),
                         this.state.navigation_target(false).is_some(),
                     )
                     .on_click(cx.listener(|this, _, _, cx| this.navigate(false, cx))),
@@ -163,7 +163,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .child(
                     button(
                         "merge-next",
-                        "下一处",
+                        mygit_gpui::i18n::text("下一处"),
                         this.state.navigation_target(true).is_some(),
                     )
                     .on_click(cx.listener(|this, _, _, cx| this.navigate(true, cx))),
@@ -184,7 +184,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 ),
         )
         .child(div().px_2().text_xs().text_color(rgb(0x92a2b9)).child(
-            "合并提交历史 · 紫色：结果与双方不同；绿色/蓝色：与父 1/父 2 不同 · 右键复制原始行",
+            mygit_gpui::i18n::text("合并提交历史 · 紫色：结果与双方不同；绿色/蓝色：与父 1/父 2 不同 · 右键复制原始行"),
         ))
         .child(
             div().flex().children(
@@ -201,7 +201,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                             .border_color(rgb(0x354259))
                             .child(div().whitespace_nowrap().child(format!(
                                 "{} · {}",
-                                ["父提交 1", "合并结果", "父提交 2"][side],
+                                [mygit_gpui::i18n::text("父提交 1"), mygit_gpui::i18n::text("合并结果"), mygit_gpui::i18n::text("父提交 2")][side],
                                 short_sha(&full_sha)
                             )))
                             .child(
@@ -215,7 +215,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                     div()
                                         .text_xs()
                                         .text_color(rgb(0xffd479))
-                                        .child("该版本中不存在此文件"),
+                                        .child(mygit_gpui::i18n::text("该版本中不存在此文件")),
                                 )
                             })
                             .child(
@@ -226,7 +226,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                         button(
                                             ["merge-p1-sha", "merge-result-sha", "merge-p2-sha"]
                                                 [side],
-                                            "复制 SHA",
+                                            mygit_gpui::i18n::text("复制 SHA"),
                                             true,
                                         )
                                         .on_click(
@@ -241,7 +241,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                         button(
                                             ["merge-p1-text", "merge-result-text", "merge-p2-text"]
                                                 [side],
-                                            "复制内容",
+                                            mygit_gpui::i18n::text("复制内容"),
                                             view.message.is_none(),
                                         )
                                         .on_click(
@@ -263,21 +263,18 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     .px_2()
                     .text_xs()
                     .text_color(rgb(0x8995a8))
-                    .child(format!(
-                        "父 1 ↔ 结果：{}；父 2 ↔ 结果：{}",
+                    .child(mygit_gpui::localized_format!("父 1 ↔ 结果：{}；父 2 ↔ 结果：{}", "Parent 1 ↔ result: {}; parent 2 ↔ result: {}",
                         view.descriptions[0], view.descriptions[1]
                     )),
             )
         })
         .when(
-            view.message
-                .as_ref()
-                .is_some_and(|message| message.contains("预览上限")),
+            view.can_expand_preview,
             |s| {
                 s.child(
                     button(
                         "merge-large-preview",
-                        "按需查看（最高 20 MB）",
+                        mygit_gpui::i18n::text("按需查看（最高 20 MB）"),
                         !this.state.loading,
                     )
                     .on_click(cx.listener(|this, _, _, cx| this.preview_large_file(cx))),
@@ -288,7 +285,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             s.child(div().p_3().text_color(rgb(0xffd479)).child(message))
         })
         .when(view.message.is_none() && view.rows.is_empty(), |s| {
-            s.child(div().p_3().child("三侧文件均为空"))
+            s.child(div().p_3().child(mygit_gpui::i18n::text("三侧文件均为空")))
         })
         .when(!view.rows.is_empty(), |s| {
             s.child(

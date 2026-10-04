@@ -35,39 +35,45 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     this,
                     cx,
                     "workspace",
-                    "全部变更 · HEAD ↔ 工作区",
+                    mygit_gpui::i18n::text("全部变更 · HEAD ↔ 工作区"),
                     BrowseMode::Workspace,
                 ))
                 .child(mode_button(
                     this,
                     cx,
                     "staged",
-                    "已暂存 · HEAD ↔ index",
+                    mygit_gpui::i18n::text("已暂存 · HEAD ↔ index"),
                     BrowseMode::Staged,
                 ))
                 .child(mode_button(
                     this,
                     cx,
                     "unstaged",
-                    "未暂存 · index ↔ 工作区",
+                    mygit_gpui::i18n::text("未暂存 · index ↔ 工作区"),
                     BrowseMode::Unstaged,
                 )),
         )
-        .child(div().p_3().text_color(rgb(0x92a2b9)).child(format!(
-            "{} · 已加载 {count} 条",
-            if this.history_query.is_some() {
-                "查询结果"
-            } else {
-                "提交 DAG"
-            }
-        )))
+        .child(
+            div()
+                .p_3()
+                .text_color(rgb(0x92a2b9))
+                .child(mygit_gpui::localized_format!(
+                    "{} · 已加载 {count} 条",
+                    "{} · {count} loaded",
+                    if this.history_query.is_some() {
+                        mygit_gpui::i18n::text("查询结果")
+                    } else {
+                        mygit_gpui::i18n::text("提交 DAG")
+                    }
+                )),
+        )
         .when(this.history_graph.iter().any(|row| row.omitted > 0), |s| {
             s.child(
                 div()
                     .px_2()
                     .text_xs()
                     .text_color(rgb(0x8995a8))
-                    .child("短灰线：父提交未包含在结果中"),
+                    .child(mygit_gpui::i18n::text("短灰线：父提交未包含在结果中")),
             )
         })
         .child(
@@ -165,9 +171,9 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             button(
                 "more-history",
                 if this.history_loading {
-                    "正在加载历史…"
+                    mygit_gpui::i18n::text("正在加载历史…")
                 } else {
-                    "加载更多"
+                    mygit_gpui::i18n::text("加载更多")
                 },
                 !this.history_loading && this.history_more(),
             )
@@ -175,8 +181,12 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         )
         .when(this.state.detail.is_some(), |s| {
             s.child(
-                button("commit-worktree-compare", "选中提交 ↔ 工作区", true)
-                    .on_click(cx.listener(|this, _, _, cx| this.compare_selected_worktree(cx))),
+                button(
+                    "commit-worktree-compare",
+                    mygit_gpui::i18n::text("选中提交 ↔ 工作区"),
+                    true,
+                )
+                .on_click(cx.listener(|this, _, _, cx| this.compare_selected_worktree(cx))),
             )
         })
         .when(
@@ -188,7 +198,7 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 s.child(
                     button(
                         "merge-three-columns",
-                        "合并提交三栏查看",
+                        mygit_gpui::i18n::text("合并提交三栏查看"),
                         !this.state.loading,
                     )
                     .on_click(cx.listener(|this, _, _, cx| {
@@ -214,32 +224,42 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         div()
                             .flex()
                             .gap_2()
-                            .child(button("copy-sha", "复制 SHA", true).on_click(cx.listener(
-                                move |_, _, _, cx| {
-                                    cx.write_to_clipboard(ClipboardItem::new_string(sha.clone()));
-                                },
-                            )))
                             .child(
-                                button("copy-message", "复制信息", true).on_click(cx.listener(
-                                    move |_, _, _, cx| {
+                                button("copy-sha", mygit_gpui::i18n::text("复制 SHA"), true)
+                                    .on_click(cx.listener(move |_, _, _, cx| {
+                                        cx.write_to_clipboard(ClipboardItem::new_string(
+                                            sha.clone(),
+                                        ));
+                                    })),
+                            )
+                            .child(
+                                button("copy-message", mygit_gpui::i18n::text("复制信息"), true)
+                                    .on_click(cx.listener(move |_, _, _, cx| {
                                         cx.write_to_clipboard(ClipboardItem::new_string(
                                             message.clone(),
                                         ));
-                                    },
-                                )),
+                                    })),
                             ),
                     )
                     .child(div().text_color(rgb(0x92a2b9)).child(format!(
                         "{} <{}>\n{}",
                         detail.author, detail.author_email, detail.author_date
                     )))
-                    .child(div().text_color(rgb(0x92a2b9)).child(format!(
-                        "提交者：{} <{}>\n{}",
-                        detail.committer, detail.committer_email, detail.commit_date
-                    )))
+                    .child(
+                        div()
+                            .text_color(rgb(0x92a2b9))
+                            .child(mygit_gpui::localized_format!(
+                                "提交者：{} <{}>\n{}",
+                                "Committer: {} <{}>\n{}",
+                                detail.committer,
+                                detail.committer_email,
+                                detail.commit_date
+                            )),
+                    )
                     .child(div().child(detail.references))
-                    .child(div().child(format!(
+                    .child(div().child(mygit_gpui::localized_format!(
                             "父提交：{}",
+                            "Parents: {}",
                             detail
                                 .parents
                                 .iter()
@@ -276,7 +296,7 @@ pub fn files(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .child(
             button(
                 "current-file-history",
-                "当前文件历史",
+                mygit_gpui::i18n::text("当前文件历史"),
                 this.state.current_file.is_some(),
             )
             .on_click(cx.listener(|this, _, _, cx| this.current_file_history(cx))),
@@ -298,31 +318,49 @@ pub fn files(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                 .flex()
                                 .gap_1()
                                 .child(
-                                    button("stage-selected", "暂存选中", !this.write_busy)
-                                        .on_click(cx.listener(|this, _, _, cx| {
-                                            this.change_index(true, false, cx)
-                                        })),
+                                    button(
+                                        "stage-selected",
+                                        mygit_gpui::i18n::text("暂存选中"),
+                                        !this.write_busy,
+                                    )
+                                    .on_click(cx.listener(
+                                        |this, _, _, cx| this.change_index(true, false, cx),
+                                    )),
                                 )
                                 .child(
-                                    button("unstage-selected", "取消暂存", !this.write_busy)
-                                        .on_click(cx.listener(|this, _, _, cx| {
-                                            this.change_index(false, false, cx)
-                                        })),
+                                    button(
+                                        "unstage-selected",
+                                        mygit_gpui::i18n::text("取消暂存"),
+                                        !this.write_busy,
+                                    )
+                                    .on_click(cx.listener(
+                                        |this, _, _, cx| this.change_index(false, false, cx),
+                                    )),
                                 ),
                         )
                         .child(
                             div()
                                 .flex()
                                 .gap_1()
-                                .child(button("stage-all", "暂存全部", !this.write_busy).on_click(
-                                    cx.listener(|this, _, _, cx| this.change_index(true, true, cx)),
-                                ))
                                 .child(
-                                    button("unstage-all", "取消全部", !this.write_busy).on_click(
-                                        cx.listener(|this, _, _, cx| {
-                                            this.change_index(false, true, cx)
-                                        }),
-                                    ),
+                                    button(
+                                        "stage-all",
+                                        mygit_gpui::i18n::text("暂存全部"),
+                                        !this.write_busy,
+                                    )
+                                    .on_click(cx.listener(
+                                        |this, _, _, cx| this.change_index(true, true, cx),
+                                    )),
+                                )
+                                .child(
+                                    button(
+                                        "unstage-all",
+                                        mygit_gpui::i18n::text("取消全部"),
+                                        !this.write_busy,
+                                    )
+                                    .on_click(cx.listener(
+                                        |this, _, _, cx| this.change_index(false, true, cx),
+                                    )),
                                 ),
                         ),
                 )
