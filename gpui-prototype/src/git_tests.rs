@@ -2195,3 +2195,29 @@ fn refresh_after_restoring_an_untracked_open_file_keeps_empty_preview() {
     assert!(diff.blocks.is_empty());
     assert!(snapshot.selection.files.is_empty());
 }
+
+#[test]
+fn explicit_large_preview_budget_survives_repository_refresh() {
+    let f = Fixture::new();
+    let text = "large line\n".repeat(100_000);
+    std::fs::write(f.0.join("large.txt"), &text).unwrap();
+    f.commit();
+    let (comparison, file) = workspace_file(&f.0, "large.txt").unwrap();
+    let bounded = compare(&f.0, &comparison, &file).unwrap();
+    assert!(bounded.can_expand_preview);
+    let expanded = compare_with_limit(&f.0, &comparison, &file, 20_000_000).unwrap();
+    assert_eq!(expanded.read_limit(), 20_000_000);
+    assert_eq!(&*expanded.right_document.text, text);
+    let refreshed = refresh_snapshot_with_limit(
+        &f.0,
+        &BrowseMode::Workspace,
+        Some((file, comparison)),
+        true,
+        expanded.read_limit(),
+    )
+    .unwrap();
+    let (_, _, diff) = refreshed.active.unwrap();
+    assert_eq!(&*diff.right_document.text, text);
+    assert_eq!(diff.read_limit(), 20_000_000);
+    assert!(!diff.can_expand_preview);
+}

@@ -68,6 +68,7 @@ pub struct View {
     pub blocks: Vec<Range<usize>>,
     pub message: Option<String>,
     pub can_expand_preview: bool,
+    pub preview_limit: usize,
 }
 impl View {
     /// A two-side projection shares existing selection, block navigation and tab
@@ -111,6 +112,7 @@ impl View {
         }));
         diff.message = self.message.clone();
         diff.can_expand_preview = self.can_expand_preview;
+        diff.preview_limit = self.preview_limit;
         diff
     }
 }
@@ -249,6 +251,7 @@ pub fn align(left: &Diff, right: &Diff) -> Result<View> {
         blocks: vec![],
         message,
         can_expand_preview: left.can_expand_preview || right.can_expand_preview,
+        preview_limit: left.read_limit().max(right.read_limit()),
     };
     if view.message.is_some() {
         return Ok(view);

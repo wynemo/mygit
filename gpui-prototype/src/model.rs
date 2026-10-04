@@ -177,12 +177,17 @@ pub struct Diff {
     pub description: Option<String>,
     /// Size-limit notices may offer a larger bounded preview, independent of message text.
     pub can_expand_preview: bool,
+    /// Explicit preview budget retained by refreshes and cached tabs (zero means default).
+    pub preview_limit: usize,
     pub left_document: crate::text::Document,
     pub right_document: crate::text::Document,
     pub left_syntax: crate::syntax::Highlighted,
     pub right_syntax: crate::syntax::Highlighted,
 }
 impl Diff {
+    pub fn read_limit(&self) -> usize {
+        self.preview_limit.clamp(2_000_000, 20_000_000)
+    }
     pub fn from_rows(rows: Vec<DiffRow>) -> Self {
         let mut blocks = Vec::new();
         let mut start = None;

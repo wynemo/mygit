@@ -542,6 +542,10 @@ impl MyGit {
             .iter()
             .find(|t| t.file.path == file.path && t.comparison == comparison)
             .cloned();
+        let preview_limit = previous
+            .as_ref()
+            .map(|tab| tab.diff.read_limit())
+            .unwrap_or(2_000_000);
         self.state.detail = self.state.listed_detail.clone();
         self.state.comparison = Some(comparison.clone());
         self.edit_mode = false;
@@ -571,10 +575,18 @@ impl MyGit {
                         .iter()
                         .find(|f| f.path == file.path)
                         .ok_or_else(|| anyhow::anyhow!("合并文件不再存在"))?;
-                    let view = mygit_gpui::merge::load(&root, &selection, target, 2_000_000)?;
+                    let view = mygit_gpui::merge::load(&root, &selection, target, preview_limit)?;
                     Ok((None, Some(view)))
                 } else {
-                    Ok((Some(git::compare(&root, &comparison, &file)?), None))
+                    Ok((
+                        Some(git::compare_with_limit(
+                            &root,
+                            &comparison,
+                            &file,
+                            preview_limit,
+                        )?),
+                        None,
+                    ))
                 }
             },
             move |this, (diff, merge), _| {
@@ -919,6 +931,7 @@ impl MyGit {
             return;
         };
         let root = repo.root.clone();
+        let preview_limit = self.state.diff.read_limit();
         let generation = self
             .state
             .begin(mygit_gpui::i18n::text("正在更新已保存 Diff…").into());
@@ -928,7 +941,7 @@ impl MyGit {
             cx,
             generation,
             self.pending.clone(),
-            move || git::compare(&root, &comparison, &file),
+            move || git::compare_with_limit(&root, &comparison, &file, preview_limit),
             |this, diff, _| {
                 this.state.set_diff(diff);
                 this.remember_tab();

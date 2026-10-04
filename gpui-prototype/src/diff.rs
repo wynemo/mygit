@@ -18,6 +18,7 @@ pub fn calculate_with_limit(left: &[u8], right: &[u8], limit: usize) -> Result<D
             limit / 1_000_000
         ));
         diff.can_expand_preview = limit < 20_000_000;
+        diff.preview_limit = limit;
         return Ok(diff);
     }
     if left
@@ -34,6 +35,7 @@ pub fn calculate_with_limit(left: &[u8], right: &[u8], limit: usize) -> Result<D
     let left = std::str::from_utf8(left).context(crate::i18n::text("旧版本不是 UTF-8 文本"))?;
     let right = std::str::from_utf8(right).context(crate::i18n::text("新版本不是 UTF-8 文本"))?;
     let mut diff = Diff::from_rows(align(left, right));
+    diff.preview_limit = limit;
     diff.left_document = crate::text::Document::new(left);
     diff.right_document = crate::text::Document::new(right);
     annotate(&mut diff);

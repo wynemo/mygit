@@ -58,6 +58,16 @@ pub fn refresh_snapshot(
     active: Option<(FileChange, Comparison)>,
     follows_list: bool,
 ) -> Result<RefreshSnapshot> {
+    refresh_snapshot_with_limit(root, mode, active, follows_list, 2_000_000)
+}
+
+pub fn refresh_snapshot_with_limit(
+    root: &Path,
+    mode: &BrowseMode,
+    active: Option<(FileChange, Comparison)>,
+    follows_list: bool,
+    limit: usize,
+) -> Result<RefreshSnapshot> {
     let repo = snapshot(root)?;
     let selection = selection(root, mode)?;
     if let Revision::Head(sha) = &selection.comparison.left
@@ -90,7 +100,8 @@ pub fn refresh_snapshot(
                 .map(Revision::Head)
                 .unwrap_or(Revision::Empty);
         }
-        let diff = compare(root, &comparison, &file)?;
+        let diff =
+            compare_with_limit(root, &comparison, &file, limit.clamp(2_000_000, 20_000_000))?;
         Some((file, comparison, diff))
     } else {
         None
@@ -1028,6 +1039,7 @@ pub fn compare_with_limit(
         ));
         diff.description = Some(description);
         diff.can_expand_preview = limit < 20_000_000;
+        diff.preview_limit = limit.min(20_000_000);
         return Ok(diff);
     }
     let left_bytes = content(root, &left, &li, limit)?;

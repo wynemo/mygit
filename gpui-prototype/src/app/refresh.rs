@@ -104,6 +104,7 @@ impl MyGit {
         // Historical merge documents are immutable and already pinned; keep the
         // three-column cache while refreshing refs and the file list.
         let follows_list = self.state.comparison == self.state.listed_comparison;
+        let preview_limit = self.state.diff.read_limit();
         let active = if self.state.merge.is_some()
             || (matches!(self.state.mode, BrowseMode::Merge(_)) && follows_list)
         {
@@ -120,7 +121,7 @@ impl MyGit {
         self.refresh_running = true;
         let task = cx.background_executor().spawn(async move {
             process::scope(token, || {
-                git::refresh_snapshot(&root, &mode, active, follows_list)
+                git::refresh_snapshot_with_limit(&root, &mode, active, follows_list, preview_limit)
             })
         });
         cx.spawn(async move |this, cx| {
