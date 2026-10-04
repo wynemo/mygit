@@ -327,3 +327,9 @@
 
 - release app 构建、plist 和 ad-hoc 签名校验通过，宿主架构 arm64；干净环境启动仍待验。
 - 加入只读的 Rust/Python Diff 基准，使用同一万行 Unicode/CRLF 文本、两处修改和 20 次迭代，记录实际时间与进程峰值 RSS。两种计算范围不同，不宣称框架速度优势；数据及复现见 PERFORMANCE.md。R01 的启动、历史、滚动和常驻内存仍待补齐。
+
+## 仓库隔离与 macOS 外部依赖
+
+- 原生切换到 unborn 仓库后，旧历史、标签页和活动文件清理；新快速定位索引和内容搜索只含新仓库文件，详见 NATIVE_VALIDATION.md。F03 等完整流程仍待验。
+- Git/rg/curl 在 macOS 保留 PATH 优先级，缺失时查标准 Homebrew/系统目录，避免 Finder 环境漏掉已安装程序；不修改系统 PATH。测试核对可执行权限、优先级、受限回退和真实子进程输出。
+- 103 项库测试通过；随后扩充同一新增依赖测试并单独复验通过，Clippy 与 macOS 构建通过。Finder 的最终 app 启动仍待原生验收。

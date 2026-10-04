@@ -3,6 +3,7 @@ pub mod blame;
 pub mod branches;
 pub mod diff;
 pub mod editor;
+mod external;
 pub mod git;
 pub mod graph;
 pub mod history;

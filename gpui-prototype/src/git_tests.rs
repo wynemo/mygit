@@ -1,4 +1,5 @@
 use super::*;
+use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 struct Fixture(PathBuf);

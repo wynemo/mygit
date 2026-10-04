@@ -8,7 +8,7 @@ python3 gpui-prototype/scripts/package_macos.py
 
 构建机需要 Python 3.9+、Rust、完整 Xcode 和 Metal Toolchain。脚本使用锁定依赖构建 release，生成 `gpui-prototype/dist/MyGit.app`，包含原生二进制、项目图标和 Cargo 版本信息，并检查 plist 和 ad-hoc 签名。输出目录已存在时拒绝覆盖；可用 `--output /另一目录/MyGit.app` 指定新路径，`--debug` 用于验证包结构。
 
-应用运行不需要 Python、Rust 或项目源码。需要 Git；项目搜索另需 `rg`，AI 生成另需支持 HTTP/HTTPS 的 `curl`。这些可执行程序必须出现在应用的 PATH 中。Finder 启动时的 PATH 可能与终端不同；首次验证可直接从已配置 PATH 的终端启动：
+应用运行不需要 Python、Rust 或项目源码。需要 Git；项目搜索另需 `rg`，AI 生成另需支持 HTTP/HTTPS 的 `curl`。应用优先使用 PATH 中的程序；macOS 找不到程序时，依次查找 `/opt/homebrew/bin`、`/usr/local/bin`、`/usr/bin` 和 `/bin` 的可执行文件，不修改全局环境。自定义安装位置仍需加入启动环境的 PATH。首次验证也可从终端启动：
 
 ```sh
 gpui-prototype/dist/MyGit.app/Contents/MacOS/MyGit /路径/仓库

@@ -5,7 +5,6 @@ use serde_json::{Value, json};
 use std::{
     hash::{Hash, Hasher},
     path::Path,
-    process::Command,
     time::Duration,
 };
 pub const DEFAULT_PROMPT: &str =
@@ -210,7 +209,7 @@ fn generate_with_timeout(config: &Config, diff: &str, timeout: Duration) -> Resu
     input.push_str("request = POST\nsilent\nproto = \"=http,https\"\nconnect-timeout = 5\nmax-time = 15\nwrite-out = \"\\n%{http_code}\"\n");
     let mut response = Vec::new();
     let output = crate::process::lines_with_input(
-        Command::new("curl")
+        crate::external::command("curl")
             .args(["--disable", "--config", "-"])
             .env_remove("MYGIT_AI_API_SECRET"),
         timeout,

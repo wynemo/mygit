@@ -6,7 +6,6 @@ use std::{
     hash::{Hash, Hasher},
     ops::Range,
     path::Path,
-    process::Command,
     time::Duration,
 };
 #[derive(Clone, Debug, Default)]
@@ -163,7 +162,7 @@ pub fn run_with_limit(root: &Path, options: &Options, limit: usize) -> Result<Re
     {
         bail!("查询最多 4096 字符，查询与过滤不能含 NUL");
     }
-    let mut command = Command::new("rg");
+    let mut command = crate::external::command("rg");
     command.current_dir(root).args([
         "--no-config",
         "--json",

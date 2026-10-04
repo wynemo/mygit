@@ -4,7 +4,6 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     io::Read,
     path::{Path, PathBuf},
-    process::Command,
 };
 
 pub(crate) fn git(root: &Path, args: &[&str]) -> Result<Vec<u8>> {
@@ -15,7 +14,7 @@ pub(crate) fn git_timeout(
     args: &[&str],
     timeout: std::time::Duration,
 ) -> Result<Vec<u8>> {
-    let mut command = Command::new("git");
+    let mut command = crate::external::command("git");
     command
         .arg("-C")
         .arg(root)
