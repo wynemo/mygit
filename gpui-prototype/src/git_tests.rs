@@ -2178,3 +2178,20 @@ fn individual_file_worktree_comparison_handles_unchanged_added_deleted_and_missi
     assert!(file_against_worktree(&f.0, revision.clone(), "../outside").is_err());
     assert!(file_against_worktree(&f.0, Revision::Index, "new.txt").is_err());
 }
+
+#[test]
+fn refresh_after_restoring_an_untracked_open_file_keeps_empty_preview() {
+    let f = Fixture::new();
+    std::fs::write(f.0.join("tracked.txt"), "tracked\n").unwrap();
+    f.commit();
+    std::fs::write(f.0.join("new.txt"), "new\n").unwrap();
+    let (comparison, file) = workspace_file(&f.0, "new.txt").unwrap();
+    std::fs::remove_file(f.0.join("new.txt")).unwrap();
+    let snapshot =
+        refresh_snapshot(&f.0, &BrowseMode::Workspace, Some((file, comparison)), true).unwrap();
+    let (_, _, diff) = snapshot.active.unwrap();
+    assert!(diff.left_document.text.is_empty());
+    assert!(diff.right_document.text.is_empty());
+    assert!(diff.blocks.is_empty());
+    assert!(snapshot.selection.files.is_empty());
+}

@@ -1090,9 +1090,10 @@ impl Render for Editor {
                         .flex_1()
                         .min_h_0(),
                     )
-                    .when(!self.compact && !self.sensitive, |s| {
-                        s.child(overview(self))
-                    }),
+                    .when(
+                        !self.compact && !self.sensitive && self.buffer.path.is_some(),
+                        |s| s.child(overview(self)),
+                    ),
             )
             .child(
                 canvas(

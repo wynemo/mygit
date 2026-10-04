@@ -409,8 +409,8 @@ pub fn confirmation(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             block,
             ..
         }) => Some(mygit_gpui::localized_format!(
-            "{}：{} → 工作区磁盘\n目标：{}{}\nindex 保持原样；先保存恢复记录，可用“撤销还原”恢复。",
-            "{}: {} → worktree on disk\nTarget: {}{}\nThe index is preserved. Recovery data is saved first; use Undo restore to recover.",
+            "{}：{} → 工作区磁盘\n目标：{}{}{}\nindex 保持原样；先保存恢复记录，可用“撤销还原”恢复。",
+            "{}: {} → worktree on disk\nTarget: {}{}{}\nThe index is preserved. Recovery data is saved first; use Undo restore to recover.",
             if block.is_some() {
                 mygit_gpui::i18n::text("还原当前差异块")
             } else {
@@ -422,6 +422,13 @@ pub fn confirmation(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 format!("、{}", file.old_path)
             } else {
                 String::new()
+            },
+            if block.is_none()
+                && comparison.targets(file).0.revision == mygit_gpui::model::Revision::Empty
+            {
+                mygit_gpui::i18n::text("\n来源中不存在该文件，确认后将删除磁盘文件。")
+            } else {
+                ""
             }
         )),
         Some(crate::app::Confirmation::Reset {

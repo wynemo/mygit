@@ -620,6 +620,10 @@ pub fn translate(language: Language, value: &str) -> &str {
         "特殊文件不支持预览" => "Special files cannot be previewed",
         "文本/二进制文件" => "Text/binary file",
         "缺少对象信息" => "Missing object information",
+        "\n来源中不存在该文件，确认后将删除磁盘文件。" => {
+            "\nThe file is absent from the source; confirming will delete it from disk."
+        }
+        "文件还原已准备，请确认操作" => "File restore is ready; confirm the operation",
         "对象模式无效" => "Invalid object mode",
         "缺少对象 ID" => "Missing object ID",
         "不支持的 Git 对象模式：{mode}" => "Unsupported Git object mode: {mode}",

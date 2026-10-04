@@ -219,6 +219,7 @@ impl MyGit {
                 {
                     return;
                 }
+                this.state.message = mygit_gpui::i18n::text("文件还原已准备，请确认操作").into();
                 this.confirmation = Some(Confirmation::Restore {
                     file,
                     comparison,

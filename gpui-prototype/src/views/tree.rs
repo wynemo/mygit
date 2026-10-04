@@ -113,7 +113,8 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .flex()
                 .items_center()
                 .gap_2()
-                .child(mygit_gpui::i18n::text("工作区文件树"))
+                .flex_wrap()
+                .child(div().w_full().child(mygit_gpui::i18n::text("工作区文件树")))
                 .child(
                     button(
                         "tree-actions",
@@ -182,11 +183,13 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                     .overflow_hidden()
                                     .whitespace_nowrap()
                                     .cursor_pointer()
-                                    .tooltip(move |_, cx| {
-                                        cx.new(|_| {
-                                            crate::views::hints::Hint(full_path.clone().into())
+                                    .when(this.tree_menu.is_none(), |s| {
+                                        s.tooltip(move |_, cx| {
+                                            cx.new(|_| {
+                                                crate::views::hints::Hint(full_path.clone().into())
+                                            })
+                                            .into()
                                         })
-                                        .into()
                                     })
                                     .bg(rgb(if Some(&entry.path) == this.tree.selected.as_ref() {
                                         0x263b56

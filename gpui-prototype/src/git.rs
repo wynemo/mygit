@@ -742,13 +742,19 @@ fn info(root: &Path, target: &FileTarget) -> Result<ContentInfo> {
         Revision::Empty => return Ok(empty()),
         Revision::Worktree => {
             let path = root.join(&target.path);
-            let metadata = std::fs::symlink_metadata(&path).with_context(|| {
-                crate::localized_format!(
-                    "无法读取工作区 {}",
-                    "Unable to read worktree {}",
-                    target.path
-                )
-            })?;
+            let metadata = match std::fs::symlink_metadata(&path) {
+                Ok(metadata) => metadata,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(empty()),
+                Err(error) => {
+                    return Err(error).with_context(|| {
+                        crate::localized_format!(
+                            "无法读取工作区 {}",
+                            "Unable to read worktree {}",
+                            target.path
+                        )
+                    });
+                }
+            };
             if metadata.file_type().is_symlink() {
                 return Ok(ContentInfo {
                     kind: crate::i18n::text("符号链接"),
@@ -804,6 +810,9 @@ fn info(root: &Path, target: &FileTarget) -> Result<ContentInfo> {
             string(git(root, &["ls-tree", "-z", sha, "--", &target.path])?)?
         }
     };
+    if record.is_empty() {
+        return Ok(empty());
+    }
     let header = record
         .split('\t')
         .next()
@@ -843,7 +852,7 @@ fn info(root: &Path, target: &FileTarget) -> Result<ContentInfo> {
     })
 }
 fn content(root: &Path, target: &FileTarget, info: &ContentInfo, limit: usize) -> Result<Vec<u8>> {
-    if target.revision == Revision::Empty {
+    if target.revision == Revision::Empty || info.kind == crate::i18n::text("空内容") {
         return Ok(vec![]);
     }
     if target.revision == Revision::Worktree {
