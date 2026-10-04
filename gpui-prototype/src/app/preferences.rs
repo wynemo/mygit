@@ -1,6 +1,49 @@
 use super::*;
 
 impl MyGit {
+    pub fn showing_tree(&self) -> bool {
+        self.show_tree || !self.settings.git_panel_visible
+    }
+    pub fn reveal_git_panel(&mut self, cx: &mut Context<Self>) {
+        if !self.settings.git_panel_visible {
+            self.settings.git_panel_visible = true;
+            self.save_settings();
+            cx.notify();
+        }
+    }
+    pub fn toggle_git_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.confirmation.is_some() {
+            return;
+        }
+        self.settings.git_panel_visible = !self.settings.git_panel_visible;
+        self.line_layouts.clear();
+        self.diff_bounds = None;
+        self.dragging = false;
+        self.save_settings();
+        // Move focus out of hidden Git inputs, without destroying their entities.
+        if let Some(editor) = self.current_editor() {
+            window.focus(&editor.read(cx).focus);
+        } else {
+            window.focus(&self.focus);
+        }
+        cx.notify();
+    }
+    pub fn toggle_tree(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.settings.git_panel_visible {
+            self.toggle_files_panel(cx);
+        } else {
+            self.show_tree = !self.show_tree;
+            self.settings.files_visible = true;
+            self.save_settings();
+        }
+        window.focus(if self.settings.files_visible {
+            &self.files_focus
+        } else {
+            &self.focus
+        });
+        cx.notify();
+    }
+
     pub fn select_language(
         &mut self,
         language: mygit_gpui::i18n::Language,

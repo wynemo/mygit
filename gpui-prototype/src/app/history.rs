@@ -23,7 +23,10 @@ impl MyGit {
         if self.state.repo.is_none() {
             return;
         }
-        self.show_history_search = !self.show_history_search;
+        self.show_history_search = !self.show_history_search || !self.settings.git_panel_visible;
+        if self.show_history_search {
+            self.reveal_git_panel(cx);
+        }
         self.prepare_history_inputs(cx);
         if self.show_history_search {
             self.hide_quick_open();
@@ -83,6 +86,7 @@ impl MyGit {
         );
     }
     pub fn show_path_history(&mut self, path: String, directory: bool, cx: &mut Context<Self>) {
+        self.reveal_git_panel(cx);
         self.prepare_history_inputs(cx);
         self.history_path = Some((path.clone(), directory));
         self.hide_quick_open();

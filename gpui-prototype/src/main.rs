@@ -39,6 +39,10 @@ fn main() {
                         mygit_gpui::i18n::text("显示 / 隐藏文件栏"),
                         ToggleFilesPanel,
                     ),
+                    MenuItem::action(
+                        mygit_gpui::i18n::text("显示 / 隐藏 Git 面板"),
+                        ToggleGitPanel,
+                    ),
                     MenuItem::separator(),
                     MenuItem::action(mygit_gpui::i18n::text("全部变更"), ViewWorkspace),
                     MenuItem::action(mygit_gpui::i18n::text("已暂存"), ViewStaged),
@@ -74,6 +78,8 @@ fn main() {
             },
         ]);
         cx.bind_keys([
+            KeyBinding::new("cmd-j", ToggleGitPanel, Some("MyGit")),
+            KeyBinding::new("ctrl-j", ToggleGitPanel, Some("MyGit")),
             KeyBinding::new("cmd-b", ToggleFilesPanel, Some("MyGit")),
             KeyBinding::new("ctrl-b", ToggleFilesPanel, Some("MyGit")),
             KeyBinding::new("cmd-k", ToggleCommitPanel, Some("MyGit")),

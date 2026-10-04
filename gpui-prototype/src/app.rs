@@ -33,6 +33,7 @@ actions!(
         RefreshRepo,
         ToggleSettings,
         ToggleFilesPanel,
+        ToggleGitPanel,
         ToggleBranches,
         ToggleHistorySearch,
         ToggleProjectSearch,
@@ -633,6 +634,19 @@ impl MyGit {
         self.active_tab = Some(index);
         self.line_layouts.clear();
         self.dragging = false;
+        if !self.settings.git_panel_visible {
+            if self.state.editable
+                && self
+                    .state
+                    .comparison
+                    .as_ref()
+                    .is_some_and(|c| c.right == Revision::Worktree)
+            {
+                self.open_current_editor(cx);
+            } else {
+                self.reveal_git_panel(cx);
+            }
+        }
         cx.notify();
     }
     pub fn close_tab(&mut self, index: usize, cx: &mut Context<Self>) {
@@ -730,7 +744,7 @@ impl MyGit {
             .is_some_and(|e| e.read(cx).buffer.dirty())
     }
     pub fn current_editor(&self) -> Option<Entity<Editor>> {
-        if !self.edit_mode
+        if (!self.edit_mode && self.settings.git_panel_visible)
             || !self.state.editable
             || !self
                 .state
@@ -747,6 +761,12 @@ impl MyGit {
             .cloned()
     }
     pub fn edit_current(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_current_editor(cx);
+        if let Some(editor) = self.current_editor() {
+            window.focus(&editor.read(cx).focus);
+        }
+    }
+    fn open_current_editor(&mut self, cx: &mut Context<Self>) {
         if !self.state.editable
             || !self
                 .state
@@ -760,9 +780,8 @@ impl MyGit {
             return;
         };
         let path = file.path.clone();
-        if let Some(editor) = self.editors.get(&path) {
+        if self.editors.contains_key(&path) {
             self.edit_mode = true;
-            window.focus(&editor.read(cx).focus);
             cx.notify();
             return;
         }
@@ -778,7 +797,11 @@ impl MyGit {
             generation,
             self.pending.clone(),
             move || mygit_gpui::editor::Buffer::load(&root.join(&path)),
-            |this, buffer, cx| {
+            |this, mut buffer, cx| {
+                buffer.select_matching_document(
+                    &this.state.diff.right_document,
+                    &this.state.text_selection,
+                );
                 let Some(file) = this.state.current_file.clone() else {
                     return;
                 };
@@ -1193,7 +1216,10 @@ impl MyGit {
         );
     }
     pub fn toggle_compare(&mut self, cx: &mut Context<Self>) {
-        self.show_compare = !self.show_compare;
+        self.show_compare = !self.show_compare || !self.settings.git_panel_visible;
+        if self.show_compare {
+            self.reveal_git_panel(cx);
+        }
         if self.show_compare {
             self.hide_quick_open();
             self.hide_project_search();
@@ -1262,9 +1288,10 @@ impl MyGit {
         );
     }
     pub fn toggle_commit(&mut self, cx: &mut Context<Self>) {
-        if self.show_commit {
+        if self.show_commit && self.settings.git_panel_visible {
             self.hide_commit();
         } else {
+            self.reveal_git_panel(cx);
             self.show_commit = true;
         }
         if self.show_commit {
@@ -1533,7 +1560,7 @@ impl MyGit {
                 });
                 Ok((comparison, file, diff, location))
             },
-            move |this, (comparison, file, diff, location), _| {
+            move |this, (comparison, file, diff, location), cx| {
                 this.state.comparison = Some(comparison);
                 this.state.current_file = Some(file);
                 this.state.set_diff(diff);
@@ -1546,6 +1573,7 @@ impl MyGit {
                         .cloned()
                         .unwrap_or_default();
                 }
+                let navigate_editor = location.as_ref().is_some_and(|(_, result)| result.is_ok());
                 if let Some((line, location)) = location {
                     match location {
                         Ok(range) => {
@@ -1576,6 +1604,26 @@ impl MyGit {
                     }
                 }
                 this.remember_tab();
+                if !this.settings.git_panel_visible && this.state.diff.message.is_none() {
+                    this.open_current_editor(cx);
+                }
+                if !this.settings.git_panel_visible
+                    && navigate_editor
+                    && let Some(editor) = this.current_editor()
+                {
+                    let moved = editor.update(cx, |editor, cx| {
+                        editor.select_matching_document(
+                            &this.state.diff.right_document,
+                            &this.state.text_selection,
+                            cx,
+                        )
+                    });
+                    if !moved {
+                        this.state.message =
+                            mygit_gpui::i18n::text("工作区内容已变化或正在输入，保留编辑器位置")
+                                .into();
+                    }
+                }
             },
         );
         cx.notify();
@@ -1699,6 +1747,7 @@ impl MyGit {
         };
         let sha = commit.sha.clone();
         self.history_cursor = Some(index);
+        self.reveal_git_panel(cx);
         window.focus(&self.history_focus);
         cx.activate(true);
         self.history_scroll
@@ -1706,9 +1755,12 @@ impl MyGit {
         self.select_mode(BrowseMode::History(sha), cx);
     }
     pub fn list_move(&mut self, forward: bool, window: &mut Window, cx: &mut Context<Self>) {
-        if self.show_branches && self.branch_focus.is_focused(window) {
+        if self.settings.git_panel_visible
+            && self.show_branches
+            && self.branch_focus.is_focused(window)
+        {
             self.move_branch(forward, cx);
-        } else if self.history_focus.is_focused(window) {
+        } else if self.settings.git_panel_visible && self.history_focus.is_focused(window) {
             let count = self.history_commits().len();
             if count == 0 {
                 return;
@@ -1725,7 +1777,7 @@ impl MyGit {
             };
             self.choose_history(index, window, cx);
         } else if self.files_focus.is_focused(window) {
-            if self.show_tree {
+            if self.showing_tree() {
                 let rows = self.tree.rows();
                 if rows.is_empty() {
                     return;
@@ -1764,16 +1816,19 @@ impl MyGit {
         }
     }
     pub fn list_enter(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.show_branches && self.branch_focus.is_focused(window) {
+        if self.settings.git_panel_visible
+            && self.show_branches
+            && self.branch_focus.is_focused(window)
+        {
             self.switch_branch(cx);
-        } else if self.history_focus.is_focused(window) {
+        } else if self.settings.git_panel_visible && self.history_focus.is_focused(window) {
             window.focus(if self.settings.files_visible {
                 &self.files_focus
             } else {
                 &self.focus
             });
         } else if self.files_focus.is_focused(window) {
-            if self.show_tree
+            if self.showing_tree()
                 && let Some((entry, _)) = self
                     .tree
                     .rows()
@@ -1788,23 +1843,35 @@ impl MyGit {
         cx.notify();
     }
     pub fn cycle_focus(&mut self, reverse: bool, window: &mut Window, cx: &mut Context<Self>) {
-        let mut handles = vec![&self.history_focus];
-        if self.settings.files_visible {
-            handles.push(&self.files_focus);
+        let mut handles = vec![];
+        if self.settings.git_panel_visible {
+            handles.push(self.history_focus.clone());
         }
-        handles.push(&self.focus);
-        if self.show_branches {
-            handles.push(&self.branch_focus);
+        if self.settings.files_visible {
+            handles.push(self.files_focus.clone());
+        }
+        if !self.settings.git_panel_visible
+            && let Some(editor) = self.current_editor()
+        {
+            handles.push(editor.read(cx).focus.clone());
+        } else {
+            handles.push(self.focus.clone());
+        }
+        if self.settings.git_panel_visible && self.show_branches {
+            handles.push(self.branch_focus.clone());
         }
         let index = handles
             .iter()
             .position(|focus| focus.is_focused(window))
             .unwrap_or(handles.len() - 1);
         let next = (index + if reverse { handles.len() - 1 } else { 1 }) % handles.len();
-        window.focus(handles[next]);
+        window.focus(&handles[next]);
         cx.notify();
     }
     pub fn navigate(&mut self, forward: bool, cx: &mut Context<Self>) {
+        if !self.settings.git_panel_visible {
+            return;
+        }
         if let Some(row) = self.state.navigate(forward) {
             self.diff_scroll.scroll_to_item_strict(
                 if self.state.merge.is_some() {
@@ -1937,6 +2004,9 @@ impl MyGit {
         }
     }
     pub fn copy_text(&mut self, cx: &mut Context<Self>) {
+        if !self.settings.git_panel_visible {
+            return;
+        }
         if let Some(text) = self
             .state
             .text_selection
@@ -1946,6 +2016,9 @@ impl MyGit {
         }
     }
     pub fn select_all_text(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.settings.git_panel_visible {
+            return;
+        }
         self.state
             .text_selection
             .select_all(self.state.diff.document(self.state.text_selection.side));
@@ -1960,6 +2033,9 @@ impl MyGit {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if !self.settings.git_panel_visible {
+            return;
+        }
         let side = self.state.text_selection.side;
         self.state
             .text_selection
@@ -2063,7 +2139,9 @@ impl MyGit {
 }
 impl Render for MyGit {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        self.ensure_blame(cx);
+        if self.settings.git_panel_visible {
+            self.ensure_blame(cx);
+        }
         let commits = self.history_commits();
         let graph_key = (
             commits.len(),
@@ -2095,7 +2173,8 @@ impl Render for MyGit {
                         return;
                     }
                     let _ = entity.update(cx, |this, cx| {
-                        if this.confirmation.is_some()
+                        if !this.settings.git_panel_visible
+                            || this.confirmation.is_some()
                             || this.current_editor().is_some()
                             || !this
                                 .diff_bounds
@@ -2123,8 +2202,16 @@ impl Render for MyGit {
             window.focus(&self.focus);
         }
         let available = (f32::from(window.viewport_size().width) - 420.).max(280.);
-        let factor =
-            (available / (self.settings.history_width + self.settings.files_width)).min(1.);
+        let requested_width = if self.settings.git_panel_visible {
+            self.settings.history_width
+        } else {
+            0.
+        } + if self.settings.files_visible {
+            self.settings.files_width
+        } else {
+            0.
+        };
+        let factor = (available / requested_width.max(1.)).min(1.);
         self.visible_history_width = (self.settings.history_width * factor).max(160.);
         self.visible_files_width = (self.settings.files_width * factor).max(120.);
         div()
@@ -2137,12 +2224,15 @@ impl Render for MyGit {
                 }
             }))
             .on_action(cx.listener(|this, _: &ViewWorkspace, _, cx| {
+                this.reveal_git_panel(cx);
                 this.select_mode(BrowseMode::Workspace, cx)
             }))
-            .on_action(
-                cx.listener(|this, _: &ViewStaged, _, cx| this.select_mode(BrowseMode::Staged, cx)),
-            )
+            .on_action(cx.listener(|this, _: &ViewStaged, _, cx| {
+                this.reveal_git_panel(cx);
+                this.select_mode(BrowseMode::Staged, cx);
+            }))
             .on_action(cx.listener(|this, _: &ViewUnstaged, _, cx| {
+                this.reveal_git_panel(cx);
                 this.select_mode(BrowseMode::Unstaged, cx)
             }))
             .on_action(cx.listener(|this, _: &StageSelected, _, cx| {
@@ -2234,6 +2324,9 @@ impl Render for MyGit {
             }))
             .on_action(cx.listener(|this, _: &ToggleSettings, _, cx| {
                 this.toggle_settings(cx);
+            }))
+            .on_action(cx.listener(|this, _: &ToggleGitPanel, window, cx| {
+                this.toggle_git_panel(window, cx);
             }))
             .on_action(cx.listener(|this, _: &ToggleFilesPanel, window, cx| {
                 this.toggle_files_panel(cx);
@@ -2331,13 +2424,14 @@ impl Render for MyGit {
             .when(self.quick.shown, |s| {
                 s.child(views::quick_open::pane(self, cx))
             })
-            .when(self.show_history_search, |s| {
-                s.child(views::history::pane(self, cx))
-            })
-            .when(self.show_branches, |s| {
+            .when(
+                self.settings.git_panel_visible && self.show_history_search,
+                |s| s.child(views::history::pane(self, cx)),
+            )
+            .when(self.settings.git_panel_visible && self.show_branches, |s| {
                 s.child(views::branches::pane(self, cx))
             })
-            .when(self.show_compare, |s| {
+            .when(self.settings.git_panel_visible && self.show_compare, |s| {
                 s.child(views::compare::pane(self, cx))
             })
             .when(self.show_settings, |s| s.child(views::settings(self, cx)))
@@ -2346,15 +2440,19 @@ impl Render for MyGit {
                     .flex()
                     .flex_1()
                     .min_h_0()
-                    .child(views::sidebar::history(self, cx))
+                    .when(self.settings.git_panel_visible, |s| {
+                        s.child(views::sidebar::history(self, cx))
+                    })
                     .when(self.settings.files_visible, |s| {
-                        s.child(if self.show_tree {
+                        s.child(if self.showing_tree() {
                             views::tree::pane(self, cx).into_any_element()
                         } else {
                             views::sidebar::files(self, cx).into_any_element()
                         })
                     })
-                    .child(if self.state.merge.is_some() {
+                    .child(if !self.settings.git_panel_visible {
+                        views::workspace::pane(self, cx).into_any_element()
+                    } else if self.state.merge.is_some() {
                         views::merge::pane(self, cx).into_any_element()
                     } else {
                         views::diff::pane(self, cx).into_any_element()
@@ -2373,7 +2471,9 @@ impl Render for MyGit {
                         self.state.message
                     )),
             )
-            .when(self.show_commit, |s| s.child(views::commit::pane(self, cx)))
+            .when(self.settings.git_panel_visible && self.show_commit, |s| {
+                s.child(views::commit::pane(self, cx))
+            })
             .when(
                 self.write_busy && !self.write_progress_text.is_empty(),
                 |s| {

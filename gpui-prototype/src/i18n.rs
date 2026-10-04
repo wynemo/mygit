@@ -752,6 +752,21 @@ pub fn translate(language: Language, value: &str) -> &str {
         "无法备份损坏配置，未覆盖原文件" => {
             "Unable to back up corrupt settings; the original was not overwritten"
         }
+        "隐藏 Git 面板" => "Hide Git panel",
+        "显示 Git 面板" => "Show Git panel",
+        "显示 / 隐藏 Git 面板" => "Show / hide Git panel",
+        "隐藏文件树" => "Hide file tree",
+        "显示文件树" => "Show file tree",
+        "工作区编辑器" => "Worktree editor",
+        "当前标签是只读比较，显示 Git 面板查看" => {
+            "This tab is a read-only comparison. Show the Git panel to view it."
+        }
+        "Git 面板已隐藏，选择工作区文件继续编辑" => {
+            "Git panel hidden. Select a worktree file to continue editing."
+        }
+        "工作区内容已变化或正在输入，保留编辑器位置" => {
+            "Worktree content changed or text is being composed; editor position preserved."
+        }
         _ => value,
     }
 }

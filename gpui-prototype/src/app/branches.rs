@@ -4,7 +4,10 @@ impl MyGit {
         if self.state.repo.is_none() {
             return;
         }
-        self.show_branches = !self.show_branches;
+        self.show_branches = !self.show_branches || !self.settings.git_panel_visible;
+        if self.show_branches {
+            self.reveal_git_panel(cx);
+        }
         self.branch_filter_sha = None;
         self.prepare_branch_inputs(cx);
         if self.show_branches {
@@ -46,6 +49,7 @@ impl MyGit {
         }));
     }
     pub fn show_commit_branches(&mut self, sha: String, cx: &mut Context<Self>) {
+        self.reveal_git_panel(cx);
         self.show_branches = true;
         self.show_history_search = false;
         self.branch_filter_sha = Some(sha);

@@ -203,6 +203,19 @@ impl Editor {
         cx.emit(Changed::Edited);
         cx.notify();
     }
+    pub fn select_matching_document(
+        &mut self,
+        document: &mygit_gpui::text::Document,
+        selection: &mygit_gpui::text::TextSelection,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        if !self.buffer.select_matching_document(document, selection) {
+            return false;
+        }
+        self.reveal();
+        cx.notify();
+        true
+    }
     fn reveal(&mut self) {
         self.scroll
             .scroll_to_item(self.caret_line(), ScrollStrategy::Center);

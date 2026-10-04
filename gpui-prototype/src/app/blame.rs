@@ -227,6 +227,7 @@ impl MyGit {
         if sha.bytes().all(|b| b == b'0') {
             return;
         }
+        self.reveal_git_panel(cx);
         self.history_cursor = self
             .history_commits()
             .iter()

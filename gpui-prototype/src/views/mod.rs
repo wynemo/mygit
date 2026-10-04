@@ -9,6 +9,7 @@ pub mod sidebar;
 pub mod tabs;
 pub mod text_line;
 pub mod tree;
+pub mod workspace;
 use crate::app::MyGit;
 use gpui::{prelude::*, *};
 
@@ -140,14 +141,30 @@ pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .child(
             button(
                 "workspace-tree",
-                mygit_gpui::i18n::text("文件树"),
+                if this.settings.git_panel_visible {
+                    mygit_gpui::i18n::text("文件树")
+                } else if this.settings.files_visible {
+                    mygit_gpui::i18n::text("隐藏文件树")
+                } else {
+                    mygit_gpui::i18n::text("显示文件树")
+                },
                 this.state.repo.is_some(),
             )
             .on_click(cx.listener(|this, _, window, cx| {
-                this.show_tree = !this.show_tree;
-                window.focus(&this.files_focus);
-                cx.notify();
+                this.toggle_tree(window, cx);
             })),
+        )
+        .child(
+            button(
+                "toggle-git-panel",
+                if this.settings.git_panel_visible {
+                    mygit_gpui::i18n::text("隐藏 Git 面板")
+                } else {
+                    mygit_gpui::i18n::text("显示 Git 面板")
+                },
+                true,
+            )
+            .on_click(cx.listener(|this, _, window, cx| this.toggle_git_panel(window, cx))),
         )
         .child(
             button("settings", mygit_gpui::i18n::text("设置 / 最近仓库"), true).on_click(
@@ -331,6 +348,18 @@ pub fn settings(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         this.toggle_files_panel(cx);
                         window.focus(&this.focus);
                     })),
+                )
+                .child(
+                    button(
+                        "settings-toggle-git",
+                        if this.settings.git_panel_visible {
+                            mygit_gpui::i18n::text("隐藏 Git 面板")
+                        } else {
+                            mygit_gpui::i18n::text("显示 Git 面板")
+                        },
+                        true,
+                    )
+                    .on_click(cx.listener(|this, _, window, cx| this.toggle_git_panel(window, cx))),
                 ),
         )
         .when(this.ai.config_shown, |s| s.child(ai_settings(this, cx)))

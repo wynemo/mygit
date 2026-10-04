@@ -60,6 +60,24 @@ impl Buffer {
         buffer.canonical = Some(path.canonicalize()?);
         Ok(buffer)
     }
+    /// Move a view selection only when it still refers to this exact document.
+    /// This does not finish an IME composition, edit text, or change undo history.
+    pub fn select_matching_document(
+        &mut self,
+        document: &Document,
+        selection: &TextSelection,
+    ) -> bool {
+        if self.marked.is_some()
+            || self.document.text != document.text
+            || selection.side != Side::Right
+        {
+            return false;
+        }
+        self.selection = selection.clone();
+        self.selection.anchor = self.document.snap(self.selection.anchor);
+        self.selection.head = self.document.snap(self.selection.head);
+        true
+    }
     /// Apply a background disk read only while this buffer has no local edits.
     pub fn accept_external(&mut self, mut replacement: Self) -> bool {
         if self.dirty()
@@ -436,6 +454,34 @@ pub fn find(text: &str, query: &str) -> Vec<Range<usize>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn view_navigation_preserves_undo_and_rejects_stale_or_composing_documents() {
+        let mut buffer = Buffer::new("first\n中文🙂\n");
+        let original = buffer.text().to_owned();
+        buffer.replace(Some(0..5), "changed").unwrap();
+        let current = buffer.document.clone();
+        let selection = TextSelection {
+            side: Side::Right,
+            anchor: 8,
+            head: 14,
+        };
+        assert!(buffer.select_matching_document(&current, &selection));
+        assert!(buffer.dirty());
+        let selected = buffer.selection.range();
+        assert!(
+            !buffer.select_matching_document(&Document::new(&original), &TextSelection::default())
+        );
+        assert_eq!(buffer.selection.range(), selected);
+        buffer.marked = Some(selected.clone());
+        assert!(!buffer.select_matching_document(&current, &TextSelection::default()));
+        assert_eq!(buffer.marked, Some(selected.clone()));
+        assert_eq!(buffer.selection.range(), selected);
+        buffer.marked = None;
+        buffer.undo();
+        assert_eq!(buffer.text(), original);
+        buffer.redo();
+        assert_eq!(buffer.text(), &*current.text);
+    }
     #[test]
     fn replacing_a_commit_draft_is_one_undo_step_and_keeps_exact_unicode_text() {
         let mut draft = Buffer::new("手动标题\n\n原始详细说明🙂");

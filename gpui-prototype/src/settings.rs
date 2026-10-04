@@ -29,6 +29,7 @@ pub struct Settings {
     pub history_width: f32,
     pub files_width: f32,
     pub files_visible: bool,
+    pub git_panel_visible: bool,
     pub code_theme: String,
     pub language: crate::i18n::Language,
     pub recent: Vec<PathBuf>,
@@ -97,6 +98,11 @@ impl Settings {
                 .pointer("/gpui/files_visible")
                 .and_then(Value::as_bool)
                 .or_else(|| data["left_panel_visible"].as_bool())
+                .unwrap_or(true),
+            git_panel_visible: data
+                .pointer("/gpui/git_panel_visible")
+                .and_then(Value::as_bool)
+                .or_else(|| data["bottom_widget_visible"].as_bool())
                 .unwrap_or(true),
             recent: data["recent_folders"]
                 .as_array()
@@ -178,6 +184,7 @@ impl Settings {
         data["gpui"]["files_width"] = json!(self.files_width);
         data["gpui"]["code_theme"] = json!(self.code_theme);
         data["gpui"]["files_visible"] = json!(self.files_visible);
+        data["gpui"]["git_panel_visible"] = json!(self.git_panel_visible);
         if let Some((root, text)) = &self.draft {
             if !data["gpui"]["commit_drafts"].is_object() {
                 data["gpui"]["commit_drafts"] = json!({});
@@ -215,6 +222,66 @@ impl Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn git_panel_visibility_restores_legacy_state_and_preserves_other_preferences() {
+        let dir = std::env::temp_dir().join(format!("mygit-git-panel-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("settings.json");
+        for (data, visible) in [
+            (json!({}), true),
+            (json!({"bottom_widget_visible": false}), false),
+            (json!({"bottom_widget_visible": true}), true),
+            (
+                json!({"bottom_widget_visible": false, "gpui": {"git_panel_visible": true}}),
+                true,
+            ),
+            (
+                json!({"bottom_widget_visible": true, "gpui": {"git_panel_visible": false}}),
+                false,
+            ),
+            (
+                json!({"bottom_widget_visible": false, "gpui": {"git_panel_visible": "invalid"}}),
+                false,
+            ),
+        ] {
+            fs::write(&path, serde_json::to_vec(&data).unwrap()).unwrap();
+            assert_eq!(Settings::load(path.clone()).git_panel_visible, visible);
+        }
+        fs::write(
+            &path,
+            serde_json::to_vec(&json!({
+                "bottom_widget_visible": false, "left_panel_visible": true,
+                "language": "English", "prompt": "KEEP 提示词", "code_style": "friendly",
+                "recent_folders": ["/tmp/repo"], "last_folder": "/tmp/repo",
+                "gpui": {"history_width": 320, "files_width": 240,
+                    "files_visible": false, "code_theme": "Solarized (dark)",
+                    "commit_drafts": {"/tmp/repo": "KEEP 草稿"}}
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let mut settings = Settings::load(path.clone());
+        assert!(!settings.git_panel_visible);
+        for visible in [true, false, true] {
+            settings.git_panel_visible = visible;
+            settings.save().unwrap();
+            let loaded = Settings::load(path.clone());
+            assert_eq!(loaded.git_panel_visible, visible);
+            assert!(!loaded.files_visible);
+            assert_eq!(loaded.history_width, 320.);
+            assert_eq!(loaded.files_width, 240.);
+            assert_eq!(loaded.code_theme, "Solarized (dark)");
+            assert_eq!(loaded.language, crate::i18n::Language::English);
+            assert_eq!(loaded.draft_for(Path::new("/tmp/repo")), "KEEP 草稿");
+            assert_eq!(loaded.last.as_deref(), Some(Path::new("/tmp/repo")));
+            let data: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+            assert_eq!(data["bottom_widget_visible"], false);
+            assert_eq!(data["left_panel_visible"], true);
+            assert_eq!(data["prompt"], "KEEP 提示词");
+            assert_eq!(data["code_style"], "friendly");
+        }
+        fs::remove_dir_all(dir).unwrap();
+    }
     #[test]
     fn language_preferences_round_trip_without_changing_drafts_or_prompt() {
         let dir = std::env::temp_dir().join(format!("mygit-language-{}", std::process::id()));
