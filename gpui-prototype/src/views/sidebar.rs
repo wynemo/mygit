@@ -168,16 +168,16 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         .flex_1()
                         .min_h_0()
                         .border_1()
-                        .border_color(rgb(0xbcbcbc))
-                        .bg(rgb(0xffffff))
+                        .border_color(rgb(crate::views::theme::BORDER))
+                        .bg(rgb(crate::views::theme::SURFACE))
                         .child(
                             div()
-                                .h(px(20.))
+                                .h(px(28.))
                                 .flex_shrink_0()
                                 .flex()
-                                .bg(rgb(0xececec))
+                                .bg(rgb(crate::views::theme::CHROME))
                                 .border_b_1()
-                                .border_color(rgb(0xc8c8c8))
+                                .border_color(rgb(crate::views::theme::BORDER))
                                 .children(
                                     [
                                         ("DAG", 120.),
@@ -201,7 +201,7 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                     .map(|(label, width)| {
                                         table_cell(label, width)
                                             .border_r_1()
-                                            .border_color(rgb(0xc8c8c8))
+                                            .border_color(rgb(crate::views::theme::BORDER))
                                     }),
                                 ),
                         )
@@ -234,13 +234,17 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                             div()
                                                 .id(i)
                                                 .w_full()
-                                                .h(px(18.))
+                                                .h(px(28.))
                                                 .flex()
                                                 .items_center()
                                                 .overflow_hidden()
                                                 .cursor_pointer()
-                                                .bg(rgb(if selected { 0xdceafa } else { 0xffffff }))
-                                                .hover(|s| s.bg(rgb(0xedf4fb)))
+                                                .bg(rgb(if selected {
+                                                    crate::views::theme::SELECTED
+                                                } else {
+                                                    crate::views::theme::SURFACE
+                                                }))
+                                                .hover(|s| s.bg(rgb(crate::views::theme::HOVER)))
                                                 .tooltip({
                                                     let subject = c.subject.clone();
                                                     move |_, cx| {
@@ -471,22 +475,22 @@ pub fn files(this: &MyGit, workspace: bool, cx: &mut Context<MyGit>) -> impl Int
                 .flex_1()
                 .min_h_0()
                 .border_1()
-                .border_color(rgb(0xbcbcbc))
-                .bg(rgb(0xffffff))
+                .border_color(rgb(crate::views::theme::BORDER))
+                .bg(rgb(crate::views::theme::SURFACE))
                 .child(
                     div()
-                        .h(px(20.))
+                        .h(px(28.))
                         .flex_shrink_0()
                         .flex()
-                        .bg(rgb(0xececec))
+                        .bg(rgb(crate::views::theme::CHROME))
                         .border_b_1()
-                        .border_color(rgb(0xc8c8c8))
+                        .border_color(rgb(crate::views::theme::BORDER))
                         .child(
                             div()
                                 .w(px(100.))
                                 .px_1()
                                 .border_r_1()
-                                .border_color(rgb(0xc8c8c8))
+                                .border_color(rgb(crate::views::theme::BORDER))
                                 .child(mygit_gpui::i18n::text("文件")),
                         )
                         .child(div().px_1().child(mygit_gpui::i18n::text("状态"))),
@@ -515,7 +519,7 @@ pub fn files(this: &MyGit, workspace: bool, cx: &mut Context<MyGit>) -> impl Int
                                         div()
                                             .id(i)
                                             .w_full()
-                                            .h(px(20.))
+                                            .h(px(28.))
                                             .flex()
                                             .items_center()
                                             .gap_1()
@@ -527,12 +531,12 @@ pub fn files(this: &MyGit, workspace: bool, cx: &mut Context<MyGit>) -> impl Int
                                                 if row.index.is_some()
                                                     && row.index == this.state.selected
                                                 {
-                                                    0xdceafa
+                                                    crate::views::theme::SELECTED
                                                 } else {
-                                                    0xffffff
+                                                    crate::views::theme::SURFACE
                                                 },
                                             ))
-                                            .hover(|s| s.bg(rgb(0xedf4fb)))
+                                            .hover(|s| s.bg(rgb(crate::views::theme::HOVER)))
                                             .child(if folder {
                                                 if expanded { "▾" } else { "▸" }
                                             } else {
@@ -568,7 +572,11 @@ pub fn files(this: &MyGit, workspace: bool, cx: &mut Context<MyGit>) -> impl Int
                                                 icons::file(&path).into_any_element()
                                             })
                                             .child(div().min_w(px(80.)).child(row.label))
-                                            .child(div().text_color(rgb(0x666666)).child(status))
+                                            .child(
+                                                div()
+                                                    .text_color(rgb(crate::views::theme::MUTED))
+                                                    .child(status),
+                                            )
                                             .on_click(cx.listener(move |this, _, window, cx| {
                                                 window.focus(&this.files_focus);
                                                 if let Some(index) = row.index {
@@ -608,8 +616,9 @@ pub fn detail(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .min_h_0()
         .min_w_0()
         .overflow_y_scroll()
-        .bg(rgb(0xffffff))
-        .p(px(8.))
+        .bg(rgb(crate::views::theme::SURFACE))
+        .p(px(16.))
+        .gap_2()
         .when_some(this.state.listed_detail.clone(), |s, detail| {
             let sha = detail.sha.clone();
             let message = detail.message.clone();
@@ -642,10 +651,14 @@ pub fn detail(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         .to_string(),
                 ),
             )
-            .child(div().text_color(rgb(0x666666)).child(format!(
-                "{} <{}>  {}",
-                detail.author, detail.author_email, detail.author_date
-            )))
+            .child(
+                div()
+                    .text_color(rgb(crate::views::theme::MUTED))
+                    .child(format!(
+                        "{} <{}>  {}",
+                        detail.author, detail.author_email, detail.author_date
+                    )),
+            )
             .child(div().child(detail.references))
             .children(
                 detail
@@ -660,30 +673,32 @@ pub fn detail(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
 fn history_tabs(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
     div()
         .id("history-tabs")
-        .h(px(29.))
+        .h(px(36.))
         .flex_shrink_0()
         .overflow_x_scroll()
         .flex()
         .items_end()
         .border_b_1()
-        .border_color(rgb(0xc8c8c8))
+        .border_color(rgb(crate::views::theme::BORDER))
         .child(
             div()
                 .id("ordinary-history-tab")
                 .px_2()
-                .h(px(23.))
+                .h(px(30.))
+                .flex()
+                .items_center()
                 .flex_shrink_0()
                 .cursor_pointer()
                 .rounded_t(px(4.))
                 .bg(rgb(if this.active_history_tab.is_none() {
-                    0x2196f3
+                    crate::views::theme::ACCENT
                 } else {
-                    0xe5e5e5
+                    crate::views::theme::HOVER
                 }))
                 .text_color(rgb(if this.active_history_tab.is_none() {
-                    0xffffff
+                    crate::views::theme::SURFACE
                 } else {
-                    0x202020
+                    crate::views::theme::TEXT
                 }))
                 .child(mygit_gpui::i18n::text("提交历史"))
                 .on_click(cx.listener(|this, _, _, cx| this.select_history_tab(None, cx))),
@@ -702,7 +717,9 @@ fn history_tabs(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     div()
                         .id(("path-history-tab", index))
                         .px_2()
-                        .h(px(23.))
+                        .h(px(30.))
+                        .flex()
+                        .items_center()
                         .flex_shrink_0()
                         .flex()
                         .items_center()
@@ -710,14 +727,14 @@ fn history_tabs(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         .cursor_pointer()
                         .rounded_t(px(4.))
                         .bg(rgb(if this.active_history_tab == Some(index) {
-                            0x2196f3
+                            crate::views::theme::ACCENT
                         } else {
-                            0xe5e5e5
+                            crate::views::theme::HOVER
                         }))
                         .text_color(rgb(if this.active_history_tab == Some(index) {
-                            0xffffff
+                            crate::views::theme::SURFACE
                         } else {
-                            0x202020
+                            crate::views::theme::TEXT
                         }))
                         .child(title)
                         .tooltip(move |_, cx| {

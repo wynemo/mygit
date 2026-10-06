@@ -7,7 +7,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .flex_col()
         .min_h_0()
         .border_t_1()
-        .border_color(rgb(0xc8c8c8))
+        .border_color(rgb(crate::views::theme::BORDER))
         .child(
             div()
                 .flex()

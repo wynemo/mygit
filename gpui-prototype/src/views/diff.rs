@@ -87,7 +87,7 @@ fn cell(
                     .px_1()
                     .flex_shrink_0()
                     .text_color(rgb(0x946200))
-                    .bg(rgb(0xf0f0f0))
+                    .bg(rgb(crate::views::theme::CHROME))
                     .child(mygit_gpui::i18n::text(label)),
             )
         })
@@ -136,7 +136,7 @@ fn unified_cell(this: &MyGit, index: usize, cx: &mut Context<MyGit>) -> Stateful
                 0xdff2df
             }
         } else {
-            0xffffff
+            crate::views::theme::SURFACE
         }))
         .on_mouse_down(
             MouseButton::Left,
@@ -233,7 +233,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .px_2()
                 .overflow_hidden()
                 .border_b_1()
-                .border_color(rgb(0xc8c8c8))
+                .border_color(rgb(crate::views::theme::BORDER))
                 .flex()
                 .items_center()
                 .gap_2()
@@ -379,7 +379,11 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     )
                     .on_click(cx.listener(|this, _, _, cx| this.navigate(false, cx))),
                 )
-                .child(div().text_color(rgb(0x666666)).child(counter))
+                .child(
+                    div()
+                        .text_color(rgb(crate::views::theme::MUTED))
+                        .child(counter),
+                )
                 .child(
                     crate::views::toolbar_button(
                         "next-diff",
@@ -428,7 +432,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         .min_w_0()
                         .overflow_hidden()
                         .whitespace_nowrap()
-                        .text_color(rgb(0x666666))
+                        .text_color(rgb(crate::views::theme::MUTED))
                         .child(mygit_gpui::localized_format!(
                             "{} · {} · 选区 {} 字节",
                             "{} · {} · {} selected bytes",
@@ -463,7 +467,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             div()
                 .flex()
                 .p_2()
-                .text_color(rgb(0x666666))
+                .text_color(rgb(crate::views::theme::MUTED))
                 .child(
                     div()
                         .flex_1()
@@ -486,7 +490,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 div()
                     .px_2()
                     .py_1()
-                    .text_color(rgb(0x666666))
+                    .text_color(rgb(crate::views::theme::MUTED))
                     .child(description),
             )
         })
@@ -526,7 +530,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         .items_center()
                         .justify_center()
                         .p_3()
-                        .text_color(rgb(0x666666))
+                        .text_color(rgb(crate::views::theme::MUTED))
                         .child(if this.state.loading {
                             mygit_gpui::i18n::text("正在加载…").into()
                         } else if this.state.active_file().is_some()
@@ -574,7 +578,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                         } else if r.changed && r.left_no.is_some() {
                                             0xfbdada
                                         } else {
-                                            0xffffff
+                                            crate::views::theme::SURFACE
                                         },
                                         active,
                                         cx,
@@ -589,7 +593,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                         } else if r.changed && r.right_no.is_some() {
                                             0xdff2df
                                         } else {
-                                            0xffffff
+                                            crate::views::theme::SURFACE
                                         },
                                         active,
                                         cx,

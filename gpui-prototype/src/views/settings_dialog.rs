@@ -216,8 +216,8 @@ fn dropdown(this: &MyGit, index: usize, cx: &mut Context<MyGit>) -> impl IntoEle
                 .w_full()
                 .rounded(px(4.))
                 .border_1()
-                .border_color(rgb(0xbcbcbc))
-                .bg(rgb(0xffffff))
+                .border_color(rgb(crate::views::theme::BORDER))
+                .bg(rgb(crate::views::theme::SURFACE))
                 .flex()
                 .items_center()
                 .justify_between()
@@ -247,8 +247,8 @@ fn dropdown(this: &MyGit, index: usize, cx: &mut Context<MyGit>) -> impl IntoEle
                         .overflow_y_scroll()
                         .occlude()
                         .border_1()
-                        .border_color(rgb(0xbcbcbc))
-                        .bg(rgb(0xffffff))
+                        .border_color(rgb(crate::views::theme::BORDER))
+                        .bg(rgb(crate::views::theme::SURFACE))
                         .shadow_md()
                         .children(choices.into_iter().enumerate().map(|(i, value)| {
                             div()
@@ -256,7 +256,10 @@ fn dropdown(this: &MyGit, index: usize, cx: &mut Context<MyGit>) -> impl IntoEle
                                 .h(px(24.))
                                 .px_2()
                                 .cursor_pointer()
-                                .hover(|s| s.bg(rgb(0x2196f3)).text_color(rgb(0xffffff)))
+                                .hover(|s| {
+                                    s.bg(rgb(crate::views::theme::ACCENT))
+                                        .text_color(rgb(crate::views::theme::SURFACE))
+                                })
                                 .child(value)
                                 .on_click(cx.listener(move |this, _, _, cx| {
                                     if let Some(form) = &mut this.settings_form {
@@ -305,7 +308,7 @@ pub fn pane(this: &MyGit, window: &Window, cx: &mut Context<MyGit>) -> impl Into
                 .rounded(px(10.))
                 .border_1()
                 .border_color(rgb(0xc6c6c6))
-                .bg(rgb(0xececec))
+                .bg(rgb(crate::views::theme::CHROME))
                 .shadow_lg()
                 .child(
                     div()
@@ -333,7 +336,7 @@ pub fn pane(this: &MyGit, window: &Window, cx: &mut Context<MyGit>) -> impl Into
                             s.child(
                                 div()
                                     .text_xs()
-                                    .text_color(rgb(0x666666))
+                                    .text_color(rgb(crate::views::theme::MUTED))
                                     .child(mygit_gpui::i18n::text("保存后重启生效")),
                             )
                         })
@@ -350,7 +353,7 @@ pub fn pane(this: &MyGit, window: &Window, cx: &mut Context<MyGit>) -> impl Into
                                 .flex()
                                 .flex_col()
                                 .border_1()
-                                .border_color(rgb(0xbcbcbc))
+                                .border_color(rgb(crate::views::theme::BORDER))
                                 .child(form.inputs[5].clone()),
                         ))
                         .when(!form.error.is_empty(), |s| {

@@ -14,6 +14,7 @@ pub mod settings_dialog;
 pub mod sidebar;
 pub mod tabs;
 pub mod text_line;
+pub mod theme;
 pub mod tree;
 pub mod workspace;
 use crate::app::MyGit;
@@ -24,17 +25,18 @@ pub fn button(id: &'static str, label: &'static str, enabled: bool) -> Stateful<
         .id(id)
         .flex_shrink_0()
         .whitespace_nowrap()
-        .h(px(24.))
+        .h(px(30.))
         .px_2()
-        .rounded(px(3.))
+        .rounded(px(6.))
         .border_1()
-        .border_color(rgb(0xbcbcbc))
-        .bg(rgb(0xf8f8f8))
+        .border_color(rgb(crate::views::theme::BORDER))
+        .bg(rgb(crate::views::theme::SURFACE))
         .flex()
         .items_center()
         .gap_1()
         .when(enabled, |s| {
-            s.cursor_pointer().hover(|s| s.bg(rgb(0xe5e5e5)))
+            s.cursor_pointer()
+                .hover(|s| s.bg(rgb(crate::views::theme::HOVER)))
         })
         .when(!enabled, |s| s.opacity(0.4))
         .when_some(icons::button_icon(id), |s, path| s.child(icons::icon(path)))
@@ -48,7 +50,7 @@ pub fn toolbar_button(id: &'static str, label: &'static str, enabled: bool) -> S
     let path = icons::button_icon(id);
     div()
         .id(id)
-        .h(px(24.))
+        .h(px(30.))
         .min_w(px(24.))
         .px_1()
         .flex_shrink_0()
@@ -56,7 +58,8 @@ pub fn toolbar_button(id: &'static str, label: &'static str, enabled: bool) -> S
         .items_center()
         .justify_center()
         .when(enabled, |s| {
-            s.cursor_pointer().hover(|s| s.bg(rgb(0xe3e3e3)))
+            s.cursor_pointer()
+                .hover(|s| s.bg(rgb(crate::views::theme::HOVER)))
         })
         .when(!enabled, |s| s.opacity(0.35))
         .when_some(path, |s, path| s.child(icons::icon(path)))
@@ -72,13 +75,13 @@ pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .map(|r| r.branch.clone())
         .unwrap_or_default();
     div()
-        .h(px(50.))
+        .h(px(56.))
         .flex_shrink_0()
         .flex()
         .items_center()
         .gap(px(10.))
-        .px(px(10.))
-        .bg(rgb(0xececec))
+        .px(px(16.))
+        .bg(rgb(crate::views::theme::CHROME))
         .child(
             button("open", mygit_gpui::i18n::text("打开文件夹"), true)
                 .w(px(114.))
@@ -98,20 +101,19 @@ pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 cx.notify();
             })),
         )
-        .child(mygit_gpui::i18n::text("分支："))
-        .child(icons::icon("icons/git_branch.svg"))
         .child(
             div()
                 .id("show-branches")
-                .w(px(280.))
-                .h(px(24.))
+                .w(px(240.))
+                .h(px(32.))
                 .flex()
                 .items_center()
                 .px_2()
                 .gap_2()
-                .bg(rgb(0xffffff))
+                .child(icons::icon("icons/git_branch.svg"))
+                .bg(rgb(crate::views::theme::SURFACE))
                 .border_1()
-                .border_color(rgb(0xbcbcbc))
+                .border_color(rgb(crate::views::theme::BORDER))
                 .rounded(px(4.))
                 .cursor_pointer()
                 .child(
@@ -177,16 +179,16 @@ pub fn toolbar_menu(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
     div()
         .id("toolbar-menu")
         .absolute()
-        .top(px(45.))
-        .left(px(if this.show_recent { 135. } else { 285. }))
+        .top(px(50.))
+        .left(px(if this.show_recent { 140. } else { 212. }))
         .w(px(if this.show_recent { 450. } else { 280. }))
         .max_h(px(300.))
         .overflow_y_scroll()
         .occlude()
         .p_1()
-        .bg(rgb(0xffffff))
+        .bg(rgb(crate::views::theme::SURFACE))
         .border_1()
-        .border_color(rgb(0xbcbcbc))
+        .border_color(rgb(crate::views::theme::BORDER))
         .rounded(px(4.))
         .on_mouse_down_out(cx.listener(|this, _, _, cx| {
             this.show_recent = false;
@@ -198,10 +200,10 @@ pub fn toolbar_menu(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 let path = path.clone();
                 div()
                     .id(("recent-menu", i))
-                    .h(px(24.))
+                    .h(px(30.))
                     .px_2()
                     .cursor_pointer()
-                    .hover(|s| s.bg(rgb(0xdceafa)))
+                    .hover(|s| s.bg(rgb(crate::views::theme::SELECTED)))
                     .child(path.display().to_string())
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.show_recent = false;
@@ -221,10 +223,10 @@ pub fn toolbar_menu(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         let reference = branch.reference.clone();
                         div()
                             .id(("branch-menu", i))
-                            .h(px(24.))
+                            .h(px(30.))
                             .px_2()
                             .cursor_pointer()
-                            .hover(|s| s.bg(rgb(0xdceafa)))
+                            .hover(|s| s.bg(rgb(crate::views::theme::SELECTED)))
                             .child(format!(
                                 "{}{}",
                                 if branch.current { "✓ " } else { "  " },
@@ -305,7 +307,7 @@ pub fn confirmation(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .w(px(520.))
                 .p_4()
                 .rounded_lg()
-                .bg(rgb(0xf5f5f5))
+                .bg(rgb(crate::views::theme::CHROME))
                 .flex()
                 .flex_col()
                 .gap_3()
@@ -394,9 +396,9 @@ pub fn popover(content: AnyElement) -> impl IntoElement {
         .w(px(650.))
         .max_h(px(600.))
         .occlude()
-        .bg(rgb(0xf5f5f5))
+        .bg(rgb(crate::views::theme::CHROME))
         .border_1()
-        .border_color(rgb(0xbcbcbc))
+        .border_color(rgb(crate::views::theme::BORDER))
         .shadow_md()
         .child(content)
 }

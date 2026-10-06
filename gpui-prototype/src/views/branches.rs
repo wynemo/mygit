@@ -18,7 +18,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .gap_2()
         .flex_shrink_0()
         .border_b_1()
-        .border_color(rgb(0xc8c8c8))
+        .border_color(rgb(crate::views::theme::BORDER))
         .child(
             div()
                 .flex()
@@ -79,10 +79,10 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                             .whitespace_nowrap()
                                             .when(
                                                 this.branch_selected.as_ref() == Some(&reference),
-                                                |s| s.bg(rgb(0xdceafa)),
+                                                |s| s.bg(rgb(crate::views::theme::SELECTED)),
                                             )
                                             .cursor_pointer()
-                                            .hover(|s| s.bg(rgb(0xedf4fb)))
+                                            .hover(|s| s.bg(rgb(crate::views::theme::HOVER)))
                                             .child(format!(
                                                 "{}{} · {}",
                                                 if branch.current {
@@ -95,7 +95,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                                 branch.name,
                                                 short_sha(&branch.sha)
                                             ))
-                                            .child(div().text_color(rgb(0x666666)).child(format!(
+                                            .child(div().text_color(rgb(crate::views::theme::MUTED)).child(format!(
                                                 "{} {}",
                                                 branch.upstream, branch.tracking
                                             )))
@@ -212,7 +212,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     )),
                 ),
         )
-        .child(div().text_color(rgb(0x666666)).child(
+        .child(div().text_color(rgb(crate::views::theme::MUTED)).child(
             mygit_gpui::i18n::text("选择引用可设为新分支起点。切换沿用 Git 对未提交内容的保护；远程检出建立本地跟踪分支。"),
         ))
 }

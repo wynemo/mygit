@@ -628,7 +628,7 @@ fn line(this: &Editor, index: usize, cx: &mut Context<Editor>) -> impl IntoEleme
                 runs.push(TextRun {
                     len: display.text.len(),
                     font,
-                    color: rgb(0x202020).into(),
+                    color: rgb(crate::views::theme::TEXT).into(),
                     background_color: None,
                     underline: None,
                     strikethrough: None,
@@ -706,7 +706,7 @@ fn line(this: &Editor, index: usize, cx: &mut Context<Editor>) -> impl IntoEleme
                             point(origin.x + x, bounds.top() + px(2.)),
                             size(px(1.), bounds.size.height - px(4.)),
                         ),
-                        rgb(0x202020),
+                        rgb(crate::views::theme::TEXT),
                     ));
                 }
             });
@@ -794,7 +794,7 @@ impl Render for Editor {
                     &[TextRun {
                         len: display.text.len(),
                         font: font(self.font_family.clone()),
-                        color: rgb(0x202020).into(),
+                        color: rgb(crate::views::theme::TEXT).into(),
                         background_color: None,
                         underline: None,
                         strikethrough: None,
@@ -884,7 +884,7 @@ impl Render for Editor {
         };
         div()
             .relative()
-            .bg(rgb(0xffffff))
+            .bg(rgb(crate::views::theme::SURFACE))
             .w_full()
             .child(scroll_listener)
             .flex()
@@ -895,19 +895,24 @@ impl Render for Editor {
                 s.h(px(24.))
                     .flex_shrink_0()
                     .border_1()
-                    .border_color(rgb(0xbcbcbc))
-                    .bg(rgb(0xffffff))
+                    .border_color(rgb(crate::views::theme::BORDER))
+                    .bg(rgb(crate::views::theme::SURFACE))
             })
             .key_context("FileEditor")
             .track_focus(&self.focus)
-            .on_mouse_down(MouseButton::Right, cx.listener(|this, event: &MouseDownEvent, window, cx| {
-                if this.compact || this.form_input { return; }
-                this.context_menu = Some(event.position);
-                this.dragging = false;
-                window.focus(&this.focus);
-                cx.stop_propagation();
-                cx.notify();
-            }))
+            .on_mouse_down(
+                MouseButton::Right,
+                cx.listener(|this, event: &MouseDownEvent, window, cx| {
+                    if this.compact || this.form_input {
+                        return;
+                    }
+                    this.context_menu = Some(event.position);
+                    this.dragging = false;
+                    window.focus(&this.focus);
+                    cx.stop_propagation();
+                    cx.notify();
+                }),
+            )
             .on_mouse_down(MouseButton::Left, cx.listener(Self::mouse_down))
             .on_mouse_move(cx.listener(Self::mouse_move))
             .on_mouse_up(
@@ -1063,17 +1068,21 @@ impl Render for Editor {
                                 this.refresh(cx);
                             })),
                         )
-                        .child(div().text_color(rgb(0x666666)).child(format!(
-                            "{} · {}",
-                            if self.buffer.path.is_none() {
-                                mygit_gpui::i18n::text("提交信息")
-                            } else if self.buffer.dirty() {
-                                mygit_gpui::i18n::text("未保存")
-                            } else {
-                                mygit_gpui::i18n::text("已保存")
-                            },
-                            if self.buffer.crlf { "CRLF" } else { "LF" }
-                        ))),
+                        .child(
+                            div()
+                                .text_color(rgb(crate::views::theme::MUTED))
+                                .child(format!(
+                                    "{} · {}",
+                                    if self.buffer.path.is_none() {
+                                        mygit_gpui::i18n::text("提交信息")
+                                    } else if self.buffer.dirty() {
+                                        mygit_gpui::i18n::text("未保存")
+                                    } else {
+                                        mygit_gpui::i18n::text("已保存")
+                                    },
+                                    if self.buffer.crlf { "CRLF" } else { "LF" }
+                                )),
+                        ),
                 )
             })
             .when(self.external_changed, |s| {
@@ -1229,50 +1238,101 @@ impl Render for Editor {
                 .size_full(),
             )
             .when_some(self.context_menu, |s, position| {
-                s.child(deferred(anchored().position(position).snap_to_window_with_margin(px(8.)).child(
-                    div().id("editor-context-menu").w(px(180.)).p_1().rounded_md()
-                        .bg(rgb(0xf4f4f4)).text_color(rgb(0x202020))
-                        .border_1().border_color(rgb(0xb9b9b9)).shadow_md().occlude()
-                        .on_mouse_down_out(cx.listener(|this, _, _, cx| {
-                            this.context_menu = None;
-                            cx.notify();
-                        }))
-                        .children(["全选", "复制", "粘贴"].into_iter().enumerate().map(|(index, label)| {
-                            div().id(("editor-menu-text", index)).px_3().py_1().rounded_sm()
-                                .cursor_pointer().hover(|s| s.bg(rgb(0xe3e3e3)))
-                                .child(mygit_gpui::i18n::text(label))
-                                .on_click(cx.listener(move |this, _, window, cx| {
+                s.child(deferred(
+                    anchored()
+                        .position(position)
+                        .snap_to_window_with_margin(px(8.))
+                        .child(
+                            div()
+                                .id("editor-context-menu")
+                                .w(px(180.))
+                                .p_1()
+                                .rounded_md()
+                                .bg(rgb(crate::views::theme::CHROME))
+                                .text_color(rgb(crate::views::theme::TEXT))
+                                .border_1()
+                                .border_color(rgb(crate::views::theme::BORDER))
+                                .shadow_md()
+                                .occlude()
+                                .on_mouse_down_out(cx.listener(|this, _, _, cx| {
                                     this.context_menu = None;
-                                    window.focus(&this.focus);
-                                    match index {
-                                        0 => this.buffer.selection.select_all(&this.buffer.document),
-                                        1 => this.copy(cx),
-                                        _ => this.paste(cx),
-                                    }
                                     cx.notify();
                                 }))
-                        }))
-                        .when(self.blame_owner.is_some(), |s| {
-                            s.child(div().my_1().border_t_1().border_color(rgb(0xc8c8c8)))
-                                .children([(true, "显示 Blame"), (false, "清除 Blame")].into_iter().map(|(enabled, label)| {
-                                    div().id(if enabled { "editor-show-blame" } else { "editor-clear-blame" })
-                                        .px_3().py_1().rounded_sm().cursor_pointer()
-                                        .hover(|s| s.bg(rgb(0xe3e3e3)))
-                                        .child(mygit_gpui::i18n::text(label))
-                                        .on_click(cx.listener(move |this, _, _, cx| {
-                                            this.context_menu = None;
-                                            if let Some(owner) = this.blame_owner.clone() {
-                                                cx.defer(move |cx| {
-                                                    let _ = owner.update(cx, |owner, cx| {
-                                                        if owner.show_blame != enabled { owner.toggle_blame(cx); }
-                                                    });
-                                                });
-                                            }
-                                            cx.notify();
-                                        }))
-                                }))
-                        })
-                )))
+                                .children(["全选", "复制", "粘贴"].into_iter().enumerate().map(
+                                    |(index, label)| {
+                                        div()
+                                            .id(("editor-menu-text", index))
+                                            .px_3()
+                                            .py_1()
+                                            .rounded_sm()
+                                            .cursor_pointer()
+                                            .hover(|s| s.bg(rgb(crate::views::theme::HOVER)))
+                                            .child(mygit_gpui::i18n::text(label))
+                                            .on_click(cx.listener(move |this, _, window, cx| {
+                                                this.context_menu = None;
+                                                window.focus(&this.focus);
+                                                match index {
+                                                    0 => this
+                                                        .buffer
+                                                        .selection
+                                                        .select_all(&this.buffer.document),
+                                                    1 => this.copy(cx),
+                                                    _ => this.paste(cx),
+                                                }
+                                                cx.notify();
+                                            }))
+                                    },
+                                ))
+                                .when(self.blame_owner.is_some(), |s| {
+                                    s.child(
+                                        div()
+                                            .my_1()
+                                            .border_t_1()
+                                            .border_color(rgb(crate::views::theme::BORDER)),
+                                    )
+                                    .children(
+                                        [(true, "显示 Blame"), (false, "清除 Blame")]
+                                            .into_iter()
+                                            .map(|(enabled, label)| {
+                                                div()
+                                                    .id(if enabled {
+                                                        "editor-show-blame"
+                                                    } else {
+                                                        "editor-clear-blame"
+                                                    })
+                                                    .px_3()
+                                                    .py_1()
+                                                    .rounded_sm()
+                                                    .cursor_pointer()
+                                                    .hover(|s| {
+                                                        s.bg(rgb(crate::views::theme::HOVER))
+                                                    })
+                                                    .child(mygit_gpui::i18n::text(label))
+                                                    .on_click(cx.listener(move |this, _, _, cx| {
+                                                        this.context_menu = None;
+                                                        if let Some(owner) =
+                                                            this.blame_owner.clone()
+                                                        {
+                                                            cx.defer(move |cx| {
+                                                                let _ = owner.update(
+                                                                    cx,
+                                                                    |owner, cx| {
+                                                                        if owner.show_blame
+                                                                            != enabled
+                                                                        {
+                                                                            owner.toggle_blame(cx);
+                                                                        }
+                                                                    },
+                                                                );
+                                                            });
+                                                        }
+                                                        cx.notify();
+                                                    }))
+                                            }),
+                                    )
+                                }),
+                        ),
+                ))
             })
     }
 }

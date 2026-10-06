@@ -11,7 +11,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .p_2()
         .gap_2()
         .border_b_1()
-        .border_color(rgb(0xc8c8c8))
+        .border_color(rgb(crate::views::theme::BORDER))
         .child(
             div()
                 .flex()

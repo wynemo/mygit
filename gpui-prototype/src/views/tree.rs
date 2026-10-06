@@ -12,8 +12,8 @@ impl Render for DraggedFile {
         div()
             .p_2()
             .rounded_md()
-            .bg(rgb(0xf4f4f4))
-            .text_color(rgb(0x202020))
+            .bg(rgb(crate::views::theme::CHROME))
+            .text_color(rgb(crate::views::theme::TEXT))
             .flex()
             .items_center()
             .gap_2()
@@ -44,9 +44,9 @@ pub fn menu(this: &MyGit, window: &Window, cx: &mut Context<MyGit>) -> impl Into
         .occlude()
         .p_2()
         .rounded_md()
-        .bg(rgb(0xffffff))
+        .bg(rgb(crate::views::theme::SURFACE))
         .border_1()
-        .border_color(rgb(0xb9b9b9))
+        .border_color(rgb(crate::views::theme::BORDER))
         .key_context("TreeMenu")
         .track_focus(&this.tree_menu_focus)
         .on_action(cx.listener(|this, _: &TreeMenuUp, _, cx| this.move_tree_menu(false, cx)))
@@ -59,7 +59,7 @@ pub fn menu(this: &MyGit, window: &Window, cx: &mut Context<MyGit>) -> impl Into
         .child(
             div()
                 .text_xs()
-                .text_color(rgb(0x666666))
+                .text_color(rgb(crate::views::theme::MUTED))
                 .child(menu.entry.path.clone()),
         )
         .children(
@@ -74,11 +74,11 @@ pub fn menu(this: &MyGit, window: &Window, cx: &mut Context<MyGit>) -> impl Into
                         .rounded_md()
                         .cursor_pointer()
                         .bg(rgb(if i == menu.selected {
-                            0xe3e3e3
+                            crate::views::theme::HOVER
                         } else {
-                            0xffffff
+                            crate::views::theme::SURFACE
                         }))
-                        .hover(|s| s.bg(rgb(0xe3e3e3)))
+                        .hover(|s| s.bg(rgb(crate::views::theme::HOVER)))
                         .child(if action == Action::History && menu.entry.directory { mygit_gpui::i18n::text("目录历史") } else { action.label() })
                         .when(action == Action::Restore, |s| {
                             s.tooltip(|_, cx| {
@@ -105,15 +105,17 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .flex_col()
         .min_h_0()
         .border_r_1()
-        .border_color(rgb(0xc8c8c8))
+        .border_color(rgb(crate::views::theme::BORDER))
         .child(
             div()
-                .h(px(19.))
+                .h(px(32.))
+                .flex()
+                .items_center()
                 .flex_shrink_0()
                 .px_1()
-                .bg(rgb(0xececec))
+                .bg(rgb(crate::views::theme::CHROME))
                 .border_b_1()
-                .border_color(rgb(0xc8c8c8))
+                .border_color(rgb(crate::views::theme::BORDER))
                 .child(mygit_gpui::i18n::text("工作区文件")),
         )
         .when(this.tree_loading, |s| {
@@ -149,7 +151,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                 div()
                                     .id(("tree-entry", i))
                                     .w_full()
-                                    .h(px(20.))
+                                    .h(px(28.))
                                     .pl(px(8. + depth as f32 * 14.))
                                     .pr_1()
                                     .flex()
@@ -167,16 +169,16 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                         })
                                     })
                                     .bg(rgb(if Some(&entry.path) == this.tree.selected.as_ref() {
-                                        0xdceafa
+                                        crate::views::theme::SELECTED
                                     } else {
-                                        0xffffff
+                                        crate::views::theme::SURFACE
                                     }))
                                     .text_color(rgb(if entry.status == "!!" {
                                         0x888888
                                     } else if !entry.status.is_empty() {
                                         0xa52a2a
                                     } else {
-                                        0x202020
+                                        crate::views::theme::TEXT
                                     }))
                                     .child(if entry.directory {
                                         if expanded { "▾" } else { "▸" }
@@ -222,7 +224,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 this.tree_scroll.clone(),
                 None,
             ))
-            .bg(rgb(0xffffff))
+            .bg(rgb(crate::views::theme::SURFACE))
             .track_scroll(this.tree_scroll.clone())
             .min_h_0()
             .flex_1(),

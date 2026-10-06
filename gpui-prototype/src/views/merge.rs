@@ -31,13 +31,13 @@ fn cell(this: &MyGit, side: usize, row: usize, cx: &mut Context<MyGit>) -> impl 
             match (view.rows[row].changed[0], view.rows[row].changed[2]) {
                 (true, true) => 0x443454,
                 (true, false) => 0xdff2df,
-                _ => 0xdceafa,
+                _ => crate::views::theme::SELECTED,
             }
         } else {
             0xfbdada
         }
     } else {
-        0xffffff
+        crate::views::theme::SURFACE
     };
     div()
         .id(("merge-cell", row * 3 + side))
@@ -183,7 +183,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         .on_click(cx.listener(|this, _, _, cx| this.change_font_size(true, cx))),
                 ),
         )
-        .child(div().px_2().text_xs().text_color(rgb(0x666666)).child(
+        .child(div().px_2().text_xs().text_color(rgb(crate::views::theme::MUTED)).child(
             mygit_gpui::i18n::text("合并提交历史 · 紫色：结果与双方不同；绿色/蓝色：与父 1/父 2 不同 · 右键复制原始行"),
         ))
         .child(

@@ -6,8 +6,8 @@ impl Render for Hint {
             .max_w(px(400.))
             .p_2()
             .rounded_md()
-            .bg(rgb(0xf4f4f4))
-            .text_color(rgb(0x202020))
+            .bg(rgb(crate::views::theme::CHROME))
+            .text_color(rgb(crate::views::theme::TEXT))
             .text_size(px(12.))
             .child(self.0.clone())
     }

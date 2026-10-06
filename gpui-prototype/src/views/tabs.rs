@@ -7,15 +7,17 @@ pub fn bar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .flex_shrink_0()
         .min_w_0()
         .overflow_hidden()
-        .h(px(27.))
-        .drag_over::<crate::views::tree::DraggedFile>(|s, _, _, _| s.bg(rgb(0xdceafa)))
+        .h(px(38.))
+        .drag_over::<crate::views::tree::DraggedFile>(|s, _, _, _| {
+            s.bg(rgb(crate::views::theme::SELECTED))
+        })
         .on_drop(
             cx.listener(|this, file: &crate::views::tree::DraggedFile, window, cx| {
                 this.drop_tree_file(file, window, cx)
             }),
         )
         .border_b_1()
-        .border_color(rgb(0xc8c8c8))
+        .border_color(rgb(crate::views::theme::BORDER))
         .when(!this.tabs.is_empty(), |s| {
             s.child(
                 div()
@@ -36,14 +38,18 @@ pub fn bar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                     .items_center()
                                     .whitespace_nowrap()
                                     .gap_2()
-                                    .px_2()
-                                    .h(px(26.))
-                                    .border_r_1()
-                                    .border_color(rgb(0xc8c8c8))
-                                    .bg(rgb(if this.active_tab == Some(i) {
-                                        0xdceafa
+                                    .px_3()
+                                    .h(px(37.))
+                                    .border_b_2()
+                                    .border_color(rgb(if this.active_tab == Some(i) {
+                                        crate::views::theme::ACCENT
                                     } else {
-                                        0xffffff
+                                        crate::views::theme::BORDER
+                                    }))
+                                    .bg(rgb(if this.active_tab == Some(i) {
+                                        crate::views::theme::SELECTED
+                                    } else {
+                                        crate::views::theme::SURFACE
                                     }))
                                     .tooltip({
                                         let path = tab.file.path.clone();
@@ -112,9 +118,9 @@ pub fn menu(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .occlude()
         .w(px(160.))
         .p_1()
-        .bg(rgb(0xffffff))
+        .bg(rgb(crate::views::theme::SURFACE))
         .border_1()
-        .border_color(rgb(0xbcbcbc))
+        .border_color(rgb(crate::views::theme::BORDER))
         .on_mouse_down_out(cx.listener(|this, _, _, cx| {
             this.tab_menu = None;
             cx.notify();

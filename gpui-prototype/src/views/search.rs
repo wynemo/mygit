@@ -12,7 +12,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .p_2()
         .gap_1()
         .border_b_1()
-        .border_color(rgb(0xc8c8c8))
+        .border_color(rgb(crate::views::theme::BORDER))
         .child(
             div()
                 .flex()
@@ -105,7 +105,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .child(
             div()
                 .text_xs()
-                .text_color(rgb(0x666666))
+                .text_color(rgb(crate::views::theme::MUTED))
                 .child(if this.search.loading {
                     mygit_gpui::i18n::text("正在搜索磁盘内容…").into()
                 } else {
@@ -127,7 +127,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .child(
             div()
                 .text_xs()
-                .text_color(rgb(0x666666))
+                .text_color(rgb(crate::views::theme::MUTED))
                 .child(mygit_gpui::i18n::text(
                     "遵循 rg 忽略规则 · 单文件 ≤20 MB · 最多 2,000 行 · 搜索磁盘内容",
                 )),
@@ -167,11 +167,11 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                     .whitespace_nowrap()
                                     .cursor_pointer()
                                     .bg(rgb(if i == this.search.selected {
-                                        0xdceafa
+                                        crate::views::theme::SELECTED
                                     } else {
-                                        0xffffff
+                                        crate::views::theme::SURFACE
                                     }))
-                                    .hover(|s| s.bg(rgb(0xedf4fb)))
+                                    .hover(|s| s.bg(rgb(crate::views::theme::HOVER)))
                                     .child(mygit_gpui::localized_format!(
                                         "{}:{} · {} 处",
                                         "{}:{} · {} matches",
@@ -182,7 +182,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                     .child(
                                         div()
                                             .text_xs()
-                                            .text_color(rgb(0x666666))
+                                            .text_color(rgb(crate::views::theme::MUTED))
                                             .child(hit.preview.clone()),
                                     )
                                     .on_click(cx.listener(move |this, _, window, cx| {

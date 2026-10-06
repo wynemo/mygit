@@ -26,7 +26,11 @@ pub fn annotation(owner: WeakEntity<MyGit>, line: Line, index: usize) -> Statefu
         .h_full()
         .px_1()
         .text_size(px(11.))
-        .text_color(rgb(if pending { 0x946200 } else { 0x666666 }))
+        .text_color(rgb(if pending {
+            0x946200
+        } else {
+            crate::views::theme::MUTED
+        }))
         .overflow_hidden()
         .whitespace_nowrap()
         .when(!pending, |s| s.cursor_pointer())
@@ -99,8 +103,8 @@ impl Render for Tooltip {
             .overflow_y_scroll()
             .p_3()
             .rounded_md()
-            .bg(rgb(0xf4f4f4))
-            .text_color(rgb(0x202020))
+            .bg(rgb(crate::views::theme::CHROME))
+            .text_color(rgb(crate::views::theme::TEXT))
             .text_size(px(13.))
             .child(if self.line.commit.uncommitted() {
                 mygit_gpui::i18n::text("未提交").to_owned()
