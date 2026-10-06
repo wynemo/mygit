@@ -478,6 +478,7 @@ pub fn translate(language: Language, value: &str) -> &str {
         "仓库变更已改变，请重新生成；当前草稿保留" => {
             "Repository changes have changed. Generate again; the current draft is preserved."
         }
+        "生成期间提交信息有修改，请重新生成；当前输入保留" => "The commit message changed during generation. Generate again; your input is preserved.",
         "Agent：" => "Agent:",
         "额外参数：" => "Extra arguments:",
         "例如：--model \"模型名称\"" => "Example: --model \"model name\"",

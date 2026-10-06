@@ -170,12 +170,8 @@ pub fn button_hint(id: &str) -> Option<&'static str> {
             "Reset HEAD, index and worktree; discard uncommitted changes and confirm before execution",
         ),
         "ai-generate" => (
-            "使用当前全部文件变更生成可编辑草稿，无需暂存；5 分钟超时",
-            "Generate an editable draft from all current changes without staging; 5-minute timeout",
-        ),
-        "ai-apply" => (
-            "替换手动草稿，可撤销；不会自动提交",
-            "Replace the manual draft with undo support; no automatic commit",
+            "使用当前全部文件变更生成并填入提交信息，无需暂存；5 分钟超时",
+            "Generate and fill the commit message from all current changes without staging; 5-minute timeout",
         ),
         "preview-large-file" | "merge-large-preview" => (
             "扩大预览读取范围，最高 20 MB",

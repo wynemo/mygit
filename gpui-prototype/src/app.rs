@@ -1924,7 +1924,7 @@ impl MyGit {
             cx.notify();
             return;
         }
-        if self.ai.loading || self.ai.applying {
+        if self.ai.loading {
             self.ai.message = mygit_gpui::i18n::text("AI 任务已取消，手动草稿保留").into();
         }
         if self.search.loading {

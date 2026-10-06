@@ -100,7 +100,6 @@ impl MyGit {
             .chain(self.history_inputs.iter().cloned())
             .chain(self.search.inputs.iter().cloned())
             .chain(self.quick.input.iter().cloned())
-            .chain(self.ai.candidate.iter().cloned())
             .collect();
         for editor in editors {
             editor.update(cx, |editor, cx| {

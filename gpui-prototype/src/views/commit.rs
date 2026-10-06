@@ -59,11 +59,11 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         } else {
                             mygit_gpui::i18n::text("AI 生成")
                         },
-                        !this.write_busy && !this.ai.loading && !this.ai.applying,
+                        !this.write_busy && !this.ai.loading,
                     )
                     .on_click(cx.listener(|this, _, _, cx| this.generate_ai(cx))),
                 )
-                .when(this.ai.loading || this.ai.applying, |s| {
+                .when(this.ai.loading, |s| {
                     s.child(
                         button("ai-cancel", mygit_gpui::i18n::text("取消 AI"), true)
                             .on_click(cx.listener(|this, _, _, cx| this.cancel_ai(cx))),
@@ -77,33 +77,6 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     .text_xs()
                     .text_color(rgb(0x946200))
                     .child(this.ai.message.clone()),
-            )
-        })
-        .when_some(this.ai.candidate.clone(), |s, candidate| {
-            s.child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .h(px(135.))
-                    .flex_shrink_0()
-                    .min_h_0()
-                    .child(
-                        div()
-                            .flex()
-                            .gap_2()
-                            .items_center()
-                            .px_2()
-                            .child(mygit_gpui::i18n::text("AI 生成草稿（可编辑）"))
-                            .child(
-                                button(
-                                    "ai-apply",
-                                    mygit_gpui::i18n::text("应用到提交信息（替换）"),
-                                    !this.write_busy && !this.ai.loading && !this.ai.applying,
-                                )
-                                .on_click(cx.listener(|this, _, _, cx| this.apply_ai(cx))),
-                            ),
-                    )
-                    .child(candidate),
             )
         })
         .child(
