@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 pub const DEFAULT_PROMPT: &str =
-    "帮我生成 commit 信息，用中文，简洁，使用 Conventional Commits 格式";
+    "直接帮我生成一行commit 信息，用中文, 简洁， 使用 Conventional Commits 格式";
 pub const AGENTS: &[(&str, &str)] = &[
     ("pi", "pi -p"),
     ("claude", "claude -p"),
