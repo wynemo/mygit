@@ -54,6 +54,9 @@ pub struct Editor {
     pub blame_lines: std::sync::Arc<Vec<mygit_gpui::blame::Line>>,
     pub blame_owner: Option<WeakEntity<MyGit>>,
     pub compact: bool,
+    pub form_input: bool,
+    form_width: Pixels,
+    form_rows: Vec<Range<usize>>,
     pub show_toolbar: bool,
     pub sensitive: bool,
     query: Option<Entity<Editor>>,
@@ -126,6 +129,9 @@ impl Editor {
             external_changed: false,
             reference: Default::default(),
             compact: false,
+            form_input: false,
+            form_width: px(240.),
+            form_rows: vec![],
             show_toolbar: false,
             sensitive: false,
             show_blame: false,
@@ -221,6 +227,13 @@ impl Editor {
             .scroll_to_item(self.caret_line(), ScrollStrategy::Center);
     }
     fn caret_line(&self) -> usize {
+        if self.form_input && !self.compact && !self.form_rows.is_empty() {
+            return self
+                .form_rows
+                .iter()
+                .rposition(|range| range.start <= self.buffer.selection.head)
+                .unwrap_or(0);
+        }
         if self.buffer.selection.head == self.buffer.text().len()
             && self.buffer.text().ends_with('\n')
         {
@@ -246,6 +259,36 @@ impl Editor {
         self.result(result, cx);
     }
     fn motion(&mut self, motion: Motion, extend: bool, cx: &mut Context<Self>) {
+        if self.form_input && !self.compact && matches!(motion, Motion::Up | Motion::Down) {
+            let row = self.caret_line();
+            let next = if matches!(motion, Motion::Up) {
+                row.saturating_sub(1)
+            } else {
+                (row + 1).min(self.form_rows.len().saturating_sub(1))
+            };
+            if let (Some(current), Some(target)) = (self.hits.get(&row), self.hits.get(&next)) {
+                let local = self
+                    .buffer
+                    .selection
+                    .head
+                    .saturating_sub(current.range.start)
+                    .min(current.range.len());
+                let x = current
+                    .line
+                    .x_for_index(current.display.display_offset(local));
+                let offset = target.range.start
+                    + target
+                        .display
+                        .source_offset(target.line.closest_index_for_x(x));
+                self.buffer.finish_composition();
+                self.buffer
+                    .selection
+                    .point(Side::Right, offset, extend, &self.buffer.document);
+                self.reveal();
+                cx.notify();
+                return;
+            }
+        }
         self.buffer.move_cursor(motion, extend);
         self.reveal();
         cx.notify();
@@ -525,13 +568,20 @@ impl EntityInputHandler for Editor {
 }
 fn line(this: &Editor, index: usize, cx: &mut Context<Editor>) -> impl IntoElement {
     let palette = cx.try_global::<CodePalette>().map_or(0, |p| p.0);
-    let range = this.buffer.document.display_range(index);
+    let range = if this.form_input && !this.compact {
+        this.form_rows
+            .get(index)
+            .cloned()
+            .unwrap_or(this.buffer.text().len()..this.buffer.text().len())
+    } else {
+        this.buffer.document.display_range(index)
+    };
     let display = if this.sensitive {
         DisplayLine::masked(&this.buffer.text()[range.clone()])
     } else {
         DisplayLine::new(&this.buffer.text()[range.clone()])
     };
-    let tokens = if this.sensitive {
+    let tokens = if this.sensitive || this.form_input {
         vec![]
     } else {
         this.syntax.lines.get(index).cloned().unwrap_or_default()
@@ -728,7 +778,47 @@ fn overview(editor: &Editor) -> impl IntoElement {
 }
 
 impl Render for Editor {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.form_input && !self.compact {
+            use unicode_segmentation::UnicodeSegmentation;
+            self.form_rows.clear();
+            for i in 0..self.buffer.document.lines.len() {
+                let range = self.buffer.document.display_range(i);
+                let text = &self.buffer.text()[range.clone()];
+                let display = DisplayLine::new(text);
+                let shaped = window.text_system().shape_line(
+                    display.text.clone().into(),
+                    px(self.font_size),
+                    &[TextRun {
+                        len: display.text.len(),
+                        font: font(self.font_family.clone()),
+                        color: rgb(0x202020).into(),
+                        background_color: None,
+                        underline: None,
+                        strikethrough: None,
+                    }],
+                    None,
+                );
+                let mut start = 0;
+                for (offset, grapheme) in text.grapheme_indices(true) {
+                    let end = offset + grapheme.len();
+                    if offset > start
+                        && shaped.x_for_index(display.display_offset(end))
+                            - shaped.x_for_index(display.display_offset(start))
+                            > self.form_width
+                    {
+                        self.form_rows
+                            .push(range.start + start..range.start + offset);
+                        start = offset;
+                    }
+                }
+                self.form_rows.push(range.start + start..range.end);
+            }
+            if self.buffer.text().ends_with('\n') {
+                self.form_rows
+                    .push(self.buffer.text().len()..self.buffer.text().len());
+            }
+        }
         let weak = cx.entity().downgrade();
         let scroll_listener = canvas(
             |_, _, _| (),
@@ -751,7 +841,7 @@ impl Render for Editor {
                         } else {
                             delta.x
                         };
-                        if dx != px(0.) {
+                        if dx != px(0.) && !(this.form_input && !this.compact) {
                             let visible = this
                                 .hits
                                 .values()
@@ -785,8 +875,11 @@ impl Render for Editor {
         self.hits.clear();
         let entity = cx.entity();
         let focus = self.focus.clone();
-        let count =
-            self.buffer.document.lines.len() + usize::from(self.buffer.text().ends_with('\n'));
+        let count = if self.form_input && !self.compact {
+            self.form_rows.len()
+        } else {
+            self.buffer.document.lines.len() + usize::from(self.buffer.text().ends_with('\n'))
+        };
         div()
             .relative()
             .bg(rgb(0xffffff))
@@ -817,21 +910,21 @@ impl Render for Editor {
             )
             .on_action(cx.listener(|this, _: &FindText, window, cx| this.show_find(window, cx)))
             .on_action(cx.listener(|this, _: &FindNext, _, cx| {
-                if this.compact {
+                if this.compact || this.form_input {
                     cx.propagate();
                 } else {
                     this.find_move(true, cx);
                 }
             }))
             .on_action(cx.listener(|this, _: &FindPrevious, _, cx| {
-                if this.compact {
+                if this.compact || this.form_input {
                     cx.propagate();
                 } else {
                     this.find_move(false, cx);
                 }
             }))
             .on_action(cx.listener(|this, _: &CloseFind, window, cx| {
-                if this.compact {
+                if this.compact || this.form_input {
                     cx.propagate();
                     return;
                 }
@@ -877,7 +970,13 @@ impl Render for Editor {
                     this.insert("\n", cx);
                 }
             }))
-            .on_action(cx.listener(|this, _: &InsertTab, _, cx| this.insert("\t", cx)))
+            .on_action(cx.listener(|this, _: &InsertTab, _, cx| {
+                if this.form_input {
+                    cx.propagate();
+                } else {
+                    this.insert("\t", cx);
+                }
+            }))
             .on_action(cx.listener(|this, _: &Left, _, cx| this.motion(Motion::Left, false, cx)))
             .on_action(cx.listener(|this, _: &Right, _, cx| this.motion(Motion::Right, false, cx)))
             .on_action(cx.listener(|this, _: &Up, _, cx| this.motion(Motion::Up, false, cx)))
@@ -1041,7 +1140,7 @@ impl Render for Editor {
                                             .h(px(this.font_size + 6.))
                                             .font_family(this.font_family.clone())
                                             .text_size(px(this.font_size))
-                                            .when(!this.compact, |s| {
+                                            .when(!this.compact && !this.form_input, |s| {
                                                 s.child(
                                                     div()
                                                         .w(px(52.))
@@ -1100,6 +1199,15 @@ impl Render for Editor {
                 canvas(
                     |_, _, _| (),
                     move |bounds, _, window, cx| {
+                        entity.update(cx, |editor, cx| {
+                            if editor.form_input
+                                && !editor.compact
+                                && (editor.form_width - bounds.size.width).abs() > px(1.)
+                            {
+                                editor.form_width = bounds.size.width;
+                                cx.notify();
+                            }
+                        });
                         window.handle_input(&focus, ElementInputHandler::new(bounds, entity), cx);
                     },
                 )

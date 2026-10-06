@@ -447,6 +447,16 @@ pub fn translate(language: Language, value: &str) -> &str {
         "合并提交三栏" => "Three-column merge",
         "自定义比较" => "Custom comparison",
         "界面语言" => "Interface language",
+        "语言：" => "Language:",
+        "字体：" => "Font:",
+        "字体大小：" => "Font size:",
+        "代码风格：" => "Code style:",
+        "API 地址：" => "API URL:",
+        "API 密钥：" => "API key:",
+        "模型名称：" => "Model:",
+        "提示词：" => "Prompt:",
+        "无法读取设置" => "Unable to read settings",
+        "字号必须为整数" => "Font size must be an integer",
         "保存后重启生效" => "Takes effect after restarting",
         "语言设置已保存，请重启应用生效" => {
             "Language preference saved. Restart the app to apply it."

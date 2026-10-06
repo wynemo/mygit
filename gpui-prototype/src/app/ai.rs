@@ -6,9 +6,6 @@ pub struct State {
     pub applying: bool,
     pub message: String,
     pub candidate: Option<Entity<Editor>>,
-    pub config_shown: bool,
-    pub config_inputs: Vec<Entity<Editor>>,
-    pub config_message: String,
     fingerprint: Option<Fingerprint>,
     pending: Cancellation,
     serial: u64,
@@ -181,87 +178,6 @@ impl MyGit {
 }
 
 impl MyGit {
-    pub fn toggle_ai_settings(&mut self, cx: &mut Context<Self>) {
-        self.ai.config_shown = !self.ai.config_shown;
-        if self.ai.config_shown && self.ai.config_inputs.is_empty() {
-            match mygit_gpui::ai::Config::load_stored(&self.settings.path) {
-                Ok(config) => {
-                    for (i, text) in [
-                        config.api_url,
-                        config.api_secret,
-                        config.model_name,
-                        config.prompt,
-                    ]
-                    .iter()
-                    .enumerate()
-                    {
-                        let font = self.state.font_family.clone();
-                        let size = self.state.font_size;
-                        self.ai.config_inputs.push(cx.new(|cx| {
-                            let mut editor =
-                                Editor::new(mygit_gpui::editor::Buffer::new(text), font, size, cx);
-                            editor.compact = i != 3;
-                            editor.show_toolbar = false;
-                            editor.sensitive = i == 1;
-                            editor
-                        }));
-                    }
-                }
-                Err(error) => {
-                    self.ai.config_message = mygit_gpui::localized_format!(
-                        "无法加载 AI 配置：{error:#}",
-                        "Unable to load AI settings: {error:#}"
-                    )
-                }
-            }
-        }
-        cx.notify();
-    }
-    pub fn save_ai_settings(&mut self, cx: &mut Context<Self>) {
-        if self.ai.config_inputs.len() != 4 {
-            return;
-        }
-        if self
-            .ai
-            .config_inputs
-            .iter()
-            .any(|e| e.read(cx).buffer.marked.is_some())
-        {
-            self.ai.config_message =
-                mygit_gpui::i18n::text("请先完成输入法组合，再保存配置").into();
-            cx.notify();
-            return;
-        }
-        let text = |i: usize| self.ai.config_inputs[i].read(cx).buffer.text().to_owned();
-        let config = mygit_gpui::ai::Config {
-            api_url: text(0),
-            api_secret: text(1),
-            model_name: text(2),
-            prompt: text(3),
-        };
-        if let Err(error) = config.validate() {
-            self.ai.config_message = mygit_gpui::localized_format!(
-                "AI 配置无效：{error:#}",
-                "Invalid AI settings: {error:#}"
-            );
-            cx.notify();
-            return;
-        }
-        self.ai.cancel();
-        self.ai.candidate = None;
-        self.ai.fingerprint = None;
-        self.settings.ai_update = Some(config);
-        let result = self.settings.save();
-        self.settings.ai_update = None;
-        self.ai.config_message = match result {
-            Ok(()) => mygit_gpui::i18n::text("AI 配置已保存；尚未发送请求").into(),
-            Err(_) => mygit_gpui::i18n::text("无法保存 AI 配置，请检查文件权限；输入保留").into(),
-        };
-        cx.notify();
-    }
-}
-
-impl MyGit {
     pub(crate) fn hide_commit(&mut self) {
         self.show_commit = false;
         if self.ai.loading || self.ai.applying {
@@ -273,9 +189,8 @@ impl MyGit {
         self.hide_commit();
         self.hide_quick_open();
         self.hide_project_search();
-        self.show_settings = true;
-        if !self.ai.config_shown {
-            self.toggle_ai_settings(cx);
+        if !self.show_settings {
+            self.toggle_settings(cx);
         }
         cx.notify();
     }

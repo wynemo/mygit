@@ -135,7 +135,6 @@ pub struct MyGit {
     pub write_progress_text: String,
     pub show_commit: bool,
     pub show_compare: bool,
-    pub font_inputs: Vec<Entity<Editor>>,
     restore_main_focus: bool,
     pub show_blame: bool,
     blame_key: Option<blame::Key>,
@@ -179,6 +178,7 @@ pub struct MyGit {
     pub tab_scroll: HashMap<String, UniformListScrollHandle>,
     pub settings: mygit_gpui::settings::Settings,
     pub show_settings: bool,
+    pub settings_form: Option<views::settings_dialog::Draft>,
     pub show_recent: bool,
     pub show_branch_dropdown: bool,
     pub show_workspace_changes: bool,
@@ -267,7 +267,6 @@ impl MyGit {
             write_progress_text: String::new(),
             show_commit: false,
             show_compare: false,
-            font_inputs: vec![],
             restore_main_focus: false,
             show_blame: false,
             ai: Default::default(),
@@ -314,6 +313,7 @@ impl MyGit {
             tab_scroll: HashMap::new(),
             settings,
             show_settings: false,
+            settings_form: None,
             show_recent: false,
             show_branch_dropdown: false,
             show_workspace_changes: false,
@@ -1813,6 +1813,10 @@ impl MyGit {
         .detach();
     }
     pub fn cancel_task(&mut self, cx: &mut Context<Self>) {
+        if self.show_settings {
+            self.cancel_settings(cx);
+            return;
+        }
         if self.tree_menu.take().is_some() {
             self.restore_main_focus = true;
             cx.notify();
@@ -1975,6 +1979,22 @@ impl MyGit {
         cx.notify();
     }
     pub fn cycle_focus(&mut self, reverse: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.show_settings {
+            if let Some(form) = &self.settings_form {
+                let count = form.inputs.len();
+                let current = form
+                    .inputs
+                    .iter()
+                    .position(|input| input.read(cx).focus.is_focused(window));
+                let next = match current {
+                    Some(i) if reverse => (i + count - 1) % count,
+                    Some(i) => (i + 1) % count,
+                    None => 0,
+                };
+                window.focus(&form.inputs[next].read(cx).focus);
+            }
+            return;
+        }
         let mut handles = vec![];
         if self.settings.git_panel_visible {
             handles.push(self.history_focus.clone());
@@ -2222,28 +2242,6 @@ impl MyGit {
                 "Unable to save settings: {e:#}"
             );
         }
-    }
-    pub fn cycle_font(&mut self, cx: &mut Context<Self>) {
-        self.state.font_family = match self.state.font_family.as_str() {
-            "Menlo" => "Courier New",
-            "Courier New" => "monospace",
-            _ => "Menlo",
-        }
-        .into();
-        self.update_editor_fonts(cx);
-        self.save_settings();
-        cx.notify();
-    }
-    pub fn resize_panel(&mut self, history: bool, increase: bool, cx: &mut Context<Self>) {
-        let width = if history {
-            &mut self.settings.history_width
-        } else {
-            &mut self.settings.files_width
-        };
-        *width = (*width + if increase { 20. } else { -20. })
-            .clamp(if history { 160. } else { 120. }, 600.);
-        self.save_settings();
-        cx.notify();
     }
     pub fn toggle_unified(&mut self, cx: &mut Context<Self>) {
         self.capture_tab();
@@ -2635,9 +2633,6 @@ impl Render for MyGit {
                     views::compare::pane(self, cx).into_any_element(),
                 ))
             })
-            .when(self.show_settings, |s| {
-                s.child(views::popover(views::settings(self, cx).into_any_element()))
-            })
             .when(
                 self.write_busy && !self.write_progress_text.is_empty(),
                 |s| {
@@ -2680,6 +2675,9 @@ impl Render for MyGit {
             })
             .when(self.tab_menu.is_some(), |s| {
                 s.child(views::tabs::menu(self, cx))
+            })
+            .when(self.show_settings, |s| {
+                s.child(views::settings_dialog::pane(self, window, cx))
             })
             .when(self.confirmation.is_some(), |s| {
                 s.child(views::confirmation(self, cx))

@@ -38,6 +38,7 @@ pub struct Settings {
     pub warning: Option<String>,
     pub draft: Option<(String, String)>,
     pub ai_update: Option<crate::ai::Config>,
+    pub code_style_update: Option<String>,
 }
 impl Settings {
     pub fn default_path() -> PathBuf {
@@ -145,6 +146,7 @@ impl Settings {
             warning,
             draft: None,
             ai_update: None,
+            code_style_update: None,
         }
     }
     pub fn draft_for(&self, root: &Path) -> String {
@@ -199,6 +201,9 @@ impl Settings {
             data["model_name"] = json!(config.model_name);
             data["prompt"] = json!(config.prompt);
         }
+        if let Some(style) = &self.code_style_update {
+            data["code_style"] = json!(style);
+        }
         data["language"] = json!(self.language.saved());
         data["font_family"] = json!(self.font_family);
         // Python passes this shared setting to QFont's integer point-size argument.
@@ -252,6 +257,30 @@ impl Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn code_style_changes_are_explicit_and_preserve_fresh_shared_settings() {
+        let dir = std::env::temp_dir().join(format!("mygit-style-compat-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("settings.json");
+        fs::write(&path, r#"{"code_style":"friendly","api_secret":"fixture"}"#).unwrap();
+        let mut settings = Settings::load(path.clone());
+        settings.code_style_update = Some("monokai".into());
+        settings.save().unwrap();
+        let data: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        assert_eq!(data["code_style"], "monokai");
+        assert_eq!(data["api_secret"], "fixture");
+        settings.code_style_update = None;
+        fs::write(
+            &path,
+            r#"{"code_style":"native","api_secret":"fixture-new"}"#,
+        )
+        .unwrap();
+        settings.save().unwrap();
+        let data: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        assert_eq!(data["code_style"], "native");
+        assert_eq!(data["api_secret"], "fixture-new");
+        fs::remove_dir_all(dir).unwrap();
+    }
     #[test]
     fn shared_font_size_is_saved_as_an_integer() {
         let dir = std::env::temp_dir().join(format!("mygit-font-compat-{}", std::process::id()));

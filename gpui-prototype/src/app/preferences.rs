@@ -38,87 +38,53 @@ impl MyGit {
         cx.notify();
     }
 
-    pub fn select_language(
-        &mut self,
-        language: mygit_gpui::i18n::Language,
-        cx: &mut Context<Self>,
-    ) {
-        self.settings.language = language;
-        self.state.message = mygit_gpui::i18n::text("语言设置已保存，请重启应用生效").into();
-        self.save_settings();
+    pub fn toggle_settings(&mut self, cx: &mut Context<Self>) {
+        if self.show_settings {
+            self.cancel_settings(cx);
+            return;
+        }
+        self.hide_quick_open();
+        self.hide_project_search();
+        self.settings_form = Some(crate::views::settings_dialog::Draft::new(self, cx));
+        self.show_settings = true;
+        self.restore_main_focus = true;
         cx.notify();
     }
-    pub fn select_code_palette(&mut self, index: usize, cx: &mut Context<Self>) {
-        let Some(name) = mygit_gpui::syntax::PALETTES.get(index) else {
+    pub fn cancel_settings(&mut self, cx: &mut Context<Self>) {
+        self.show_settings = false;
+        self.settings_form = None;
+        self.restore_main_focus = true;
+        cx.notify();
+    }
+    pub fn accept_settings(&mut self, cx: &mut Context<Self>) {
+        let Some(form) = &self.settings_form else {
             return;
         };
-        self.settings.code_theme = (*name).into();
-        cx.set_global(crate::views::editor::CodePalette(index));
-        self.line_layouts.clear();
-        self.update_editor_fonts(cx);
-        self.save_settings();
-        cx.notify();
-    }
-    pub fn toggle_settings(&mut self, cx: &mut Context<Self>) {
-        self.show_settings = !self.show_settings;
-        self.restore_main_focus = true;
-        if self.show_settings {
-            self.hide_quick_open();
-            self.hide_project_search();
-            self.font_inputs = [
-                self.state.font_family.clone(),
-                self.state.font_size.to_string(),
-            ]
-            .into_iter()
-            .map(|text| {
-                cx.new(|cx| {
-                    let mut editor = Editor::new(
-                        mygit_gpui::editor::Buffer::new(&text),
-                        self.state.font_family.clone(),
-                        self.state.font_size,
-                        cx,
-                    );
-                    editor.compact = true;
-                    editor.show_toolbar = false;
-                    editor
-                })
-            })
-            .collect();
-        }
-        cx.notify();
-    }
-    pub fn apply_font_settings(&mut self, cx: &mut Context<Self>) {
-        if self.font_inputs.len() != 2 {
-            return;
-        }
-        if self
-            .font_inputs
-            .iter()
-            .any(|e| e.read(cx).buffer.marked.is_some())
-        {
-            self.state.message = mygit_gpui::i18n::text("请先完成字体设置输入").into();
-            cx.notify();
-            return;
-        }
-        let family = self.font_inputs[0].read(cx).buffer.text().trim().to_owned();
-        let size = self.font_inputs[1]
-            .read(cx)
-            .buffer
-            .text()
-            .trim()
-            .parse::<f32>();
-        match mygit_gpui::settings::validate_font(&family, size.ok()) {
-            Ok(size) => {
-                self.state.font_family = family;
-                self.state.font_size = size;
+        let result = form.saved_settings(self, cx).and_then(|settings| {
+            settings.save()?;
+            Ok(settings)
+        });
+        match result {
+            Ok(mut settings) => {
+                settings.ai_update = None;
+                settings.code_style_update = None;
+                self.state.font_family = settings.font_family.clone();
+                self.state.font_size = settings.font_size;
+                let palette = mygit_gpui::syntax::palette_index(&settings.code_theme);
+                self.settings = settings;
+                cx.set_global(crate::views::editor::CodePalette(palette));
                 self.line_layouts.clear();
                 self.update_editor_fonts(cx);
-                self.state.message = mygit_gpui::i18n::text("字体设置已应用").into();
-                self.save_settings();
+                self.ai.reset();
+                self.cancel_settings(cx);
             }
-            Err(error) => self.state.message = error.to_string(),
+            Err(error) => {
+                if let Some(form) = &mut self.settings_form {
+                    form.error = error.to_string();
+                }
+                cx.notify();
+            }
         }
-        cx.notify();
     }
     pub fn update_editor_fonts(&mut self, cx: &mut Context<Self>) {
         let editors: Vec<_> = self
@@ -134,9 +100,7 @@ impl MyGit {
             .chain(self.history_inputs.iter().cloned())
             .chain(self.search.inputs.iter().cloned())
             .chain(self.quick.input.iter().cloned())
-            .chain(self.ai.config_inputs.iter().cloned())
             .chain(self.ai.candidate.iter().cloned())
-            .chain(self.font_inputs.iter().cloned())
             .collect();
         for editor in editors {
             editor.update(cx, |editor, cx| {
@@ -145,11 +109,6 @@ impl MyGit {
                 cx.notify();
             });
         }
-    }
-    pub fn clear_recent_repositories(&mut self, cx: &mut Context<Self>) {
-        self.settings.clear_recent();
-        self.save_settings();
-        cx.notify();
     }
     pub fn toggle_files_panel(&mut self, cx: &mut Context<Self>) {
         self.tree_menu = None;
