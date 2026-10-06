@@ -1257,7 +1257,9 @@ impl MyGit {
             } else {
                 mygit_gpui::i18n::text("正在取消暂存…")
             },
-            if stage {
+            if self.show_commit {
+                BrowseMode::Workspace
+            } else if stage {
                 BrowseMode::Staged
             } else {
                 BrowseMode::Unstaged
@@ -1356,6 +1358,7 @@ impl MyGit {
             self.show_workspace_changes = false;
         }
         if self.show_commit {
+            self.select_mode(BrowseMode::Workspace, cx);
             self.hide_quick_open();
             self.hide_project_search();
             self.show_branches = false;
@@ -1370,8 +1373,13 @@ impl MyGit {
                 .as_ref()
                 .map(|r| self.settings.draft_for(&r.root))
                 .unwrap_or_default();
-            let editor =
-                cx.new(|cx| Editor::new(mygit_gpui::editor::Buffer::new(&text), font, size, cx));
+            let editor = cx.new(|cx| {
+                let mut editor =
+                    Editor::new(mygit_gpui::editor::Buffer::new(&text), font, size, cx);
+                editor.form_input = true;
+                editor.show_toolbar = false;
+                editor
+            });
             cx.subscribe(&editor, |this, editor, _: &Changed, cx| {
                 if let Some(repo) = &this.state.repo {
                     this.settings.draft = Some((
@@ -1386,23 +1394,70 @@ impl MyGit {
         }
         cx.notify();
     }
-    pub fn commit(&mut self, cx: &mut Context<Self>) {
-        if self.write_busy {
+    pub fn commit_selected(&mut self, push: bool, cx: &mut Context<Self>) {
+        if self.write_busy || self.file_selection.is_empty() {
             return;
         }
         let (Some(repo), Some(editor)) = (&self.state.repo, &self.commit_editor) else {
             return;
         };
-        let root = repo.root.clone();
         let message = editor.read(cx).buffer.text().to_owned();
+        if message.trim().is_empty() {
+            return;
+        }
+        let mut paths: Vec<String> = self
+            .state
+            .files
+            .iter()
+            .filter(|f| self.file_selection.contains(&f.path))
+            .flat_map(|f| [f.path.clone(), f.old_path.clone()])
+            .collect();
+        paths.sort();
+        paths.dedup();
+        if paths.is_empty() {
+            return;
+        }
+        if self
+            .editors
+            .iter()
+            .any(|(path, editor)| paths.contains(path) && editor.read(cx).buffer.dirty())
+        {
+            self.write_message =
+                mygit_gpui::i18n::text("所选文件有未保存修改，请先保存后再暂存").into();
+            cx.notify();
+            return;
+        }
+        let root = repo.root.clone();
+        let remote = self
+            .remote_name
+            .as_ref()
+            .map(|e| e.read(cx).buffer.text().trim().to_owned())
+            .unwrap_or_else(|| "origin".into());
         self.run_write(
-            mygit_gpui::i18n::text("正在提交暂存内容…"),
+            "Commit",
             BrowseMode::Workspace,
             true,
-            move || git::commit_index(&root, &message),
+            move || {
+                let output = git::commit_paths(&root, &message, &paths)?;
+                if push {
+                    match mygit_gpui::operations::remote(
+                        &root,
+                        mygit_gpui::operations::RemoteOperation::Push,
+                        &remote,
+                    ) {
+                        Ok(result) => Ok(format!("{output}\n{result}")),
+                        Err(error) => {
+                            anyhow::bail!("Commit succeeded. Push failed: {error:#}\n{output}")
+                        }
+                    }
+                } else {
+                    Ok(output)
+                }
+            },
             cx,
         );
     }
+
     fn run_write(
         &mut self,
         label: &str,

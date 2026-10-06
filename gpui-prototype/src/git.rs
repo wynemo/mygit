@@ -655,6 +655,27 @@ pub fn commit_index(root: &Path, message: &str) -> Result<String> {
     Ok(output.trim().into())
 }
 
+/// Commit only checked paths, preserving staged changes belonging to other files.
+pub fn commit_paths(root: &Path, message: &str, paths: &[String]) -> Result<String> {
+    validate_paths(paths)?;
+    if paths.is_empty() || message.trim().is_empty() {
+        bail!("Select files and enter a commit message");
+    }
+    if !git(root, &["ls-files", "--unmerged", "-z"])?.is_empty() {
+        bail!("Unresolved conflicts remain; cannot commit");
+    }
+    stage(root, paths, false)?;
+    let mut args = vec!["commit", "--only", "-m", message, "--"];
+    args.extend(paths.iter().map(String::as_str));
+    Ok(string(git_timeout(
+        root,
+        &args,
+        std::time::Duration::from_secs(120),
+    )?)?
+    .trim()
+    .into())
+}
+
 pub fn workspace_status(root: &Path) -> Result<BTreeMap<String, String>> {
     let bytes = git(
         root,

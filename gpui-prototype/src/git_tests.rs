@@ -2309,3 +2309,24 @@ fn default_history_includes_unmerged_remote_branch_and_pins_all_pages() {
     assert_ne!(snapshot.history_tips, refreshed.history_tips);
     assert!(!refreshed.commits.iter().any(|c| c.sha == side));
 }
+
+#[test]
+fn checked_file_commit_excludes_other_staged_files_and_supports_new_files() {
+    let f = Fixture::new();
+    std::fs::write(f.0.join("selected"), "before").unwrap();
+    std::fs::write(f.0.join("other"), "before").unwrap();
+    f.commit();
+    std::fs::write(f.0.join("selected"), "after").unwrap();
+    std::fs::write(f.0.join("other"), "staged").unwrap();
+    stage(&f.0, &["other".into()], false).unwrap();
+    std::fs::write(f.0.join("new"), "new").unwrap();
+    commit_paths(&f.0, "checked only", &["selected".into(), "new".into()]).unwrap();
+    assert_eq!(git(&f.0, &["show", "HEAD:selected"]).unwrap(), b"after");
+    assert_eq!(git(&f.0, &["show", "HEAD:new"]).unwrap(), b"new");
+    assert_eq!(git(&f.0, &["show", "HEAD:other"]).unwrap(), b"before");
+    assert_eq!(git(&f.0, &["show", ":other"]).unwrap(), b"staged");
+    assert_eq!(
+        git(&f.0, &["diff", "--cached", "--name-only"]).unwrap(),
+        b"other\n"
+    );
+}

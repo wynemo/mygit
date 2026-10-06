@@ -45,7 +45,7 @@ fn activity(id: &'static str, path: &'static str, label: &'static str) -> Statef
         .cursor_pointer()
         .rounded(px(8.))
         .hover(|s| s.bg(rgb(crate::views::theme::HOVER)))
-        .child(icons::icon(path).size(px(34.)))
+        .child(icons::icon(path).size(px(20.)))
         .tooltip(move |_, cx| cx.new(|_| views::hints::Hint(label.into())).into())
 }
 
