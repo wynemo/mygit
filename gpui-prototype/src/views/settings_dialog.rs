@@ -60,6 +60,7 @@ pub struct Draft {
     pub language: Language,
     pub original_language: Language,
     pub code_style: String,
+    pub agent: String,
     original_style: String,
     pub dropdown: Option<usize>,
     pub error: String,
@@ -92,37 +93,30 @@ impl Draft {
             .unwrap_or(this.state.font_size as f64)
             .round()
             .to_string();
-        let inputs = [
-            family,
-            size,
-            config.api_url,
-            config.api_secret,
-            config.model_name,
-            config.prompt,
-        ]
-        .into_iter()
-        .enumerate()
-        .map(|(i, text)| {
-            cx.new(|cx| {
-                let mut editor = Editor::new(
-                    mygit_gpui::editor::Buffer::new(&text),
-                    "Helvetica".into(),
-                    13.,
-                    cx,
-                );
-                editor.compact = i != 5;
-                editor.form_input = true;
-                editor.sensitive = i == 3;
-                editor
+        let inputs = [family, size, config.agent_args, config.prompt]
+            .into_iter()
+            .enumerate()
+            .map(|(i, text)| {
+                cx.new(|cx| {
+                    let mut editor = Editor::new(
+                        mygit_gpui::editor::Buffer::new(&text),
+                        "Helvetica".into(),
+                        13.,
+                        cx,
+                    );
+                    editor.compact = i != 3;
+                    editor.form_input = true;
+                    editor
+                })
             })
-        })
-        .collect();
+            .collect();
         Self {
             inputs,
             language,
             original_language: language,
             original_style: code_style.clone(),
             code_style,
+            agent: config.agent,
             dropdown: None,
             error: if load_failed {
                 mygit_gpui::i18n::text("无法读取设置").into()
@@ -164,11 +158,11 @@ impl Draft {
             .into();
         }
         settings.ai_update = Some(Config {
-            api_url: text(2),
-            api_secret: text(3),
-            model_name: text(4),
-            prompt: text(5),
+            agent: self.agent.clone(),
+            agent_args: text(2),
+            prompt: text(3),
         });
+        settings.ai_update.as_ref().unwrap().validate()?;
         Ok(settings)
     }
 }
@@ -195,15 +189,23 @@ fn row(label: &'static str, content: impl IntoElement) -> Div {
 }
 fn dropdown(this: &MyGit, index: usize, cx: &mut Context<MyGit>) -> impl IntoElement {
     let form = this.settings_form.as_ref().unwrap();
-    let value = if index == 0 {
-        form.language.saved().to_owned()
-    } else {
-        form.code_style.clone()
+    let value = match index {
+        0 => form.language.saved().to_owned(),
+        1 => form.code_style.clone(),
+        _ => mygit_gpui::ai::AGENTS
+            .iter()
+            .find(|(name, _)| *name == form.agent)
+            .map(|(_, label)| *label)
+            .unwrap_or(&form.agent)
+            .to_owned(),
     };
-    let choices = if index == 0 {
-        vec!["中文", "English"]
-    } else {
-        CODE_STYLES.to_vec()
+    let choices = match index {
+        0 => vec!["中文", "English"],
+        1 => CODE_STYLES.to_vec(),
+        _ => mygit_gpui::ai::AGENTS
+            .iter()
+            .map(|(_, label)| *label)
+            .collect(),
     };
     div()
         .relative()
@@ -265,8 +267,10 @@ fn dropdown(this: &MyGit, index: usize, cx: &mut Context<MyGit>) -> impl IntoEle
                                     if let Some(form) = &mut this.settings_form {
                                         if index == 0 {
                                             form.language = Language::from_saved(value);
-                                        } else {
+                                        } else if index == 1 {
                                             form.code_style = value.into();
+                                        } else {
+                                            form.agent = mygit_gpui::ai::AGENTS[i].0.into();
                                         }
                                         form.dropdown = None;
                                     }
@@ -343,9 +347,14 @@ pub fn pane(this: &MyGit, window: &Window, cx: &mut Context<MyGit>) -> impl Into
                         .child(row("字体：", form.inputs[0].clone()))
                         .child(row("字体大小：", form.inputs[1].clone()))
                         .child(row("代码风格：", dropdown(this, 1, cx)))
-                        .child(row("API 地址：", form.inputs[2].clone()))
-                        .child(row("API 密钥：", form.inputs[3].clone()))
-                        .child(row("模型名称：", form.inputs[4].clone()))
+                        .child(row("Agent：", dropdown(this, 2, cx)))
+                        .child(row("额外参数：", form.inputs[2].clone()))
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(rgb(crate::views::theme::MUTED))
+                                .child(mygit_gpui::i18n::text("例如：--model \"模型名称\"")),
+                        )
                         .child(row(
                             "提示词：",
                             div()
@@ -354,7 +363,7 @@ pub fn pane(this: &MyGit, window: &Window, cx: &mut Context<MyGit>) -> impl Into
                                 .flex_col()
                                 .border_1()
                                 .border_color(rgb(crate::views::theme::BORDER))
-                                .child(form.inputs[5].clone()),
+                                .child(form.inputs[3].clone()),
                         ))
                         .when(!form.error.is_empty(), |s| {
                             s.child(div().text_color(rgb(0xa52a2a)).child(form.error.clone()))

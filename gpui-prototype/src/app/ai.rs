@@ -42,14 +42,14 @@ impl MyGit {
         self.ai.reset();
         self.ai.pending = Default::default();
         self.ai.loading = true;
-        self.ai.message = mygit_gpui::i18n::text("正在按当前暂存 Diff 生成…（15 秒超时）").into();
+        self.ai.message = mygit_gpui::i18n::text("正在按当前文件变更生成…（5 分钟超时）").into();
         let serial = self.ai.serial;
         let epoch = self.repository_epoch;
         let token = self.ai.pending.clone();
         let task = cx.background_executor().spawn(async move {
             mygit_gpui::process::scope(token, || {
                 let config = mygit_gpui::ai::Config::load(&settings)?;
-                mygit_gpui::ai::generate_staged(&root, &config)
+                mygit_gpui::ai::generate_changes(&root, &config)
             })
         });
         cx.spawn(async move |this, cx| {
@@ -127,7 +127,7 @@ impl MyGit {
         let epoch = self.repository_epoch;
         let token = self.ai.pending.clone();
         let task = cx.background_executor().spawn(async move {
-            mygit_gpui::process::scope(token, || mygit_gpui::ai::fingerprint(&root))
+            mygit_gpui::process::scope(token, || mygit_gpui::ai::changes_fingerprint(&root))
         });
         cx.spawn(async move |this, cx| {
             let result = task.await;
@@ -138,8 +138,7 @@ impl MyGit {
                 this.ai.applying = false;
                 this.ai.message = match result {
                     Ok(current) if current != expected => {
-                        mygit_gpui::i18n::text("暂存区或 HEAD 已改变，请重新生成；当前草稿保留")
-                            .into()
+                        mygit_gpui::i18n::text("仓库变更已改变，请重新生成；当前草稿保留").into()
                     }
                     Ok(_)
                         if editor.read(cx).buffer.marked.is_some()
@@ -164,8 +163,8 @@ impl MyGit {
                     },
                     Err(error) => {
                         mygit_gpui::localized_format!(
-                            "无法校验暂存区：{error:#}",
-                            "Unable to validate index: {error:#}"
+                            "无法校验仓库变更：{error:#}",
+                            "Unable to validate repository changes: {error:#}"
                         )
                     }
                 };

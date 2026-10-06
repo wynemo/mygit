@@ -13,8 +13,17 @@ pub(crate) fn command(name: &str) -> Command {
             .into_iter()
             .flatten()
             .collect();
-        let fallback =
-            ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"].map(PathBuf::from);
+        let mut fallback = vec![];
+        if let Some(home) = std::env::var_os("HOME") {
+            let home = PathBuf::from(home);
+            fallback.extend([
+                home.join(".local/bin"),
+                home.join(".npm-global/bin"),
+                home.join(".cargo/bin"),
+            ]);
+        }
+        fallback
+            .extend(["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"].map(PathBuf::from));
         if let Some(program) = fallback_program(name, &directories, &fallback) {
             return Command::new(program);
         }
@@ -24,7 +33,7 @@ pub(crate) fn command(name: &str) -> Command {
 
 #[cfg(target_os = "macos")]
 fn fallback_program(name: &str, path: &[PathBuf], fallback: &[PathBuf]) -> Option<PathBuf> {
-    if !matches!(name, "git" | "rg" | "curl")
+    if !matches!(name, "git" | "rg" | "curl" | "pi" | "claude" | "codex")
         || path
             .iter()
             .any(|directory| executable(&directory.join(name)))

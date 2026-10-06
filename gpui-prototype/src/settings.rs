@@ -196,9 +196,12 @@ impl Settings {
             Err(e) => return Err(e.into()),
         };
         if let Some(config) = &self.ai_update {
-            data["api_url"] = json!(config.api_url);
-            data["api_secret"] = json!(config.api_secret);
-            data["model_name"] = json!(config.model_name);
+            config.validate()?;
+            data["agent"] = json!(config.agent);
+            data["agent_args"] = json!(config.agent_args);
+            for key in ["api_url", "api_secret", "model_name"] {
+                data.as_object_mut().unwrap().remove(key);
+            }
             data["prompt"] = json!(config.prompt);
         }
         if let Some(style) = &self.code_style_update {
@@ -455,7 +458,7 @@ mod tests {
         fs::remove_dir_all(dir).unwrap();
     }
     #[test]
-    fn ai_configuration_updates_are_explicit_private_and_preserve_legacy_fields() {
+    fn agent_configuration_migrates_legacy_fields_and_preserves_other_settings() {
         let dir = std::env::temp_dir().join(format!(
             "mygit-ai-settings-{}-{}",
             std::process::id(),
@@ -472,14 +475,20 @@ mod tests {
         let data: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
         assert_eq!(data["api_secret"], "fixture-old");
         settings.ai_update = Some(crate::ai::Config {
-            api_url: "https://example.com/new".into(),
-            api_secret: "fixture-new".into(),
-            model_name: "new".into(),
+            agent: "claude".into(),
+            agent_args: "--model 'test model'".into(),
             prompt: "中文提示".into(),
         });
         settings.save().unwrap();
         let data: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
-        assert_eq!(data["api_secret"], "fixture-new");
+        assert_eq!(data["agent"], "claude");
+        assert_eq!(data["agent_args"], "--model 'test model'");
+        for key in ["api_url", "api_secret", "model_name"] {
+            assert!(data.get(key).is_none());
+        }
+        let loaded = crate::ai::Config::load(&path).unwrap();
+        assert_eq!(loaded.agent, "claude");
+        assert_eq!(loaded.validate().unwrap(), ["--model", "test model"]);
         assert_eq!(data["prompt"], "中文提示");
         assert_eq!(data["future"], 42);
         #[cfg(unix)]

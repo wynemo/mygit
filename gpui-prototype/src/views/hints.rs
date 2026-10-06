@@ -170,8 +170,8 @@ pub fn button_hint(id: &str) -> Option<&'static str> {
             "Reset HEAD, index and worktree; discard uncommitted changes and confirm before execution",
         ),
         "ai-generate" => (
-            "使用当前暂存 Diff 生成可编辑草稿；15 秒超时",
-            "Generate an editable draft from the current staged Diff; 15-second timeout",
+            "使用当前全部文件变更生成可编辑草稿，无需暂存；5 分钟超时",
+            "Generate an editable draft from all current changes without staging; 5-minute timeout",
         ),
         "ai-apply" => (
             "替换手动草稿，可撤销；不会自动提交",

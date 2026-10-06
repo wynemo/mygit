@@ -386,8 +386,8 @@ pub fn translate(language: Language, value: &str) -> &str {
         "无法保存设置：{e:#}" => "Unable to save settings: {e:#}",
         "请先完成字体设置输入" => "Finish composing the font settings first",
         "字体设置已应用" => "Font settings applied",
-        "正在按当前暂存 Diff 生成…（15 秒超时）" => {
-            "Generating from the current staged Diff… (15-second timeout)"
+        "正在按当前文件变更生成…（5 分钟超时）" => {
+            "Generating from the current file changes… (5-minute timeout)"
         }
         "生成草稿可编辑；点击应用将替换手动草稿，可撤销" => {
             "The generated draft is editable. Applying it replaces the manual draft and can be undone."
@@ -458,6 +458,40 @@ pub fn translate(language: Language, value: &str) -> &str {
         "API 地址：" => "API URL:",
         "API 密钥：" => "API key:",
         "模型名称：" => "Model:",
+        "存在未解决冲突，无法生成提交信息" => {
+            "Unresolved conflicts prevent commit message generation"
+        }
+        "变更 Diff 超过 1 MB，请拆分变更后重试" => {
+            "Changes Diff exceeds 1 MB; split the changes and retry"
+        }
+        "变更路径不是 UTF-8" => "Changed path is not UTF-8",
+        "仓库变更在读取期间改变，请重试" => {
+            "Repository changes changed while reading; retry"
+        }
+        "变更 Diff 不是 UTF-8，无法生成提交信息" => {
+            "Changes Diff is not UTF-8; unable to generate a commit message"
+        }
+        "没有文件变更" => "No file changes",
+        "仓库变更在生成期间改变，未应用结果，请重试" => {
+            "Repository changes changed during generation; the result was not applied. Retry."
+        }
+        "仓库变更已改变，请重新生成；当前草稿保留" => {
+            "Repository changes have changed. Generate again; the current draft is preserved."
+        }
+        "Agent：" => "Agent:",
+        "额外参数：" => "Extra arguments:",
+        "例如：--model \"模型名称\"" => "Example: --model \"model name\"",
+        "请选择 pi、claude 或 codex" => "Select pi, claude or codex",
+        "Agent 参数或提示词包含 NUL" => "Agent arguments or prompt contain NUL",
+        "额外参数格式错误，请检查引号是否配对" => {
+            "Invalid extra arguments; check matching quotes"
+        }
+        "Agent 生成超时" => "Agent generation timed out",
+        "无法执行 Agent，请检查命令是否安装且可从 PATH 访问" => {
+            "Unable to run agent; check installation and PATH"
+        }
+        "Codex 未返回最终提交信息" => "Codex did not return a final commit message",
+        "Agent 提交信息不是 UTF-8" => "Agent commit message is not UTF-8",
         "提示词：" => "Prompt:",
         "无法读取设置" => "Unable to read settings",
         "字号必须为整数" => "Font size must be an integer",
@@ -492,8 +526,8 @@ pub fn translate(language: Language, value: &str) -> &str {
         "暂存区或 HEAD 在生成期间改变，未应用结果，请重试" => {
             "The index or HEAD changed during generation; the result was not applied. Retry."
         }
-        "AI 请求需要 1 MB 以内的非空暂存 Diff" => {
-            "AI requests require a nonempty staged Diff within 1 MB"
+        "AI 请求需要 1 MB 以内的非空变更 Diff" => {
+            "AI requests require a nonempty changes Diff within 1 MB"
         }
         "AI 请求已取消" => "AI request cancelled",
         "AI 请求超时" => "AI request timed out",
