@@ -201,7 +201,8 @@ impl Settings {
         }
         data["language"] = json!(self.language.saved());
         data["font_family"] = json!(self.font_family);
-        data["font_size"] = json!(self.font_size);
+        // Python passes this shared setting to QFont's integer point-size argument.
+        data["font_size"] = json!(self.font_size.round() as u32);
         data["recent_folders"] = json!(self.recent);
         data["last_folder"] = json!(self.last);
         if !data["gpui"].is_object() {
@@ -251,6 +252,22 @@ impl Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn shared_font_size_is_saved_as_an_integer() {
+        let dir = std::env::temp_dir().join(format!("mygit-font-compat-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("settings.json");
+        fs::write(&path, r#"{"font_size":13.0,"code_style":"friendly"}"#).unwrap();
+        let mut settings = Settings::load(path.clone());
+        for (size, expected) in [(13., 13), (16.5, 17), (22., 22)] {
+            settings.font_size = size;
+            settings.save().unwrap();
+            let data: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+            assert_eq!(data["font_size"].as_u64(), Some(expected));
+            assert_eq!(data["code_style"], "friendly");
+        }
+        fs::remove_dir_all(dir).unwrap();
+    }
     #[test]
     fn git_panel_visibility_restores_legacy_state_and_preserves_other_preferences() {
         let dir = std::env::temp_dir().join(format!("mygit-git-panel-{}", std::process::id()));

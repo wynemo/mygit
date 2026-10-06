@@ -27,23 +27,27 @@ impl UniformListDecoration for ListScrollbar {
         let handle = self.0.0.borrow().base_handle.clone();
         let down_handle = handle.clone();
         let move_handle = handle;
+        // UniformList positions decorations at the scrolled content origin.
+        // Cancel that translation so the track stays inside the viewport.
+        let viewport_top = bounds.top() - offset.y;
         let update = move |position: Point<Pixels>, handle: &ScrollHandle| {
             let ratio = if travel > 0. {
-                ((f32::from(position.y - bounds.top()) - thumb / 2.) / travel).clamp(0., 1.)
+                ((f32::from(position.y - viewport_top) - thumb / 2.) / travel).clamp(0., 1.)
             } else {
                 0.
             };
             handle.set_offset(point(handle.offset().x, px(-ratio * maximum)));
         };
         div()
+            .relative()
             .w(px(self.1.unwrap_or(f32::from(bounds.size.width))))
             .h(bounds.size.height)
             .child(
                 div()
                     .id("list-scrollbar")
                     .absolute()
-                    .right_0()
-                    .top_0()
+                    .right(offset.x)
+                    .top(-offset.y)
                     .w(px(12.))
                     .h(bounds.size.height)
                     .bg(rgb(0xf1f1f1))

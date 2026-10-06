@@ -2610,6 +2610,8 @@ impl Render for MyGit {
             .font_family("Helvetica")
             .text_size(px(13.))
             .child(views::toolbar(self, cx))
+            .child(views::layout::body(self, cx))
+            // Paint floating panes after the workspace so it cannot cover them.
             .when(self.quick.shown, |s| {
                 s.child(views::popover(
                     views::quick_open::pane(self, cx).into_any_element(),
@@ -2636,7 +2638,6 @@ impl Render for MyGit {
             .when(self.show_settings, |s| {
                 s.child(views::popover(views::settings(self, cx).into_any_element()))
             })
-            .child(views::layout::body(self, cx))
             .when(
                 self.write_busy && !self.write_progress_text.is_empty(),
                 |s| {
