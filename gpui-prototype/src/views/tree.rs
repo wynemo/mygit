@@ -79,7 +79,7 @@ pub fn menu(this: &MyGit, window: &Window, cx: &mut Context<MyGit>) -> impl Into
                             0xffffff
                         }))
                         .hover(|s| s.bg(rgb(0xe3e3e3)))
-                        .child(action.label())
+                        .child(if action == Action::History && menu.entry.directory { mygit_gpui::i18n::text("目录历史") } else { action.label() })
                         .when(action == Action::Restore, |s| {
                             s.tooltip(|_, cx| {
                                 cx.new(|_| {

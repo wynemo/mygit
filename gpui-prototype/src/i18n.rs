@@ -45,6 +45,7 @@ pub fn translate(language: Language, value: &str) -> &str {
     }
     match value {
         "文件历史" => "File history",
+        "目录历史" => "Folder history",
         "编辑工作区文件" => "Edit worktree file",
         "当前文件与工作区比较" => "Compare file with worktree",
         "正在比较文件与工作区…" => "Comparing file with worktree…",
@@ -446,6 +447,7 @@ pub fn translate(language: Language, value: &str) -> &str {
         "提交变更" => "Commit changes",
         "合并提交三栏" => "Three-column merge",
         "自定义比较" => "Custom comparison",
+        "暂无文件历史" => "No file history",
         "界面语言" => "Interface language",
         "语言：" => "Language:",
         "字体：" => "Font:",

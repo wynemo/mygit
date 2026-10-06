@@ -1,7 +1,7 @@
 mod ai;
 mod blame;
 mod branches;
-mod history;
+pub mod history;
 mod notifications;
 mod preferences;
 mod quick_open;
@@ -156,6 +156,9 @@ pub struct MyGit {
     pub history_query_generation: u64,
     pub history_search_pending: bool,
     pub history_path: Option<(String, bool)>,
+    pub path_history_tabs: Vec<history::PathTab>,
+    pub active_history_tab: Option<usize>,
+    ordinary_history: Option<history::Snapshot>,
     pub history_search_error: Option<String>,
     filtered_commits: Vec<Commit>,
     pub history_graph: Vec<mygit_gpui::graph::Row>,
@@ -291,6 +294,9 @@ impl MyGit {
             history_query_generation: 0,
             history_search_pending: false,
             history_path: None,
+            path_history_tabs: vec![],
+            active_history_tab: None,
+            ordinary_history: None,
             history_search_error: None,
             filtered_commits: vec![],
             history_graph: vec![],

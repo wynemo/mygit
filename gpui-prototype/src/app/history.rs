@@ -1,8 +1,105 @@
 use super::*;
 use mygit_gpui::history::{self, Filter};
+#[derive(Clone, Default)]
+pub struct Snapshot {
+    query: Option<history::Query>,
+    commits: Vec<Commit>,
+    next: usize,
+    more: bool,
+    cursor: Option<usize>,
+    scroll: UniformListScrollHandle,
+    error: Option<String>,
+    failed: bool,
+}
+pub struct PathTab {
+    pub path: String,
+    pub directory: bool,
+    state: Snapshot,
+}
 impl MyGit {
+    fn history_snapshot(&self) -> Snapshot {
+        Snapshot {
+            query: self.history_query.clone(),
+            commits: self.filtered_commits.clone(),
+            next: self.filtered_next,
+            more: self.filtered_more,
+            cursor: self.history_cursor,
+            scroll: self.history_scroll.clone(),
+            error: self.history_search_error.clone(),
+            failed: self.history_failed,
+        }
+    }
+    fn remember_history_tab(&mut self) {
+        let state = self.history_snapshot();
+        if let Some(index) = self.active_history_tab {
+            self.path_history_tabs[index].state = state;
+        } else {
+            self.ordinary_history = Some(state);
+        }
+    }
+    fn restore_history_tab(&mut self, index: Option<usize>, cx: &mut Context<Self>) {
+        self.history_pending.cancel();
+        self.history_pending = Default::default();
+        self.history_query_generation += 1;
+        self.history_search_pending = false;
+        self.history_loading = false;
+        self.show_history_search = false;
+        self.active_history_tab = index;
+        let (state, path) = match index {
+            Some(index) => {
+                let tab = &self.path_history_tabs[index];
+                (tab.state.clone(), Some((tab.path.clone(), tab.directory)))
+            }
+            None => (self.ordinary_history.clone().unwrap_or_default(), None),
+        };
+        self.history_query = state.query;
+        self.filtered_commits = state.commits;
+        self.filtered_next = state.next;
+        self.filtered_more = state.more;
+        self.history_cursor = state.cursor;
+        self.history_scroll = state.scroll;
+        self.history_search_error = state.error;
+        self.history_failed = state.failed;
+        self.history_path = path.clone();
+        self.history_graph_key = None;
+        if self.history_query.is_none()
+            && let Some((path, directory)) = path
+        {
+            self.start_history_filter(
+                Filter {
+                    path: Some(path),
+                    follow: !directory,
+                    ..Default::default()
+                },
+                cx,
+            );
+        }
+        cx.notify();
+    }
+    pub fn select_history_tab(&mut self, index: Option<usize>, cx: &mut Context<Self>) {
+        if index == self.active_history_tab {
+            return;
+        }
+        self.remember_history_tab();
+        self.restore_history_tab(index, cx);
+    }
+    pub fn close_history_tab(&mut self, index: usize, cx: &mut Context<Self>) {
+        if self.active_history_tab == Some(index) {
+            self.path_history_tabs.remove(index);
+            self.restore_history_tab(None, cx);
+        } else {
+            self.path_history_tabs.remove(index);
+            if let Some(active) = &mut self.active_history_tab
+                && *active > index
+            {
+                *active -= 1;
+            }
+            cx.notify();
+        }
+    }
+
     pub fn history_commits(&self) -> &[Commit] {
-        if self.history_query.is_some() {
+        if self.history_query.is_some() || self.active_history_tab.is_some() {
             &self.filtered_commits
         } else {
             self.state
@@ -13,13 +110,16 @@ impl MyGit {
         }
     }
     pub fn history_more(&self) -> bool {
-        if self.history_query.is_some() {
+        if self.history_query.is_some() || self.active_history_tab.is_some() {
             self.filtered_more
         } else {
             self.state.repo.as_ref().is_some_and(|r| r.history_more)
         }
     }
     pub fn toggle_history_search(&mut self, cx: &mut Context<Self>) {
+        if self.active_history_tab.is_some() {
+            self.select_history_tab(None, cx);
+        }
         if self.state.repo.is_none() {
             return;
         }
@@ -87,28 +187,26 @@ impl MyGit {
     }
     pub fn show_path_history(&mut self, path: String, directory: bool, cx: &mut Context<Self>) {
         self.reveal_git_panel(cx);
-        self.prepare_history_inputs(cx);
-        self.history_path = Some((path.clone(), directory));
         self.hide_quick_open();
         self.hide_project_search();
-        self.show_history_search = true;
         self.show_branches = false;
         self.show_compare = false;
-        for (input, value) in self.history_inputs.iter().zip(["", "HEAD", "", "", ""]) {
-            input.update(cx, |editor, cx| {
-                editor.buffer = mygit_gpui::editor::Buffer::new(value);
-                editor.refresh(cx);
+        self.show_history_search = false;
+        let index = self
+            .path_history_tabs
+            .iter()
+            .position(|tab| tab.path == path && tab.directory == directory)
+            .unwrap_or_else(|| {
+                self.path_history_tabs.push(PathTab {
+                    path,
+                    directory,
+                    state: Snapshot::default(),
+                });
+                self.path_history_tabs.len() - 1
             });
-        }
-        self.start_history_filter(
-            Filter {
-                path: Some(path),
-                follow: !directory,
-                ..Default::default()
-            },
-            cx,
-        );
+        self.select_history_tab(Some(index), cx);
     }
+
     pub fn current_file_history(&mut self, cx: &mut Context<Self>) {
         if let Some(file) = &self.state.current_file {
             self.show_path_history(file.path.clone(), false, cx);
@@ -225,6 +323,9 @@ impl MyGit {
         cx.notify();
     }
     pub fn clear_history_filter(&mut self, cx: &mut Context<Self>) {
+        if self.active_history_tab.is_some() {
+            self.select_history_tab(None, cx);
+        }
         self.history_pending.cancel();
         self.history_pending = Default::default();
         self.history_query_generation += 1;
@@ -248,6 +349,9 @@ impl MyGit {
         cx.notify();
     }
     pub(super) fn reset_history_search(&mut self) {
+        self.path_history_tabs.clear();
+        self.active_history_tab = None;
+        self.ordinary_history = None;
         self.history_query_generation += 1;
         self.history_search_pending = false;
         self.history_query = None;

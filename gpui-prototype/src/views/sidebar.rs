@@ -59,47 +59,77 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     }),
                 ),
         )
-        .child(
-            div()
-                .h(px(29.))
-                .flex_shrink_0()
-                .flex()
-                .items_end()
-                .border_b_1()
-                .border_color(rgb(0xc8c8c8))
-                .child(
+        .child(history_tabs(this, cx))
+        .when_some(this.active_history_tab, |s, index| {
+            let tab = &this.path_history_tabs[index];
+            let root = this
+                .state
+                .repo
+                .as_ref()
+                .map(|repo| repo.root.join(&tab.path).display().to_string())
+                .unwrap_or_else(|| tab.path.clone());
+            s.child(
+                div()
+                    .flex_shrink_0()
+                    .py_1()
+                    .text_ellipsis()
+                    .overflow_hidden()
+                    .child(mygit_gpui::localized_format!(
+                        "{}：{}",
+                        "{}: {}",
+                        if tab.directory {
+                            mygit_gpui::i18n::text("目录历史")
+                        } else {
+                            mygit_gpui::i18n::text("文件历史")
+                        },
+                        root
+                    )),
+            )
+            .when(this.history_loading, |s| {
+                s.child(
                     div()
-                        .px_2()
-                        .h(px(23.))
-                        .bg(rgb(0x2196f3))
-                        .text_color(rgb(0xffffff))
-                        .rounded_t(px(4.))
-                        .child(mygit_gpui::i18n::text("提交历史")),
-                ),
-        )
-        .child(
-            div()
-                .h(px(48.))
-                .flex_shrink_0()
-                .flex()
-                .items_center()
-                .gap_2()
-                .px_1()
-                .child(
-                    div()
-                        .flex_1()
-                        .max_w(px(124.))
-                        .min_w_0()
-                        .h(px(24.))
-                        .when_some(this.history_inputs.first().cloned(), |s, editor| {
-                            s.child(editor)
-                        }),
+                        .flex_shrink_0()
+                        .child(mygit_gpui::i18n::text("正在加载历史…")),
                 )
-                .children(
-                    ["Branch", "User", "Date"]
-                        .into_iter()
-                        .enumerate()
-                        .map(|(i, label)| {
+            })
+            .when_some(this.history_search_error.clone(), |s, error| {
+                s.child(div().flex_shrink_0().text_color(rgb(0xa52a2a)).child(error))
+            })
+            .when(
+                !this.history_loading
+                    && !this.history_failed
+                    && this.history_query.is_some()
+                    && count == 0,
+                |s| {
+                    s.child(
+                        div()
+                            .flex_shrink_0()
+                            .child(mygit_gpui::i18n::text("暂无文件历史")),
+                    )
+                },
+            )
+        })
+        .when(this.active_history_tab.is_none(), |s| {
+            s.child(
+                div()
+                    .h(px(48.))
+                    .flex_shrink_0()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .px_1()
+                    .child(
+                        div()
+                            .flex_1()
+                            .max_w(px(124.))
+                            .min_w_0()
+                            .h(px(24.))
+                            .when_some(this.history_inputs.first().cloned(), |s, editor| {
+                                s.child(editor)
+                            }),
+                    )
+                    .children(["Branch", "User", "Date"].into_iter().enumerate().map(
+                        |(i, label)| {
                             div()
                                 .id(("history-filter", i))
                                 .flex_shrink_0()
@@ -108,9 +138,10 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                 .on_click(
                                     cx.listener(|this, _, _, cx| this.toggle_history_search(cx)),
                                 )
-                        }),
-                ),
-        )
+                        },
+                    )),
+            )
+        })
         .child(
             div()
                 .id("history-table-scroll")
@@ -126,7 +157,11 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 })
                 .child(
                     div()
-                        .w(px(720.))
+                        .w(px(if this.active_history_tab.is_some() {
+                            550.
+                        } else {
+                            720.
+                        }))
                         .min_w_full()
                         .flex()
                         .flex_col()
@@ -146,12 +181,23 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                 .children(
                                     [
                                         ("DAG", 120.),
-                                        (mygit_gpui::i18n::text("提交信息"), 200.),
+                                        (
+                                            mygit_gpui::i18n::text("提交信息"),
+                                            if this.active_history_tab.is_some() {
+                                                300.
+                                            } else {
+                                                200.
+                                            },
+                                        ),
                                         ("Branches", 150.),
                                         (mygit_gpui::i18n::text("作者"), 100.),
                                         (mygit_gpui::i18n::text("日期"), 150.),
                                     ]
                                     .into_iter()
+                                    .filter(|(label, _)| {
+                                        this.active_history_tab.is_none()
+                                            || (*label != "DAG" && *label != "Branches")
+                                    })
                                     .map(|(label, width)| {
                                         table_cell(label, width)
                                             .border_r_1()
@@ -206,22 +252,35 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                                         .into()
                                                     }
                                                 })
-                                                .child(
-                                                    div()
-                                                        .w(px(120.))
-                                                        .h_full()
-                                                        .flex_shrink_0()
-                                                        .when_some(
-                                                            this.history_graph.get(i).cloned(),
-                                                            |s, row| {
-                                                                s.child(crate::views::graph::row(
-                                                                    row,
-                                                                ))
-                                                            },
-                                                        ),
-                                                )
-                                                .child(table_cell(c.subject.clone(), 200.))
-                                                .child(table_cell(references, 150.))
+                                                .when(this.active_history_tab.is_none(), |s| {
+                                                    s.child(
+                                                        div()
+                                                            .w(px(120.))
+                                                            .h_full()
+                                                            .flex_shrink_0()
+                                                            .when_some(
+                                                                this.history_graph.get(i).cloned(),
+                                                                |s, row| {
+                                                                    s.child(
+                                                                        crate::views::graph::row(
+                                                                            row,
+                                                                        ),
+                                                                    )
+                                                                },
+                                                            ),
+                                                    )
+                                                })
+                                                .child(table_cell(
+                                                    c.subject.clone(),
+                                                    if this.active_history_tab.is_some() {
+                                                        300.
+                                                    } else {
+                                                        200.
+                                                    },
+                                                ))
+                                                .when(this.active_history_tab.is_none(), |s| {
+                                                    s.child(table_cell(references, 150.))
+                                                })
                                                 .child(table_cell(c.author.clone(), 100.))
                                                 .child(table_cell(
                                                     c.date
@@ -596,4 +655,84 @@ pub fn detail(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     .map(|line| div().min_h(px(17.)).child(line.to_string())),
             )
         })
+}
+
+fn history_tabs(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
+    div()
+        .id("history-tabs")
+        .h(px(29.))
+        .flex_shrink_0()
+        .overflow_x_scroll()
+        .flex()
+        .items_end()
+        .border_b_1()
+        .border_color(rgb(0xc8c8c8))
+        .child(
+            div()
+                .id("ordinary-history-tab")
+                .px_2()
+                .h(px(23.))
+                .flex_shrink_0()
+                .cursor_pointer()
+                .rounded_t(px(4.))
+                .bg(rgb(if this.active_history_tab.is_none() {
+                    0x2196f3
+                } else {
+                    0xe5e5e5
+                }))
+                .text_color(rgb(if this.active_history_tab.is_none() {
+                    0xffffff
+                } else {
+                    0x202020
+                }))
+                .child(mygit_gpui::i18n::text("提交历史"))
+                .on_click(cx.listener(|this, _, _, cx| this.select_history_tab(None, cx))),
+        )
+        .children(
+            this.path_history_tabs
+                .iter()
+                .enumerate()
+                .map(|(index, tab)| {
+                    let name = std::path::Path::new(&tab.path)
+                        .file_name()
+                        .map(|name| name.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| tab.path.clone());
+                    let title = mygit_gpui::localized_format!("{} 历史", "{} history", name);
+                    let path = tab.path.clone();
+                    div()
+                        .id(("path-history-tab", index))
+                        .px_2()
+                        .h(px(23.))
+                        .flex_shrink_0()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .cursor_pointer()
+                        .rounded_t(px(4.))
+                        .bg(rgb(if this.active_history_tab == Some(index) {
+                            0x2196f3
+                        } else {
+                            0xe5e5e5
+                        }))
+                        .text_color(rgb(if this.active_history_tab == Some(index) {
+                            0xffffff
+                        } else {
+                            0x202020
+                        }))
+                        .child(title)
+                        .tooltip(move |_, cx| {
+                            cx.new(|_| crate::views::hints::Hint(path.clone().into()))
+                                .into()
+                        })
+                        .child(div().id(("close-history-tab", index)).child("×").on_click(
+                            cx.listener(move |this, _, _, cx| {
+                                cx.stop_propagation();
+                                this.close_history_tab(index, cx);
+                            }),
+                        ))
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            this.select_history_tab(Some(index), cx)
+                        }))
+                }),
+        )
 }

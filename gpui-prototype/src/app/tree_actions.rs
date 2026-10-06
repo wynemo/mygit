@@ -22,7 +22,7 @@ impl Action {
     pub fn label(self) -> &'static str {
         mygit_gpui::i18n::text(match self {
             Self::Open => "打开文件",
-            Self::History => "历史",
+            Self::History => "文件历史",
             Self::CopyRelative => "复制相对路径",
             Self::CopyFull => "复制完整路径",
             Self::Reveal => "在文件管理器中显示",
