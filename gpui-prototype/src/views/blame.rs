@@ -1,6 +1,32 @@
 use crate::app::MyGit;
 use gpui::{prelude::*, *};
 use mygit_gpui::{blame::Line, model::short_sha};
+// Stable commit colors: scrolling, refreshes and opposite diff sides agree.
+// Use pale backgrounds with dark ink so annotations remain readable.
+fn commit_colors(sha: &str, pending: bool) -> (u32, u32, u32) {
+    if pending {
+        return (0xfff3d6, 0x805b14, 0xd8a438);
+    }
+    const COLORS: [(u32, u32, u32); 12] = [
+        (0xe4edfc, 0x365789, 0x7a9ed5),
+        (0xe9e5f7, 0x594687, 0xa08cc9),
+        (0xe0f0e9, 0x326650, 0x7ab29a),
+        (0xf9e6e5, 0x874c49, 0xd49893),
+        (0xe0f0f4, 0x356574, 0x80b4c3),
+        (0xf5eadb, 0x7b5b32, 0xc4a070),
+        (0xeee5f2, 0x735381, 0xb397c0),
+        (0xeaf0dc, 0x586735, 0xa6b67b),
+        (0xf7e4ed, 0x854963, 0xcf93ad),
+        (0xe3eaf2, 0x455c77, 0x8da5c0),
+        (0xe0efef, 0x366c69, 0x7ab3af),
+        (0xf8ebdf, 0x865b3b, 0xd0a27d),
+    ];
+    let hash = sha.bytes().fold(2166136261u32, |hash, byte| {
+        (hash ^ u32::from(byte)).wrapping_mul(16777619)
+    });
+    COLORS[hash as usize % COLORS.len()]
+}
+
 pub fn gutter(owner: WeakEntity<MyGit>, line: Option<Line>, index: usize) -> Div {
     div()
         .w(px(100.))
@@ -10,6 +36,7 @@ pub fn gutter(owner: WeakEntity<MyGit>, line: Option<Line>, index: usize) -> Div
 }
 pub fn annotation(owner: WeakEntity<MyGit>, line: Line, index: usize) -> Stateful<Div> {
     let pending = line.commit.uncommitted();
+    let (background, foreground, edge) = commit_colors(&line.commit.sha, pending);
     let label = if pending {
         mygit_gpui::i18n::text("未提交").into()
     } else {
@@ -26,11 +53,11 @@ pub fn annotation(owner: WeakEntity<MyGit>, line: Line, index: usize) -> Statefu
         .h_full()
         .px_1()
         .text_size(px(11.))
-        .text_color(rgb(if pending {
-            0x946200
-        } else {
-            crate::views::theme::MUTED
-        }))
+        .bg(rgb(background))
+        .text_color(rgb(foreground))
+        .border_l_2()
+        .border_color(rgb(edge))
+        .hover(|s| s.bg(rgb(edge)).text_color(rgb(0x182333)))
         .overflow_hidden()
         .whitespace_nowrap()
         .when(!pending, |s| s.cursor_pointer())
