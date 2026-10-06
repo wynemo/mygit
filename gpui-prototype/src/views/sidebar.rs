@@ -10,8 +10,8 @@ fn table_cell(text: impl Into<SharedString>, width: f32) -> Div {
         .w(px(width))
         .flex_shrink_0()
         .px_1()
-        .overflow_hidden()
-        .text_ellipsis()
+        .line_height(px(18.))
+        .truncate()
         .child(text.into())
 }
 
