@@ -2,6 +2,10 @@
 use std::path::Path;
 
 pub const ICONS: &[(&str, &[u8])] = &[
+    ("icons/panel-chevron-down.svg", include_bytes!("../assets/icons/panel-chevron-down.svg")),
+    ("icons/panel-chevron-up.svg", include_bytes!("../assets/icons/panel-chevron-up.svg")),
+    ("icons/panel-chevron-left.svg", include_bytes!("../assets/icons/panel-chevron-left.svg")),
+    ("icons/panel-chevron-right.svg", include_bytes!("../assets/icons/panel-chevron-right.svg")),
     (
         "icons/arrow_down.svg",
         include_bytes!("../assets/icons/arrow_down.svg"),

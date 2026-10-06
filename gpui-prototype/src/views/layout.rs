@@ -316,6 +316,7 @@ pub fn body(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                         s
                                     })
                                     .flex_basis(px(0.))
+                                    .overflow_hidden()
                                     .child(views::sidebar::files(this, false, cx)),
                             )
                             .child(

@@ -397,6 +397,11 @@ pub fn files(this: &MyGit, workspace: bool, cx: &mut Context<MyGit>) -> impl Int
         Vec::new()
     };
     let count = rows.len();
+    let scroll = if workspace {
+        this.workspace_files_scroll.clone()
+    } else {
+        this.files_scroll.clone()
+    };
     div()
         .key_context("FilesList")
         .track_focus(&this.files_focus)
@@ -405,6 +410,7 @@ pub fn files(this: &MyGit, workspace: bool, cx: &mut Context<MyGit>) -> impl Int
         .flex_1()
         .min_w_0()
         .min_h_0()
+        .overflow_hidden()
         .p(px(5.))
         .child(
             div()
@@ -480,7 +486,9 @@ pub fn files(this: &MyGit, workspace: bool, cx: &mut Context<MyGit>) -> impl Int
                 .flex()
                 .flex_col()
                 .flex_1()
+                .flex_basis(px(0.))
                 .min_h_0()
+                .overflow_hidden()
                 .border_1()
                 .border_color(rgb(crate::views::theme::BORDER))
                 .bg(rgb(crate::views::theme::SURFACE))
@@ -604,11 +612,12 @@ pub fn files(this: &MyGit, workspace: bool, cx: &mut Context<MyGit>) -> impl Int
                     )
                     .w_full()
                     .with_decoration(crate::views::scrollbar::ListScrollbar(
-                        this.files_scroll.clone(),
+                        scroll.clone(),
                         None,
                     ))
-                    .track_scroll(this.files_scroll.clone())
+                    .track_scroll(scroll.clone())
                     .min_h_0()
+                    .flex_basis(px(0.))
                     .flex_1(),
                 ),
         )

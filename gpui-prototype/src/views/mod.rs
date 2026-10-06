@@ -149,27 +149,29 @@ pub fn toolbar(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 .on_click(cx.listener(|this, _, _, cx| this.toggle_settings(cx))),
         )
         .child(
-            button(
-                "toggle-git-panel",
-                if this.settings.git_panel_visible {
-                    "⌄"
-                } else {
-                    "⌃"
-                },
-                true,
-            )
+            button("toggle-git-panel", "", true)
+            .w(px(30.))
+            .px_0()
+            .gap_0()
+            .justify_center()
+            .child(icons::icon(if this.settings.git_panel_visible {
+                "icons/panel-chevron-down.svg"
+            } else {
+                "icons/panel-chevron-up.svg"
+            }))
             .on_click(cx.listener(|this, _, window, cx| this.toggle_git_panel(window, cx))),
         )
         .child(
-            button(
-                "toggle-files-panel",
-                if this.settings.files_visible {
-                    "‹"
-                } else {
-                    "›"
-                },
-                true,
-            )
+            button("toggle-files-panel", "", true)
+            .w(px(30.))
+            .px_0()
+            .gap_0()
+            .justify_center()
+            .child(icons::icon(if this.settings.files_visible {
+                "icons/panel-chevron-left.svg"
+            } else {
+                "icons/panel-chevron-right.svg"
+            }))
             .on_click(cx.listener(|this, _, window, cx| {
                 this.toggle_files_panel(cx);
                 window.focus(&this.focus);
