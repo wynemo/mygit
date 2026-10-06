@@ -115,3 +115,11 @@ pub fn create(root: &Path, name: &str, base: &str) -> Result<String> {
         "Created and switched to {name}"
     ))
 }
+
+/// Checkout a pinned commit without moving a branch or forcing worktree changes.
+pub fn checkout_commit(root: &Path, revision: &str) -> Result<String> {
+    let crate::model::Revision::Commit(sha) = crate::git::resolve_revision(root, revision)? else {
+        anyhow::bail!("Checkout target must be a commit");
+    };
+    Ok(String::from_utf8_lossy(&git(root, &["switch", "--detach", &sha])?).into_owned())
+}

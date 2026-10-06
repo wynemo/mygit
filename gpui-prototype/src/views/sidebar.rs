@@ -296,15 +296,12 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                                 ))
                                                 .on_mouse_down(
                                                     MouseButton::Right,
-                                                    cx.listener(move |this, _, window, cx| {
-                                                        if let Some(commit) =
-                                                            this.history_commits().get(i)
-                                                        {
-                                                            this.show_commit_branches(
-                                                                commit.sha.clone(),
-                                                                cx,
-                                                            );
-                                                            window.focus(&this.branch_focus);
+                                                    cx.listener(move |this, event: &MouseDownEvent, window, cx| {
+                                                        if let Some(commit) = this.history_commits().get(i).cloned() {
+                                                            this.history_cursor = Some(i);
+                                                            this.history_menu = Some((event.position, commit));
+                                                            window.focus(&this.history_focus);
+                                                            cx.notify();
                                                         }
                                                         cx.stop_propagation();
                                                     }),

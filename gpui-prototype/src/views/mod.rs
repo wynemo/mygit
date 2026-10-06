@@ -6,6 +6,7 @@ pub mod diff;
 pub mod editor;
 pub mod hints;
 pub mod history;
+pub mod history_menu;
 pub mod icons;
 pub mod layout;
 pub mod notifications;

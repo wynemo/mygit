@@ -185,8 +185,11 @@ pub struct MyGit {
     pub show_recent: bool,
     pub show_branch_dropdown: bool,
     pub show_workspace_changes: bool,
+    pub comparison_activity: Option<Comparison>,
+    pub comparison_activity_menu: Option<Point<Pixels>>,
     pub change_folders_collapsed: std::collections::BTreeSet<String>,
     pub tab_menu: Option<Point<Pixels>>,
+    pub history_menu: Option<(Point<Pixels>, Commit)>,
     pub pending: mygit_gpui::process::Cancellation,
     pub history_pending: mygit_gpui::process::Cancellation,
     pub tree: mygit_gpui::workspace::Tree,
@@ -323,8 +326,11 @@ impl MyGit {
             show_recent: false,
             show_branch_dropdown: false,
             show_workspace_changes: false,
+            comparison_activity: None,
+            comparison_activity_menu: None,
             change_folders_collapsed: Default::default(),
             tab_menu: None,
+            history_menu: None,
             pending: Default::default(),
             history_pending: Default::default(),
             tree: mygit_gpui::workspace::Tree::new(),
@@ -398,6 +404,9 @@ impl MyGit {
     }
     fn load_unchecked(&mut self, path: PathBuf, cx: &mut Context<Self>) {
         self.tree_menu = None;
+        self.history_menu = None;
+        self.comparison_activity = None;
+        self.comparison_activity_menu = None;
         self.restore_main_focus = true;
         self.reset_refresh();
         self.reset_blame();
@@ -480,6 +489,13 @@ impl MyGit {
         );
     }
     pub fn select_mode(&mut self, mode: BrowseMode, cx: &mut Context<Self>) {
+        if let BrowseMode::Compare(comparison) = &mode {
+            self.comparison_activity = Some(comparison.clone());
+            self.comparison_activity_menu = None;
+            self.hide_commit();
+            self.show_workspace_changes = true;
+            self.settings.files_visible = true;
+        }
         self.hide_quick_open();
         self.hide_project_search();
         let Some(repo) = &self.state.repo else {
@@ -2735,6 +2751,14 @@ impl Render for MyGit {
             .when(self.show_recent || self.show_branch_dropdown, |s| {
                 s.child(views::toolbar_menu(self, cx))
             })
+            .when(
+                self.history_menu.is_some() && self.confirmation.is_none(),
+                |s| s.child(views::history_menu::menu(self, window, cx)),
+            )
+            .when(
+                self.comparison_activity_menu.is_some() && self.confirmation.is_none(),
+                |s| s.child(views::layout::activity_menu(self, window, cx)),
+            )
             .when(self.tab_menu.is_some(), |s| {
                 s.child(views::tabs::menu(self, cx))
             })

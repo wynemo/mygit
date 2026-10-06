@@ -48,6 +48,75 @@ impl MyGit {
             editor
         }));
     }
+    pub fn history_context_action(&mut self, action: usize, cx: &mut Context<Self>) {
+        let Some((_, commit)) = self.history_menu.take() else {
+            return;
+        };
+        cx.notify();
+        match action {
+            0 => cx.write_to_clipboard(ClipboardItem::new_string(commit.sha)),
+            1 => {
+                let Some(repo) = &self.state.repo else {
+                    return;
+                };
+                let root = repo.root.clone();
+                let task = cx
+                    .background_executor()
+                    .spawn(async move { git::commit_detail(&root, &commit.sha) });
+                cx.spawn(async move |this, cx| {
+                    let result = task.await;
+                    let _ = this.update(cx, |this, cx| match result {
+                        Ok(detail) => {
+                            cx.write_to_clipboard(ClipboardItem::new_string(detail.message))
+                        }
+                        Err(error) => {
+                            this.write_message = format!("{error:#}");
+                            cx.notify();
+                        }
+                    });
+                })
+                .detach();
+            }
+            2 => self.select_mode(
+                BrowseMode::Compare(Comparison {
+                    left: Revision::Commit(commit.sha),
+                    right: Revision::Worktree,
+                }),
+                cx,
+            ),
+            3..=5 => {
+                self.prepare_branch_inputs(cx);
+                if let Some(input) = &self.branch_base {
+                    input.update(cx, |editor, cx| {
+                        editor.buffer = mygit_gpui::editor::Buffer::new(&commit.sha);
+                        editor.refresh(cx);
+                    });
+                }
+                let mode = match action {
+                    3 => mygit_gpui::operations::ResetMode::Soft,
+                    4 => mygit_gpui::operations::ResetMode::Mixed,
+                    _ => mygit_gpui::operations::ResetMode::Hard,
+                };
+                self.request_reset(mode, cx);
+            }
+            6 => {
+                if !self.branch_write_ready(cx) {
+                    return;
+                }
+                let root = self.state.repo.as_ref().unwrap().root.clone();
+                self.run_write(
+                    "Checkout",
+                    BrowseMode::Workspace,
+                    false,
+                    move || mygit_gpui::branches::checkout_commit(&root, &commit.sha),
+                    cx,
+                );
+            }
+            7 => self.show_commit_branches(commit.sha, cx),
+            _ => {}
+        }
+    }
+
     pub fn show_commit_branches(&mut self, sha: String, cx: &mut Context<Self>) {
         self.reveal_git_panel(cx);
         self.show_branches = true;

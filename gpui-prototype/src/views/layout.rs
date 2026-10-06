@@ -121,22 +121,48 @@ pub fn body(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                             })
                             .on_click(cx.listener(|this, _, _, cx| this.toggle_commit(cx))),
                         )
-                        .child(
-                            activity(
-                                "activity-changes",
-                                "icons/changes.svg",
-                                mygit_gpui::i18n::text("全部变更"),
-                            )
-                            .when(this.show_workspace_changes, |s| {
-                                s.bg(rgb(crate::views::theme::SELECTED))
-                            })
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.hide_commit();
-                                this.hide_project_search();
-                                this.show_workspace_changes = true;
-                                this.settings.files_visible = true;
-                                this.select_mode(mygit_gpui::model::BrowseMode::Workspace, cx);
-                            })),
+                        .when(
+                            this.comparison_activity.is_some() || this.show_workspace_changes,
+                            |s| {
+                                s.child(
+                                    activity(
+                                        "activity-changes",
+                                        "icons/changes.svg",
+                                        if this.comparison_activity.is_some() {
+                                            "Compare with Working Tree"
+                                        } else {
+                                            mygit_gpui::i18n::text("全部变更")
+                                        },
+                                    )
+                                    .when(this.show_workspace_changes, |s| {
+                                        s.bg(rgb(crate::views::theme::SELECTED))
+                                    })
+                                    .on_mouse_down(
+                                        MouseButton::Right,
+                                        cx.listener(|this, event: &MouseDownEvent, _, cx| {
+                                            this.comparison_activity_menu = Some(event.position);
+                                            cx.stop_propagation();
+                                            cx.notify();
+                                        }),
+                                    )
+                                    .on_click(cx.listener(
+                                        |this, _, _, cx| {
+                                            this.hide_commit();
+                                            this.hide_project_search();
+                                            this.show_workspace_changes = true;
+                                            this.settings.files_visible = true;
+                                            let mode = this
+                                                .comparison_activity
+                                                .clone()
+                                                .map(mygit_gpui::model::BrowseMode::Compare)
+                                                .unwrap_or(
+                                                    mygit_gpui::model::BrowseMode::Workspace,
+                                                );
+                                            this.select_mode(mode, cx);
+                                        },
+                                    )),
+                                )
+                            },
                         )
                         .child(
                             activity(
@@ -309,4 +335,55 @@ pub fn body(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     ),
             )
         })
+}
+
+pub fn activity_menu(this: &MyGit, window: &Window, cx: &mut Context<MyGit>) -> impl IntoElement {
+    let position = this.comparison_activity_menu.unwrap();
+    div()
+        .id("comparison-activity-menu")
+        .absolute()
+        .occlude()
+        .left(
+            position
+                .x
+                .min(window.viewport_size().width - px(180.))
+                .max(px(0.)),
+        )
+        .top(
+            position
+                .y
+                .min(window.viewport_size().height - px(44.))
+                .max(px(0.)),
+        )
+        .w(px(180.))
+        .p_1()
+        .rounded(px(6.))
+        .shadow_md()
+        .bg(rgb(super::theme::SURFACE))
+        .border_1()
+        .border_color(rgb(super::theme::BORDER))
+        .on_mouse_down_out(cx.listener(|this, _, _, cx| {
+            this.comparison_activity_menu = None;
+            cx.notify();
+        }))
+        .child(
+            div()
+                .id("hide-comparison-activity")
+                .h(px(32.))
+                .px_3()
+                .flex()
+                .items_center()
+                .cursor_pointer()
+                .rounded(px(4.))
+                .hover(|s| s.bg(rgb(super::theme::SELECTED)))
+                .child(mygit_gpui::i18n::text("隐藏"))
+                .on_click(cx.listener(|this, _, window, cx| {
+                    this.comparison_activity_menu = None;
+                    this.comparison_activity = None;
+                    this.show_workspace_changes = false;
+                    this.settings.files_visible = true;
+                    window.focus(&this.tree_focus);
+                    cx.notify();
+                })),
+        )
 }

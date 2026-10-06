@@ -2330,3 +2330,26 @@ fn checked_file_commit_excludes_other_staged_files_and_supports_new_files() {
         b"other\n"
     );
 }
+
+#[test]
+fn history_checkout_detaches_at_target_and_refuses_conflicting_worktree_changes() {
+    let f = Fixture::new();
+    std::fs::write(f.0.join("file"), "first").unwrap();
+    let first = f.commit();
+    std::fs::write(f.0.join("file"), "second").unwrap();
+    let second = f.commit();
+    std::fs::write(f.0.join("file"), "unsaved on disk").unwrap();
+    assert!(crate::branches::checkout_commit(&f.0, &first).is_err());
+    assert_eq!(head(&f.0).unwrap(), Revision::Head(second.clone()));
+    assert_eq!(std::fs::read(f.0.join("file")).unwrap(), b"unsaved on disk");
+    std::fs::write(f.0.join("file"), "second").unwrap();
+    crate::branches::checkout_commit(&f.0, &first).unwrap();
+    assert!(snapshot(&f.0).unwrap().detached);
+    assert_eq!(head(&f.0).unwrap(), Revision::Head(first));
+    assert_eq!(
+        string(git(&f.0, &["rev-parse", "main"]).unwrap())
+            .unwrap()
+            .trim(),
+        second
+    );
+}
