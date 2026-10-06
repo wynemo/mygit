@@ -154,7 +154,7 @@ pub fn page(root: &Path, query: &Query, mut offset: usize) -> Result<Page> {
             format!("--skip={offset}"),
             "-z".into(),
             "--format=%H%x00%B%x00%an%x00%aI%x00%P%x00%D".into(),
-            "--topo-order".into(),
+            "--date-order".into(),
             "--fixed-strings".into(),
             "--regexp-ignore-case".into(),
         ];

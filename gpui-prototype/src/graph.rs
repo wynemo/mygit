@@ -58,14 +58,20 @@ pub fn layout(commits: &[Commit], filtered: bool) -> Vec<Row> {
                 }
                 l.as_ref().map(|l| Edge {
                     from: i,
-                    to: i,
+                    to: if l.sha == commit.sha { lane } else { i },
                     color: l.color,
                     incoming: true,
-                    continuation: i != lane,
+                    continuation: l.sha != commit.sha,
                 })
             })
             .collect();
-        lanes[lane] = None;
+        // Multiple branches may await the same ancestor. Join them at its node,
+        // retaining the leftmost lane and its color for the shared history.
+        for pending in &mut lanes {
+            if pending.as_ref().is_some_and(|l| l.sha == commit.sha) {
+                *pending = None;
+            }
+        }
         let mut seen = HashSet::new();
         let mut omitted = 0;
         for (p, parent) in commit
@@ -81,7 +87,9 @@ pub fn layout(commits: &[Commit], filtered: bool) -> Vec<Row> {
             let target = lanes
                 .iter()
                 .position(|l| l.as_ref().is_some_and(|l| &l.sha == parent));
-            let (target, edge_color) = if let Some(target) = target {
+            let (target, edge_color) = if let Some(target) = target
+                && !(p == 0 && target > lane)
+            {
                 (target, lanes[target].as_ref().unwrap().color)
             } else {
                 let target = if p == 0 && lanes[lane].is_none() {
@@ -184,16 +192,52 @@ mod tests {
         );
         assert_eq!(rows[1].lane, 1);
         assert_eq!(rows[2].lane, 0);
-        assert_eq!(rows[3].lane, 1);
+        assert_eq!(rows[3].lane, 0);
         assert!(
-            rows[2]
+            rows[3]
                 .edges
                 .iter()
-                .any(|e| !e.incoming && e.from == 0 && e.to == 1)
+                .any(|e| e.incoming && e.from == 1 && e.to == 0)
         );
         assert!(!rows[3].edges.iter().any(|e| !e.incoming));
         assert_ne!(rows[0].color, rows[1].color);
-        assert_eq!(rows[1].color, rows[3].color);
+        assert_eq!(rows[0].color, rows[3].color);
+    }
+    #[test]
+    fn shared_ancestor_keeps_main_lane_and_side_color_until_the_join() {
+        let commits = vec![
+            c("merge", &["main1", "side"]),
+            c("main1", &["main2"]),
+            c("main2", &["main3"]),
+            c("main3", &["main4"]),
+            c("main4", &["main5"]),
+            c("side", &["root"]),
+            c("main5", &["root"]),
+            c("root", &["older"]),
+            c("older", &[]),
+        ];
+        let rows = layout(&commits, false);
+        for end in 1..=commits.len() {
+            assert_eq!(layout(&commits[..end], false), rows[..end]);
+        }
+        assert_eq!(
+            rows.iter().map(|r| r.lane).collect::<Vec<_>>(),
+            vec![0, 0, 0, 0, 0, 1, 0, 0, 0]
+        );
+        assert_eq!(rows[0].color, rows[7].color);
+        assert!(
+            rows[6]
+                .edges
+                .iter()
+                .any(|e| !e.incoming && e.from == 0 && e.to == 0 && e.color == rows[0].color)
+        );
+        assert!(
+            rows[7]
+                .edges
+                .iter()
+                .any(|e| e.incoming && e.from == 1 && e.to == 0 && e.color == rows[5].color)
+        );
+        assert_eq!(rows[8].columns, 1);
     }
     #[test]
     fn octopus_roots_duplicates_and_filtered_ancestors_are_explicit() {

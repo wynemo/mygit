@@ -228,7 +228,7 @@ pub fn history_page(root: &Path, tip: &str, skip: usize) -> Result<HistoryPage> 
             &format!("--skip={skip}"),
             "-z",
             "--format=%H%x00%s%x00%an%x00%aI%x00%P%x00%D",
-            "--topo-order",
+            "--date-order",
             tip,
             "--",
         ],

@@ -2221,3 +2221,52 @@ fn explicit_large_preview_budget_survives_repository_refresh() {
     assert_eq!(diff.read_limit(), 20_000_000);
     assert!(!diff.can_expand_preview);
 }
+
+#[test]
+fn merge_history_interleaves_branches_by_date_without_reversing_parent_edges() {
+    let f = Fixture::new();
+    let tree = string(git(&f.0, &["write-tree"]).unwrap()).unwrap();
+    let make = |subject: &str, day: u32, parents: &[&str]| {
+        let date = format!("2026-09-{day:02}T12:00:00+00:00");
+        let mut command = Command::new("git");
+        command
+            .current_dir(&f.0)
+            .env("GIT_AUTHOR_DATE", &date)
+            .env("GIT_COMMITTER_DATE", &date)
+            .args(["commit-tree", tree.trim(), "-m", subject]);
+        for parent in parents {
+            command.args(["-p", parent]);
+        }
+        let output = command.output().unwrap();
+        assert!(output.status.success());
+        String::from_utf8(output.stdout).unwrap().trim().to_owned()
+    };
+    let root = make("root", 1, &[]);
+    let older = make("older main", 2, &[&root]);
+    let side = make("side", 3, &[&root]);
+    let newer = make("newer main", 4, &[&older]);
+    let merge = make("merge", 5, &[&newer, &side]);
+    git(&f.0, &["update-ref", "refs/heads/main", &merge]).unwrap();
+    let expected = vec![merge, newer, side, older, root];
+    let commits = history_page(&f.0, &expected[0], 0).unwrap().commits;
+    assert_eq!(
+        commits.iter().map(|c| &c.sha).collect::<Vec<_>>(),
+        expected.iter().collect::<Vec<_>>()
+    );
+    let query = crate::history::prepare(&f.0, crate::history::Filter::default()).unwrap();
+    let searched = crate::history::page(&f.0, &query, 0).unwrap().commits;
+    assert_eq!(
+        searched.iter().map(|c| &c.sha).collect::<Vec<_>>(),
+        expected.iter().collect::<Vec<_>>()
+    );
+    let rows = crate::graph::layout(&commits, false);
+    assert_eq!(
+        rows.iter().map(|r| r.lane).collect::<Vec<_>>(),
+        vec![0, 0, 1, 0, 0]
+    );
+    for (i, commit) in commits.iter().enumerate() {
+        for parent in &commit.parents {
+            assert!(commits.iter().position(|c| &c.sha == parent).unwrap() > i);
+        }
+    }
+}
