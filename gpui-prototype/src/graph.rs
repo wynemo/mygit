@@ -11,6 +11,28 @@ pub struct Edge {
     pub incoming: bool,
     pub continuation: bool,
 }
+impl Edge {
+    /// Horizontal lane position at the boundary between virtual rows. Both
+    /// halves interpolate between the same two row-center endpoints.
+    pub fn boundary_lane(&self, adjacent: Option<&Row>) -> f32 {
+        let matching = adjacent.and_then(|row| {
+            row.edges.iter().find(|edge| {
+                edge.incoming != self.incoming
+                    && edge.color == self.color
+                    && if self.incoming {
+                        edge.to == self.from
+                    } else {
+                        edge.from == self.to
+                    }
+            })
+        });
+        if self.incoming {
+            (matching.map_or(self.from, |edge| edge.from) as f32 + self.to as f32) / 2.
+        } else {
+            (self.from as f32 + matching.map_or(self.to, |edge| edge.to) as f32) / 2.
+        }
+    }
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Row {
     pub lane: usize,
@@ -123,7 +145,10 @@ pub fn layout(commits: &[Commit], filtered: bool) -> Vec<Row> {
         }
         for (i, pending) in lanes.iter().enumerate() {
             if i != lane
-                && edges.iter().any(|e| e.incoming && e.from == i)
+                // A lane consumed at this node may already have been reused by
+                // another parent. Only an incoming through-line needs a lower
+                // continuation; the new parent has its own outgoing edge.
+                && edges.iter().any(|e| e.incoming && e.continuation && e.from == i)
                 && let Some(pending) = pending
             {
                 edges.push(Edge {
@@ -270,6 +295,80 @@ mod tests {
             && e.color == rows[1].color));
         assert_eq!(rows[3].color, rows[0].color);
         assert_eq!(rows[4].columns, 1);
+        for end in 1..=commits.len() {
+            assert_eq!(layout(&commits[..end], false), rows[..end]);
+        }
+    }
+
+    #[test]
+    fn bends_span_row_centers_and_virtual_row_boundaries_match() {
+        let rows = layout(
+            &[
+                c("merge", &["main", "side"]),
+                c("side", &["root"]),
+                c("main", &["root"]),
+                c("root", &[]),
+            ],
+            false,
+        );
+        for pair in rows.windows(2) {
+            for outgoing in pair[0].edges.iter().filter(|e| !e.incoming) {
+                let incoming = pair[1]
+                    .edges
+                    .iter()
+                    .find(|e| e.incoming && e.from == outgoing.to && e.color == outgoing.color)
+                    .unwrap();
+                let boundary = (outgoing.from as f32 + incoming.to as f32) / 2.;
+                assert_eq!(outgoing.boundary_lane(Some(&pair[1])), boundary);
+                assert_eq!(incoming.boundary_lane(Some(&pair[0])), boundary);
+            }
+        }
+        let fork = rows[0]
+            .edges
+            .iter()
+            .find(|e| !e.incoming && e.to == 1)
+            .unwrap();
+        assert_eq!(fork.boundary_lane(Some(&rows[1])), 0.5);
+        let join = rows[3]
+            .edges
+            .iter()
+            .find(|e| e.incoming && e.from == 1)
+            .unwrap();
+        assert_eq!(join.boundary_lane(Some(&rows[2])), 0.5);
+    }
+
+    #[test]
+    fn joined_lane_reused_by_a_merge_parent_has_no_extra_vertical_segment() {
+        let commits = vec![
+            c("first-merge", &["main", "yellow"]),
+            c("yellow", &["second-merge"]),
+            c("main", &["second-merge"]),
+            c("second-merge", &["older-main", "red"]),
+            c("red", &["root"]),
+            c("older-main", &["root"]),
+            c("root", &[]),
+        ];
+        let rows = layout(&commits, false);
+        let join = &rows[3];
+        assert!(
+            join.edges
+                .iter()
+                .any(|e| e.incoming && e.from == 1 && e.to == 0)
+        );
+        assert!(
+            join.edges
+                .iter()
+                .any(|e| !e.incoming && e.from == 0 && e.to == 1)
+        );
+        assert!(!join.edges.iter().any(|e| !e.incoming && e.from == 1));
+        assert_eq!(join.edges.iter().filter(|e| !e.incoming).count(), 2);
+        let red = &rows[4];
+        let outgoing = join
+            .edges
+            .iter()
+            .find(|e| !e.incoming && e.to == red.lane)
+            .unwrap();
+        assert_eq!(outgoing.color, red.color);
         for end in 1..=commits.len() {
             assert_eq!(layout(&commits[..end], false), rows[..end]);
         }

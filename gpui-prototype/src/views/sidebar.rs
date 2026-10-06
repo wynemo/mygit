@@ -276,6 +276,8 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                                                     s.child(
                                                                         crate::views::graph::row(
                                                                             row,
+                                                                            i.checked_sub(1).and_then(|index| this.history_graph.get(index)).cloned(),
+                                                                            this.history_graph.get(i + 1).cloned(),
                                                                         ),
                                                                     )
                                                                 },

@@ -3,20 +3,30 @@ use mygit_gpui::graph::Row;
 const COLORS: [u32; 8] = [
     0x1f77b4, 0xe4a0ff, 0x277b31, 0xffcb77, 0xff8c9a, 0x71dce8, 0xc0ce77, 0xb1a0ff,
 ];
-pub fn row(row: Row) -> impl IntoElement {
+pub fn row(row: Row, previous: Option<Row>, next: Option<Row>) -> impl IntoElement {
     let width = (row.columns as f32 * 14. + 12.).max(28.);
     canvas(
         |_, _, _| (),
         move |bounds, _, window, _| {
             let x = |lane: usize| bounds.left() + px(12. + lane as f32 * 14.);
+            let boundary_x = |lane: f32| bounds.left() + px(12. + lane * 14.);
             let middle = bounds.top() + bounds.size.height / 2.;
             for edge in &row.edges {
                 let (start, end) = if edge.incoming {
-                    (point(x(edge.from), bounds.top()), point(x(edge.to), middle))
+                    (
+                        point(
+                            boundary_x(edge.boundary_lane(previous.as_ref())),
+                            bounds.top(),
+                        ),
+                        point(x(edge.to), middle),
+                    )
                 } else {
                     (
                         point(x(edge.from), middle),
-                        point(x(edge.to), bounds.bottom()),
+                        point(
+                            boundary_x(edge.boundary_lane(next.as_ref())),
+                            bounds.bottom(),
+                        ),
                     )
                 };
                 let mut path = PathBuilder::stroke(px(1.5));
