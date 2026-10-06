@@ -208,6 +208,8 @@ pub struct MyGit {
     pub files_focus: FocusHandle,
     pub history_scroll: UniformListScrollHandle,
     pub files_scroll: UniformListScrollHandle,
+    pub workspace_files_scroll: UniformListScrollHandle,
+    pub commit_files_scroll: UniformListScrollHandle,
     pub tree_scroll: UniformListScrollHandle,
     pub history_cursor: Option<usize>,
     pub visible_history_width: f32,
@@ -352,6 +354,8 @@ impl MyGit {
             files_focus: cx.focus_handle(),
             history_scroll: UniformListScrollHandle::new(),
             files_scroll: UniformListScrollHandle::new(),
+            workspace_files_scroll: UniformListScrollHandle::new(),
+            commit_files_scroll: UniformListScrollHandle::new(),
             tree_scroll: UniformListScrollHandle::new(),
             history_cursor: None,
             visible_history_width: 260.,
@@ -459,6 +463,8 @@ impl MyGit {
         self.history_cursor = None;
         self.history_scroll = UniformListScrollHandle::new();
         self.files_scroll = UniformListScrollHandle::new();
+        self.workspace_files_scroll = UniformListScrollHandle::new();
+        self.commit_files_scroll = UniformListScrollHandle::new();
         self.tree_scroll = UniformListScrollHandle::new();
         self.last_path = Some(path.clone());
         self.state.detail = None;

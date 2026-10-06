@@ -318,9 +318,9 @@ fn changes(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             .flex_1()
             .min_h_0()
             .w_full()
-            .track_scroll(this.files_scroll.clone())
+            .track_scroll(this.commit_files_scroll.clone())
             .with_decoration(crate::views::scrollbar::ListScrollbar(
-                this.files_scroll.clone(),
+                this.commit_files_scroll.clone(),
                 None,
             )),
         )
