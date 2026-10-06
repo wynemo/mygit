@@ -189,6 +189,9 @@ pub struct MyGit {
     pub comparison_activity_menu: Option<Point<Pixels>>,
     pub change_folders_collapsed: std::collections::BTreeSet<String>,
     pub tab_menu: Option<Point<Pixels>>,
+    pub history_branch_menu: Option<Point<Pixels>>,
+    pub history_branch_group: Option<String>,
+    pub history_branch_recent: Vec<String>,
     pub history_menu: Option<(Point<Pixels>, Commit)>,
     pub pending: mygit_gpui::process::Cancellation,
     pub history_pending: mygit_gpui::process::Cancellation,
@@ -330,6 +333,9 @@ impl MyGit {
             comparison_activity_menu: None,
             change_folders_collapsed: Default::default(),
             tab_menu: None,
+            history_branch_menu: None,
+            history_branch_group: None,
+            history_branch_recent: vec![],
             history_menu: None,
             pending: Default::default(),
             history_pending: Default::default(),
@@ -405,6 +411,9 @@ impl MyGit {
     fn load_unchecked(&mut self, path: PathBuf, cx: &mut Context<Self>) {
         self.tree_menu = None;
         self.history_menu = None;
+        self.history_branch_menu = None;
+        self.history_branch_group = None;
+        self.history_branch_recent.clear();
         self.comparison_activity = None;
         self.comparison_activity_menu = None;
         self.restore_main_focus = true;
@@ -2758,6 +2767,10 @@ impl Render for MyGit {
             .when(
                 self.comparison_activity_menu.is_some() && self.confirmation.is_none(),
                 |s| s.child(views::layout::activity_menu(self, window, cx)),
+            )
+            .when(
+                self.history_branch_menu.is_some() && self.confirmation.is_none(),
+                |s| s.child(views::history_branch_menu::menu(self, window, cx)),
             )
             .when(self.tab_menu.is_some(), |s| {
                 s.child(views::tabs::menu(self, cx))

@@ -136,7 +136,15 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                 .cursor_pointer()
                                 .child(format!("{label} ⌄"))
                                 .on_click(
-                                    cx.listener(|this, _, _, cx| this.toggle_history_search(cx)),
+                                    cx.listener(move |this, event: &ClickEvent, _, cx| {
+                                        if i == 0 {
+                                            this.history_branch_menu = if this.history_branch_menu.is_some() { None } else { Some(event.position()) };
+                                            this.history_branch_group = None;
+                                            cx.notify();
+                                        } else {
+                                            this.toggle_history_search(cx);
+                                        }
+                                    }),
                                 )
                         },
                     )),

@@ -163,6 +163,21 @@ impl MyGit {
                 }
             }));
     }
+    pub fn select_history_branch(&mut self, scope: String, cx: &mut Context<Self>) {
+        self.history_branch_menu = None;
+        self.history_branch_group = None;
+        self.history_branch_recent.retain(|item| item != &scope);
+        self.history_branch_recent.insert(0, scope.clone());
+        self.history_branch_recent.truncate(10);
+        self.prepare_history_inputs(cx);
+        if let Some(input) = self.history_inputs.get(1) {
+            input.update(cx, |editor, cx| {
+                editor.buffer = mygit_gpui::editor::Buffer::new(&scope);
+                editor.refresh(cx);
+            });
+        }
+        self.search_history_inputs(cx);
+    }
     pub fn search_history_inputs(&mut self, cx: &mut Context<Self>) {
         if self.history_inputs.len() != 5 {
             return;
