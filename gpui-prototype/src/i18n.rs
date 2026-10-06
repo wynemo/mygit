@@ -123,6 +123,8 @@ pub fn translate(language: Language, value: &str) -> &str {
         "取消全部" => "Unstage all",
         "无末尾换行" => "No newline at end of file",
         "隐藏 Blame" => "Hide Blame",
+        "显示 Blame" => "Show Blame",
+        "清除 Blame" => "Clear Blame",
         "正在读取三侧 Blame…" => "Loading Blame for three sides…",
         "首父双栏" => "First-parent split view",
         "上一处" => "Previous change",

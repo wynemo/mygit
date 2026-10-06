@@ -70,6 +70,7 @@ pub struct Editor {
     horizontal: f32,
     hits: HashMap<usize, Hit>,
     dragging: bool,
+    context_menu: Option<Point<Pixels>>,
 }
 impl EventEmitter<Changed> for Editor {}
 impl Editor {
@@ -148,6 +149,7 @@ impl Editor {
             horizontal: 0.,
             hits: HashMap::new(),
             dragging: false,
+            context_menu: None,
         }
     }
     pub fn replace_all(&mut self, text: &str, cx: &mut Context<Self>) -> anyhow::Result<()> {
@@ -898,6 +900,14 @@ impl Render for Editor {
             })
             .key_context("FileEditor")
             .track_focus(&self.focus)
+            .on_mouse_down(MouseButton::Right, cx.listener(|this, event: &MouseDownEvent, window, cx| {
+                if this.compact || this.form_input { return; }
+                this.context_menu = Some(event.position);
+                this.dragging = false;
+                window.focus(&this.focus);
+                cx.stop_propagation();
+                cx.notify();
+            }))
             .on_mouse_down(MouseButton::Left, cx.listener(Self::mouse_down))
             .on_mouse_move(cx.listener(Self::mouse_move))
             .on_mouse_up(
@@ -924,6 +934,10 @@ impl Render for Editor {
                 }
             }))
             .on_action(cx.listener(|this, _: &CloseFind, window, cx| {
+                if this.context_menu.take().is_some() {
+                    cx.notify();
+                    return;
+                }
                 if this.compact || this.form_input {
                     cx.propagate();
                     return;
@@ -1214,5 +1228,51 @@ impl Render for Editor {
                 .absolute()
                 .size_full(),
             )
+            .when_some(self.context_menu, |s, position| {
+                s.child(deferred(anchored().position(position).snap_to_window_with_margin(px(8.)).child(
+                    div().id("editor-context-menu").w(px(180.)).p_1().rounded_md()
+                        .bg(rgb(0xf4f4f4)).text_color(rgb(0x202020))
+                        .border_1().border_color(rgb(0xb9b9b9)).shadow_md().occlude()
+                        .on_mouse_down_out(cx.listener(|this, _, _, cx| {
+                            this.context_menu = None;
+                            cx.notify();
+                        }))
+                        .children(["全选", "复制", "粘贴"].into_iter().enumerate().map(|(index, label)| {
+                            div().id(("editor-menu-text", index)).px_3().py_1().rounded_sm()
+                                .cursor_pointer().hover(|s| s.bg(rgb(0xe3e3e3)))
+                                .child(mygit_gpui::i18n::text(label))
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    this.context_menu = None;
+                                    window.focus(&this.focus);
+                                    match index {
+                                        0 => this.buffer.selection.select_all(&this.buffer.document),
+                                        1 => this.copy(cx),
+                                        _ => this.paste(cx),
+                                    }
+                                    cx.notify();
+                                }))
+                        }))
+                        .when(self.blame_owner.is_some(), |s| {
+                            s.child(div().my_1().border_t_1().border_color(rgb(0xc8c8c8)))
+                                .children([(true, "显示 Blame"), (false, "清除 Blame")].into_iter().map(|(enabled, label)| {
+                                    div().id(if enabled { "editor-show-blame" } else { "editor-clear-blame" })
+                                        .px_3().py_1().rounded_sm().cursor_pointer()
+                                        .hover(|s| s.bg(rgb(0xe3e3e3)))
+                                        .child(mygit_gpui::i18n::text(label))
+                                        .on_click(cx.listener(move |this, _, _, cx| {
+                                            this.context_menu = None;
+                                            if let Some(owner) = this.blame_owner.clone() {
+                                                cx.defer(move |cx| {
+                                                    let _ = owner.update(cx, |owner, cx| {
+                                                        if owner.show_blame != enabled { owner.toggle_blame(cx); }
+                                                    });
+                                                });
+                                            }
+                                            cx.notify();
+                                        }))
+                                }))
+                        })
+                )))
+            })
     }
 }
