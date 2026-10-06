@@ -2270,3 +2270,42 @@ fn merge_history_interleaves_branches_by_date_without_reversing_parent_edges() {
         }
     }
 }
+
+#[test]
+fn default_history_includes_unmerged_remote_branch_and_pins_all_pages() {
+    let f = Fixture::new();
+    std::fs::write(f.0.join("file"), "root\n").unwrap();
+    let root = f.commit();
+    git(&f.0, &["checkout", "-b", "side"]).unwrap();
+    std::fs::write(f.0.join("file"), "side\n").unwrap();
+    let side = f.commit();
+    git(&f.0, &["update-ref", "refs/remotes/origin/side", &side]).unwrap();
+    git(&f.0, &["checkout", "main"]).unwrap();
+    git(&f.0, &["branch", "-D", "side"]).unwrap();
+    std::fs::write(f.0.join("file"), "main\n").unwrap();
+    let main = f.commit();
+    let snapshot = snapshot(&f.0).unwrap();
+    assert_eq!(snapshot.history_tip.as_deref(), Some(main.as_str()));
+    assert!(snapshot.commits.iter().any(|c| c.sha == side));
+    assert!(snapshot.commits.iter().any(|c| c.sha == main));
+    assert!(snapshot.commits.iter().any(|c| c.sha == root));
+    let rows = crate::graph::layout(&snapshot.commits, false);
+    assert!(rows.iter().any(|row| row.lane > 0));
+    assert!(
+        rows.iter()
+            .any(|row| row.edges.iter().any(|e| e.from != e.to))
+    );
+    // Moving/deleting references does not change pages of the pinned graph.
+    git(&f.0, &["update-ref", "-d", "refs/remotes/origin/side"]).unwrap();
+    let pinned = history_page_tips(&f.0, &snapshot.history_tips, 1).unwrap();
+    assert_eq!(
+        pinned.commits.iter().map(|c| &c.sha).collect::<Vec<_>>(),
+        snapshot.commits[1..]
+            .iter()
+            .map(|c| &c.sha)
+            .collect::<Vec<_>>()
+    );
+    let refreshed = super::snapshot(&f.0).unwrap();
+    assert_ne!(snapshot.history_tips, refreshed.history_tips);
+    assert!(!refreshed.commits.iter().any(|c| c.sha == side));
+}

@@ -143,7 +143,9 @@ impl MyGit {
                         active: diff,
                     }) => {
                         if let Some(previous) = &this.state.repo {
-                            if previous.history_tip == repo.history_tip {
+                            if previous.history_tip == repo.history_tip
+                                && previous.history_tips == repo.history_tips
+                            {
                                 repo.commits = previous.commits.clone();
                                 repo.history_more = previous.history_more;
                             } else if this.history_query.is_none() && !this.history_search_pending {

@@ -144,7 +144,7 @@ impl MyGit {
         }
         let font = self.state.font_family.clone();
         let size = self.state.font_size;
-        for value in ["", "HEAD", "", "", ""] {
+        for value in ["", "ALL", "", "", ""] {
             self.history_inputs.push(cx.new(|cx| {
                 let mut editor = Editor::new(
                     mygit_gpui::editor::Buffer::new(value),
@@ -340,7 +340,7 @@ impl MyGit {
         self.history_path = None;
         self.history_search_error = None;
         self.history_scroll = Default::default();
-        for (input, value) in self.history_inputs.iter().zip(["", "HEAD", "", "", ""]) {
+        for (input, value) in self.history_inputs.iter().zip(["", "ALL", "", "", ""]) {
             input.update(cx, |editor, cx| {
                 editor.buffer = mygit_gpui::editor::Buffer::new(value);
                 editor.refresh(cx);

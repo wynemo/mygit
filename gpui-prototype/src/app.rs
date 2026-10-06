@@ -1769,9 +1769,10 @@ impl MyGit {
         if self.history_loading || !repo.history_more {
             return;
         }
-        let Some(tip) = repo.history_tip.clone() else {
+        let tips = repo.history_tips.clone();
+        if tips.is_empty() {
             return;
-        };
+        }
         let root = repo.root.clone();
         let skip = repo.commits.len();
         let epoch = self.repository_epoch;
@@ -1779,10 +1780,10 @@ impl MyGit {
         self.history_loading = true;
         self.history_failed = false;
         cx.notify();
-        let expected_tip = tip.clone();
+        let expected_tips = tips.clone();
         let token = self.history_pending.clone();
         let task = cx.background_executor().spawn(async move {
-            mygit_gpui::process::scope(token, || git::history_page(&root, &tip, skip))
+            mygit_gpui::process::scope(token, || git::history_page_tips(&root, &tips, skip))
         });
         cx.spawn(async move |this, cx| {
             let result = task.await;
@@ -1793,7 +1794,7 @@ impl MyGit {
                     return;
                 }
                 if !this.state.repo.as_ref().is_some_and(|repo| {
-                    repo.history_tip.as_ref() == Some(&expected_tip) && repo.commits.len() == skip
+                    repo.history_tips == expected_tips && repo.commits.len() == skip
                 }) {
                     return;
                 }

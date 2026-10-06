@@ -145,13 +145,15 @@ pub fn snapshot(path: &Path) -> Result<Snapshot> {
         Revision::Head(sha) => Some(sha),
         _ => None,
     };
-    let page = match &history_tip {
-        Some(sha) => history_page(&root, sha, 0)?,
-        None => HistoryPage {
-            commits: vec![],
-            more: false,
+    let history_tips = crate::history::prepare(
+        &root,
+        crate::history::Filter {
+            scope: "ALL".into(),
+            ..Default::default()
         },
-    };
+    )?
+    .tips;
+    let page = history_page_tips(&root, &history_tips, 0)?;
     let branches = crate::branches::list(&root)?;
     let references = reference_labels(&root, history_tip.as_deref(), &branch, detached)?;
     Ok(Snapshot {
@@ -162,6 +164,7 @@ pub fn snapshot(path: &Path) -> Result<Snapshot> {
         detached,
         commits: page.commits,
         history_tip,
+        history_tips,
         history_more: page.more,
     })
 }
@@ -218,21 +221,30 @@ pub fn reference_labels(
         .map(|(sha, labels)| (sha, labels.join(", ")))
         .collect())
 }
-/// All pages use the same pinned tip, even when HEAD changes between requests.
+/// Single-tip history for explicitly selected revisions.
 pub fn history_page(root: &Path, tip: &str, skip: usize) -> Result<HistoryPage> {
-    let output = string(git(
-        root,
-        &[
-            "log",
-            "-101",
-            &format!("--skip={skip}"),
-            "-z",
-            "--format=%H%x00%s%x00%an%x00%aI%x00%P%x00%D",
-            "--date-order",
-            tip,
-            "--",
-        ],
-    )?)?;
+    history_page_tips(root, &[tip.to_owned()], skip)
+}
+/// All pages reuse the pinned reference tips, even when branches move.
+pub fn history_page_tips(root: &Path, tips: &[String], skip: usize) -> Result<HistoryPage> {
+    if tips.is_empty() {
+        return Ok(HistoryPage {
+            commits: vec![],
+            more: false,
+        });
+    }
+    let mut arguments = vec![
+        "log".to_owned(),
+        "-101".into(),
+        format!("--skip={skip}"),
+        "-z".into(),
+        "--format=%H%x00%s%x00%an%x00%aI%x00%P%x00%D".into(),
+        "--date-order".into(),
+    ];
+    arguments.extend(tips.iter().cloned());
+    arguments.push("--".into());
+    let borrowed: Vec<_> = arguments.iter().map(String::as_str).collect();
+    let output = string(git(root, &borrowed)?)?;
     let fields: Vec<_> = output
         .strip_suffix('\0')
         .unwrap_or(&output)

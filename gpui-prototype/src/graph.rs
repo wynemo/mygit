@@ -87,8 +87,11 @@ pub fn layout(commits: &[Commit], filtered: bool) -> Vec<Row> {
             let target = lanes
                 .iter()
                 .position(|l| l.as_ref().is_some_and(|l| &l.sha == parent));
+            // Keep each first-parent lane until the ancestor row itself. Joining
+            // an already pending parent here changes the side branch's color and
+            // bends its line into the main lane above the ancestor node.
             let (target, edge_color) = if let Some(target) = target
-                && !(p == 0 && target > lane)
+                && !(p == 0 && target != lane)
             {
                 (target, lanes[target].as_ref().unwrap().color)
             } else {
@@ -239,6 +242,39 @@ mod tests {
         );
         assert_eq!(rows[8].columns, 1);
     }
+    #[test]
+    fn unmerged_side_branch_keeps_its_color_and_joins_at_ancestor_node() {
+        let commits = vec![
+            c("main", &["root"]),
+            c("side-tip", &["side-base"]),
+            c("side-base", &["root"]),
+            c("root", &["older"]),
+            c("older", &[]),
+        ];
+        let rows = layout(&commits, false);
+        assert_eq!(rows[1].lane, 1);
+        assert_eq!(rows[2].lane, 1);
+        assert_eq!(rows[1].color, rows[2].color);
+        assert_ne!(rows[0].color, rows[1].color);
+        // The side branch leaves its last node vertically, in its own color.
+        assert!(rows[2].edges.iter().any(|e| !e.incoming
+            && !e.continuation
+            && e.from == 1
+            && e.to == 1
+            && e.color == rows[1].color));
+        // Its incoming half reaches the ancestor node, not the mainline boundary.
+        assert!(rows[3].edges.iter().any(|e| e.incoming
+            && !e.continuation
+            && e.from == 1
+            && e.to == rows[3].lane
+            && e.color == rows[1].color));
+        assert_eq!(rows[3].color, rows[0].color);
+        assert_eq!(rows[4].columns, 1);
+        for end in 1..=commits.len() {
+            assert_eq!(layout(&commits[..end], false), rows[..end]);
+        }
+    }
+
     #[test]
     fn octopus_roots_duplicates_and_filtered_ancestors_are_explicit() {
         let commits = vec![

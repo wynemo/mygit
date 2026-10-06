@@ -23,6 +23,8 @@ pub struct Snapshot {
     pub detached: bool,
     pub commits: Vec<Commit>,
     pub history_tip: Option<String>,
+    /// Pinned tips for the default graph, including unmerged branches.
+    pub history_tips: Vec<String>,
     pub history_more: bool,
     pub branches: Vec<BranchRef>,
 }
