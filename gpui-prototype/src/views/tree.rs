@@ -1,6 +1,5 @@
-use crate::{
-    app::{DismissTreeMenu, MyGit, TreeMenuAccept, TreeMenuDown, TreeMenuUp, tree_actions::Action},
-    views::button,
+use crate::app::{
+    DismissTreeMenu, MyGit, TreeMenuAccept, TreeMenuDown, TreeMenuUp, tree_actions::Action,
 };
 use gpui::{prelude::*, *};
 #[derive(Clone)]
@@ -13,8 +12,8 @@ impl Render for DraggedFile {
         div()
             .p_2()
             .rounded_md()
-            .bg(rgb(0x263449))
-            .text_color(rgb(0xdce5f3))
+            .bg(rgb(0xf4f4f4))
+            .text_color(rgb(0x202020))
             .flex()
             .items_center()
             .gap_2()
@@ -45,9 +44,9 @@ pub fn menu(this: &MyGit, window: &Window, cx: &mut Context<MyGit>) -> impl Into
         .occlude()
         .p_2()
         .rounded_md()
-        .bg(rgb(0x1d293b))
+        .bg(rgb(0xffffff))
         .border_1()
-        .border_color(rgb(0x44546c))
+        .border_color(rgb(0xb9b9b9))
         .key_context("TreeMenu")
         .track_focus(&this.tree_menu_focus)
         .on_action(cx.listener(|this, _: &TreeMenuUp, _, cx| this.move_tree_menu(false, cx)))
@@ -60,7 +59,7 @@ pub fn menu(this: &MyGit, window: &Window, cx: &mut Context<MyGit>) -> impl Into
         .child(
             div()
                 .text_xs()
-                .text_color(rgb(0x92a2b9))
+                .text_color(rgb(0x666666))
                 .child(menu.entry.path.clone()),
         )
         .children(
@@ -75,11 +74,11 @@ pub fn menu(this: &MyGit, window: &Window, cx: &mut Context<MyGit>) -> impl Into
                         .rounded_md()
                         .cursor_pointer()
                         .bg(rgb(if i == menu.selected {
-                            0x344962
+                            0xe3e3e3
                         } else {
-                            0x1d293b
+                            0xffffff
                         }))
-                        .hover(|s| s.bg(rgb(0x344962)))
+                        .hover(|s| s.bg(rgb(0xe3e3e3)))
                         .child(action.label())
                         .when(action == Action::Restore, |s| {
                             s.tooltip(|_, cx| {
@@ -99,54 +98,29 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
     let rows = this.tree.rows();
     div()
         .key_context("FilesList")
-        .track_focus(&this.files_focus)
+        .track_focus(&this.tree_focus)
         .w(px(this.visible_files_width))
         .flex_shrink_0()
         .flex()
         .flex_col()
         .min_h_0()
         .border_r_1()
-        .border_color(rgb(0x2b3545))
+        .border_color(rgb(0xc8c8c8))
         .child(
             div()
-                .p_2()
-                .flex()
-                .items_center()
-                .gap_2()
-                .flex_wrap()
-                .child(div().w_full().child(mygit_gpui::i18n::text("工作区文件树")))
-                .child(
-                    button(
-                        "tree-actions",
-                        mygit_gpui::i18n::text("文件操作"),
-                        this.tree.selected.is_some(),
-                    )
-                    .on_click(
-                        cx.listener(|this, _, window, cx| this.selected_tree_menu(window, cx)),
-                    ),
-                )
-                .child(
-                    button(
-                        "selected-tree-history",
-                        mygit_gpui::i18n::text("历史"),
-                        this.tree.selected.is_some(),
-                    )
-                    .on_click(cx.listener(|this, _, _, cx| this.selected_tree_history(cx))),
-                )
-                .child(
-                    button(
-                        "refresh-tree",
-                        mygit_gpui::i18n::text("刷新"),
-                        !this.tree_loading,
-                    )
-                    .on_click(cx.listener(|this, _, _, cx| this.refresh_tree(cx))),
-                ),
+                .h(px(19.))
+                .flex_shrink_0()
+                .px_1()
+                .bg(rgb(0xececec))
+                .border_b_1()
+                .border_color(rgb(0xc8c8c8))
+                .child(mygit_gpui::i18n::text("工作区文件")),
         )
         .when(this.tree_loading, |s| {
             s.child(div().p_2().child(mygit_gpui::i18n::text("正在读取目录…")))
         })
         .when_some(this.tree_error.clone(), |s, e| {
-            s.child(div().p_2().text_color(rgb(0xffd479)).child(e))
+            s.child(div().p_2().text_color(rgb(0x946200)).child(e))
         })
         .child(
             uniform_list(
@@ -174,7 +148,8 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                     );
                                 div()
                                     .id(("tree-entry", i))
-                                    .h(px(30.))
+                                    .w_full()
+                                    .h(px(20.))
                                     .pl(px(8. + depth as f32 * 14.))
                                     .pr_1()
                                     .flex()
@@ -192,14 +167,16 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                         })
                                     })
                                     .bg(rgb(if Some(&entry.path) == this.tree.selected.as_ref() {
-                                        0x263b56
+                                        0xdceafa
                                     } else {
-                                        0x111722
+                                        0xffffff
                                     }))
                                     .text_color(rgb(if entry.status == "!!" {
-                                        0x7f8b9c
+                                        0x888888
+                                    } else if !entry.status.is_empty() {
+                                        0xa52a2a
                                     } else {
-                                        0xdce5f3
+                                        0x202020
                                     }))
                                     .child(if entry.directory {
                                         if expanded { "▾" } else { "▸" }
@@ -214,7 +191,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                     } else {
                                         crate::views::icons::file(&entry.path).into_any_element()
                                     })
-                                    .child(format!("{}  {}", entry.name, entry.status))
+                                    .child(entry.name.clone())
                                     .when_some(dragged, |s, file| {
                                         s.on_drag(file, |file, _, _, cx| cx.new(|_| file.clone()))
                                     })
@@ -240,7 +217,13 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         .collect::<Vec<_>>()
                 }),
             )
-            .track_scroll(this.files_scroll.clone())
+            .w_full()
+            .with_decoration(crate::views::scrollbar::ListScrollbar(
+                this.tree_scroll.clone(),
+                None,
+            ))
+            .bg(rgb(0xffffff))
+            .track_scroll(this.tree_scroll.clone())
             .min_h_0()
             .flex_1(),
         )

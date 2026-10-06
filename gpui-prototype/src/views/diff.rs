@@ -49,7 +49,7 @@ fn cell(
         .flex()
         .flex_1()
         .min_w_0()
-        .h(px(this.state.font_size + 12.))
+        .h(px(this.state.font_size + 6.))
         .overflow_hidden()
         .bg(rgb(color))
         .cursor(CursorStyle::IBeam)
@@ -63,7 +63,7 @@ fn cell(
             div()
                 .w(px(52.))
                 .flex_shrink_0()
-                .text_color(rgb(if active { 0xffd479 } else { 0x7f8b9c }))
+                .text_color(rgb(if active { 0x946200 } else { 0x888888 }))
                 .child(no.map(|n| n.to_string()).unwrap_or_default()),
         )
         .when(this.show_blame, |s| {
@@ -86,8 +86,8 @@ fn cell(
                 div()
                     .px_1()
                     .flex_shrink_0()
-                    .text_color(rgb(0xffd479))
-                    .bg(rgb(0x283346))
+                    .text_color(rgb(0x946200))
+                    .bg(rgb(0xf0f0f0))
                     .child(mygit_gpui::i18n::text(label)),
             )
         })
@@ -122,21 +122,21 @@ fn unified_cell(this: &MyGit, index: usize, cx: &mut Context<MyGit>) -> Stateful
         .id(("unified-row", index))
         .flex()
         .w_full()
-        .h(px(this.state.font_size + 12.))
+        .h(px(this.state.font_size + 6.))
         .font_family(this.state.font_family.clone())
         .text_size(px(this.state.font_size))
         .overflow_hidden()
         .cursor(CursorStyle::IBeam)
         .bg(rgb(if active {
-            0x624233
+            0xffe7b8
         } else if changed {
             if side == Side::Left {
-                0x43262f
+                0xfbdada
             } else {
-                0x203c32
+                0xdff2df
             }
         } else {
-            0x151d29
+            0xffffff
         }))
         .on_mouse_down(
             MouseButton::Left,
@@ -148,14 +148,14 @@ fn unified_cell(this: &MyGit, index: usize, cx: &mut Context<MyGit>) -> Stateful
             div()
                 .w(px(52.))
                 .flex_shrink_0()
-                .text_color(rgb(0x7f8b9c))
+                .text_color(rgb(0x888888))
                 .child(left.map(|n| n.to_string()).unwrap_or_default()),
         )
         .child(
             div()
                 .w(px(52.))
                 .flex_shrink_0()
-                .text_color(rgb(0x7f8b9c))
+                .text_color(rgb(0x888888))
                 .child(right.map(|n| n.to_string()).unwrap_or_default()),
         )
         .when(this.show_blame, |s| {
@@ -188,7 +188,7 @@ fn unified_cell(this: &MyGit, index: usize, cx: &mut Context<MyGit>) -> Stateful
                 div()
                     .px_1()
                     .flex_shrink_0()
-                    .text_color(rgb(0xffd479))
+                    .text_color(rgb(0x946200))
                     .child(mygit_gpui::i18n::text(label)),
             )
         })
@@ -228,23 +228,26 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .child(crate::views::tabs::bar(this, cx))
         .child(
             div()
-                .p_3()
+                .h(px(38.))
+                .flex_shrink_0()
+                .px_2()
+                .overflow_hidden()
                 .border_b_1()
-                .border_color(rgb(0x2b3545))
+                .border_color(rgb(0xc8c8c8))
                 .flex()
-                .flex_wrap()
                 .items_center()
                 .gap_2()
                 .child(
                     div()
                         .flex_1()
+                        .min_w_0()
                         .overflow_hidden()
                         .whitespace_nowrap()
                         .child(title),
                 )
                 .when(this.state.current_file.is_some(), |s| {
                     s.child(
-                        button(
+                        crate::views::toolbar_button(
                             "current-file-history",
                             mygit_gpui::i18n::text("文件历史"),
                             !this.state.loading,
@@ -256,7 +259,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     !this.state.editable && this.state.current_file.is_some(),
                     |s| {
                         s.child(
-                            button(
+                            crate::views::toolbar_button(
                                 "edit-current-worktree",
                                 mygit_gpui::i18n::text("编辑工作区文件"),
                                 !this.state.loading,
@@ -275,7 +278,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     }),
                     |s| {
                         s.child(
-                            button(
+                            crate::views::toolbar_button(
                                 "compare-current-worktree",
                                 mygit_gpui::i18n::text("当前文件与工作区比较"),
                                 !this.state.loading,
@@ -295,7 +298,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                             .is_some_and(|c| c.right == mygit_gpui::model::Revision::Worktree),
                     |s| {
                         s.child(
-                            button(
+                            crate::views::toolbar_button(
                                 "edit-file",
                                 if this.edit_mode {
                                     mygit_gpui::i18n::text("查看 Diff")
@@ -325,7 +328,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         ),
                     |s| {
                         s.child(
-                            button(
+                            crate::views::toolbar_button(
                                 "restore-file",
                                 mygit_gpui::i18n::text("还原文件"),
                                 !this.write_busy,
@@ -335,7 +338,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                             ),
                         )
                         .child(
-                            button(
+                            crate::views::toolbar_button(
                                 "restore-block",
                                 mygit_gpui::i18n::text("还原当前块"),
                                 !this.write_busy && this.state.current_block.is_some(),
@@ -345,7 +348,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     },
                 )
                 .child(
-                    button(
+                    crate::views::toolbar_button(
                         "diff-layout",
                         if this.state.unified {
                             mygit_gpui::i18n::text("双栏")
@@ -357,7 +360,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     .on_click(cx.listener(|this, _, _, cx| this.toggle_unified(cx))),
                 )
                 .child(
-                    button(
+                    crate::views::toolbar_button(
                         "toggle-blame",
                         if this.show_blame {
                             mygit_gpui::i18n::text("隐藏 Blame")
@@ -369,20 +372,32 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                     .on_click(cx.listener(|this, _, _, cx| this.toggle_blame(cx))),
                 )
                 .child(
-                    button("previous-diff", mygit_gpui::i18n::text("上一处"), previous)
-                        .on_click(cx.listener(|this, _, _, cx| this.navigate(false, cx))),
+                    crate::views::toolbar_button(
+                        "previous-diff",
+                        mygit_gpui::i18n::text("上一处"),
+                        previous,
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.navigate(false, cx))),
                 )
-                .child(div().text_color(rgb(0x92a2b9)).child(counter))
+                .child(div().text_color(rgb(0x666666)).child(counter))
                 .child(
-                    button("next-diff", mygit_gpui::i18n::text("下一处"), next)
-                        .on_click(cx.listener(|this, _, _, cx| this.navigate(true, cx))),
+                    crate::views::toolbar_button(
+                        "next-diff",
+                        mygit_gpui::i18n::text("下一处"),
+                        next,
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.navigate(true, cx))),
                 )
-                .child(button("scroll-left", "←", true).on_click(
-                    cx.listener(|this, _, window, cx| this.move_horizontal(false, window, cx)),
-                ))
-                .child(button("scroll-right", "→", true).on_click(
-                    cx.listener(|this, _, window, cx| this.move_horizontal(true, window, cx)),
-                )),
+                .child(
+                    crate::views::toolbar_button("scroll-left", "←", true).on_click(
+                        cx.listener(|this, _, window, cx| this.move_horizontal(false, window, cx)),
+                    ),
+                )
+                .child(
+                    crate::views::toolbar_button("scroll-right", "→", true).on_click(
+                        cx.listener(|this, _, window, cx| this.move_horizontal(true, window, cx)),
+                    ),
+                ),
         )
         .child(
             div()
@@ -413,7 +428,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         .min_w_0()
                         .overflow_hidden()
                         .whitespace_nowrap()
-                        .text_color(rgb(0x92a2b9))
+                        .text_color(rgb(0x666666))
                         .child(mygit_gpui::localized_format!(
                             "{} · {} · 选区 {} 字节",
                             "{} · {} · {} selected bytes",
@@ -448,7 +463,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             div()
                 .flex()
                 .p_2()
-                .text_color(rgb(0x92a2b9))
+                .text_color(rgb(0x666666))
                 .child(
                     div()
                         .flex_1()
@@ -471,7 +486,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 div()
                     .px_2()
                     .py_1()
-                    .text_color(rgb(0x92a2b9))
+                    .text_color(rgb(0x666666))
                     .child(description),
             )
         })
@@ -496,7 +511,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             s.child(
                 div()
                     .px_2()
-                    .text_color(rgb(0xffd479))
+                    .text_color(rgb(0x946200))
                     .child(this.blame_error.clone()),
             )
         })
@@ -511,7 +526,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         .items_center()
                         .justify_center()
                         .p_3()
-                        .text_color(rgb(0x92a2b9))
+                        .text_color(rgb(0x666666))
                         .child(if this.state.loading {
                             mygit_gpui::i18n::text("正在加载…").into()
                         } else if this.state.active_file().is_some()
@@ -547,7 +562,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                     .id(i)
                                     .flex()
                                     .w_full()
-                                    .h(px(this.state.font_size + 12.))
+                                    .h(px(this.state.font_size + 6.))
                                     .font_family(this.state.font_family.clone())
                                     .text_size(px(this.state.font_size))
                                     .child(cell(
@@ -555,26 +570,26 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                         Side::Left,
                                         i,
                                         if active {
-                                            0x624233
+                                            0xffe7b8
                                         } else if r.changed && r.left_no.is_some() {
-                                            0x43262f
+                                            0xfbdada
                                         } else {
-                                            0x151d29
+                                            0xffffff
                                         },
                                         active,
                                         cx,
                                     ))
-                                    .child(div().w(px(1.)).h_full().bg(rgb(0x354259)))
+                                    .child(div().w(px(1.)).h_full().bg(rgb(0xd0d0d0)))
                                     .child(cell(
                                         this,
                                         Side::Right,
                                         i,
                                         if active {
-                                            0x365245
+                                            0xe3f4df
                                         } else if r.changed && r.right_no.is_some() {
-                                            0x203c32
+                                            0xdff2df
                                         } else {
-                                            0x151d29
+                                            0xffffff
                                         },
                                         active,
                                         cx,

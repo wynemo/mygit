@@ -126,7 +126,7 @@ impl Editor {
             external_changed: false,
             reference: Default::default(),
             compact: false,
-            show_toolbar: true,
+            show_toolbar: false,
             sensitive: false,
             show_blame: false,
             blame_lines: Default::default(),
@@ -576,7 +576,7 @@ fn line(this: &Editor, index: usize, cx: &mut Context<Editor>) -> impl IntoEleme
                 runs.push(TextRun {
                     len: display.text.len(),
                     font,
-                    color: rgb(0xdce5f3).into(),
+                    color: rgb(0x202020).into(),
                     background_color: None,
                     underline: None,
                     strikethrough: None,
@@ -623,7 +623,7 @@ fn line(this: &Editor, index: usize, cx: &mut Context<Editor>) -> impl IntoEleme
                             point(origin.x + x1, bounds.top()),
                             size((x2 - x1).max(px(0.)), bounds.size.height),
                         ),
-                        rgb(0x315b92),
+                        rgb(0xb5d6fa),
                     ));
                 }
                 if let Some(marked) = &marked
@@ -639,7 +639,7 @@ fn line(this: &Editor, index: usize, cx: &mut Context<Editor>) -> impl IntoEleme
                             point(origin.x + x1, bounds.bottom() - px(2.)),
                             size(x2 - x1, px(1.)),
                         ),
-                        rgb(0xffd479),
+                        rgb(0x946200),
                     ));
                 }
                 let _ = line.paint(origin, bounds.size.height, window, cx);
@@ -654,7 +654,7 @@ fn line(this: &Editor, index: usize, cx: &mut Context<Editor>) -> impl IntoEleme
                             point(origin.x + x, bounds.top() + px(2.)),
                             size(px(1.), bounds.size.height - px(4.)),
                         ),
-                        rgb(0xe5edf8),
+                        rgb(0x202020),
                     ));
                 }
             });
@@ -745,7 +745,7 @@ impl Render for Editor {
                         {
                             return;
                         }
-                        let delta = event.delta.pixel_delta(px(this.font_size + 12.));
+                        let delta = event.delta.pixel_delta(px(this.font_size + 6.));
                         let dx = if event.modifiers.shift && delta.x == px(0.) {
                             delta.y
                         } else {
@@ -789,6 +789,7 @@ impl Render for Editor {
             self.buffer.document.lines.len() + usize::from(self.buffer.text().ends_with('\n'));
         div()
             .relative()
+            .bg(rgb(0xffffff))
             .w_full()
             .child(scroll_listener)
             .flex()
@@ -796,11 +797,11 @@ impl Render for Editor {
             .min_h_0()
             .when(!self.compact, |s| s.flex_1())
             .when(self.compact, |s| {
-                s.h(px(32.))
+                s.h(px(24.))
                     .flex_shrink_0()
                     .border_1()
-                    .border_color(rgb(0x3a4d68))
-                    .bg(rgb(0x172131))
+                    .border_color(rgb(0xbcbcbc))
+                    .bg(rgb(0xffffff))
             })
             .key_context("FileEditor")
             .track_focus(&self.focus)
@@ -949,7 +950,7 @@ impl Render for Editor {
                                 this.refresh(cx);
                             })),
                         )
-                        .child(div().text_color(rgb(0x92a2b9)).child(format!(
+                        .child(div().text_color(rgb(0x666666)).child(format!(
                             "{} · {}",
                             if self.buffer.path.is_none() {
                                 mygit_gpui::i18n::text("提交信息")
@@ -966,7 +967,7 @@ impl Render for Editor {
                 s.child(
                     div()
                         .p_2()
-                        .text_color(rgb(0xffd479))
+                        .text_color(rgb(0x946200))
                         .child(mygit_gpui::i18n::text(
                             "磁盘文件已变化。保存会检查冲突；无未保存修改时可重新加载。",
                         )),
@@ -976,7 +977,7 @@ impl Render for Editor {
                 s.child(
                     div()
                         .p_2()
-                        .text_color(rgb(0xffd479))
+                        .text_color(rgb(0x946200))
                         .child(self.message.clone()),
                 )
             })
@@ -1037,7 +1038,7 @@ impl Render for Editor {
                                             .id(("editor-line", i))
                                             .w_full()
                                             .flex()
-                                            .h(px(this.font_size + 12.))
+                                            .h(px(this.font_size + 6.))
                                             .font_family(this.font_family.clone())
                                             .text_size(px(this.font_size))
                                             .when(!this.compact, |s| {
@@ -1045,7 +1046,7 @@ impl Render for Editor {
                                                     div()
                                                         .w(px(52.))
                                                         .flex_shrink_0()
-                                                        .text_color(rgb(0x7f8b9c))
+                                                        .text_color(rgb(0x888888))
                                                         .child(format!(
                                                             "{} {}",
                                                             this.marks

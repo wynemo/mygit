@@ -67,7 +67,7 @@ pub fn line(this: &MyGit, side: Side, row: usize, cx: &mut Context<MyGit>) -> im
                 runs.push(TextRun {
                     len: display.text.len(),
                     font,
-                    color: rgb(0xdce5f3).into(),
+                    color: rgb(0x202020).into(),
                     background_color: None,
                     underline: None,
                     strikethrough: None,
@@ -95,9 +95,9 @@ pub fn line(this: &MyGit, side: Side, row: usize, cx: &mut Context<MyGit>) -> im
                             size((x2 - x1).max(px(1.)), bounds.size.height),
                         ),
                         rgb(if side == Side::Left {
-                            0x873c4b
+                            0xf5b6b6
                         } else {
-                            0x286847
+                            0xb5dfb5
                         }),
                     ));
                 }
@@ -120,7 +120,7 @@ pub fn line(this: &MyGit, side: Side, row: usize, cx: &mut Context<MyGit>) -> im
                                 point(origin.x + x1, bounds.top()),
                                 size((x2 - x1).max(px(0.)), bounds.size.height),
                             ),
-                            rgb(0x315b92),
+                            rgb(0xb5d6fa),
                         ));
                     }
                     if selection.range().is_empty()
@@ -134,7 +134,7 @@ pub fn line(this: &MyGit, side: Side, row: usize, cx: &mut Context<MyGit>) -> im
                                 point(origin.x + x, bounds.top() + px(3.)),
                                 size(px(1.), bounds.size.height - px(6.)),
                             ),
-                            rgb(0xe5edf8),
+                            rgb(0x202020),
                         ));
                     }
                 }

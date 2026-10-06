@@ -227,7 +227,7 @@ impl MyGit {
         self.quick.shown = false;
         self.quick.cancel();
         self.quick.reveal = Some(path.clone());
-        self.show_tree = true;
+        self.settings.files_visible = true;
         self.refresh_tree(cx);
         self.open_workspace_file(path, cx);
         window.focus(&self.focus);

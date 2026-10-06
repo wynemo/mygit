@@ -7,7 +7,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .p_2()
         .gap_2()
         .border_b_1()
-        .border_color(rgb(0x2b3545))
+        .border_color(rgb(0xc8c8c8))
         .child(mygit_gpui::i18n::text(
             "输入提交 SHA/分支/标签；EMPTY 表示空内容，右侧可用 WORKTREE。比较视图只读。",
         ))

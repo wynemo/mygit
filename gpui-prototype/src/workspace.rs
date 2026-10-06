@@ -127,7 +127,11 @@ pub fn read(root: &Path, expanded: &BTreeSet<String>) -> Result<BTreeMap<String,
                 status,
             });
         }
-        entries.sort_by(|a, b| a.name.cmp(&b.name));
+        entries.sort_by(|a, b| {
+            b.directory
+                .cmp(&a.directory)
+                .then_with(|| a.name.cmp(&b.name))
+        });
         result.insert(parent.clone(), entries);
     }
     Ok(result)

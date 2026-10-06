@@ -10,7 +10,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .p_2()
         .gap_1()
         .border_b_1()
-        .border_color(rgb(0x2b3545))
+        .border_color(rgb(0xc8c8c8))
         .child(
             div()
                 .flex()
@@ -52,7 +52,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .child(
             div()
                 .text_xs()
-                .text_color(rgb(0x92a2b9))
+                .text_color(rgb(0x666666))
                 .child(if this.quick.indexing {
                     mygit_gpui::i18n::text("正在更新文件索引…").into()
                 } else if this.quick.searching {
@@ -68,7 +68,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 }),
         )
         .when_some(this.quick.error.clone(), |s, error| {
-            s.child(div().text_color(rgb(0xffd479)).child(error))
+            s.child(div().text_color(rgb(0x946200)).child(error))
         })
         .when(
             !this.quick.indexing
@@ -95,11 +95,11 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                     .whitespace_nowrap()
                                     .cursor_pointer()
                                     .bg(rgb(if i == this.quick.selected {
-                                        0x263b56
+                                        0xdceafa
                                     } else {
-                                        0x151d29
+                                        0xffffff
                                     }))
-                                    .hover(|s| s.bg(rgb(0x253248)))
+                                    .hover(|s| s.bg(rgb(0xedf4fb)))
                                     .child(path.clone())
                                     .on_click(cx.listener(move |this, _, window, cx| {
                                         if let Some(index) = this

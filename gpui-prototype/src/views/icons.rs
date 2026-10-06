@@ -5,7 +5,7 @@ pub fn icon(path: &'static str) -> Svg {
         .path(path)
         .size(px(16.))
         .flex_shrink_0()
-        .text_color(rgb(0xc5d5e8))
+        .text_color(rgb(0x202020))
 }
 pub fn file(path: &str) -> Img {
     img(ImageSource::Resource(Resource::Embedded(

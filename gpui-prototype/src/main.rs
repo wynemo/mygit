@@ -38,6 +38,13 @@ fn main() {
                     MenuItem::action(mygit_gpui::i18n::text("项目内容搜索"), ToggleProjectSearch),
                     MenuItem::action(mygit_gpui::i18n::text("文件快速定位"), ToggleQuickOpen),
                     MenuItem::action(mygit_gpui::i18n::text("取消加载"), CancelTask),
+                    MenuItem::action(mygit_gpui::i18n::text("撤销还原"), UndoRestore),
+                    MenuItem::action(mygit_gpui::i18n::text("比较版本"), ToggleCompare),
+                    MenuItem::action(
+                        mygit_gpui::i18n::text("选中提交 ↔ 工作区"),
+                        CompareSelectedWorktree,
+                    ),
+                    MenuItem::action(mygit_gpui::i18n::text("当前文件历史"), SelectedTreeHistory),
                     MenuItem::action(
                         mygit_gpui::i18n::text("显示 / 隐藏文件栏"),
                         ToggleFilesPanel,

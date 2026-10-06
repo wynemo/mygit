@@ -1,19 +1,20 @@
-use crate::{app::MyGit, views::button};
+use crate::{
+    app::MyGit,
+    views::{button, icons},
+};
 use gpui::{prelude::*, *};
-use mygit_gpui::model::{BrowseMode, short_sha};
+use mygit_gpui::model::BrowseMode;
 
-fn mode_button(
-    this: &MyGit,
-    cx: &mut Context<MyGit>,
-    id: &'static str,
-    label: &'static str,
-    mode: BrowseMode,
-) -> impl IntoElement {
-    button(id, label, this.state.repo.is_some())
-        .mb_1()
-        .when(this.state.mode == mode, |s| s.bg(rgb(0x263b56)))
-        .on_click(cx.listener(move |this, _, _, cx| this.select_mode(mode.clone(), cx)))
+fn table_cell(text: impl Into<SharedString>, width: f32) -> Div {
+    div()
+        .w(px(width))
+        .flex_shrink_0()
+        .px_1()
+        .overflow_hidden()
+        .text_ellipsis()
+        .child(text.into())
 }
+
 pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
     let count = this.history_commits().len();
     div()
@@ -24,419 +25,575 @@ pub fn history(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .flex()
         .flex_col()
         .min_h_0()
-        .border_r_1()
-        .border_color(rgb(0x2b3545))
+        .p(px(10.))
         .child(
             div()
-                .p_2()
+                .h(px(34.))
+                .flex_shrink_0()
+                .flex()
+                .items_center()
+                .gap_3()
+                .children(
+                    [
+                        (
+                            "fetch-remote",
+                            "Fetch",
+                            mygit_gpui::operations::RemoteOperation::Fetch,
+                        ),
+                        (
+                            "pull-remote",
+                            "Pull",
+                            mygit_gpui::operations::RemoteOperation::Pull,
+                        ),
+                        (
+                            "push-remote",
+                            "Push",
+                            mygit_gpui::operations::RemoteOperation::Push,
+                        ),
+                    ]
+                    .into_iter()
+                    .map(|(id, label, operation)| {
+                        button(id, label, !this.write_busy && this.state.repo.is_some()).on_click(
+                            cx.listener(move |this, _, _, cx| this.remote_operation(operation, cx)),
+                        )
+                    }),
+                ),
+        )
+        .child(
+            div()
+                .h(px(29.))
+                .flex_shrink_0()
+                .flex()
+                .items_end()
+                .border_b_1()
+                .border_color(rgb(0xc8c8c8))
+                .child(
+                    div()
+                        .px_2()
+                        .h(px(23.))
+                        .bg(rgb(0x2196f3))
+                        .text_color(rgb(0xffffff))
+                        .rounded_t(px(4.))
+                        .child(mygit_gpui::i18n::text("提交历史")),
+                ),
+        )
+        .child(
+            div()
+                .h(px(48.))
+                .flex_shrink_0()
+                .flex()
+                .items_center()
+                .gap_2()
+                .px_1()
+                .child(
+                    div()
+                        .flex_1()
+                        .max_w(px(124.))
+                        .min_w_0()
+                        .h(px(24.))
+                        .when_some(this.history_inputs.first().cloned(), |s, editor| {
+                            s.child(editor)
+                        }),
+                )
+                .children(
+                    ["Branch", "User", "Date"]
+                        .into_iter()
+                        .enumerate()
+                        .map(|(i, label)| {
+                            div()
+                                .id(("history-filter", i))
+                                .flex_shrink_0()
+                                .cursor_pointer()
+                                .child(format!("{label} ⌄"))
+                                .on_click(
+                                    cx.listener(|this, _, _, cx| this.toggle_history_search(cx)),
+                                )
+                        }),
+                ),
+        )
+        .child(
+            div()
+                .id("history-table-scroll")
                 .flex()
                 .flex_col()
-                .child(mode_button(
-                    this,
-                    cx,
-                    "workspace",
-                    mygit_gpui::i18n::text("全部变更 · HEAD ↔ 工作区"),
-                    BrowseMode::Workspace,
-                ))
-                .child(mode_button(
-                    this,
-                    cx,
-                    "staged",
-                    mygit_gpui::i18n::text("已暂存 · HEAD ↔ index"),
-                    BrowseMode::Staged,
-                ))
-                .child(mode_button(
-                    this,
-                    cx,
-                    "unstaged",
-                    mygit_gpui::i18n::text("未暂存 · index ↔ 工作区"),
-                    BrowseMode::Unstaged,
-                )),
+                .flex_1()
+                .min_h_0()
+                .overflow_x_scroll()
+                // Do not translate an exhausted vertical wheel into horizontal scrolling.
+                .map(|mut s| {
+                    s.style().restrict_scroll_to_axis = Some(true);
+                    s
+                })
+                .child(
+                    div()
+                        .w(px(720.))
+                        .min_w_full()
+                        .flex()
+                        .flex_col()
+                        .flex_1()
+                        .min_h_0()
+                        .border_1()
+                        .border_color(rgb(0xbcbcbc))
+                        .bg(rgb(0xffffff))
+                        .child(
+                            div()
+                                .h(px(20.))
+                                .flex_shrink_0()
+                                .flex()
+                                .bg(rgb(0xececec))
+                                .border_b_1()
+                                .border_color(rgb(0xc8c8c8))
+                                .children(
+                                    [
+                                        ("DAG", 120.),
+                                        (mygit_gpui::i18n::text("提交信息"), 200.),
+                                        ("Branches", 150.),
+                                        (mygit_gpui::i18n::text("作者"), 100.),
+                                        (mygit_gpui::i18n::text("日期"), 150.),
+                                    ]
+                                    .into_iter()
+                                    .map(|(label, width)| {
+                                        table_cell(label, width)
+                                            .border_r_1()
+                                            .border_color(rgb(0xc8c8c8))
+                                    }),
+                                ),
+                        )
+                        .child(
+                            uniform_list(
+                                "history",
+                                count,
+                                cx.processor(|this, range: std::ops::Range<usize>, _, cx| {
+                                    if !this.history_failed
+                                        && this.history_more()
+                                        && range.end >= this.history_commits().len()
+                                    {
+                                        let entity = cx.entity().downgrade();
+                                        cx.defer(move |cx| {
+                                            let _ = entity
+                                                .update(cx, |this, cx| this.load_more_history(cx));
+                                        });
+                                    }
+                                    range
+                                        .map(|i| {
+                                            let c = &this.history_commits()[i];
+                                            let references = this
+                                                .state
+                                                .repo
+                                                .as_ref()
+                                                .and_then(|r| r.references.get(&c.sha))
+                                                .cloned()
+                                                .unwrap_or_default();
+                                            let selected = this.history_cursor == Some(i);
+                                            div()
+                                                .id(i)
+                                                .w_full()
+                                                .h(px(18.))
+                                                .flex()
+                                                .items_center()
+                                                .overflow_hidden()
+                                                .cursor_pointer()
+                                                .bg(rgb(if selected { 0xdceafa } else { 0xffffff }))
+                                                .hover(|s| s.bg(rgb(0xedf4fb)))
+                                                .tooltip({
+                                                    let subject = c.subject.clone();
+                                                    move |_, cx| {
+                                                        cx.new(|_| {
+                                                            crate::views::hints::Hint(
+                                                                subject.clone().into(),
+                                                            )
+                                                        })
+                                                        .into()
+                                                    }
+                                                })
+                                                .child(
+                                                    div()
+                                                        .w(px(120.))
+                                                        .h_full()
+                                                        .flex_shrink_0()
+                                                        .when_some(
+                                                            this.history_graph.get(i).cloned(),
+                                                            |s, row| {
+                                                                s.child(crate::views::graph::row(
+                                                                    row,
+                                                                ))
+                                                            },
+                                                        ),
+                                                )
+                                                .child(table_cell(c.subject.clone(), 200.))
+                                                .child(table_cell(references, 150.))
+                                                .child(table_cell(c.author.clone(), 100.))
+                                                .child(table_cell(
+                                                    c.date
+                                                        .replace('T', " ")
+                                                        .chars()
+                                                        .take(19)
+                                                        .collect::<String>(),
+                                                    150.,
+                                                ))
+                                                .on_mouse_down(
+                                                    MouseButton::Right,
+                                                    cx.listener(move |this, _, window, cx| {
+                                                        if let Some(commit) =
+                                                            this.history_commits().get(i)
+                                                        {
+                                                            this.show_commit_branches(
+                                                                commit.sha.clone(),
+                                                                cx,
+                                                            );
+                                                            window.focus(&this.branch_focus);
+                                                        }
+                                                        cx.stop_propagation();
+                                                    }),
+                                                )
+                                                .on_click(cx.listener(
+                                                    move |this, _, window, cx| {
+                                                        this.choose_history(i, window, cx)
+                                                    },
+                                                ))
+                                        })
+                                        .collect::<Vec<_>>()
+                                }),
+                            )
+                            .w_full()
+                            .with_decoration(crate::views::scrollbar::ListScrollbar(
+                                this.history_scroll.clone(),
+                                Some(this.visible_history_width - 20.),
+                            ))
+                            .track_scroll(this.history_scroll.clone())
+                            .min_h_0()
+                            .flex_1(),
+                        ),
+                ),
         )
+}
+
+#[derive(Clone)]
+struct ChangeRow {
+    label: String,
+    path: String,
+    depth: usize,
+    index: Option<usize>,
+}
+fn change_rows(this: &MyGit) -> Vec<ChangeRow> {
+    let mut rows = Vec::new();
+    let mut seen = std::collections::BTreeSet::new();
+    for (index, file) in this.state.files.iter().enumerate() {
+        let parts: Vec<_> = file.path.split('/').collect();
+        let mut prefix = String::new();
+        let mut hidden = false;
+        for (depth, part) in parts.iter().enumerate() {
+            if !prefix.is_empty() {
+                prefix.push('/');
+            }
+            prefix.push_str(part);
+            if depth == parts.len() - 1 {
+                rows.push(ChangeRow {
+                    label: (*part).into(),
+                    path: file.path.clone(),
+                    depth,
+                    index: Some(index),
+                });
+            } else {
+                if seen.insert(prefix.clone()) {
+                    rows.push(ChangeRow {
+                        label: (*part).into(),
+                        path: prefix.clone(),
+                        depth,
+                        index: None,
+                    });
+                }
+                if this.change_folders_collapsed.contains(&prefix) {
+                    hidden = true;
+                    break;
+                }
+            }
+        }
+        if hidden {
+            continue;
+        }
+    }
+    rows
+}
+
+pub fn files(this: &MyGit, workspace: bool, cx: &mut Context<MyGit>) -> impl IntoElement {
+    let worktree = matches!(
+        this.state.mode,
+        BrowseMode::Workspace | BrowseMode::Staged | BrowseMode::Unstaged
+    );
+    let rows = if workspace || !worktree {
+        change_rows(this)
+    } else {
+        Vec::new()
+    };
+    let count = rows.len();
+    div()
+        .key_context("FilesList")
+        .track_focus(&this.files_focus)
+        .flex()
+        .flex_col()
+        .flex_1()
+        .min_w_0()
+        .min_h_0()
+        .p(px(5.))
         .child(
             div()
-                .p_3()
-                .text_color(rgb(0x92a2b9))
+                .h(px(25.))
+                .flex_shrink_0()
                 .child(mygit_gpui::localized_format!(
-                    "{} · 已加载 {count} 条",
-                    "{} · {count} loaded",
-                    if this.history_query.is_some() {
-                        mygit_gpui::i18n::text("查询结果")
-                    } else {
-                        mygit_gpui::i18n::text("提交 DAG")
-                    }
+                    "文件变化：",
+                    "Changed files:"
                 )),
         )
-        .when(this.history_graph.iter().any(|row| row.omitted > 0), |s| {
+        .when(workspace, |s| {
             s.child(
-                div()
-                    .px_2()
-                    .text_xs()
-                    .text_color(rgb(0x8995a8))
-                    .child(mygit_gpui::i18n::text("短灰线：父提交未包含在结果中")),
+                div().flex().flex_wrap().gap_1().pb_1().children(
+                    [
+                        (
+                            "workspace",
+                            mygit_gpui::i18n::text("全部变更"),
+                            BrowseMode::Workspace,
+                        ),
+                        (
+                            "staged",
+                            mygit_gpui::i18n::text("已暂存"),
+                            BrowseMode::Staged,
+                        ),
+                        (
+                            "unstaged",
+                            mygit_gpui::i18n::text("未暂存"),
+                            BrowseMode::Unstaged,
+                        ),
+                    ]
+                    .into_iter()
+                    .map(|(id, label, mode)| {
+                        button(id, label, true).on_click(
+                            cx.listener(move |this, _, _, cx| this.select_mode(mode.clone(), cx)),
+                        )
+                    }),
+                ),
+            )
+            .child(
+                div().flex().flex_wrap().gap_1().pb_1().children(
+                    [
+                        (
+                            "stage-selected",
+                            mygit_gpui::i18n::text("暂存选中"),
+                            true,
+                            false,
+                        ),
+                        (
+                            "unstage-selected",
+                            mygit_gpui::i18n::text("取消暂存"),
+                            false,
+                            false,
+                        ),
+                        ("stage-all", mygit_gpui::i18n::text("暂存全部"), true, true),
+                        (
+                            "unstage-all",
+                            mygit_gpui::i18n::text("取消全部"),
+                            false,
+                            true,
+                        ),
+                    ]
+                    .into_iter()
+                    .map(|(id, label, stage, all)| {
+                        button(id, label, !this.write_busy).on_click(
+                            cx.listener(move |this, _, _, cx| this.change_index(stage, all, cx)),
+                        )
+                    }),
+                ),
             )
         })
         .child(
-            uniform_list(
-                "history",
-                count,
-                cx.processor(|this, range: std::ops::Range<usize>, _, cx| {
-                    if !this.history_failed
-                        && this.history_more()
-                        && range.end >= this.history_commits().len()
-                    {
-                        let entity = cx.entity().downgrade();
-                        cx.defer(move |cx| {
-                            let _ = entity.update(cx, |this, cx| this.load_more_history(cx));
-                        });
-                    }
-                    range
-                        .map(|i| {
-                            let c = &this.history_commits()[i];
-                            let references = this
-                                .state
-                                .repo
-                                .as_ref()
-                                .and_then(|repo| repo.references.get(&c.sha))
-                                .cloned()
-                                .unwrap_or_default();
+            div()
+                .flex()
+                .flex_col()
+                .flex_1()
+                .min_h_0()
+                .border_1()
+                .border_color(rgb(0xbcbcbc))
+                .bg(rgb(0xffffff))
+                .child(
+                    div()
+                        .h(px(20.))
+                        .flex_shrink_0()
+                        .flex()
+                        .bg(rgb(0xececec))
+                        .border_b_1()
+                        .border_color(rgb(0xc8c8c8))
+                        .child(
                             div()
-                                .id(i)
-                                .h(px(76.))
-                                .flex()
-                                .overflow_hidden()
-                                .cursor_pointer()
-                                .bg(rgb(
-                                    if this.state.mode == BrowseMode::History(c.sha.clone())
-                                        || this.state.mode == BrowseMode::Merge(c.sha.clone())
-                                    {
-                                        0x263b56
-                                    } else {
-                                        0x151d29
-                                    },
-                                ))
-                                .hover(|s| s.bg(rgb(0x253248)))
-                                .when_some(this.history_graph.get(i).cloned(), |s, row| {
-                                    s.child(crate::views::graph::row(row))
+                                .w(px(100.))
+                                .px_1()
+                                .border_r_1()
+                                .border_color(rgb(0xc8c8c8))
+                                .child(mygit_gpui::i18n::text("文件")),
+                        )
+                        .child(div().px_1().child(mygit_gpui::i18n::text("状态"))),
+                )
+                .child(
+                    uniform_list(
+                        if workspace {
+                            "workspace-changes"
+                        } else {
+                            "commit-changes"
+                        },
+                        count,
+                        cx.processor(move |this, range: std::ops::Range<usize>, _, cx| {
+                            let rows = change_rows(this);
+                            range
+                                .filter_map(|i| {
+                                    rows.get(i).cloned().map(|row| {
+                                        let folder = row.index.is_none();
+                                        let expanded =
+                                            !this.change_folders_collapsed.contains(&row.path);
+                                        let path = row.path.clone();
+                                        let status = row
+                                            .index
+                                            .map(|i| this.state.files[i].status.clone())
+                                            .unwrap_or_default();
+                                        div()
+                                            .id(i)
+                                            .w_full()
+                                            .h(px(20.))
+                                            .flex()
+                                            .items_center()
+                                            .gap_1()
+                                            .pl(px(6. + row.depth as f32 * 14.))
+                                            .overflow_hidden()
+                                            .whitespace_nowrap()
+                                            .cursor_pointer()
+                                            .bg(rgb(
+                                                if row.index.is_some()
+                                                    && row.index == this.state.selected
+                                                {
+                                                    0xdceafa
+                                                } else {
+                                                    0xffffff
+                                                },
+                                            ))
+                                            .hover(|s| s.bg(rgb(0xedf4fb)))
+                                            .child(if folder {
+                                                if expanded { "▾" } else { "▸" }
+                                            } else {
+                                                " "
+                                            })
+                                            .when(workspace && !folder, |s| {
+                                                s.child(
+                                                    div()
+                                                        .id(("file-checkbox", i))
+                                                        .cursor_pointer()
+                                                        .child(
+                                                            if this.file_selection.contains(&path) {
+                                                                "☑"
+                                                            } else {
+                                                                "☐"
+                                                            },
+                                                        )
+                                                        .on_click(cx.listener(
+                                                            move |this, _, _, cx| {
+                                                                cx.stop_propagation();
+                                                                if let Some(index) = row.index {
+                                                                    this.toggle_file_selection(
+                                                                        index, cx,
+                                                                    );
+                                                                }
+                                                            },
+                                                        )),
+                                                )
+                                            })
+                                            .child(if folder {
+                                                icons::icon("icons/folder.svg").into_any_element()
+                                            } else {
+                                                icons::file(&path).into_any_element()
+                                            })
+                                            .child(div().min_w(px(80.)).child(row.label))
+                                            .child(div().text_color(rgb(0x666666)).child(status))
+                                            .on_click(cx.listener(move |this, _, window, cx| {
+                                                window.focus(&this.files_focus);
+                                                if let Some(index) = row.index {
+                                                    this.select_file(index, cx);
+                                                } else {
+                                                    if !this.change_folders_collapsed.remove(&path)
+                                                    {
+                                                        this.change_folders_collapsed
+                                                            .insert(path.clone());
+                                                    }
+                                                    cx.notify();
+                                                }
+                                            }))
+                                    })
                                 })
-                                .child(
-                                    div()
-                                        .p_2()
-                                        .min_w_0()
-                                        .overflow_hidden()
-                                        .child(div().whitespace_nowrap().child(c.subject.clone()))
-                                        .child(
-                                            div()
-                                                .whitespace_nowrap()
-                                                .text_color(rgb(0x92a2b9))
-                                                .child(format!(
-                                                    "{}  {}  {}",
-                                                    short_sha(&c.sha),
-                                                    c.author,
-                                                    c.date
-                                                )),
-                                        )
-                                        .when(!references.is_empty(), |s| {
-                                            s.child(
-                                                div()
-                                                    .text_xs()
-                                                    .whitespace_nowrap()
-                                                    .text_color(rgb(0x70d6a5))
-                                                    .child(references),
-                                            )
-                                        }),
-                                )
-                                .on_mouse_down(
-                                    MouseButton::Right,
-                                    cx.listener(move |this, _, window, cx| {
-                                        if let Some(commit) = this.history_commits().get(i) {
-                                            this.show_commit_branches(commit.sha.clone(), cx);
-                                            window.focus(&this.branch_focus);
-                                        }
-                                        cx.stop_propagation();
-                                    }),
-                                )
-                                .on_click(cx.listener(move |this, _, window, cx| {
-                                    this.choose_history(i, window, cx)
-                                }))
-                        })
-                        .collect::<Vec<_>>()
-                }),
-            )
-            .track_scroll(this.history_scroll.clone())
-            .min_h_0()
-            .flex_1(),
-        )
-        .child(
-            button(
-                "more-history",
-                if this.history_loading {
-                    mygit_gpui::i18n::text("正在加载历史…")
-                } else {
-                    mygit_gpui::i18n::text("加载更多")
-                },
-                !this.history_loading && this.history_more(),
-            )
-            .on_click(cx.listener(|this, _, _, cx| this.load_more_history(cx))),
-        )
-        .when(this.state.detail.is_some(), |s| {
-            s.child(
-                button(
-                    "commit-worktree-compare",
-                    mygit_gpui::i18n::text("选中提交 ↔ 工作区"),
-                    true,
-                )
-                .on_click(cx.listener(|this, _, _, cx| this.compare_selected_worktree(cx))),
-            )
-        })
-        .when(
-            this.state
-                .detail
-                .as_ref()
-                .is_some_and(|d| d.parents.len() == 2),
-            |s| {
-                s.child(
-                    button(
-                        "merge-three-columns",
-                        mygit_gpui::i18n::text("合并提交三栏查看"),
-                        !this.state.loading,
+                                .collect::<Vec<_>>()
+                        }),
                     )
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        if let Some(detail) = &this.state.detail {
-                            this.select_mode(BrowseMode::Merge(detail.sha.clone()), cx);
-                        }
-                    })),
-                )
-            },
+                    .w_full()
+                    .with_decoration(crate::views::scrollbar::ListScrollbar(
+                        this.files_scroll.clone(),
+                        None,
+                    ))
+                    .track_scroll(this.files_scroll.clone())
+                    .min_h_0()
+                    .flex_1(),
+                ),
         )
-        .when_some(this.state.detail.clone(), |s, detail| {
+}
+
+pub fn detail(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
+    div()
+        .id("commit-detail")
+        .flex()
+        .flex_col()
+        .flex_1()
+        .min_h_0()
+        .min_w_0()
+        .overflow_y_scroll()
+        .bg(rgb(0xffffff))
+        .p(px(8.))
+        .when_some(this.state.listed_detail.clone(), |s, detail| {
             let sha = detail.sha.clone();
             let message = detail.message.clone();
             s.child(
                 div()
-                    .id("commit-detail")
-                    .h(px(240.))
-                    .overflow_y_scroll()
-                    .p_2()
-                    .border_t_1()
-                    .border_color(rgb(0x2b3545))
+                    .flex()
+                    .gap_2()
                     .child(
-                        div()
-                            .flex()
-                            .gap_2()
-                            .child(
-                                button("copy-sha", mygit_gpui::i18n::text("复制 SHA"), true)
-                                    .on_click(cx.listener(move |_, _, _, cx| {
-                                        cx.write_to_clipboard(ClipboardItem::new_string(
-                                            sha.clone(),
-                                        ));
-                                    })),
-                            )
-                            .child(
-                                button("copy-message", mygit_gpui::i18n::text("复制信息"), true)
-                                    .on_click(cx.listener(move |_, _, _, cx| {
-                                        cx.write_to_clipboard(ClipboardItem::new_string(
-                                            message.clone(),
-                                        ));
-                                    })),
-                            ),
+                        button("copy-sha", mygit_gpui::i18n::text("复制 SHA"), true).on_click(
+                            cx.listener(move |_, _, _, cx| {
+                                cx.write_to_clipboard(ClipboardItem::new_string(sha.clone()))
+                            }),
+                        ),
                     )
-                    .child(div().text_color(rgb(0x92a2b9)).child(format!(
-                        "{} <{}>\n{}",
-                        detail.author, detail.author_email, detail.author_date
-                    )))
                     .child(
-                        div()
-                            .text_color(rgb(0x92a2b9))
-                            .child(mygit_gpui::localized_format!(
-                                "提交者：{} <{}>\n{}",
-                                "Committer: {} <{}>\n{}",
-                                detail.committer,
-                                detail.committer_email,
-                                detail.commit_date
-                            )),
-                    )
-                    .child(div().child(detail.references))
-                    .child(div().child(mygit_gpui::localized_format!(
-                            "父提交：{}",
-                            "Parents: {}",
-                            detail
-                                .parents
-                                .iter()
-                                .map(|p| short_sha(p))
-                                .collect::<Vec<_>>()
-                                .join(" ")
-                        )))
-                    .children(
-                        detail
-                            .message
-                            .split('\n')
-                            .map(|line| div().min_h(px(18.)).child(line.to_owned()))
-                            .collect::<Vec<_>>(),
+                        button("copy-message", mygit_gpui::i18n::text("复制信息"), true).on_click(
+                            cx.listener(move |_, _, _, cx| {
+                                cx.write_to_clipboard(ClipboardItem::new_string(message.clone()))
+                            }),
+                        ),
                     ),
             )
+            .child(
+                div().font_weight(FontWeight::BOLD).child(
+                    detail
+                        .message
+                        .lines()
+                        .next()
+                        .unwrap_or_default()
+                        .to_string(),
+                ),
+            )
+            .child(div().text_color(rgb(0x666666)).child(format!(
+                "{} <{}>  {}",
+                detail.author, detail.author_email, detail.author_date
+            )))
+            .child(div().child(detail.references))
+            .children(
+                detail
+                    .message
+                    .lines()
+                    .skip(1)
+                    .map(|line| div().min_h(px(17.)).child(line.to_string())),
+            )
         })
-}
-pub fn files(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
-    div()
-        .key_context("FilesList")
-        .track_focus(&this.files_focus)
-        .w(px(this.visible_files_width))
-        .flex_shrink_0()
-        .flex()
-        .flex_col()
-        .min_h_0()
-        .border_r_1()
-        .border_color(rgb(0x2b3545))
-        .child(div().p_3().child(format!(
-            "{} ({})",
-            this.state.mode.label(),
-            this.state.files.len()
-        )))
-        .child(
-            button(
-                "current-file-history",
-                mygit_gpui::i18n::text("当前文件历史"),
-                this.state.current_file.is_some(),
-            )
-            .on_click(cx.listener(|this, _, _, cx| this.current_file_history(cx))),
-        )
-        .when(
-            matches!(
-                this.state.mode,
-                BrowseMode::Workspace | BrowseMode::Staged | BrowseMode::Unstaged
-            ),
-            |s| {
-                s.child(
-                    div()
-                        .p_1()
-                        .flex()
-                        .flex_col()
-                        .gap_1()
-                        .child(
-                            div()
-                                .flex()
-                                .gap_1()
-                                .child(
-                                    button(
-                                        "stage-selected",
-                                        mygit_gpui::i18n::text("暂存选中"),
-                                        !this.write_busy,
-                                    )
-                                    .on_click(cx.listener(
-                                        |this, _, _, cx| this.change_index(true, false, cx),
-                                    )),
-                                )
-                                .child(
-                                    button(
-                                        "unstage-selected",
-                                        mygit_gpui::i18n::text("取消暂存"),
-                                        !this.write_busy,
-                                    )
-                                    .on_click(cx.listener(
-                                        |this, _, _, cx| this.change_index(false, false, cx),
-                                    )),
-                                ),
-                        )
-                        .child(
-                            div()
-                                .flex()
-                                .gap_1()
-                                .child(
-                                    button(
-                                        "stage-all",
-                                        mygit_gpui::i18n::text("暂存全部"),
-                                        !this.write_busy,
-                                    )
-                                    .on_click(cx.listener(
-                                        |this, _, _, cx| this.change_index(true, true, cx),
-                                    )),
-                                )
-                                .child(
-                                    button(
-                                        "unstage-all",
-                                        mygit_gpui::i18n::text("取消全部"),
-                                        !this.write_busy,
-                                    )
-                                    .on_click(cx.listener(
-                                        |this, _, _, cx| this.change_index(false, true, cx),
-                                    )),
-                                ),
-                        ),
-                )
-            },
-        )
-        .child(
-            uniform_list(
-                ("files", this.state.generation as usize),
-                this.state.files.len(),
-                cx.processor(|this, range: std::ops::Range<usize>, _, cx| {
-                    range
-                        .map(|i| {
-                            let file = &this.state.files[i];
-                            div()
-                                .id(i)
-                                .h(px(36.))
-                                .px_2()
-                                .py_1()
-                                .overflow_hidden()
-                                .whitespace_nowrap()
-                                .cursor_pointer()
-                                .bg(rgb(if this.state.selected == Some(i) {
-                                    0x263b56
-                                } else {
-                                    0x111722
-                                }))
-                                .hover(|s| s.bg(rgb(0x253248)))
-                                .flex()
-                                .gap_1()
-                                .when(
-                                    matches!(
-                                        this.state.mode,
-                                        BrowseMode::Workspace
-                                            | BrowseMode::Staged
-                                            | BrowseMode::Unstaged
-                                    ),
-                                    |s| {
-                                        s.child(
-                                            div()
-                                                .id(("file-checkbox", i))
-                                                .flex_shrink_0()
-                                                .cursor_pointer()
-                                                .child(
-                                                    if this.file_selection.contains(&file.path) {
-                                                        "☑"
-                                                    } else {
-                                                        "☐"
-                                                    },
-                                                )
-                                                .on_click(cx.listener(move |this, _, _, cx| {
-                                                    cx.stop_propagation();
-                                                    this.toggle_file_selection(i, cx);
-                                                })),
-                                        )
-                                    },
-                                )
-                                .child(format!(
-                                    "{}  {}",
-                                    if matches!(this.state.mode, BrowseMode::Merge(_)) {
-                                        "Δ"
-                                    } else {
-                                        &file.status
-                                    },
-                                    file.path
-                                ))
-                                .on_click(cx.listener(move |this, _, window, cx| {
-                                    window.focus(&this.files_focus);
-                                    cx.activate(true);
-                                    this.select_file(i, cx);
-                                }))
-                        })
-                        .collect::<Vec<_>>()
-                }),
-            )
-            .track_scroll(this.files_scroll.clone())
-            .min_h_0()
-            .flex_1(),
-        )
 }

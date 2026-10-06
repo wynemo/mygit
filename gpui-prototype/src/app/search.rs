@@ -166,7 +166,7 @@ impl MyGit {
             return;
         }
         self.quick.reveal = Some(hit.path.clone());
-        self.show_tree = true;
+        self.settings.files_visible = true;
         self.refresh_tree(cx);
         self.open_workspace_hit(hit, cx);
         window.focus(&self.focus);

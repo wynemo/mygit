@@ -6,8 +6,8 @@ impl Render for Hint {
             .max_w(px(400.))
             .p_2()
             .rounded_md()
-            .bg(rgb(0x263449))
-            .text_color(rgb(0xdce5f3))
+            .bg(rgb(0xf4f4f4))
+            .text_color(rgb(0x202020))
             .text_size(px(12.))
             .child(self.0.clone())
     }

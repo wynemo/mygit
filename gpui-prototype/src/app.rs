@@ -34,6 +34,10 @@ actions!(
         OpenRepo,
         RefreshRepo,
         ToggleSettings,
+        UndoRestore,
+        ToggleCompare,
+        CompareSelectedWorktree,
+        SelectedTreeHistory,
         ToggleFilesPanel,
         ToggleGitPanel,
         ToggleNotifications,
@@ -175,6 +179,11 @@ pub struct MyGit {
     pub tab_scroll: HashMap<String, UniformListScrollHandle>,
     pub settings: mygit_gpui::settings::Settings,
     pub show_settings: bool,
+    pub show_recent: bool,
+    pub show_branch_dropdown: bool,
+    pub show_workspace_changes: bool,
+    pub change_folders_collapsed: std::collections::BTreeSet<String>,
+    pub tab_menu: Option<Point<Pixels>>,
     pub pending: mygit_gpui::process::Cancellation,
     pub history_pending: mygit_gpui::process::Cancellation,
     pub tree: mygit_gpui::workspace::Tree,
@@ -182,13 +191,15 @@ pub struct MyGit {
     pub tree_loading: bool,
     pub tree_epoch: u64,
     pub tree_error: Option<String>,
-    pub show_tree: bool,
+    pub panel_drag: Option<(u8, Point<Pixels>, f32)>,
+    pub tree_focus: FocusHandle,
     pub history_loading: bool,
     pub history_failed: bool,
     pub history_focus: FocusHandle,
     pub files_focus: FocusHandle,
     pub history_scroll: UniformListScrollHandle,
     pub files_scroll: UniformListScrollHandle,
+    pub tree_scroll: UniformListScrollHandle,
     pub history_cursor: Option<usize>,
     pub visible_history_width: f32,
     pub visible_files_width: f32,
@@ -303,6 +314,11 @@ impl MyGit {
             tab_scroll: HashMap::new(),
             settings,
             show_settings: false,
+            show_recent: false,
+            show_branch_dropdown: false,
+            show_workspace_changes: false,
+            change_folders_collapsed: Default::default(),
+            tab_menu: None,
             pending: Default::default(),
             history_pending: Default::default(),
             tree: mygit_gpui::workspace::Tree::new(),
@@ -310,13 +326,15 @@ impl MyGit {
             tree_loading: false,
             tree_epoch: 0,
             tree_error: None,
-            show_tree: false,
+            panel_drag: None,
+            tree_focus: cx.focus_handle(),
             history_loading: false,
             history_failed: false,
             history_focus: cx.focus_handle(),
             files_focus: cx.focus_handle(),
             history_scroll: UniformListScrollHandle::new(),
             files_scroll: UniformListScrollHandle::new(),
+            tree_scroll: UniformListScrollHandle::new(),
             history_cursor: None,
             visible_history_width: 260.,
             visible_files_width: 220.,
@@ -417,6 +435,7 @@ impl MyGit {
         self.history_cursor = None;
         self.history_scroll = UniformListScrollHandle::new();
         self.files_scroll = UniformListScrollHandle::new();
+        self.tree_scroll = UniformListScrollHandle::new();
         self.last_path = Some(path.clone());
         self.state.detail = None;
         self.state.listed_detail = None;
@@ -449,6 +468,7 @@ impl MyGit {
                 this.save_settings();
                 this.start_watcher(cx);
                 this.refresh_tree(cx);
+                this.prepare_history_inputs(cx);
                 this.select_mode(BrowseMode::Workspace, cx);
             },
         );
@@ -461,21 +481,13 @@ impl MyGit {
         };
         let root = repo.root.clone();
         self.capture_tab();
-        self.active_tab = None;
         self.file_selection.clear();
-        self.state.detail = None;
         self.state.listed_detail = None;
-        self.state.current_file = None;
-        self.show_tree = false;
-        self.edit_mode = false;
-        self.state.editable = matches!(mode, BrowseMode::Workspace | BrowseMode::Unstaged);
+        self.panel_drag = None;
         self.state.mode = mode.clone();
-        self.state.comparison = None;
         self.state.listed_comparison = None;
         self.state.files.clear();
         self.state.selected = None;
-        self.state.clear_diff();
-        self.line_layouts.clear();
         self.dragging = false;
         let generation = self.state.begin(mygit_gpui::localized_format!(
             "正在读取{}…",
@@ -498,11 +510,9 @@ impl MyGit {
                 };
                 Ok((git::selection(&root, &mode)?, detail))
             },
-            |this, (selection, detail), cx| {
+            |this, (selection, detail), _cx| {
                 this.state.listed_detail = detail.clone();
-                this.state.detail = detail;
                 this.state.listed_comparison = Some(selection.comparison.clone());
-                this.state.comparison = Some(selection.comparison);
                 this.state.files = selection.files;
                 this.state.message = mygit_gpui::localized_format!(
                     "{} · {} 个文件",
@@ -510,9 +520,6 @@ impl MyGit {
                     this.state.mode.label(),
                     this.state.files.len()
                 );
-                if !this.state.files.is_empty() {
-                    this.select_file(0, cx);
-                }
             },
         );
     }
@@ -1322,7 +1329,7 @@ impl MyGit {
         cx.notify();
     }
     pub fn compare_selected_worktree(&mut self, cx: &mut Context<Self>) {
-        let Some(detail) = &self.state.detail else {
+        let Some(detail) = &self.state.listed_detail else {
             return;
         };
         self.select_mode(
@@ -1339,6 +1346,8 @@ impl MyGit {
         } else {
             self.reveal_git_panel(cx);
             self.show_commit = true;
+            self.settings.files_visible = true;
+            self.show_workspace_changes = false;
         }
         if self.show_commit {
             self.hide_quick_open();
@@ -1512,8 +1521,7 @@ impl MyGit {
                                 .iter()
                                 .position(|(entry, _)| entry.path == path)
                         {
-                            this.files_scroll
-                                .scroll_to_item(row, ScrollStrategy::Center);
+                            this.tree_scroll.scroll_to_item(row, ScrollStrategy::Center);
                         }
                     }
                     Err(e) => this.tree_error = Some(format!("{e:#}")),
@@ -1531,7 +1539,7 @@ impl MyGit {
         cx: &mut Context<Self>,
     ) {
         window.focus(if self.settings.files_visible {
-            &self.files_focus
+            &self.tree_focus
         } else {
             &self.focus
         });
@@ -1548,7 +1556,7 @@ impl MyGit {
         cx.notify();
     }
     pub fn open_workspace_file(&mut self, path: String, cx: &mut Context<Self>) {
-        self.open_workspace_target(path, None, false, cx);
+        self.open_workspace_target(path, None, true, cx);
     }
     pub fn edit_current_worktree(&mut self, cx: &mut Context<Self>) {
         if self.confirmation.is_some() || self.state.loading {
@@ -1874,6 +1882,7 @@ impl MyGit {
         };
         let sha = commit.sha.clone();
         self.history_cursor = Some(index);
+        self.show_workspace_changes = false;
         self.reveal_git_panel(cx);
         window.focus(&self.history_focus);
         cx.activate(true);
@@ -1903,8 +1912,8 @@ impl MyGit {
                 }
             };
             self.choose_history(index, window, cx);
-        } else if self.files_focus.is_focused(window) {
-            if self.showing_tree() {
+        } else if self.files_focus.is_focused(window) || self.tree_focus.is_focused(window) {
+            if self.tree_focus.is_focused(window) {
                 let rows = self.tree.rows();
                 if rows.is_empty() {
                     return;
@@ -1919,7 +1928,7 @@ impl MyGit {
                     current.saturating_sub(1)
                 };
                 self.tree.selected = Some(rows[next].0.path.clone());
-                self.files_scroll
+                self.tree_scroll
                     .scroll_to_item(next, ScrollStrategy::Center);
                 cx.notify();
                 return;
@@ -1949,13 +1958,9 @@ impl MyGit {
         {
             self.switch_branch(cx);
         } else if self.settings.git_panel_visible && self.history_focus.is_focused(window) {
-            window.focus(if self.settings.files_visible {
-                &self.files_focus
-            } else {
-                &self.focus
-            });
-        } else if self.files_focus.is_focused(window) {
-            if self.showing_tree()
+            window.focus(&self.files_focus);
+        } else if self.files_focus.is_focused(window) || self.tree_focus.is_focused(window) {
+            if self.tree_focus.is_focused(window)
                 && let Some((entry, _)) = self
                     .tree
                     .rows()
@@ -1973,9 +1978,10 @@ impl MyGit {
         let mut handles = vec![];
         if self.settings.git_panel_visible {
             handles.push(self.history_focus.clone());
+            handles.push(self.files_focus.clone());
         }
         if self.settings.files_visible {
-            handles.push(self.files_focus.clone());
+            handles.push(self.tree_focus.clone());
         }
         if !self.settings.git_panel_visible
             && let Some(editor) = self.current_editor()
@@ -1996,7 +2002,7 @@ impl MyGit {
         cx.notify();
     }
     pub fn navigate(&mut self, forward: bool, cx: &mut Context<Self>) {
-        if !self.settings.git_panel_visible || self.show_notifications || self.tree_menu.is_some() {
+        if self.show_notifications || self.tree_menu.is_some() {
             return;
         }
         if let Some(row) = self.state.navigate(forward) {
@@ -2089,9 +2095,34 @@ impl MyGit {
     pub fn mouse_move(
         &mut self,
         event: &MouseMoveEvent,
-        _window: &mut Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if let Some((axis, origin, value)) = self.panel_drag {
+            if event.pressed_button != Some(MouseButton::Left) {
+                self.panel_drag = None;
+                self.save_settings();
+                return;
+            }
+            let delta = event.position - origin;
+            match axis {
+                0 => {
+                    self.settings.workspace_fraction = (value
+                        + f32::from(delta.y)
+                            / (f32::from(window.viewport_size().height) - 80.).max(1.))
+                    .clamp(0.25, 0.85)
+                }
+                1 => self.settings.files_width = (value + f32::from(delta.x)).clamp(120., 600.),
+                _ => {
+                    self.settings.history_width = (value
+                        + f32::from(delta.x) * 780.
+                            / f32::from(window.viewport_size().width).max(1.))
+                    .clamp(160., 600.)
+                }
+            }
+            cx.notify();
+            return;
+        }
         if !self.dragging {
             return;
         }
@@ -2137,7 +2168,7 @@ impl MyGit {
             }
             return;
         }
-        if !self.settings.git_panel_visible || self.show_notifications || self.tree_menu.is_some() {
+        if self.show_notifications || self.tree_menu.is_some() {
             return;
         }
         if let Some(text) = self
@@ -2149,7 +2180,7 @@ impl MyGit {
         }
     }
     pub fn select_all_text(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.settings.git_panel_visible || self.show_notifications || self.tree_menu.is_some() {
+        if self.show_notifications || self.tree_menu.is_some() {
             return;
         }
         self.state
@@ -2166,7 +2197,7 @@ impl MyGit {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if !self.settings.git_panel_visible || self.show_notifications || self.tree_menu.is_some() {
+        if self.show_notifications || self.tree_menu.is_some() {
             return;
         }
         let side = self.state.text_selection.side;
@@ -2252,8 +2283,12 @@ impl MyGit {
             .map(|b| f32::from(b.size.width))
             .unwrap_or_else(|| {
                 f32::from(window.viewport_size().width)
-                    - self.visible_history_width
-                    - self.visible_files_width
+                    - 40.
+                    - if self.settings.files_visible {
+                        self.visible_files_width + 6.
+                    } else {
+                        0.
+                    }
             });
         let visible = if self.state.merge.is_some() {
             width / 3. - 140. - if self.show_blame { 100. } else { 0. }
@@ -2315,7 +2350,7 @@ impl Render for MyGit {
                         {
                             return;
                         }
-                        let delta = event.delta.pixel_delta(px(this.state.font_size + 12.));
+                        let delta = event.delta.pixel_delta(px(this.state.font_size + 6.));
                         let horizontal = if event.modifiers.shift && delta.x == px(0.) {
                             delta.y
                         } else {
@@ -2338,19 +2373,13 @@ impl Render for MyGit {
                 &self.focus
             });
         }
-        let available = (f32::from(window.viewport_size().width) - 420.).max(280.);
-        let requested_width = if self.settings.git_panel_visible {
-            self.settings.history_width
-        } else {
-            0.
-        } + if self.settings.files_visible {
-            self.settings.files_width
-        } else {
-            0.
-        };
-        let factor = (available / requested_width.max(1.)).min(1.);
-        self.visible_history_width = (self.settings.history_width * factor).max(160.);
-        self.visible_files_width = (self.settings.files_width * factor).max(120.);
+        let viewport_width = f32::from(window.viewport_size().width);
+        self.visible_files_width = self
+            .settings
+            .files_width
+            .min((viewport_width - 400.).max(120.));
+        self.visible_history_width = (viewport_width * self.settings.history_width / 780.)
+            .clamp(200., (viewport_width - 300.).max(200.));
         div()
             .relative()
             .child(scroll_listener)
@@ -2474,9 +2503,16 @@ impl Render for MyGit {
                 this.toggle_git_panel(window, cx);
             }))
             .on_action(cx.listener(|this, _: &ToggleFilesPanel, window, cx| {
-                this.toggle_files_panel(cx);
-                window.focus(&this.focus);
+                this.toggle_tree(window, cx);
             }))
+            .on_action(cx.listener(|this, _: &UndoRestore, _, cx| this.undo_restore(cx)))
+            .on_action(cx.listener(|this, _: &ToggleCompare, _, cx| this.toggle_compare(cx)))
+            .on_action(cx.listener(|this, _: &CompareSelectedWorktree, _, cx| {
+                this.compare_selected_worktree(cx)
+            }))
+            .on_action(
+                cx.listener(|this, _: &SelectedTreeHistory, _, cx| this.selected_tree_history(cx)),
+            )
             .on_action(cx.listener(|this, _: &CancelTask, _, cx| this.cancel_task(cx)))
             .on_action(
                 cx.listener(|this, _: &FocusNext, window, cx| this.cycle_focus(false, window, cx)),
@@ -2496,11 +2532,21 @@ impl Render for MyGit {
             .on_mouse_move(cx.listener(Self::mouse_move))
             .on_mouse_up(
                 MouseButton::Left,
-                cx.listener(|this, _, _, _| this.dragging = false),
+                cx.listener(|this, _, _, _| {
+                    this.dragging = false;
+                    if this.panel_drag.take().is_some() {
+                        this.save_settings();
+                    }
+                }),
             )
             .on_mouse_up_out(
                 MouseButton::Left,
-                cx.listener(|this, _, _, _| this.dragging = false),
+                cx.listener(|this, _, _, _| {
+                    this.dragging = false;
+                    if this.panel_drag.take().is_some() {
+                        this.save_settings();
+                    }
+                }),
             )
             .on_action(cx.listener(|this, _: &CopyText, _, cx| this.copy_text(cx)))
             .on_action(
@@ -2559,66 +2605,38 @@ impl Render for MyGit {
             .size_full()
             .flex()
             .flex_col()
-            .bg(rgb(0x111722))
-            .text_color(rgb(0xdce5f3))
+            .bg(rgb(0xececec))
+            .text_color(rgb(0x202020))
+            .font_family("Helvetica")
             .text_size(px(13.))
             .child(views::toolbar(self, cx))
-            .when(self.search.shown, |s| {
-                s.child(views::search::pane(self, cx))
-            })
             .when(self.quick.shown, |s| {
-                s.child(views::quick_open::pane(self, cx))
+                s.child(views::popover(
+                    views::quick_open::pane(self, cx).into_any_element(),
+                ))
             })
             .when(
                 self.settings.git_panel_visible && self.show_history_search,
-                |s| s.child(views::history::pane(self, cx)),
+                |s| {
+                    s.child(views::popover(
+                        views::history::pane(self, cx).into_any_element(),
+                    ))
+                },
             )
             .when(self.settings.git_panel_visible && self.show_branches, |s| {
-                s.child(views::branches::pane(self, cx))
+                s.child(views::popover(
+                    views::branches::pane(self, cx).into_any_element(),
+                ))
             })
             .when(self.settings.git_panel_visible && self.show_compare, |s| {
-                s.child(views::compare::pane(self, cx))
+                s.child(views::popover(
+                    views::compare::pane(self, cx).into_any_element(),
+                ))
             })
-            .when(self.show_settings, |s| s.child(views::settings(self, cx)))
-            .child(
-                div()
-                    .flex()
-                    .flex_1()
-                    .min_h_0()
-                    .when(self.settings.git_panel_visible, |s| {
-                        s.child(views::sidebar::history(self, cx))
-                    })
-                    .when(self.settings.files_visible, |s| {
-                        s.child(if self.showing_tree() {
-                            views::tree::pane(self, cx).into_any_element()
-                        } else {
-                            views::sidebar::files(self, cx).into_any_element()
-                        })
-                    })
-                    .child(if !self.settings.git_panel_visible {
-                        views::workspace::pane(self, cx).into_any_element()
-                    } else if self.state.merge.is_some() {
-                        views::merge::pane(self, cx).into_any_element()
-                    } else {
-                        views::diff::pane(self, cx).into_any_element()
-                    }),
-            )
-            .child(
-                div()
-                    .px_3()
-                    .py_2()
-                    .border_t_1()
-                    .border_color(rgb(0x2b3545))
-                    .text_color(rgb(0x92a2b9))
-                    .child(format!(
-                        "{}{}",
-                        if self.state.loading { "◌  " } else { "" },
-                        self.state.message
-                    )),
-            )
-            .when(self.settings.git_panel_visible && self.show_commit, |s| {
-                s.child(views::commit::pane(self, cx))
+            .when(self.show_settings, |s| {
+                s.child(views::popover(views::settings(self, cx).into_any_element()))
             })
+            .child(views::layout::body(self, cx))
             .when(
                 self.write_busy && !self.write_progress_text.is_empty(),
                 |s| {
@@ -2632,7 +2650,7 @@ impl Render for MyGit {
                         .rev()
                         .collect::<Vec<_>>()
                         .join("\n");
-                    s.child(div().px_3().py_1().text_color(rgb(0x92a2b9)).child(text))
+                    s.child(div().px_3().py_1().text_color(rgb(0x666666)).child(text))
                 },
             )
             .when(!self.write_message.is_empty(), |s| {
@@ -2643,7 +2661,7 @@ impl Render for MyGit {
                         .overflow_y_scroll()
                         .flex_shrink_0()
                         .p_2()
-                        .text_color(rgb(0xffd479))
+                        .text_color(rgb(0x946200))
                         .child(self.write_message.clone()),
                 )
             })
@@ -2656,6 +2674,12 @@ impl Render for MyGit {
                 self.confirmation.is_none() && self.tree_menu.is_some(),
                 |s| s.child(views::tree::menu(self, window, cx)),
             )
+            .when(self.show_recent || self.show_branch_dropdown, |s| {
+                s.child(views::toolbar_menu(self, cx))
+            })
+            .when(self.tab_menu.is_some(), |s| {
+                s.child(views::tabs::menu(self, cx))
+            })
             .when(self.confirmation.is_some(), |s| {
                 s.child(views::confirmation(self, cx))
             })

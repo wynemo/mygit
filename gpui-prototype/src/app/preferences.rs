@@ -2,7 +2,7 @@ use super::*;
 
 impl MyGit {
     pub fn showing_tree(&self) -> bool {
-        self.show_tree || !self.settings.git_panel_visible
+        self.settings.files_visible
     }
     pub fn reveal_git_panel(&mut self, cx: &mut Context<Self>) {
         if !self.settings.git_panel_visible {
@@ -29,15 +29,9 @@ impl MyGit {
         cx.notify();
     }
     pub fn toggle_tree(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.settings.git_panel_visible {
-            self.toggle_files_panel(cx);
-        } else {
-            self.show_tree = !self.show_tree;
-            self.settings.files_visible = true;
-            self.save_settings();
-        }
+        self.toggle_files_panel(cx);
         window.focus(if self.settings.files_visible {
-            &self.files_focus
+            &self.tree_focus
         } else {
             &self.focus
         });

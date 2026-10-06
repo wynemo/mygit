@@ -23,21 +23,21 @@ fn cell(this: &MyGit, side: usize, row: usize, cx: &mut Context<MyGit>) -> impl 
     });
     let active = this.state.active_row(row);
     let color = if active {
-        0x3c435f
+        0xffe7b8
     } else if source.is_none() {
         0x1c2533
     } else if view.rows[row].changed[side] {
         if side == 1 {
             match (view.rows[row].changed[0], view.rows[row].changed[2]) {
                 (true, true) => 0x443454,
-                (true, false) => 0x203c32,
-                _ => 0x263b56,
+                (true, false) => 0xdff2df,
+                _ => 0xdceafa,
             }
         } else {
-            0x43262f
+            0xfbdada
         }
     } else {
-        0x151d29
+        0xffffff
     };
     div()
         .id(("merge-cell", row * 3 + side))
@@ -67,7 +67,7 @@ fn cell(this: &MyGit, side: usize, row: usize, cx: &mut Context<MyGit>) -> impl 
             div()
                 .w(px(42.))
                 .flex_shrink_0()
-                .text_color(rgb(0x8995a8))
+                .text_color(rgb(0x888888))
                 .child(source.map(|n| n.to_string()).unwrap_or_default()),
         )
         .when(this.show_blame, |s| {
@@ -83,7 +83,7 @@ fn cell(this: &MyGit, side: usize, row: usize, cx: &mut Context<MyGit>) -> impl 
                 div()
                     .px_1()
                     .flex_shrink_0()
-                    .text_color(rgb(0xffd479))
+                    .text_color(rgb(0x946200))
                     .child(ending),
             )
         })
@@ -133,7 +133,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             s.child(
                 div()
                     .px_2()
-                    .text_color(rgb(0xffd479))
+                    .text_color(rgb(0x946200))
                     .child(this.blame_error.clone()),
             )
         })
@@ -183,7 +183,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         .on_click(cx.listener(|this, _, _, cx| this.change_font_size(true, cx))),
                 ),
         )
-        .child(div().px_2().text_xs().text_color(rgb(0x92a2b9)).child(
+        .child(div().px_2().text_xs().text_color(rgb(0x666666)).child(
             mygit_gpui::i18n::text("合并提交历史 · 紫色：结果与双方不同；绿色/蓝色：与父 1/父 2 不同 · 右键复制原始行"),
         ))
         .child(
@@ -198,7 +198,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                             .p_2()
                             .overflow_hidden()
                             .border_r_1()
-                            .border_color(rgb(0x354259))
+                            .border_color(rgb(0xd0d0d0))
                             .child(div().whitespace_nowrap().child(format!(
                                 "{} · {}",
                                 [mygit_gpui::i18n::text("父提交 1"), mygit_gpui::i18n::text("合并结果"), mygit_gpui::i18n::text("父提交 2")][side],
@@ -214,7 +214,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                 s.child(
                                     div()
                                         .text_xs()
-                                        .text_color(rgb(0xffd479))
+                                        .text_color(rgb(0x946200))
                                         .child(mygit_gpui::i18n::text("该版本中不存在此文件")),
                                 )
                             })
@@ -262,7 +262,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 div()
                     .px_2()
                     .text_xs()
-                    .text_color(rgb(0x8995a8))
+                    .text_color(rgb(0x888888))
                     .child(mygit_gpui::localized_format!("父 1 ↔ 结果：{}；父 2 ↔ 结果：{}", "Parent 1 ↔ result: {}; parent 2 ↔ result: {}",
                         view.descriptions[0], view.descriptions[1]
                     )),
@@ -282,7 +282,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             },
         )
         .when_some(view.message.clone(), |s, message| {
-            s.child(div().p_3().text_color(rgb(0xffd479)).child(message))
+            s.child(div().p_3().text_color(rgb(0x946200)).child(message))
         })
         .when(view.message.is_none() && view.rows.is_empty(), |s| {
             s.child(div().p_3().child(mygit_gpui::i18n::text("三侧文件均为空")))
@@ -306,7 +306,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                             .id(row)
                                             .flex()
                                             .w_full()
-                                            .h(px(this.state.font_size + 12.))
+                                            .h(px(this.state.font_size + 6.))
                                             .font_family(this.state.font_family.clone())
                                             .text_size(px(this.state.font_size))
                                             .children(

@@ -32,8 +32,8 @@ pub fn pane(this: &MyGit, window: &Window, cx: &mut Context<MyGit>) -> impl Into
         .gap_2()
         .rounded_md()
         .border_1()
-        .border_color(rgb(0x44546c))
-        .bg(rgb(0x1d293b))
+        .border_color(rgb(0xb9b9b9))
+        .bg(rgb(0xffffff))
         .when(this.show_notifications, |s| {
             s.h(px(height))
                 .child(
@@ -88,7 +88,7 @@ pub fn pane(this: &MyGit, window: &Window, cx: &mut Context<MyGit>) -> impl Into
                                     s.child(
                                         div()
                                             .text_xs()
-                                            .text_color(rgb(0x92a2b9))
+                                            .text_color(rgb(0x666666))
                                             .child(root.display().to_string()),
                                     )
                                 })
@@ -115,7 +115,7 @@ pub fn pane(this: &MyGit, window: &Window, cx: &mut Context<MyGit>) -> impl Into
                     s.child(
                         div()
                             .text_xs()
-                            .text_color(rgb(0x92a2b9))
+                            .text_color(rgb(0x666666))
                             .child(root.display().to_string()),
                     )
                 })

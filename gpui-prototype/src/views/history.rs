@@ -11,7 +11,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
         .p_2()
         .gap_2()
         .border_b_1()
-        .border_color(rgb(0x2b3545))
+        .border_color(rgb(0xc8c8c8))
         .child(
             div()
                 .flex()
@@ -81,6 +81,6 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
             ))
         })
         .when_some(this.history_search_error.clone(), |s, error| {
-            s.child(div().text_color(rgb(0xffd479)).child(error))
+            s.child(div().text_color(rgb(0x946200)).child(error))
         })
 }

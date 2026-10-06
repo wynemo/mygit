@@ -124,7 +124,7 @@ impl MyGit {
         if self.tree_menu.take().is_some() {
             self.restore_main_focus = false;
             window.focus(if self.settings.files_visible && self.showing_tree() {
-                &self.files_focus
+                &self.tree_focus
             } else {
                 &self.focus
             });
@@ -145,7 +145,7 @@ impl MyGit {
         };
         self.restore_main_focus = false;
         window.focus(if self.settings.files_visible && self.showing_tree() {
-            &self.files_focus
+            &self.tree_focus
         } else {
             &self.focus
         });

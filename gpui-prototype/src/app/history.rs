@@ -38,7 +38,7 @@ impl MyGit {
         }
         cx.notify();
     }
-    fn prepare_history_inputs(&mut self, cx: &mut Context<Self>) {
+    pub(crate) fn prepare_history_inputs(&mut self, cx: &mut Context<Self>) {
         if !self.history_inputs.is_empty() {
             return;
         }

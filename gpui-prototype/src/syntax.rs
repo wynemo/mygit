@@ -10,8 +10,13 @@ use syntect::{
     parsing::{ParseState, ScopeStack, SyntaxSet},
 };
 
-pub const THEME: &str = "base16-ocean.dark";
-pub const PALETTES: [&str; 3] = [THEME, "base16-eighties.dark", "Solarized (dark)"];
+pub const THEME: &str = "InspiredGitHub";
+pub const PALETTES: [&str; 4] = [
+    THEME,
+    "base16-ocean.dark",
+    "base16-eighties.dark",
+    "Solarized (dark)",
+];
 pub fn palette_index(name: &str) -> usize {
     PALETTES.iter().position(|p| *p == name).unwrap_or(0)
 }
@@ -19,7 +24,7 @@ pub fn palette_index(name: &str) -> usize {
 pub struct Token {
     pub range: Range<usize>,
     pub color: u32,
-    colors: [u32; 3],
+    colors: [u32; 4],
 }
 impl Token {
     pub fn color_for(&self, palette: usize) -> u32 {
@@ -64,8 +69,8 @@ pub fn highlight(document: &Document, path: &str) -> Highlighted {
             let Ok(ops) = parser.parse_line(text, syntaxes) else {
                 return vec![Token {
                     range: 0..visible_len,
-                    color: 0xdce5f3,
-                    colors: [0xdce5f3; 3],
+                    color: 0x202020,
+                    colors: [0x202020; 4],
                 }];
             };
             let mut result = vec![];

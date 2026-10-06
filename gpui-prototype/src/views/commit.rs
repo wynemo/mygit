@@ -2,17 +2,12 @@ use crate::{app::MyGit, views::button};
 use gpui::{prelude::*, *};
 pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
     div()
-        .h(px(if this.ai.candidate.is_some() {
-            360.
-        } else {
-            250.
-        }))
-        .flex_shrink_0()
+        .flex_1()
         .flex()
         .flex_col()
         .min_h_0()
         .border_t_1()
-        .border_color(rgb(0x2b3545))
+        .border_color(rgb(0xc8c8c8))
         .child(
             div()
                 .flex()
@@ -63,7 +58,7 @@ pub fn pane(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                 div()
                     .px_2()
                     .text_xs()
-                    .text_color(rgb(0xffd479))
+                    .text_color(rgb(0x946200))
                     .child(this.ai.message.clone()),
             )
         })

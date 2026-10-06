@@ -27,6 +27,7 @@ pub struct Settings {
     pub font_family: String,
     pub font_size: f32,
     pub history_width: f32,
+    pub workspace_fraction: f32,
     pub files_width: f32,
     pub files_visible: bool,
     pub git_panel_visible: bool,
@@ -83,15 +84,41 @@ impl Settings {
                 .unwrap_or("Menlo")
                 .into(),
             font_size: number("/font_size", 12., 10., 22.),
+            workspace_fraction: number("/gpui/workspace_fraction", 0.625, 0.25, 0.85),
             history_width: number("/gpui/history_width", 260., 160., 600.),
-            files_width: number("/gpui/files_width", 220., 120., 600.),
+            files_width: if data
+                .pointer("/gpui/layout_version")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+                < 2
+                && data
+                    .pointer("/gpui/files_width")
+                    .and_then(Value::as_f64)
+                    .is_none_or(|w| w == 220.)
+            {
+                number("/panel_widths/file_tree", 250., 120., 600.)
+            } else {
+                number("/gpui/files_width", 250., 120., 600.)
+            },
             language: crate::i18n::Language::from_saved(
                 data["language"].as_str().unwrap_or("中文"),
             ),
             code_theme: crate::syntax::PALETTES[crate::syntax::palette_index(
-                data.pointer("/gpui/code_theme")
-                    .and_then(Value::as_str)
-                    .unwrap_or(""),
+                if data
+                    .pointer("/gpui/layout_version")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0)
+                    >= 2
+                {
+                    data.pointer("/gpui/code_theme")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                } else {
+                    match data.pointer("/gpui/code_theme").and_then(Value::as_str) {
+                        Some("base16-ocean.dark") | None => "InspiredGitHub",
+                        Some(name) => name,
+                    }
+                },
             )]
             .into(),
             files_visible: data
@@ -184,6 +211,8 @@ impl Settings {
         data["gpui"]["files_width"] = json!(self.files_width);
         data["gpui"]["code_theme"] = json!(self.code_theme);
         data["gpui"]["files_visible"] = json!(self.files_visible);
+        data["gpui"]["layout_version"] = json!(2);
+        data["gpui"]["workspace_fraction"] = json!(self.workspace_fraction);
         data["gpui"]["git_panel_visible"] = json!(self.git_panel_visible);
         if let Some((root, text)) = &self.draft {
             if !data["gpui"]["commit_drafts"].is_object() {
