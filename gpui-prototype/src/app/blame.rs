@@ -1,6 +1,17 @@
 use super::*;
 use mygit_gpui::blame::Line;
 use std::sync::Arc;
+// Visibility belongs to a file in a specific repository and comparison.
+// Source contents and editor mode are deliberately excluded so edits preserve it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct Scope {
+    root: PathBuf,
+    path: String,
+    old_path: String,
+    comparison: Comparison,
+    mode: BrowseMode,
+}
+
 #[derive(Clone)]
 pub(super) struct Key {
     file: FileChange,
@@ -34,22 +45,36 @@ impl Key {
     }
 }
 impl MyGit {
+    fn blame_scope(&self) -> Option<Scope> {
+        Some(Scope {
+            root: self.state.repo.as_ref()?.root.clone(),
+            path: self.state.current_file.as_ref()?.path.clone(),
+            old_path: self.state.current_file.as_ref()?.old_path.clone(),
+            comparison: self.state.comparison.clone()?,
+            mode: self.state.mode.clone(),
+        })
+    }
     pub fn toggle_blame(&mut self, cx: &mut Context<Self>) {
-        if self.state.current_file.is_none() {
+        let Some(scope) = self.blame_scope() else {
             return;
-        }
-        self.show_blame = !self.show_blame;
-        if !self.show_blame {
-            self.blame_pending.cancel();
-            self.blame_epoch += 1;
-            self.blame_key = None;
-            self.blame_loading = false;
+        };
+        if let Some(index) = self.blame_scopes.iter().position(|saved| saved == &scope) {
+            self.blame_scopes.remove(index);
+        } else {
+            self.blame_scopes.push(scope);
         }
         self.ensure_blame(cx);
         cx.notify();
     }
     pub(super) fn ensure_blame(&mut self, cx: &mut Context<Self>) {
-        if !self.show_blame {
+        let enabled = self
+            .blame_scope()
+            .is_some_and(|scope| self.blame_scopes.contains(&scope));
+        if self.show_blame && !enabled {
+            self.reset_blame();
+        }
+        self.show_blame = enabled;
+        if !enabled {
             self.sync_editor_blame(cx);
             return;
         }
@@ -313,5 +338,38 @@ impl MyGit {
         self.blame_detail_serial += 1;
         self.blame_detail_loading = None;
         self.blame_details.clear();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[::core::prelude::v1::test]
+    fn blame_visibility_is_scoped_to_repository_file_and_comparison() {
+        let scope = Scope {
+            root: PathBuf::from("/repo"),
+            path: "a.rs".into(),
+            old_path: "a.rs".into(),
+            comparison: Comparison {
+                left: Revision::Index,
+                right: Revision::Worktree,
+            },
+            mode: BrowseMode::Workspace,
+        };
+        let mut enabled = vec![scope.clone()];
+        let mut other_file = scope.clone();
+        other_file.path = "b.rs".into();
+        assert!(!enabled.contains(&other_file));
+        let mut other_comparison = scope.clone();
+        other_comparison.comparison.left = Revision::Commit("abc".into());
+        assert!(!enabled.contains(&other_comparison));
+        let mut other_repo = scope.clone();
+        other_repo.root = PathBuf::from("/other");
+        assert!(!enabled.contains(&other_repo));
+        enabled.push(other_file.clone());
+        enabled.retain(|saved| saved != &scope);
+        assert!(!enabled.contains(&scope));
+        assert!(enabled.contains(&other_file));
     }
 }
