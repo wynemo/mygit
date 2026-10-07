@@ -27,9 +27,43 @@ fn commit_colors(sha: &str, pending: bool) -> (u32, u32, u32) {
     COLORS[hash as usize % COLORS.len()]
 }
 
-pub fn gutter(owner: WeakEntity<MyGit>, line: Option<Line>, index: usize) -> Div {
+const FONT_FAMILY: &str = ".AppleSystemUIFont";
+
+fn label(line: &Line) -> String {
+    if line.commit.uncommitted() {
+        mygit_gpui::i18n::text("未提交").into()
+    } else {
+        format!("{} {}", short_sha(&line.commit.sha), line.commit.author)
+    }
+}
+
+// Measure unique labels once when annotations load, keeping every row aligned.
+pub fn column_width<'a>(lines: impl Iterator<Item = &'a Line>, cx: &App) -> f32 {
+    let mut labels = std::collections::HashSet::new();
+    lines.fold(100.0_f32, |width, line| {
+        let label = label(line);
+        if !labels.insert(label.clone()) {
+            return width;
+        }
+        let text_system = cx.text_system();
+        let font_id = text_system.resolve_font(&font(FONT_FAMILY));
+        let text_width: f32 = label
+            .chars()
+            .map(|ch| {
+                text_system
+                    .advance(font_id, px(11.), ch)
+                    .map(|size| f32::from(size.width))
+                    .unwrap_or(11.)
+            })
+            .sum();
+        // Padding, left border and a little breathing room.
+        width.max(text_width.ceil() + 16.)
+    })
+}
+
+pub fn gutter(owner: WeakEntity<MyGit>, line: Option<Line>, index: usize, width: f32) -> Div {
     div()
-        .w(px(100.))
+        .w(px(width))
         .h_full()
         .flex_shrink_0()
         .when_some(line, |s, line| s.child(annotation(owner, line, index)))
@@ -37,21 +71,18 @@ pub fn gutter(owner: WeakEntity<MyGit>, line: Option<Line>, index: usize) -> Div
 pub fn annotation(owner: WeakEntity<MyGit>, line: Line, index: usize) -> Stateful<Div> {
     let pending = line.commit.uncommitted();
     let (background, foreground, edge) = commit_colors(&line.commit.sha, pending);
-    let label = if pending {
-        mygit_gpui::i18n::text("未提交").into()
-    } else {
-        format!("{} {}", short_sha(&line.commit.sha), line.commit.author)
-    };
+    let label = label(&line);
     let tooltip_owner = owner.clone();
     let tooltip_line = line.clone();
     let click_owner = owner.clone();
     let sha = line.commit.sha.clone();
     div()
         .id(("blame-annotation", index))
-        .w(px(100.))
+        .w_full()
         .flex_shrink_0()
         .h_full()
         .px_1()
+        .font_family(FONT_FAMILY)
         .text_size(px(11.))
         .bg(rgb(background))
         .text_color(rgb(foreground))

@@ -137,6 +137,7 @@ pub struct MyGit {
     pub show_compare: bool,
     restore_main_focus: bool,
     pub show_blame: bool,
+    pub blame_width: f32,
     blame_key: Option<blame::Key>,
     blame_pending: mygit_gpui::process::Cancellation,
     blame_epoch: u64,
@@ -280,6 +281,7 @@ impl MyGit {
             show_compare: false,
             restore_main_focus: false,
             show_blame: false,
+            blame_width: 100.,
             ai: Default::default(),
             quick: Default::default(),
             search: Default::default(),
@@ -2381,12 +2383,17 @@ impl MyGit {
                         0.
                     }
             });
-        let visible = if self.state.merge.is_some() {
-            width / 3. - 140. - if self.show_blame { 100. } else { 0. }
-        } else if self.state.unified {
-            width - 122.
+        let blame_width = if self.show_blame {
+            self.blame_width
         } else {
-            width / 2. - 52.
+            0.
+        };
+        let visible = if self.state.merge.is_some() {
+            width / 3. - 140. - blame_width
+        } else if self.state.unified {
+            width - 122. - blame_width
+        } else {
+            width / 2. - 52. - blame_width
         };
         let limit = ((self.state.panel_width - 68.) * self.state.font_size / 12. - visible).max(0.);
         self.state.horizontal_offset = (self.state.horizontal_offset + delta).clamp(0., limit);

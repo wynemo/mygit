@@ -71,6 +71,7 @@ fn cell(
                 cx.entity().downgrade(),
                 no.and_then(|n| this.blame_line(side, n - 1)),
                 row,
+                this.blame_width,
             ))
         })
         .child(
@@ -166,6 +167,7 @@ fn unified_cell(this: &MyGit, index: usize, cx: &mut Context<MyGit>) -> Stateful
                     .source_line(side, row)
                     .and_then(|line| this.blame_line(side, line)),
                 index,
+                this.blame_width,
             ))
         })
         .child(div().w(px(18.)).flex_shrink_0().child(if !changed {

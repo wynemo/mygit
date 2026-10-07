@@ -186,6 +186,13 @@ impl MyGit {
                         Default::default()
                     }
                 };
+                this.blame_width = crate::views::blame::column_width(
+                    this.blame_left
+                        .iter()
+                        .chain(this.blame_right.iter())
+                        .chain(this.blame_third.iter()),
+                    cx,
+                );
                 this.blame_error = errors.join("；");
                 this.sync_editor_blame(cx);
                 cx.notify();
@@ -199,13 +206,15 @@ impl MyGit {
         };
         let enabled = self.show_blame;
         let current = editor.read(cx);
-        if current.show_blame != enabled
+        if current.blame_width != self.blame_width
+            || current.show_blame != enabled
             || !Arc::ptr_eq(&current.blame_lines, &self.blame_right)
             || current.blame_owner.is_none()
         {
             let owner = cx.entity().downgrade();
             editor.update(cx, |editor, cx| {
                 editor.show_blame = enabled;
+                editor.blame_width = self.blame_width;
                 editor.blame_lines = self.blame_right.clone();
                 editor.blame_owner = Some(owner);
                 cx.notify();

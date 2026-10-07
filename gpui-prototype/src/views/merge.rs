@@ -75,6 +75,7 @@ fn cell(this: &MyGit, side: usize, row: usize, cx: &mut Context<MyGit>) -> impl 
                 cx.entity().downgrade(),
                 source.and_then(|line| this.blame_line(source_side, line - 1)),
                 row * 3 + side,
+                this.blame_width,
             ))
         })
         .child(crate::views::text_line::line(this, source_side, row, cx))

@@ -51,6 +51,7 @@ pub struct Editor {
     external_changed: bool,
     pub reference: mygit_gpui::text::Document,
     pub show_blame: bool,
+    pub blame_width: f32,
     pub blame_lines: std::sync::Arc<Vec<mygit_gpui::blame::Line>>,
     pub blame_owner: Option<WeakEntity<MyGit>>,
     pub compact: bool,
@@ -136,6 +137,7 @@ impl Editor {
             show_toolbar: false,
             sensitive: false,
             show_blame: false,
+            blame_width: 100.,
             blame_lines: Default::default(),
             blame_owner: None,
             query: None,
@@ -1191,6 +1193,7 @@ impl Render for Editor {
                                                         owner.clone(),
                                                         this.blame_lines.get(i).cloned(),
                                                         i,
+                                                        this.blame_width,
                                                     ))
                                                 } else {
                                                     s
