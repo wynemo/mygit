@@ -2,14 +2,15 @@ use super::*;
 use mygit_gpui::blame::Line;
 use std::sync::Arc;
 // Visibility belongs to a file in a specific repository and comparison.
-// Source contents and editor mode are deliberately excluded so edits preserve it.
+// Source contents, editor mode and the history list mode are excluded.
+// Browsing another commit does not change the comparison in the open file.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct Scope {
     root: PathBuf,
     path: String,
     old_path: String,
     comparison: Comparison,
-    mode: BrowseMode,
+    merge_revisions: Option<[String; 3]>,
 }
 
 #[derive(Clone)]
@@ -51,7 +52,7 @@ impl MyGit {
             path: self.state.current_file.as_ref()?.path.clone(),
             old_path: self.state.current_file.as_ref()?.old_path.clone(),
             comparison: self.state.comparison.clone()?,
-            mode: self.state.mode.clone(),
+            merge_revisions: self.state.merge.as_ref().map(|view| view.revisions.clone()),
         })
     }
     pub fn toggle_blame(&mut self, cx: &mut Context<Self>) {
@@ -263,21 +264,89 @@ impl MyGit {
             return;
         }
         self.reveal_git_panel(cx);
-        self.history_cursor = self
+        // A newer click takes precedence over an earlier history load/search.
+        self.history_pending.cancel();
+        self.history_pending = Default::default();
+        self.history_query_generation += 1;
+        self.history_loading = false;
+        self.history_search_pending = false;
+        if self.locate_blame_commit(&sha) {
+            cx.notify();
+            return;
+        }
+        // A search or file-history tab may hide the commit. Return to full history.
+        self.clear_history_filter(cx);
+        if self.locate_blame_commit(&sha) {
+            cx.notify();
+            return;
+        }
+        let Some(repo) = &self.state.repo else {
+            return;
+        };
+        let root = repo.root.clone();
+        let mut tips = repo.history_tips.clone();
+        // Include detached/unreferenced commits while retaining surrounding history.
+        if !tips.contains(&sha) {
+            tips.push(sha.clone());
+        }
+        let epoch = self.repository_epoch;
+        let generation = self.history_query_generation;
+        let token = self.history_pending.clone();
+        self.history_loading = true;
+        self.history_failed = false;
+        let task = cx.background_executor().spawn(async move {
+            mygit_gpui::process::scope(token, || -> anyhow::Result<_> {
+                let mut commits = Vec::new();
+                loop {
+                    let page = git::history_page_tips(&root, &tips, commits.len())?;
+                    let found = page.commits.iter().any(|commit| commit.sha == sha);
+                    commits.extend(page.commits);
+                    if found || !page.more {
+                        return Ok((commits, page.more, tips, sha));
+                    }
+                }
+            })
+        });
+        cx.spawn(async move |this, cx| {
+            let result = task.await;
+            let _ = this.update(cx, |this, cx| {
+                if this.repository_epoch != epoch || this.history_query_generation != generation {
+                    return;
+                }
+                this.history_loading = false;
+                match result {
+                    Ok((commits, more, tips, sha)) => {
+                        if let Some(repo) = &mut this.state.repo {
+                            repo.commits = commits;
+                            repo.history_more = more;
+                            repo.history_tips = tips;
+                        }
+                        this.locate_blame_commit(&sha);
+                    }
+                    Err(error) => {
+                        this.history_failed = true;
+                        this.state.message =
+                            format!("{}: {error:#}", mygit_gpui::i18n::text("加载历史失败"));
+                    }
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+        cx.notify();
+    }
+    fn locate_blame_commit(&mut self, sha: &str) -> bool {
+        let Some(index) = self
             .history_commits()
             .iter()
-            .position(|commit| commit.sha == sha);
-        if self.history_cursor.is_none() {
-            self.start_history_filter(
-                mygit_gpui::history::Filter {
-                    scope: sha.clone(),
-                    text: sha.clone(),
-                    ..Default::default()
-                },
-                cx,
-            );
-        }
-        self.select_mode(BrowseMode::History(sha), cx);
+            .position(|commit| commit.sha == sha)
+        else {
+            return false;
+        };
+        self.history_cursor = Some(index);
+        self.history_scroll
+            .scroll_to_item(index, ScrollStrategy::Center);
+        true
     }
     pub fn load_blame_detail(&mut self, sha: String, cx: &mut Context<Self>) {
         if self.blame_details.contains_key(&sha) || self.blame_detail_loading.as_ref() == Some(&sha)
@@ -355,7 +424,7 @@ mod tests {
                 left: Revision::Index,
                 right: Revision::Worktree,
             },
-            mode: BrowseMode::Workspace,
+            merge_revisions: None,
         };
         let mut enabled = vec![scope.clone()];
         let mut other_file = scope.clone();
@@ -364,6 +433,9 @@ mod tests {
         let mut other_comparison = scope.clone();
         other_comparison.comparison.left = Revision::Commit("abc".into());
         assert!(!enabled.contains(&other_comparison));
+        let mut merge = scope.clone();
+        merge.merge_revisions = Some(["parent1".into(), "result".into(), "parent2".into()]);
+        assert!(!enabled.contains(&merge));
         let mut other_repo = scope.clone();
         other_repo.root = PathBuf::from("/other");
         assert!(!enabled.contains(&other_repo));
