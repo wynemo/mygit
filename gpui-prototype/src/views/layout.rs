@@ -12,7 +12,7 @@ fn splitter(axis: u8, cx: &mut Context<MyGit>) -> Stateful<Div> {
         .bg(rgb(crate::views::theme::BORDER))
         .hover(|s| s.bg(rgb(crate::views::theme::MUTED)))
         .when(axis == 0, |s| {
-            s.h(px(1.)).w_full().cursor(CursorStyle::ResizeUpDown)
+            s.h(px(6.)).w_full().cursor(CursorStyle::ResizeUpDown)
         })
         .when(axis != 0, |s| {
             s.w(px(4.)).h_full().cursor(CursorStyle::ResizeLeftRight)
