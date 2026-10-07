@@ -264,6 +264,10 @@ impl MyGit {
             return;
         }
         self.reveal_git_panel(cx);
+        self.show_workspace_changes = false;
+        // This updates the lower file list and commit detail only. The open file's
+        // comparison and Blame scope remain unchanged until a file is selected.
+        self.select_mode(BrowseMode::History(sha.clone()), cx);
         // A newer click takes precedence over an earlier history load/search.
         self.history_pending.cancel();
         self.history_pending = Default::default();
