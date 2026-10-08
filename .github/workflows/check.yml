@@ -45,7 +45,7 @@ jobs:
       - name: Build and package app
         run: |
           python3 gpui-prototype/scripts/package_macos.py
-          lipo -verify_arch arm64 gpui-prototype/dist/MyGit.app/Contents/MacOS/MyGit
+          lipo gpui-prototype/dist/MyGit.app/Contents/MacOS/MyGit -verify_arch arm64
           ditto -c -k --sequesterRsrc --keepParent \
             gpui-prototype/dist/MyGit.app gpui-prototype/dist/MyGit-macos-arm64.zip
 
