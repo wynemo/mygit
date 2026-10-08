@@ -1,44 +1,103 @@
-name: Code Check
+name: Build Rust
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
+    tags: ['v*']
   pull_request:
-    branches: [ main ]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  check:
-    runs-on: ubuntu-latest
-
-    name: Run checks
+  macos:
+    name: macOS ARM64
+    runs-on: macos-15
+    timeout-minutes: 60
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install -y libxcb-randr0 libxcb-shape0 libxcb-xinerama0 libxcb-icccm4 libxcb-keysyms1 libxcb-render0 libxkbcommon-x11-0 libxcb-xfixes0
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
 
-    - name: install xvfb
-      run: sudo apt-get update && sudo apt-get install -y xvfb libxcb-cursor0
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gpui-prototype
 
-    - name: Install EGL / OpenGL libs
-      run: sudo apt-get install -y libegl1
+      - name: Prepare Metal toolchain
+        run: |
+          test "$(uname -m)" = arm64
+          if ! xcrun metal --version; then
+            xcodebuild -downloadComponent MetalToolchain
+          fi
 
-    - name: Install ripgrep
-      run: sudo apt-get install -y ripgrep
+      - name: Build and package app
+        run: |
+          python3 gpui-prototype/scripts/package_macos.py
+          lipo -verify_arch arm64 gpui-prototype/dist/MyGit.app/Contents/MacOS/MyGit
+          ditto -c -k --sequesterRsrc --keepParent \
+            gpui-prototype/dist/MyGit.app gpui-prototype/dist/MyGit-macos-arm64.zip
 
-    - name: Set up Python 3.12
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.12'
-        
-    - name: Install Ruff
-      run: pip install ruff
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyGit-macos-arm64
+          path: gpui-prototype/dist/MyGit-macos-arm64.zip
+          if-no-files-found: error
 
-    - name: Install uv
-      run: pip install uv
-      
-    - name: Run check.sh script
-      run: |
-        chmod +x ./check.sh
-        ./check.sh
+  windows:
+    name: Windows x86_64
+    runs-on: windows-2022
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gpui-prototype
+
+      - name: Locate Windows shader compiler
+        run: |
+          $sdkBin = "${env:ProgramFiles(x86)}\Windows Kits\10\bin"
+          $fxc = Get-ChildItem "$sdkBin\*\x64\fxc.exe" |
+            Sort-Object { [version]$_.Directory.Parent.Name } -Descending |
+            Select-Object -First 1
+          if (-not $fxc) { throw "Windows SDK fxc.exe was not found" }
+          "GPUI_FXC_PATH=$($fxc.FullName)" >> $env:GITHUB_ENV
+
+      - name: Build release executable
+        run: cargo build --locked --release --manifest-path gpui-prototype/Cargo.toml --target x86_64-pc-windows-msvc
+
+      - name: Package executable
+        run: |
+          New-Item -ItemType Directory -Force gpui-prototype/dist | Out-Null
+          Copy-Item gpui-prototype/target/x86_64-pc-windows-msvc/release/mygit-gpui.exe gpui-prototype/dist/MyGit.exe
+          Compress-Archive -Path gpui-prototype/dist/MyGit.exe -DestinationPath gpui-prototype/dist/MyGit-windows-x86_64.zip
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyGit-windows-x86_64
+          path: gpui-prototype/dist/MyGit-windows-x86_64.zip
+          if-no-files-found: error

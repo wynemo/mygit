@@ -21,3 +21,12 @@ gpui-prototype/dist/MyGit.app/Contents/MacOS/MyGit /路径/仓库
 已验证 debug 包的 plist、签名及动态依赖：仅链接 macOS 系统库/框架，没有 Python 或开发目录动态库依赖。release 包亦已构建并通过 plist 和签名校验，二进制为 arm64。干净环境及完整启动验收尚待完成，不能据此勾选整个 R06。
 
 界面 SVG 编译嵌入二进制，ICNS 从 `assets/icons/mygit.icns` 复制；构建及运行不依赖旧版根目录 `icons/`。本轮从 `/tmp` 调用脚本生成隔离 debug 包，plist 与签名检查通过；没有将包结构检查当作干净机器启动或本轮新界面的窗口验收。
+
+## GitHub Actions 构建
+
+`Build Rust` 工作流在推送到 `main`、向 `main` 提交 PR、推送 `v*` 标签或手动触发时，使用 Cargo.lock 构建 Rust release，仅生成两个平台的产物：
+
+- `MyGit-macos-arm64`：`MyGit-macos-arm64.zip`，内含带 ad-hoc 签名的 `MyGit.app`。
+- `MyGit-windows-x86_64`：`MyGit-windows-x86_64.zip`，内含 `MyGit.exe`，目标为 `x86_64-pc-windows-msvc`。
+
+在对应 Actions 运行页面的 Artifacts 下载。工作流不自动发布 GitHub Release；运行仍需自行安装 Git、ripgrep 和所选 AI agent CLI。Windows SDK 的 `fxc.exe` 仅用于构建 GPUI shaders，不作为运行依赖分发。
