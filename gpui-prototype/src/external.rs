@@ -33,7 +33,7 @@ pub(crate) fn command(name: &str) -> Command {
 
 #[cfg(target_os = "macos")]
 fn fallback_program(name: &str, path: &[PathBuf], fallback: &[PathBuf]) -> Option<PathBuf> {
-    if !matches!(name, "git" | "rg" | "curl" | "pi" | "claude" | "codex")
+    if !matches!(name, "git" | "curl" | "pi" | "claude" | "codex")
         || path
             .iter()
             .any(|directory| executable(&directory.join(name)))
@@ -74,27 +74,30 @@ mod tests {
         std::fs::create_dir_all(&preferred).unwrap();
         std::fs::create_dir_all(&fallback).unwrap();
         for directory in [&preferred, &fallback] {
-            let tool = directory.join("rg");
+            let tool = directory.join("curl");
             std::fs::write(&tool, b"#!/bin/sh\nprintf fixture-tool\n").unwrap();
             std::fs::set_permissions(&tool, std::fs::Permissions::from_mode(0o700)).unwrap();
         }
         // Explicit PATH tools keep normal subprocess lookup; fallback only handles absence.
         assert!(
             fallback_program(
-                "rg",
+                "curl",
                 std::slice::from_ref(&preferred),
                 std::slice::from_ref(&fallback)
             )
             .is_none()
         );
-        let resolved = fallback_program("rg", &[], std::slice::from_ref(&fallback)).unwrap();
+        let resolved = fallback_program("curl", &[], std::slice::from_ref(&fallback)).unwrap();
         let output = Command::new(resolved).output().unwrap();
         assert!(output.status.success());
         assert_eq!(output.stdout, b"fixture-tool");
         assert!(fallback_program("unrecognized", &[], std::slice::from_ref(&fallback)).is_none());
-        std::fs::set_permissions(fallback.join("rg"), std::fs::Permissions::from_mode(0o600))
-            .unwrap();
-        assert!(fallback_program("rg", &[], std::slice::from_ref(&fallback)).is_none());
+        std::fs::set_permissions(
+            fallback.join("curl"),
+            std::fs::Permissions::from_mode(0o600),
+        )
+        .unwrap();
+        assert!(fallback_program("curl", &[], std::slice::from_ref(&fallback)).is_none());
         std::fs::remove_dir_all(root).unwrap();
     }
 }

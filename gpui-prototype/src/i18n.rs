@@ -768,7 +768,6 @@ pub fn translate(language: Language, value: &str) -> &str {
         "文件内容在搜索后改变，请重新搜索" => {
             "The file changed after searching; search again"
         }
-        "ripgrep 返回无效 JSON" => "ripgrep returned invalid JSON",
         "搜索结果缺少行号" => "Search result is missing the line number",
         "搜索行号超出范围" => "Search line number is out of range",
         "搜索行号必须从 1 开始" => "Search line numbers must start at 1",
@@ -779,10 +778,7 @@ pub fn translate(language: Language, value: &str) -> &str {
         "查询最多 4096 字符，查询与过滤不能含 NUL" => {
             "Queries support up to 4096 characters; queries and filters cannot contain NUL"
         }
-        "项目搜索失败（需要可执行的 ripgrep/rg）" => {
-            "Project search failed (an executable ripgrep/rg is required)"
-        }
-        "ripgrep 搜索失败：{}" => "ripgrep search failed: {}",
+        "ripgrep 搜索失败" => "ripgrep search failed",
         "\n单条搜索输出超过 64 MB，已停止读取" => {
             "\nA search record exceeds 64 MB; reading stopped"
         }

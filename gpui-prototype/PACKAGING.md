@@ -8,7 +8,7 @@ python3 gpui-prototype/scripts/package_macos.py
 
 构建机需要 Python 3.9+、Rust、完整 Xcode 和 Metal Toolchain。脚本使用锁定依赖构建 release，生成 `gpui-prototype/dist/MyGit.app`，包含原生二进制、GPUI 自有 assets 中的项目图标和 Cargo 版本信息，并检查 plist 和 ad-hoc 签名。输出目录已存在时拒绝覆盖；可用 `--output /另一目录/MyGit.app` 指定新路径，`--debug` 用于验证包结构。
 
-应用运行不需要 Python、Rust 或项目源码。需要 Git；项目搜索另需 `rg`，AI 生成另需支持 HTTP/HTTPS 的 `curl`。应用优先使用 PATH 中的程序；macOS 找不到程序时，依次查找 `/opt/homebrew/bin`、`/usr/local/bin`、`/usr/bin` 和 `/bin` 的可执行文件，不修改全局环境。自定义安装位置仍需加入启动环境的 PATH。首次验证也可从终端启动：
+应用运行不需要 Python、Rust 或项目源码。需要 Git；项目搜索内置 ripgrep Rust 库，无需安装 `rg`；AI 生成另需支持 HTTP/HTTPS 的 `curl`。应用优先使用 PATH 中的程序；macOS 找不到程序时，依次查找 `/opt/homebrew/bin`、`/usr/local/bin`、`/usr/bin` 和 `/bin` 的可执行文件，不修改全局环境。自定义安装位置仍需加入启动环境的 PATH。首次验证也可从终端启动：
 
 ```sh
 gpui-prototype/dist/MyGit.app/Contents/MacOS/MyGit /路径/仓库
@@ -29,4 +29,4 @@ gpui-prototype/dist/MyGit.app/Contents/MacOS/MyGit /路径/仓库
 - `MyGit-macos-arm64`：`MyGit-macos-arm64.zip`，内含带 ad-hoc 签名的 `MyGit.app`。
 - `MyGit-windows-x86_64`：`MyGit-windows-x86_64.zip`，内含 `MyGit.exe`，目标为 `x86_64-pc-windows-msvc`。
 
-两个平台构建成功后，工作流自动创建对应版本的 GitHub Release，并上传上述两个 ZIP；重复运行会更新同名附件。可在 GitHub Releases 页面或对应 Actions 运行页面的 Artifacts 下载。运行仍需自行安装 Git、ripgrep 和所选 AI agent CLI。Windows SDK 的 `fxc.exe` 仅用于构建 GPUI shaders，不作为运行依赖分发。
+两个平台构建成功后，工作流自动创建对应版本的 GitHub Release，并上传上述两个 ZIP；重复运行会更新同名附件。可在 GitHub Releases 页面或对应 Actions 运行页面的 Artifacts 下载。运行仍需自行安装 Git 和所选 AI agent CLI。Windows SDK 的 `fxc.exe` 仅用于构建 GPUI shaders，不作为运行依赖分发。

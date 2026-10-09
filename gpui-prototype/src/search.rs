@@ -1,12 +1,16 @@
-//! Bounded ripgrep JSON search over the repository's disk contents.
+//! Bounded in-process ripgrep search over the repository's disk contents.
 use anyhow::{Context, Result, bail};
-use serde_json::Value;
+use grep_matcher::Matcher;
+use grep_regex::{RegexMatcher, RegexMatcherBuilder};
+use grep_searcher::{BinaryDetection, Searcher, SearcherBuilder, Sink, SinkMatch};
+use ignore::{WalkBuilder, overrides::OverrideBuilder};
 use std::{
     collections::BTreeSet,
     hash::{Hash, Hasher},
+    io::{self, Read},
     ops::Range,
     path::Path,
-    time::Duration,
+    time::{Duration, Instant},
 };
 #[derive(Clone, Debug, Default)]
 pub struct Options {
@@ -82,62 +86,38 @@ struct Collector {
     limit: usize,
     preview_bytes: usize,
     files: BTreeSet<String>,
+    deadline: Instant,
 }
 impl Collector {
-    fn consume(&mut self, record: &[u8]) -> Result<bool> {
-        let value: Value =
-            serde_json::from_slice(record).context(crate::i18n::text("ripgrep 返回无效 JSON"))?;
-        if value["type"] != "match" {
-            return Ok(true);
-        }
-        let data = &value["data"];
-        let (Some(path), Some(raw)) = (
-            data["path"]["text"].as_str(),
-            data["lines"]["text"].as_str(),
-        ) else {
+    fn consume(
+        &mut self,
+        path: Option<&str>,
+        line: usize,
+        bytes: &[u8],
+        matcher: &RegexMatcher,
+    ) -> Result<bool> {
+        let (Some(path), Ok(raw)) = (path, std::str::from_utf8(bytes)) else {
             self.results.skipped_encoding += 1;
             return Ok(true);
         };
-        let path = path.strip_prefix("./").unwrap_or(path);
         crate::git::validate_paths(&[path.into()])?;
-        let line = data["line_number"]
-            .as_u64()
-            .context(crate::i18n::text("搜索结果缺少行号"))?;
-        let line = usize::try_from(line).context(crate::i18n::text("搜索行号超出范围"))?;
-        if line == 0 {
-            bail!(crate::localized_format!(
-                "搜索行号必须从 1 开始",
-                "Search line numbers must start at 1"
-            ));
-        }
-        let matches = data["submatches"]
-            .as_array()
-            .context(crate::i18n::text("搜索结果缺少匹配范围"))?;
         let mut ranges = vec![];
-        for found in matches {
-            let start = usize::try_from(
-                found["start"]
-                    .as_u64()
-                    .context(crate::i18n::text("匹配起点无效"))?,
-            )?;
-            let end = usize::try_from(
-                found["end"]
-                    .as_u64()
-                    .context(crate::i18n::text("匹配终点无效"))?,
-            )?;
-            if start > end
-                || end > raw.len()
-                || !raw.is_char_boundary(start)
-                || !raw.is_char_boundary(end)
-            {
-                bail!(crate::localized_format!(
-                    "匹配范围不在 UTF-8 文本边界内",
-                    "Match range is not on UTF-8 text boundaries"
-                ));
+        let mut occurrences = 0;
+        matcher.try_find_iter(raw.strip_suffix('\n').unwrap_or(raw).as_bytes(), |found| {
+            if occurrences % 128 == 0 {
+                check_search(self.deadline)?;
             }
+            occurrences += 1;
             if ranges.len() < 128 {
-                ranges.push(start..end);
+                ranges.push(found.start()..found.end());
             }
+            Ok::<_, anyhow::Error>(true)
+        })??;
+        if ranges
+            .iter()
+            .any(|r| !raw.is_char_boundary(r.start) || !raw.is_char_boundary(r.end))
+        {
+            bail!(crate::i18n::text("匹配范围不在 UTF-8 文本边界内"));
         }
         let display = display_line(raw);
         let mut end = display.len().min(4096);
@@ -155,13 +135,13 @@ impl Collector {
         }
         self.preview_bytes += preview.len();
         self.files.insert(path.into());
-        self.results.occurrences += matches.len();
+        self.results.occurrences += occurrences;
         self.results.hits.push(Hit {
             path: path.into(),
             line,
             preview,
             ranges,
-            occurrences: matches.len(),
+            occurrences,
             line_hash: hash(raw),
             line_length: raw.len(),
         });
@@ -185,86 +165,151 @@ pub fn run_with_limit(root: &Path, options: &Options, limit: usize) -> Result<Re
             "Queries support up to 4096 characters; queries and filters cannot contain NUL"
         ));
     }
-    let mut command = crate::external::command("rg");
-    command.current_dir(root).args([
-        "--no-config",
-        "--json",
-        "--color=never",
-        "--line-number",
-        "--sort=path",
-        "--max-filesize=20M",
-        "--encoding=none",
-    ]);
-    if !options.case_sensitive {
-        command.arg("--ignore-case");
-    } else {
-        command.arg("--case-sensitive");
-    }
-    if !options.regex {
-        command.arg("--fixed-strings");
-    }
-    if options.whole_word {
-        command.arg("--word-regexp");
-    }
-    if options.hidden {
-        command.arg("--hidden");
-    }
+    let matcher = RegexMatcherBuilder::new()
+        .case_insensitive(!options.case_sensitive)
+        .fixed_strings(!options.regex)
+        .word(options.whole_word)
+        .line_terminator(Some(b'\n'))
+        .build_many(&options.query.split('\n').collect::<Vec<_>>())
+        .context(crate::i18n::text("ripgrep 搜索失败"))?;
+    let mut overrides = OverrideBuilder::new(root);
     if !options.include.trim().is_empty() {
-        command.arg(format!("--glob={}", options.include.trim()));
+        overrides.add(options.include.trim())?;
     }
     if !options.exclude.trim().is_empty() {
-        command.arg(format!("--glob=!{}", options.exclude.trim()));
+        overrides.add(&format!("!{}", options.exclude.trim()))?;
     }
-    command
-        .args(["--glob=!**/.git", "--glob=!**/.git/**"])
-        .arg(format!("--regexp={}", options.query))
-        .args(["--", "."]);
+    overrides.add("!**/.git")?.add("!**/.git/**")?;
+    let mut walk = WalkBuilder::new(root);
+    walk.hidden(!options.hidden)
+        .follow_links(false)
+        .max_filesize(Some(20 * 1024 * 1024))
+        .add_custom_ignore_filename(".rgignore")
+        .overrides(overrides.build()?)
+        .sort_by_file_path(|a, b| a.cmp(b));
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let mut searcher = SearcherBuilder::new()
+        .line_number(true)
+        .bom_sniffing(false)
+        .binary_detection(BinaryDetection::quit(0))
+        .build();
     let mut collector = Collector {
         results: Default::default(),
         limit: limit.min(10_000),
         preview_bytes: 0,
         files: Default::default(),
+        deadline,
     };
-    let output = crate::process::lines(
-        &mut command,
-        Duration::from_secs(30),
-        64 * 1024 * 1024,
-        |record| collector.consume(record),
-    )
-    .context(crate::i18n::text("项目搜索失败（需要可执行的 ripgrep/rg）"))?;
-    if !output.stopped && !matches!(output.status.code(), Some(0 | 1)) {
+    for entry in walk.build() {
+        check_search(deadline)?;
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(error) => {
+                return Err(error).context(crate::i18n::text("ripgrep 搜索失败"));
+            }
+        };
+        if let Some(error) = entry.error() {
+            collector.diagnostic(error);
+        }
+        if !entry.file_type().is_some_and(|kind| kind.is_file()) {
+            continue;
+        }
+        let file = match std::fs::File::open(entry.path()) {
+            Ok(file) => file,
+            Err(error) => {
+                return Err(error).context(crate::i18n::text("ripgrep 搜索失败"));
+            }
+        };
+        let path = entry.path().strip_prefix(root)?.to_str();
+        let sink = SearchSink {
+            collector: &mut collector,
+            matcher: &matcher,
+            path,
+            deadline,
+        };
+        // Bound reads as well as traversal: cancellation also works for files with no matches.
+        let reader = CheckedReader {
+            inner: file.take(20 * 1024 * 1024),
+            deadline,
+        };
+        if let Err(error) = searcher.search_reader(&matcher, reader, sink) {
+            check_search(deadline)?;
+            return Err(error).context(crate::i18n::text("ripgrep 搜索失败"));
+        }
+        if collector.results.truncated {
+            break;
+        }
+    }
+    check_search(deadline)?;
+    collector.results.files = collector.files.len();
+    Ok(collector.results)
+}
+fn check_search(deadline: Instant) -> Result<()> {
+    crate::process::check()?;
+    if Instant::now() >= deadline {
         bail!(crate::localized_format!(
-            "ripgrep 搜索失败：{}",
-            "ripgrep search failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
+            "项目搜索超时",
+            "Project search timed out"
         ));
     }
-    collector.results.truncated |= output.stopped;
-    collector.results.files = collector.files.len();
-    collector.results.diagnostic =
-        crate::process::display_diagnostic(String::from_utf8_lossy(&output.stderr).trim().into());
-    if output.record_exceeded {
-        collector
-            .results
-            .diagnostic
-            .push_str(crate::i18n::text("\n单条搜索输出超过 64 MB，已停止读取"));
+    Ok(())
+}
+struct CheckedReader<R> {
+    inner: R,
+    deadline: Instant,
+}
+impl<R: Read> Read for CheckedReader<R> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        check_search(self.deadline).map_err(io::Error::other)?;
+        let length = buf.len().min(64 * 1024);
+        self.inner.read(&mut buf[..length])
     }
-    Ok(collector.results)
+}
+struct SearchSink<'a> {
+    collector: &'a mut Collector,
+    matcher: &'a RegexMatcher,
+    path: Option<&'a str>,
+    deadline: Instant,
+}
+impl Sink for SearchSink<'_> {
+    type Error = io::Error;
+    fn matched(&mut self, _: &Searcher, found: &SinkMatch<'_>) -> io::Result<bool> {
+        check_search(self.deadline).map_err(io::Error::other)?;
+        let line = usize::try_from(found.line_number().unwrap()).map_err(io::Error::other)?;
+        self.collector
+            .consume(self.path, line, found.bytes(), self.matcher)
+            .map_err(io::Error::other)
+    }
+}
+impl Collector {
+    fn diagnostic(&mut self, error: &impl std::fmt::Display) {
+        if self.results.diagnostic.len() < 16_384 {
+            let message = crate::process::display_diagnostic(error.to_string());
+            self.results.diagnostic.push_str(&message);
+            self.results.diagnostic.push('\n');
+        }
+    }
 }
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
-    fn parser_and_location_preserve_raw_unicode_and_reject_stale_or_invalid_offsets() {
+    fn collection_and_location_preserve_raw_unicode_and_reject_stale_offsets() {
         let mut collector = Collector {
             results: Default::default(),
             limit: 2,
             preview_bytes: 0,
             files: Default::default(),
+            deadline: Instant::now() + Duration::from_secs(30),
         };
-        let record = serde_json::json!({"type":"match","data":{"path":{"text":"./中文 文件.rs"},"line_number":2,"lines":{"text":"\t😀 e\u{301}\r\n"},"submatches":[{"start":1,"end":5},{"start":6,"end":7}]}});
+        let matcher = RegexMatcher::new("😀|e").unwrap();
         collector
-            .consume(&serde_json::to_vec(&record).unwrap())
+            .consume(
+                Some("中文 文件.rs"),
+                2,
+                "\t😀 e\u{301}\r\n".as_bytes(),
+                &matcher,
+            )
             .unwrap();
         let hit = &collector.results.hits[0];
         assert_eq!(hit.path, "中文 文件.rs");
@@ -275,18 +320,75 @@ mod tests {
             hit.locate(&crate::text::Document::new("first\nchanged\n"))
                 .is_err()
         );
-        let mut invalid = record.clone();
-        invalid["data"]["submatches"][0]["end"] = 3.into();
-        assert!(
-            collector
-                .consume(&serde_json::to_vec(&invalid).unwrap())
-                .is_err()
-        );
-        let bytes = serde_json::json!({"type":"match","data":{"path":{"bytes":"AA=="},"lines":{"text":"text"}}});
+        collector.consume(None, 1, b"text", &matcher).unwrap();
         collector
-            .consume(&serde_json::to_vec(&bytes).unwrap())
+            .consume(Some("invalid"), 1, b"\xff", &matcher)
             .unwrap();
-        assert_eq!(collector.results.skipped_encoding, 1);
-        assert!(collector.consume(b"not json").is_err());
+        assert_eq!(collector.results.skipped_encoding, 2);
+    }
+    #[test]
+    fn ignore_binary_encoding_size_and_raw_line_offsets() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join(".rgignore"), "ignored.txt\n").unwrap();
+        std::fs::write(root.path().join("ignored.txt"), "needle\n").unwrap();
+        std::fs::write(root.path().join("binary"), b"\0needle\n").unwrap();
+        std::fs::write(root.path().join("invalid"), b"needle\xff\n").unwrap();
+        std::fs::write(root.path().join("a.txt"), "needle\r\nneedle").unwrap();
+        let large = std::fs::File::create(root.path().join("large")).unwrap();
+        large.set_len(20 * 1024 * 1024 + 1).unwrap();
+        let options = Options {
+            query: "needle".into(),
+            ..Default::default()
+        };
+        let results = run(root.path(), &options).unwrap();
+        assert_eq!(results.files, 1);
+        assert_eq!(results.hits.len(), 2);
+        assert_eq!(results.skipped_encoding, 1);
+        assert_eq!(results.hits[0].preview, "needle");
+        let document = crate::text::Document::new("needle\r\nneedle");
+        for hit in &results.hits {
+            assert_eq!(&document.text[hit.locate(&document).unwrap()], "needle");
+        }
+        let anchored = Options {
+            query: "needle$".into(),
+            regex: true,
+            ..Default::default()
+        };
+        let results = run(root.path(), &anchored).unwrap();
+        assert_eq!(results.hits.len(), 1);
+        assert_eq!(results.hits[0].line, 2);
+        assert!(run_with_limit(root.path(), &options, 0).unwrap().truncated);
+    }
+    #[test]
+    fn reader_checks_cancellation_and_deadline_even_without_matches() {
+        let token = crate::process::Cancellation::default();
+        let mut reader = CheckedReader {
+            inner: io::Cursor::new(b"no matches"),
+            deadline: Instant::now() + Duration::from_secs(30),
+        };
+        token.cancel();
+        assert!(crate::process::scope(token, || reader.read(&mut [0; 10])).is_err());
+        reader.deadline = Instant::now();
+        assert!(reader.read(&mut [0; 10]).is_err());
+    }
+    #[test]
+    fn newline_patterns_and_zero_width_unicode_matches_keep_cli_semantics() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("file"), "foo\nbar\n🙂\n").unwrap();
+        let options = Options {
+            query: "foo\nbar".into(),
+            ..Default::default()
+        };
+        let results = run(root.path(), &options).unwrap();
+        assert_eq!(results.hits.len(), 2);
+        let options = Options {
+            query: "^|$".into(),
+            regex: true,
+            ..Default::default()
+        };
+        let results = run(root.path(), &options).unwrap();
+        assert_eq!(results.hits[2].ranges, vec![0..0, 4..4]);
+        let missing = root.path().join("missing");
+        assert!(run(&missing, &options).is_err());
     }
 }
