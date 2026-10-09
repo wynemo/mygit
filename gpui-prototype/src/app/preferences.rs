@@ -38,11 +38,30 @@ impl MyGit {
         cx.notify();
     }
 
+    pub fn open_about(&mut self, cx: &mut Context<Self>) {
+        if self.confirmation.is_some() {
+            return;
+        }
+        self.cancel_settings(cx);
+        self.hide_quick_open();
+        self.show_notifications = false;
+        self.show_recent = false;
+        self.show_branch_dropdown = false;
+        self.show_about = true;
+        self.restore_main_focus = true;
+        cx.notify();
+    }
+    pub fn close_about(&mut self, cx: &mut Context<Self>) {
+        self.show_about = false;
+        self.restore_main_focus = true;
+        cx.notify();
+    }
     pub fn toggle_settings(&mut self, cx: &mut Context<Self>) {
         if self.show_settings {
             self.cancel_settings(cx);
             return;
         }
+        self.show_about = false;
         self.hide_quick_open();
         self.hide_project_search();
         self.settings_form = Some(crate::views::settings_dialog::Draft::new(self, cx));

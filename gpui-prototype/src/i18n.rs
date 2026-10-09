@@ -295,6 +295,8 @@ pub fn translate(language: Language, value: &str) -> &str {
         }
         "请输入查询；没有匹配结果" => "Enter a query; no matches",
         "{}:{} · {} 处" => "{}:{} · {} matches",
+        "关于" => "About",
+        "版本" => "Version",
         "设置" => "Settings",
         "退出" => "Quit",
         "仓库" => "Repository",

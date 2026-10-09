@@ -1,3 +1,4 @@
+pub mod about;
 pub mod blame;
 pub mod branches;
 pub mod commit;

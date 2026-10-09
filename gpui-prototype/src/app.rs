@@ -34,6 +34,7 @@ actions!(
         OpenRepo,
         RefreshRepo,
         ToggleSettings,
+        ShowAbout,
         UndoRestore,
         ToggleCompare,
         CompareSelectedWorktree,
@@ -182,6 +183,7 @@ pub struct MyGit {
     pub active_tab: Option<usize>,
     pub tab_scroll: HashMap<String, UniformListScrollHandle>,
     pub settings: mygit_gpui::settings::Settings,
+    pub show_about: bool,
     pub show_settings: bool,
     pub settings_form: Option<views::settings_dialog::Draft>,
     pub show_recent: bool,
@@ -330,6 +332,7 @@ impl MyGit {
             active_tab: None,
             tab_scroll: HashMap::new(),
             settings,
+            show_about: false,
             show_settings: false,
             settings_form: None,
             show_recent: false,
@@ -1910,6 +1913,10 @@ impl MyGit {
         .detach();
     }
     pub fn cancel_task(&mut self, cx: &mut Context<Self>) {
+        if self.show_about {
+            self.close_about(cx);
+            return;
+        }
         if self.show_settings {
             self.cancel_settings(cx);
             return;
@@ -2076,6 +2083,9 @@ impl MyGit {
         cx.notify();
     }
     pub fn cycle_focus(&mut self, reverse: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.show_about {
+            return;
+        }
         if self.show_settings {
             if let Some(form) = &self.settings_form {
                 let count = form.inputs.len();
@@ -2593,6 +2603,7 @@ impl Render for MyGit {
                     window.focus(&this.branch_focus);
                 }
             }))
+            .on_action(cx.listener(|this, _: &ShowAbout, _, cx| this.open_about(cx)))
             .on_action(cx.listener(|this, _: &ToggleSettings, _, cx| {
                 this.toggle_settings(cx);
             }))
@@ -2793,6 +2804,7 @@ impl Render for MyGit {
             .when(self.show_settings, |s| {
                 s.child(views::settings_dialog::pane(self, window, cx))
             })
+            .when(self.show_about, |s| s.child(views::about::pane(cx)))
             .when(self.confirmation.is_some(), |s| {
                 s.child(views::confirmation(self, cx))
             })

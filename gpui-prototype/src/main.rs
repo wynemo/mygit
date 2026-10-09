@@ -22,6 +22,8 @@ fn main() {
             Menu {
                 name: "MyGit".into(),
                 items: vec![
+                    MenuItem::action(mygit_gpui::i18n::text("关于"), ShowAbout),
+                    MenuItem::separator(),
                     MenuItem::action(mygit_gpui::i18n::text("设置"), ToggleSettings),
                     MenuItem::action(mygit_gpui::i18n::text("通知"), ToggleNotifications),
                     MenuItem::separator(),
