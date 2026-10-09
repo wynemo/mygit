@@ -29,4 +29,4 @@ gpui-prototype/dist/MyGit.app/Contents/MacOS/MyGit /路径/仓库
 - `MyGit-macos-arm64`：`MyGit-macos-arm64.zip`，内含带 ad-hoc 签名的 `MyGit.app`。
 - `MyGit-windows-x86_64`：`MyGit-windows-x86_64.zip`，内含 `MyGit.exe`，目标为 `x86_64-pc-windows-msvc`。
 
-在对应 Actions 运行页面的 Artifacts 下载。工作流不自动发布 GitHub Release；运行仍需自行安装 Git、ripgrep 和所选 AI agent CLI。Windows SDK 的 `fxc.exe` 仅用于构建 GPUI shaders，不作为运行依赖分发。
+两个平台构建成功后，工作流自动创建对应版本的 GitHub Release，并上传上述两个 ZIP；重复运行会更新同名附件。可在 GitHub Releases 页面或对应 Actions 运行页面的 Artifacts 下载。运行仍需自行安装 Git、ripgrep 和所选 AI agent CLI。Windows SDK 的 `fxc.exe` 仅用于构建 GPUI shaders，不作为运行依赖分发。

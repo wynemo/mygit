@@ -52,6 +52,33 @@ jobs:
           path: gpui-prototype/dist/MyGit-macos-arm64.zip
           if-no-files-found: error
 
+  release:
+    name: Publish GitHub Release
+    needs: [macos, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: MyGit-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          test -s dist/MyGit-macos-arm64.zip
+          test -s dist/MyGit-windows-x86_64.zip
+          if ! gh release view "$RELEASE_TAG"; then
+            gh release create "$RELEASE_TAG" --verify-tag --title "$RELEASE_TAG" --generate-notes
+          fi
+          gh release upload "$RELEASE_TAG" dist/MyGit-macos-arm64.zip dist/MyGit-windows-x86_64.zip --clobber
+
   windows:
     name: Windows x86_64
     runs-on: windows-2022
