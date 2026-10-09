@@ -24,7 +24,7 @@ gpui-prototype/dist/MyGit.app/Contents/MacOS/MyGit /路径/仓库
 
 ## GitHub Actions 构建
 
-`Build Rust` 工作流在推送到 `main`、向 `main` 提交 PR、推送 `v*` 标签或手动触发时，使用 Cargo.lock 构建 Rust release，仅生成两个平台的产物：
+`Build Rust` 工作流仅在推送 `v*` 版本标签（例如 `v0.1.0`）时触发，使用 Cargo.lock 构建 Rust release，仅生成两个平台的产物：
 
 - `MyGit-macos-arm64`：`MyGit-macos-arm64.zip`，内含带 ad-hoc 签名的 `MyGit.app`。
 - `MyGit-windows-x86_64`：`MyGit-windows-x86_64.zip`，内含 `MyGit.exe`，目标为 `x86_64-pc-windows-msvc`。
