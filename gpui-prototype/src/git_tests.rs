@@ -2053,57 +2053,6 @@ fn project_search_reports_non_utf8_paths_and_never_follows_directory_links() {
 }
 
 #[test]
-fn ai_staged_diff_uses_index_in_unborn_and_renamed_repositories_and_detects_changes() {
-    let f = Fixture::new();
-    std::fs::write(f.0.join("空 格.txt"), "暂存内容\n").unwrap();
-    git(&f.0, &["add", "--", "空 格.txt"]).unwrap();
-    std::fs::write(f.0.join("空 格.txt"), "磁盘后来内容\n").unwrap();
-    let staged = crate::ai::staged(&f.0).unwrap();
-    assert!(staged.diff.contains("暂存内容"));
-    assert!(!staged.diff.contains("磁盘后来内容"));
-    assert_eq!(staged.fingerprint, crate::ai::fingerprint(&f.0).unwrap());
-    git(&f.0, &["commit", "-m", "initial"]).unwrap();
-    assert_ne!(staged.fingerprint, crate::ai::fingerprint(&f.0).unwrap());
-    assert!(crate::ai::staged(&f.0).is_err());
-    git(&f.0, &["mv", "--", "空 格.txt", "new name.txt"]).unwrap();
-    let renamed = crate::ai::staged(&f.0).unwrap();
-    assert!(renamed.diff.contains("new name.txt"));
-    let before = renamed.fingerprint;
-    git(&f.0, &["add", "--", "new name.txt"]).unwrap();
-    assert_ne!(before, crate::ai::fingerprint(&f.0).unwrap());
-}
-#[test]
-fn ai_staged_diff_rejects_conflicts_and_oversized_payload_without_touching_index() {
-    let f = Fixture::new();
-    std::fs::write(f.0.join("large.txt"), "x".repeat(1_000_100)).unwrap();
-    git(&f.0, &["add", "large.txt"]).unwrap();
-    let before = crate::ai::fingerprint(&f.0).unwrap();
-    assert!(
-        crate::ai::staged(&f.0)
-            .unwrap_err()
-            .to_string()
-            .contains("1 MB")
-    );
-    assert_eq!(before, crate::ai::fingerprint(&f.0).unwrap());
-    git(&f.0, &["commit", "-m", "base"]).unwrap();
-    git(&f.0, &["checkout", "-b", "other"]).unwrap();
-    std::fs::write(f.0.join("large.txt"), "other\n").unwrap();
-    git(&f.0, &["commit", "-am", "other"]).unwrap();
-    git(&f.0, &["checkout", "-"]).unwrap();
-    std::fs::write(f.0.join("large.txt"), "main\n").unwrap();
-    git(&f.0, &["commit", "-am", "main"]).unwrap();
-    assert!(git(&f.0, &["merge", "other"]).is_err());
-    let before = crate::ai::fingerprint(&f.0).unwrap();
-    assert!(
-        crate::ai::staged(&f.0)
-            .unwrap_err()
-            .to_string()
-            .contains("冲突")
-    );
-    assert_eq!(before, crate::ai::fingerprint(&f.0).unwrap());
-}
-
-#[test]
 fn tree_file_restore_uses_head_preserves_index_and_can_recover_new_files() {
     let f = Fixture::new();
     let path = "中文 file.txt";

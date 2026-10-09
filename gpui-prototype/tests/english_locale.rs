@@ -65,10 +65,7 @@ fn english_startup_preserves_repository_data_and_task_semantics() {
         prompt: "打开仓库".into(),
     };
     // Already cancelled: no agent request or child process is started.
-    let error = process::scope(token, || {
-        ai::generate(Path::new("."), &config, "diff fixture")
-    })
-    .unwrap_err();
+    let error = process::scope(token, || ai::generate(Path::new("."), &config)).unwrap_err();
     assert_eq!(error.to_string(), "AI request cancelled");
     assert_eq!(config.prompt, "打开仓库");
     assert!(

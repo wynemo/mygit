@@ -47,7 +47,7 @@ impl MyGit {
         let task = cx.background_executor().spawn(async move {
             mygit_gpui::process::scope(token, || {
                 let config = mygit_gpui::ai::Config::load(&settings)?;
-                mygit_gpui::ai::generate_changes(&root, &config)
+                mygit_gpui::ai::generate(&root, &config)
             })
         });
         cx.spawn(async move |this, cx| {
@@ -58,13 +58,13 @@ impl MyGit {
                 }
                 this.ai.loading = false;
                 match result {
-                    Ok(generated) => {
+                    Ok(message) => {
                         this.ai.message = if editor.read(cx).buffer.marked.is_some()
                             || editor.read(cx).buffer.text() != original
                         {
                             mygit_gpui::i18n::text("生成期间提交信息有修改，请重新生成；当前输入保留").into()
                         } else {
-                            match editor.update(cx, |editor, cx| editor.replace_all(&generated.message, cx)) {
+                            match editor.update(cx, |editor, cx| editor.replace_all(&message, cx)) {
                                 Ok(()) => String::new(),
                                 Err(error) => mygit_gpui::localized_format!(
                                     "无法填入提交信息：{error:#}",
