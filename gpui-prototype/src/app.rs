@@ -2804,7 +2804,7 @@ impl Render for MyGit {
             .when(self.show_settings, |s| {
                 s.child(views::settings_dialog::pane(self, window, cx))
             })
-            .when(self.show_about, |s| s.child(views::about::pane(cx)))
+            .when(self.show_about, |s| s.child(views::about::pane(window, cx)))
             .when(self.confirmation.is_some(), |s| {
                 s.child(views::confirmation(self, cx))
             })
