@@ -2,6 +2,17 @@ use std::process::Command;
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=assets/windows/mygit.rc");
+    println!("cargo:rerun-if-changed=assets/icons/mygit.ico");
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        embed_resource::compile_for(
+            "assets/windows/mygit.rc",
+            ["mygit-gpui"],
+            embed_resource::NONE,
+        )
+        .manifest_required()
+        .expect("Unable to embed the Windows application icon");
+    }
     let output = Command::new("git")
         .args(["rev-parse", "--short=8", "HEAD"])
         .output();

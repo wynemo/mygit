@@ -37,3 +37,6 @@ windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gd
 
 [dev-dependencies]
 resvg = { version = "=0.45.1", default-features = false }
+
+[build-dependencies]
+embed-resource = "=3.0.11"

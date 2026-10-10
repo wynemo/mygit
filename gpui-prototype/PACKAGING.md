@@ -29,4 +29,6 @@ gpui-prototype/dist/MyGit.app/Contents/MacOS/MyGit /路径/仓库
 - `MyGit-macos-arm64`：`MyGit-macos-arm64.zip`，内含带 ad-hoc 签名的 `MyGit.app`。
 - `MyGit-windows-x86_64`：`MyGit-windows-x86_64.zip`，内含 `MyGit.exe`，目标为 `x86_64-pc-windows-msvc`。
 
+Windows 构建将 `assets/icons/mygit.ico` 嵌入 exe 的编号 1 图标资源，供资源管理器和 GPUI 窗口/任务栏使用。ICO 包含 16、24、32、48、64、128 和 256 像素尺寸，复用现有 `mygit.png` 图标。构建需要 Windows SDK 资源编译器；嵌入失败会中止构建，运行时无需附带图标文件。
+
 两个平台构建成功后，工作流自动创建对应版本的 GitHub Release，并上传上述两个 ZIP；重复运行会更新同名附件。可在 GitHub Releases 页面或对应 Actions 运行页面的 Artifacts 下载。运行仍需自行安装 Git 和所选 AI agent CLI。Windows SDK 的 `fxc.exe` 仅用于构建 GPUI shaders，不作为运行依赖分发。
