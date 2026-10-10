@@ -1,5 +1,8 @@
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
+
 mod app;
 mod assets;
+mod startup_window;
 mod tasks;
 mod views;
 use app::*;
@@ -292,14 +295,15 @@ fn main() {
             KeyBinding::new("escape", QuickDismiss, Some("QuickOpen > FileEditor")),
         ]);
         cx.on_window_closed(|cx| cx.quit()).detach();
+        let (display_id, bounds) = startup_window::placement(cx);
         cx.open_window(
             WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
-                    None,
-                    size(px(1400.), px(860.)),
-                    cx,
-                ))),
-                window_min_size: Some(size(px(760.), px(480.))),
+                display_id,
+                window_bounds: Some(WindowBounds::Windowed(bounds)),
+                window_min_size: Some(size(
+                    px(760.).min(bounds.size.width),
+                    px(480.).min(bounds.size.height),
+                )),
                 titlebar: Some(TitlebarOptions {
                     title: Some("MyGit · GPUI Prototype".into()),
                     ..Default::default()

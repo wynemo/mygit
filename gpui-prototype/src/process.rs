@@ -1,5 +1,15 @@
 //! Bounded, cancellable child execution. Each UI job gets its own cancellation scope.
 use anyhow::{Context, Result, bail};
+
+fn hide_console(command: &mut std::process::Command) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
+    #[cfg(not(windows))]
+    let _ = command;
+}
 use std::{
     cell::RefCell,
     io::{BufRead, BufReader, Read, Write},
@@ -126,6 +136,7 @@ fn drain(mut reader: impl Read, progress: Option<Progress>) -> std::io::Result<(
 }
 pub fn output(command: &mut Command, timeout: Duration) -> Result<Output> {
     check()?;
+    hide_console(command);
     command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -231,6 +242,7 @@ pub fn lines_with_input(
     mut consume: impl FnMut(&[u8]) -> Result<bool> + Send,
 ) -> Result<LineOutput> {
     check()?;
+    hide_console(command);
     command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
