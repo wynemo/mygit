@@ -61,14 +61,19 @@ fn windows_placement(cx: &App) -> Option<(Option<DisplayId>, Bounds<Pixels>)> {
     let monitor = unsafe {
         GetCursorPos(&mut cursor).ok()?;
         let monitor = MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST);
-        EnumDisplayMonitors(
+        if !EnumDisplayMonitors(
             None,
             None,
             Some(collect),
             LPARAM(&mut monitors as *mut _ as isize),
         )
-        .ok()?;
-        GetMonitorInfoW(monitor, &mut info).ok()?;
+        .as_bool()
+        {
+            return None;
+        }
+        if !GetMonitorInfoW(monitor, &mut info).as_bool() {
+            return None;
+        }
         monitor
     };
     let index = monitors
