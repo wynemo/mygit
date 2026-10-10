@@ -8,15 +8,15 @@ python3 gpui-prototype/scripts/package_macos.py
 
 构建机需要 Python 3.9+、Rust、完整 Xcode 和 Metal Toolchain。脚本使用锁定依赖构建 release，生成 `gpui-prototype/dist/MyGit.app`，包含原生二进制、GPUI 自有 assets 中的项目图标和 Cargo 版本信息，并检查 plist 和 ad-hoc 签名。输出目录已存在时拒绝覆盖；可用 `--output /另一目录/MyGit.app` 指定新路径，`--debug` 用于验证包结构。
 
-应用运行不需要 Python、Rust 或项目源码。需要 Git；项目搜索内置 ripgrep Rust 库，无需安装 `rg`；AI 生成另需支持 HTTP/HTTPS 的 `curl`。应用优先使用 PATH 中的程序；macOS 找不到程序时，依次查找 `/opt/homebrew/bin`、`/usr/local/bin`、`/usr/bin` 和 `/bin` 的可执行文件，不修改全局环境。自定义安装位置仍需加入启动环境的 PATH。首次验证也可从终端启动：
+应用运行不需要 Python、Rust 或项目源码。需要 Git；项目搜索内置 ripgrep Rust 库，无需安装 `rg`；AI 生成另需安装所选本地 agent CLI（`pi`、`claude` 或 `codex`）并完成登录或配置。应用优先使用 PATH 中的程序；macOS 找不到程序时，依次查找 `/opt/homebrew/bin`、`/usr/local/bin`、`/usr/bin` 和 `/bin` 的可执行文件，不修改全局环境。自定义安装位置仍需加入启动环境的 PATH。首次验证也可从终端启动：
 
 ```sh
 gpui-prototype/dist/MyGit.app/Contents/MacOS/MyGit /路径/仓库
 ```
 
-配置兼容 `~/.git_manager/settings.json`；使用 `MYGIT_CONFIG_DIR=/临时配置目录` 可隔离验收设置。回退仍使用根目录 Python 入口，打包脚本不修改默认入口或旧版配置。
+配置兼容 `~/.git_manager/settings.json`；使用 `MYGIT_CONFIG_DIR=/临时配置目录` 可隔离验收设置。当前维护入口为 Rust + GPUI，根目录 Python/PyQt 版本仅保留作历史参考。
 
-本机 ad-hoc 签名用于本机验证，不等同于 Developer ID 签名或公证；分发前需要独立完成签名、公证及干净机器启动验收。当前只生成宿主机架构，尚无 universal、Windows 或 Linux 安装包。
+本机 ad-hoc 签名用于本机验证，不等同于 Developer ID 签名或公证；分发前需要独立完成签名、公证及干净机器启动验收。本地脚本只生成宿主机架构的 macOS 包，尚无 universal 或 Linux 安装包；Windows 构建由下述 GitHub Actions 工作流提供。
 
 已验证 debug 包的 plist、签名及动态依赖：仅链接 macOS 系统库/框架，没有 Python 或开发目录动态库依赖。release 包亦已构建并通过 plist 和签名校验，二进制为 arm64。干净环境及完整启动验收尚待完成，不能据此勾选整个 R06。
 
