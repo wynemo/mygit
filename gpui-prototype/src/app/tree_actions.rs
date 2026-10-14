@@ -17,6 +17,7 @@ pub enum Action {
     Reveal,
     Blame,
     Restore,
+    AddToGitignore,
 }
 impl Action {
     pub fn label(self) -> &'static str {
@@ -28,6 +29,7 @@ impl Action {
             Self::Reveal => "在文件管理器中显示",
             Self::Blame => "显示 / 隐藏 Blame",
             Self::Restore => "还原到 HEAD",
+            Self::AddToGitignore => "添加到 .gitignore",
         })
     }
 }
@@ -81,6 +83,9 @@ impl MyGit {
             Action::CopyFull,
             Action::Reveal,
         ]);
+        if !self.write_busy && menu.entry.status != "!!" {
+            actions.push(Action::AddToGitignore);
+        }
         if !menu.entry.directory {
             if self
                 .state
@@ -170,6 +175,31 @@ impl MyGit {
             Action::Reveal => cx.reveal_path(&menu.root.join(menu.entry.path)),
             Action::Blame => self.toggle_blame(cx),
             Action::Restore => self.request_tree_restore(menu.entry.path, cx),
+            Action::AddToGitignore => {
+                if self.is_dirty(".gitignore", cx)
+                    || self
+                        .editors
+                        .get(".gitignore")
+                        .is_some_and(|editor| editor.read(cx).buffer.marked.is_some())
+                {
+                    self.notify_result(
+                        mygit_gpui::notifications::Kind::Error,
+                        mygit_gpui::i18n::text("请先保存或关闭 .gitignore 的编辑器修改").into(),
+                        cx,
+                    );
+                    return;
+                }
+                self.run_write(
+                    mygit_gpui::i18n::text("正在添加到 .gitignore…"),
+                    self.state.mode.clone(),
+                    false,
+                    move || {
+                        git::add_to_gitignore(&menu.root, &menu.entry.path, menu.entry.directory)?;
+                        Ok(mygit_gpui::i18n::text("已添加到 .gitignore").into())
+                    },
+                    cx,
+                );
+            }
         }
         cx.notify();
     }

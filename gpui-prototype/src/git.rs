@@ -575,6 +575,62 @@ pub(crate) fn validate_paths(paths: &[String]) -> Result<()> {
     }
     Ok(())
 }
+/// Append an exact, repository-rooted rule without changing existing ignore rules.
+pub fn add_to_gitignore(root: &Path, path: &str, directory: bool) -> Result<()> {
+    use std::io::Write;
+    validate_paths(&[path.to_owned()])?;
+    if path.contains(['\n', '\r']) {
+        bail!(crate::i18n::text("忽略规则不支持换行路径"));
+    }
+    let mut rule = String::from("/");
+    for ch in path.chars() {
+        if matches!(ch, '\\' | '*' | '?' | '[' | ']' | '#' | '!' | ' ') {
+            rule.push('\\');
+        }
+        rule.push(ch);
+    }
+    if directory {
+        rule.push('/');
+    }
+    let ignore = root.join(".gitignore");
+    match std::fs::symlink_metadata(&ignore) {
+        Ok(metadata) if !metadata.file_type().is_file() => {
+            bail!(crate::i18n::text(".gitignore 必须是普通文件"));
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
+    let existing = match std::fs::read(&ignore) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        Err(error) => return Err(error.into()),
+    };
+    if existing
+        .split(|byte| *byte == b'\n')
+        .any(|line| line.strip_suffix(b"\r").unwrap_or(line) == rule.as_bytes())
+    {
+        return Ok(());
+    }
+    let newline = if existing.windows(2).any(|pair| pair == b"\r\n") {
+        "\r\n"
+    } else {
+        "\n"
+    };
+    let mut addition = Vec::new();
+    if !existing.is_empty() && !existing.ends_with(b"\n") {
+        addition.extend_from_slice(newline.as_bytes());
+    }
+    addition.extend_from_slice(rule.as_bytes());
+    addition.extend_from_slice(newline.as_bytes());
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(ignore)?
+        .write_all(&addition)?;
+    Ok(())
+}
+
 pub fn stage(root: &Path, paths: &[String], all: bool) -> Result<()> {
     validate_paths(paths)?;
     if !all && paths.is_empty() {

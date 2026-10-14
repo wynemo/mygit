@@ -232,6 +232,21 @@ fn changes(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                         .map(|position| {
                             let i = order[position];
                             let file = &this.state.files[i];
+                            let menu_entry = mygit_gpui::workspace::Entry {
+                                path: file.path.clone(),
+                                name: std::path::Path::new(&file.path)
+                                    .file_name()
+                                    .unwrap_or_default()
+                                    .to_string_lossy()
+                                    .into_owned(),
+                                directory: this
+                                    .state
+                                    .repo
+                                    .as_ref()
+                                    .is_some_and(|repo| repo.root.join(&file.path).is_dir()),
+                                symlink: false,
+                                status: file.status.clone(),
+                            };
                             let checked = this.file_selection.contains(&file.path);
                             let path = std::path::Path::new(&file.path);
                             let name = path
@@ -307,6 +322,18 @@ fn changes(this: &MyGit, cx: &mut Context<MyGit>) -> impl IntoElement {
                                         .child(file.status.clone()),
                                 )
                                 .cursor_pointer()
+                                .on_mouse_down(
+                                    MouseButton::Right,
+                                    cx.listener(move |this, event: &MouseDownEvent, window, cx| {
+                                        this.show_tree_menu(
+                                            menu_entry.clone(),
+                                            event.position,
+                                            window,
+                                            cx,
+                                        );
+                                        cx.stop_propagation();
+                                    }),
+                                )
                                 .on_click(cx.listener(move |this, _, window, cx| {
                                     window.focus(&this.files_focus);
                                     this.select_file(i, cx);

@@ -2302,3 +2302,54 @@ fn history_checkout_detaches_at_target_and_refuses_conflicting_worktree_changes(
         second
     );
 }
+
+#[test]
+fn gitignore_exact_paths_preserve_rules_and_ignore_directories() {
+    let f = Fixture::new();
+    std::fs::write(f.0.join(".gitignore"), b"# keep\r\nexisting").unwrap();
+    let path = "a [1]*?!# .txt";
+    std::fs::write(f.0.join(path), "content").unwrap();
+    std::fs::write(f.0.join("a 1other.txt"), "content").unwrap();
+    std::fs::create_dir_all(f.0.join("build/sub")).unwrap();
+    std::fs::write(f.0.join("build/sub/file"), "content").unwrap();
+    std::fs::create_dir_all(f.0.join("nested/build")).unwrap();
+    std::fs::write(f.0.join("nested/build/file"), "content").unwrap();
+    add_to_gitignore(&f.0, path, false).unwrap();
+    add_to_gitignore(&f.0, "build", true).unwrap();
+    let content = std::fs::read(f.0.join(".gitignore")).unwrap();
+    assert!(content.starts_with(b"# keep\r\nexisting\r\n"));
+    add_to_gitignore(&f.0, path, false).unwrap();
+    assert_eq!(std::fs::read(f.0.join(".gitignore")).unwrap(), content);
+    let ignored = |path: &str| Command::new("git").arg("-C").arg(&f.0)
+        .args(["check-ignore", "--", path]).output().unwrap().status.success();
+    assert!(ignored(path));
+    assert!(ignored("build/sub/file"));
+    assert!(!ignored("a 1other.txt"));
+    assert!(!ignored("nested/build/file"));
+    assert!(add_to_gitignore(&f.0, "../outside", false).is_err());
+    assert!(add_to_gitignore(&f.0, "line\nbreak", false).is_err());
+    assert_eq!(std::fs::read(f.0.join(".gitignore")).unwrap(), content);
+}
+
+#[test]
+fn gitignore_creates_file_and_preserves_tracked_files() {
+    let f = Fixture::new();
+    std::fs::write(f.0.join("tracked"), "content").unwrap();
+    f.commit();
+    add_to_gitignore(&f.0, "tracked", false).unwrap();
+    assert_eq!(
+        std::fs::read_to_string(f.0.join(".gitignore")).unwrap(),
+        "/tracked\n"
+    );
+    assert!(git(&f.0, &["ls-files", "--error-unmatch", "tracked"]).is_ok());
+}
+
+#[cfg(unix)]
+#[test]
+fn gitignore_refuses_symlink() {
+    let f = Fixture::new();
+    std::fs::write(f.0.join("other"), "keep").unwrap();
+    std::os::unix::fs::symlink("other", f.0.join(".gitignore")).unwrap();
+    assert!(add_to_gitignore(&f.0, "file", false).is_err());
+    assert_eq!(std::fs::read_to_string(f.0.join("other")).unwrap(), "keep");
+}

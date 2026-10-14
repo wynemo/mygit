@@ -62,6 +62,16 @@ pub fn translate(language: Language, value: &str) -> &str {
         "复制完整路径" => "Copy full path",
         "在文件管理器中显示" => "Reveal in file manager",
         "显示 / 隐藏 Blame" => "Show / hide Blame",
+        "添加到 .gitignore" => "Add to .gitignore",
+        "正在添加到 .gitignore…" => "Adding to .gitignore…",
+        "已添加到 .gitignore" => "Added to .gitignore",
+        "请先保存或关闭 .gitignore 的编辑器修改" => {
+            "Save or close edits to .gitignore first"
+        }
+        "忽略规则不支持换行路径" => {
+            "Ignore rules do not support paths containing line breaks"
+        }
+        ".gitignore 必须是普通文件" => ".gitignore must be a regular file",
         "还原到 HEAD" => "Restore from HEAD",
         "正在准备文件还原…" => "Preparing file restore…",
         "将文件拖到此处打开" => "Drop a file here to open it",
